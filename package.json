@@ -1,8 +1,16 @@
 {
-  "name": "disposabl-app",
+  "name": "create-disposabl-app-repo",
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "bun --hot index.js"
+    "dev": "bun --hot cli/templates/default/index.ts",
+    "build": "bun cli/build.ts",
+    "test": "bun test cli",
+    "typecheck": "bun check",
+    "lint": "biome check ."
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.3",
+    "@types/bun": "1.4.4"
   }
 }

@@ -10,17 +10,17 @@
     "directory": "cli"
   },
   "bin": {
-    "create-disposabl-app": "index.js"
+    "create-disposabl-app": "dist/index.js"
   },
-  "files": ["index.js", "LICENSE"],
+  "files": [
+    "dist",
+    "LICENSE"
+  ],
   "engines": {
-    "bun": ">=1.4.4"
+    "node": ">=22"
   },
   "scripts": {
-    "test": "bun test"
-  },
-  "dependencies": {
-    "giget": "3.3.1"
+    "build": "bun build.ts"
   },
   "publishConfig": {
     "access": "public"

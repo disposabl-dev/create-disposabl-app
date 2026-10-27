@@ -1,5 +1,5 @@
 const server = Bun.serve({
-  port: process.env.PORT || 3000,
+  port: process.env.PORT ?? 3000,
   fetch() {
     return new Response("Your Disposabl app is ready.\n");
   },

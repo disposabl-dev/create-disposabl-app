@@ -22,17 +22,30 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
         with:
-          node-version: '24'
+          node-version: "24"
           package-manager-cache: false
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: '1.4.4'
+          bun-version: "1.4.4"
       - run: bun install --frozen-lockfile
-        working-directory: cli
-      - run: bun test
-        working-directory: cli
+      - run: bun run typecheck
+      - run: bun run lint
+      - run: bun run test
       - name: Set next patch version
         working-directory: cli
         run: npm version "0.0.$((GITHUB_RUN_NUMBER + 1))" --no-git-tag-version
-      - run: npm publish --access public
+      - run: bun run build
+      - name: Pack npm artifact
+        id: pack
         working-directory: cli
+        run: |
+          tarball=$(npm pack --ignore-scripts --silent)
+          echo "tarball=$PWD/$tarball" >> "$GITHUB_OUTPUT"
+      - name: Test packed CLI and generated app
+        run: bun cli/smoke.ts "$TARBALL"
+        env:
+          TARBALL: ${{ steps.pack.outputs.tarball }}
+      - name: Publish tested artifact
+        run: npm publish "$TARBALL" --access public
+        env:
+          TARBALL: ${{ steps.pack.outputs.tarball }}
