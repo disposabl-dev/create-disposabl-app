@@ -1,0 +1,38 @@
+name: Publish npm package
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    if: github.repository == 'disposabl-dev/create-disposabl-app'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    concurrency:
+      group: npm-publish
+      cancel-in-progress: false
+      queue: max
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.4'
+      - run: bun install --frozen-lockfile
+        working-directory: cli
+      - run: bun test
+        working-directory: cli
+      - name: Set next patch version
+        working-directory: cli
+        run: npm version "0.0.$((GITHUB_RUN_NUMBER + 1))" --no-git-tag-version
+      - run: npm publish --access public
+        working-directory: cli

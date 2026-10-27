@@ -22,4 +22,6 @@ bun install
 bun test
 ```
 
-Every push to `main` runs the tests and publishes the next patch version through npm trusted publishing. Versions are calculated from npm in CI without a version commit. The local manifest starts at `0.0.1`; npm shows the current published version. No npm token is stored in GitHub.
+Publish the first version, `0.0.1`, locally after `npm login`. Then configure npm trusted publishing for `disposabl-dev/create-disposabl-app` and `publish.yml`.
+
+Every push to `main` runs the tests and publishes through npm trusted publishing. The patch is the workflow run number plus one, starting at `0.0.2`. This keeps versions unique while npm processes earlier uploads. Failed runs leave a version gap; reruns keep the same version. The local manifest stays at `0.0.1`. No npm token is stored in GitHub.
