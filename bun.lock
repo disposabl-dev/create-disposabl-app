@@ -14,7 +14,7 @@
     },
     "cli": {
       "name": "create-disposabl-app",
-      "version": "0.0.3",
+      "version": "0.0.4",
       "bin": {
         "create-disposabl-app": "dist/index.js",
       },
