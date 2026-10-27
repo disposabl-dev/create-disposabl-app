@@ -4,6 +4,14 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "bun --hot index.ts"
+    "dev": "bun --hot index.ts",
+    "lint": "eslint ."
+  },
+  "devDependencies": {
+    "eslint": "catalog:",
+    "@eslint/js": "catalog:",
+    "typescript-eslint": "catalog:",
+    "typescript": "catalog:",
+    "@types/bun": "catalog:"
   }
 }

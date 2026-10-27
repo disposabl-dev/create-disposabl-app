@@ -12,7 +12,7 @@ jobs:
     if: github.repository == 'disposabl-dev/create-disposabl-app'
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       id-token: write
     concurrency:
       group: npm-publish
@@ -20,6 +20,8 @@ jobs:
       queue: max
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v6
         with:
           node-version: "24"
@@ -28,12 +30,12 @@ jobs:
         with:
           bun-version: "1.4.4"
       - run: bun install --frozen-lockfile
+      - name: Prepare semver release
+        id: release
+        run: bun release.ts prepare
+      - run: bun fmt --check
       - run: bun run typecheck
       - run: bun run lint
-      - run: bun run test
-      - name: Set next patch version
-        working-directory: cli
-        run: npm version "0.0.$((GITHUB_RUN_NUMBER + 1))" --no-git-tag-version
       - run: bun run build
       - name: Pack npm artifact
         id: pack
@@ -41,11 +43,9 @@ jobs:
         run: |
           tarball=$(npm pack --ignore-scripts --silent)
           echo "tarball=$PWD/$tarball" >> "$GITHUB_OUTPUT"
-      - name: Test packed CLI and generated app
-        run: bun cli/smoke.ts "$TARBALL"
+      - name: Publish npm package and GitHub Release
+        if: steps.release.outputs.version != ''
+        run: bun release.ts publish "$TARBALL"
         env:
           TARBALL: ${{ steps.pack.outputs.tarball }}
-      - name: Publish tested artifact
-        run: npm publish "$TARBALL" --access public
-        env:
-          TARBALL: ${{ steps.pack.outputs.tarball }}
+          GH_TOKEN: ${{ github.token }}

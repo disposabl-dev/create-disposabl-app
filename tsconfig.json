@@ -10,6 +10,6 @@
     "resolveJsonModule": true,
     "skipLibCheck": true
   },
-  "include": ["cli/**/*.ts"],
+  "include": ["cli/**/*.ts", "release.ts"],
   "exclude": ["cli/dist", "node_modules"]
 }

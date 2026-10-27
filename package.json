@@ -5,12 +5,25 @@
   "scripts": {
     "dev": "bun --hot cli/templates/default/index.ts",
     "build": "bun cli/build.ts",
-    "test": "bun test cli",
     "typecheck": "bun check",
-    "lint": "biome check ."
+    "lint": "eslint --config cli/templates/default/eslint.config.js ."
   },
   "devDependencies": {
-    "@biomejs/biome": "2.6.3",
+    "@types/bun": "catalog:",
+    "@types/prompts": "2.4.9",
+    "@types/semver": "7.8.0",
+    "semver": "7.8.5",
+    "eslint": "catalog:"
+  },
+  "workspaces": [
+    "cli",
+    "cli/templates/default"
+  ],
+  "catalog": {
+    "eslint": "10.13.0",
+    "@eslint/js": "10.0.1",
+    "typescript-eslint": "8.72.1",
+    "typescript": "6.0.3",
     "@types/bun": "1.4.4"
   }
 }
