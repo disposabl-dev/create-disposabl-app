@@ -1,0 +1,28 @@
+{
+  "name": "create-disposabl-app",
+  "version": "0.0.1",
+  "description": "Create a Disposabl app with Bun",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/disposabl-dev/create-disposabl-app.git",
+    "directory": "cli"
+  },
+  "bin": {
+    "create-disposabl-app": "index.js"
+  },
+  "files": ["index.js", "LICENSE"],
+  "engines": {
+    "bun": ">=1.4.4"
+  },
+  "scripts": {
+    "test": "bun test"
+  },
+  "dependencies": {
+    "giget": "3.3.1"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

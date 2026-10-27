@@ -1,0 +1,8 @@
+{
+  "name": "disposabl-app",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --hot index.js"
+  }
+}
