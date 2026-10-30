@@ -1,6 +1,7 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { appendFile, readFile, writeFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import semver from "semver";
 
@@ -11,7 +12,7 @@ type Registry = {
 
 const git = (...args: string[]) =>
   execFileSync("git", args, { encoding: "utf8" }).trim();
-const manifestPath = "cli/package.json";
+const manifestPath = "packages/create-disposabl-app/package.json";
 const manifest = () => Bun.file(manifestPath).json();
 const source = process.env.GITHUB_SHA ?? "";
 const releaseCommit = () =>
@@ -72,15 +73,26 @@ async function prepare() {
     )
       .split("\n")
       .filter(Boolean);
-    const reserved = commits.map(
-      (commit) => JSON.parse(git("show", `${commit}:${manifestPath}`)).version,
-    );
+    const reserved = commits.map((commit) => {
+      // Releases before the workspace migration stored their manifest in cli/.
+      const current = spawnSync("git", ["show", `${commit}:${manifestPath}`], {
+        encoding: "utf8",
+      });
+      return JSON.parse(
+        current.status === 0
+          ? current.stdout
+          : git("show", `${commit}:cli/package.json`),
+      ).version;
+    });
     pkg.version = nextVersion(pkg.version, [
       ...Object.keys(published.versions),
       ...reserved,
     ]);
     await writeFile(manifestPath, `${JSON.stringify(pkg, null, 2)}\n`);
-    execFileSync("bun", ["install", "--lockfile-only"], { stdio: "inherit" });
+    execFileSync("bun", ["install", "--lockfile-only"], {
+      cwd: import.meta.dir,
+      stdio: "inherit",
+    });
   }
   if (process.env.GITHUB_OUTPUT) {
     await appendFile(process.env.GITHUB_OUTPUT, `version=${pkg.version}\n`);
@@ -117,7 +129,7 @@ async function publish(artifact: string) {
       "user.email",
       "41898282+github-actions[bot]@users.noreply.github.com",
     );
-    git("add", manifestPath, "bun.lock");
+    git("add", manifestPath, "packages/create-disposabl-app/bun.lock");
     git(
       "commit",
       "--allow-empty",
@@ -188,6 +200,7 @@ async function publish(artifact: string) {
 }
 
 if (import.meta.main) {
+  process.chdir(resolve(import.meta.dir, "../.."));
   if (!source || process.env.GITHUB_ACTIONS !== "true")
     throw new Error("Run releases through GitHub Actions.");
   if (process.argv[2] === "prepare") await prepare();

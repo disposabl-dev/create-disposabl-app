@@ -11,6 +11,9 @@ jobs:
   publish:
     if: github.repository == 'disposabl-dev/create-disposabl-app'
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/create-disposabl-app
     permissions:
       contents: write
       id-token: write
@@ -36,10 +39,10 @@ jobs:
       - run: bun fmt --check
       - run: bun run typecheck
       - run: bun run lint
+      - run: bun run test
       - run: bun run build
       - name: Pack npm artifact
         id: pack
-        working-directory: cli
         run: |
           tarball=$(npm pack --ignore-scripts --silent)
           echo "tarball=$PWD/$tarball" >> "$GITHUB_OUTPUT"

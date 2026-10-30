@@ -1,0 +1,49 @@
+{
+  "name": "create-disposabl-app",
+  "version": "0.1.0",
+  "description": "Create a Disposabl app",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/disposabl-dev/create-disposabl-app.git",
+    "directory": "packages/create-disposabl-app"
+  },
+  "bin": {
+    "create-disposabl-app": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "packageManager": "bun@1.4.4",
+  "scripts": {
+    "build": "bun build.ts",
+    "typecheck": "bun check",
+    "lint": "eslint .",
+    "test": "bun test tests",
+    "format": "bun fmt"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@clack/core": "1.5.1",
+    "@clack/prompts": "1.8.1",
+    "commander": "15.0.0",
+    "picocolors": "1.1.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/bun": "1.4.4",
+    "@types/semver": "7.8.0",
+    "eslint": "10.13.0",
+    "jiti": "2.7.0",
+    "semver": "7.8.5",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.72.1"
+  }
+}
