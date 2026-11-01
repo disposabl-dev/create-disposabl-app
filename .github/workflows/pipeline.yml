@@ -36,6 +36,14 @@ jobs:
         with:
           bun-version: "1.4.4"
 
+      - name: Cache Turbo tasks
+        uses: actions/cache@v4
+        with:
+          path: .turbo/cache
+          key: turbo-${{ runner.os }}-${{ runner.arch }}-node24-bun1.4.4-${{ github.sha }}
+          restore-keys: |
+            turbo-${{ runner.os }}-${{ runner.arch }}-node24-bun1.4.4-
+
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
@@ -53,6 +61,8 @@ jobs:
         run: bun test --pass-with-no-tests
 
       - name: Build
+        # Trusted branches build once below, with their actual deployment URLs.
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository
         env:
           VITE_CONVEX_URL: https://ci.invalid
           VITE_CONVEX_SITE_URL: https://ci.invalid

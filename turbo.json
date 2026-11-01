@@ -3,57 +3,35 @@
   "ui": "tui",
   "tasks": {
     "build": {
-      "dependsOn": [
-        "^build"
-      ],
-      "inputs": [
-        "$TURBO_DEFAULT$",
-        ".env*"
-      ],
-      "outputs": [
-        "dist/**",
-        ".output/app/**"
-      ],
-      "env": [
-        "VITE_CONVEX_SITE_URL",
-        "VITE_CONVEX_URL"
-      ],
-      "cache": false
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", ".env*"],
+      "outputs": ["dist/**", ".output/app/**"],
+      "env": ["VITE_CONVEX_SITE_URL", "VITE_CONVEX_URL"]
     },
     "lint": {
-      "dependsOn": [
-        "^lint"
-      ]
+      "dependsOn": ["^lint"]
     },
     "format": {
-      "dependsOn": [
-        "^format"
-      ],
+      "dependsOn": ["^format"],
       "cache": false
     },
     "typecheck": {
-      "dependsOn": [
-        "^typecheck"
-      ]
+      "dependsOn": ["^typecheck"]
+    },
+    "@disposabl/web#typecheck": {
+      "dependsOn": ["^typecheck"],
+      "outputs": ["src/routeTree.gen.ts"]
     },
     "@disposabl/backend#dev:setup": {
       "cache": false,
-      "passThroughEnv": [
-        "CONVEX_DEPLOY_KEY"
-      ]
+      "passThroughEnv": ["CONVEX_DEPLOY_KEY"]
     },
     "dev": {
-      "dependsOn": [
-        "@disposabl/backend#dev:setup"
-      ],
+      "dependsOn": ["@disposabl/backend#dev:setup"],
       "cache": false,
       "persistent": true,
-      "passThroughEnv": [
-        "VITE_*"
-      ]
+      "passThroughEnv": ["VITE_*"]
     }
   },
-  "globalDependencies": [
-    "disposabl.json"
-  ]
+  "globalDependencies": ["disposabl.json", "packages/backend/convex/**"]
 }
