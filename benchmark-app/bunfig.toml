@@ -1,0 +1,6 @@
+[fmt]
+ignorePatterns = [
+  "**/routeTree.gen.ts",
+  "**/convex/_generated/**",
+  "**/.agents/**",
+]

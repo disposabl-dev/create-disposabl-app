@@ -1,0 +1,5 @@
+{
+  "version": "0.0.0-development",
+  "platforms": ["web", "android", "ios", "windows", "linux", "macos"],
+  "features": ["authentication"]
+}

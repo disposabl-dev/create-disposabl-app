@@ -1,0 +1,6 @@
+{
+  "routesDirectory": "./src/router",
+  "routeFileIgnorePattern": "__root\\.tsx$",
+  "generatedRouteTree": "./src/routeTree.gen.ts",
+  "virtualRouteConfig": "../../packages/disposabl-kit/client/vite.config.ts"
+}
