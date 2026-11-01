@@ -1,0 +1,90 @@
+import type { ForgeConfig } from '@electron-forge/shared-types';
+import { MakerSquirrel } from '@electron-forge/maker-squirrel';
+import { MakerZIP } from '@electron-forge/maker-zip';
+import { MakerDeb } from '@electron-forge/maker-deb';
+import { MakerRpm } from '@electron-forge/maker-rpm';
+import { VitePlugin } from '@electron-forge/plugin-vite';
+import { FusesPlugin } from '@electron-forge/plugin-fuses';
+import { PublisherGitHub } from '@electron-forge/publisher-github';
+import { FuseV1Options, FuseVersion } from '@electron/fuses';
+
+const config: ForgeConfig = {
+  packagerConfig: {
+    asar: true,
+    // Native bundle metadata needs a numeric version; package.json retains the PR suffix.
+    appVersion: process.env.DESKTOP_VERSION?.split('-')[0],
+    buildVersion: process.env.DESKTOP_VERSION?.split('-')[0],
+    download: {
+      cacheRoot: process.env.electron_config_cache,
+    },
+  },
+  rebuildConfig: {},
+  hooks: {
+    prePackage: async (_config, platform, arch) => {
+      const supported =
+        (platform === 'darwin' && arch === 'arm64') ||
+        ((platform === 'win32' || platform === 'linux') && arch === 'x64');
+
+      if (!supported) {
+        throw new Error(
+          `Unsupported desktop target ${platform}/${arch}. Use Windows x64, Linux x64, or macOS arm64.`,
+        );
+      }
+    },
+  },
+  makers: [
+    new MakerSquirrel({}),
+    new MakerZIP({}, ['darwin']),
+    new MakerRpm({}),
+    new MakerDeb({}),
+  ],
+  publishers: [
+    new PublisherGitHub({
+      repository: {
+        owner: 'disposabl-dev',
+        name: 'create-disposabl-app',
+      },
+      tagPrefix: 'desktop-v',
+      draft: true,
+      prerelease: false,
+    }),
+  ],
+  plugins: [
+    new VitePlugin({
+      // `build` can specify multiple entry builds, which can be Main process, Preload scripts, Worker process, etc.
+      // If you are familiar with Vite configuration, it will look really familiar.
+      build: [
+        {
+          // `entry` is just an alias for `build.lib.entry` in the corresponding file of `config`.
+          entry: 'src/main.ts',
+          config: 'vite.main.config.mts',
+          target: 'main',
+        },
+        {
+          entry: 'src/preload.ts',
+          config: 'vite.preload.config.mts',
+          target: 'preload',
+        },
+      ],
+      renderer: [
+        {
+          name: 'main_window',
+          config: 'vite.renderer.config.mts',
+        },
+      ],
+    }),
+    // Fuses are used to enable/disable various Electron functionality
+    // at package time, before code signing the application
+    new FusesPlugin({
+      version: FuseVersion.V1,
+      [FuseV1Options.RunAsNode]: false,
+      [FuseV1Options.EnableCookieEncryption]: true,
+      [FuseV1Options.EnableNodeOptionsEnvironmentVariable]: false,
+      [FuseV1Options.EnableNodeCliInspectArguments]: false,
+      [FuseV1Options.EnableEmbeddedAsarIntegrityValidation]: true,
+      [FuseV1Options.OnlyLoadAppFromAsar]: true,
+    }),
+  ],
+};
+
+export default config;

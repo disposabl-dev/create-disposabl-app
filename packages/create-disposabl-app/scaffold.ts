@@ -9,7 +9,11 @@ import {
 } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { selectedFolders, type DisposablConfig } from "./options";
+import {
+  selectedFolders,
+  selectFeatures,
+  type DisposablConfig,
+} from "./options";
 
 export async function createProject(
   template: string,
@@ -17,6 +21,10 @@ export async function createProject(
   name: string,
   config: DisposablConfig,
 ) {
+  config = {
+    ...config,
+    features: selectFeatures(config.features.join(",") || "none"),
+  };
   const folders = selectedFolders(config);
   for (const folder of folders) {
     if (!existsSync(join(template, folder, "package.json"))) {

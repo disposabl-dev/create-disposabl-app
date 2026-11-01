@@ -54,12 +54,13 @@ export const features = [
   {
     id: "authentication",
     label: "Authentication",
-    hint: "Record selection only",
+    hint: "Always included",
   },
 ] as const;
 
 export type Platform = (typeof platforms)[number]["id"];
 export type Feature = (typeof features)[number]["id"];
+export const requiredFeatures: readonly Feature[] = ["authentication"];
 export type DisposablConfig = {
   version: string;
   platforms: Platform[];
@@ -93,8 +94,7 @@ export function selectPlatforms(input = "web"): Platform[] {
 }
 
 export function selectFeatures(input = "none"): Feature[] {
-  if (input === "none") return [];
-  const requested = parseList(input);
+  const requested = input === "none" ? [] : parseList(input);
   for (const id of requested) {
     if (!features.some((feature) => feature.id === id)) {
       throw new Error(
@@ -105,7 +105,10 @@ export function selectFeatures(input = "none"): Feature[] {
     }
   }
   return features
-    .filter((option) => requested.includes(option.id))
+    .filter(
+      (option) =>
+        requiredFeatures.includes(option.id) || requested.includes(option.id),
+    )
     .map((option) => option.id);
 }
 

@@ -30,10 +30,16 @@ await cp(join(root, "LICENSE"), join(dir, "LICENSE"));
           ".turbo",
           ".expo",
           ".vite",
+          ".output",
+          ".tanstack",
+          ".nitro",
+          ".vinxi",
+          ".convex",
           ".DS_Store",
         ].includes(basename(path)) &&
         path !== dir &&
         !basename(path).endsWith(".tgz") &&
+        !basename(path).endsWith(".tsbuildinfo") &&
         (basename(path) === ".env.example" ||
           !/^\.env(?:\.|$)/.test(basename(path))),
     });

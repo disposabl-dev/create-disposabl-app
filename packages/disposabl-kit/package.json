@@ -1,0 +1,60 @@
+{
+  "name": "@disposabl/disposabl-kit",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "lint": "eslint",
+    "format": "prettier --write \"**/*.{ts,tsx}\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@base-ui/react": "^1.9.0",
+    "@fontsource-variable/inter": "^5.3.0",
+    "@shadcn/react": "^0.3.1",
+    "class-variance-authority": "^0.7.1",
+    "cmdk": "^1.1.1",
+    "cn": "^0.5.0",
+    "date-fns": "^4.4.0",
+    "embla-carousel-react": "^8.6.0",
+    "input-otp": "^1.5.0",
+    "lucide-react": "catalog:",
+    "react": "catalog:",
+    "react-day-picker": "^10.0.2",
+    "react-dom": "catalog:",
+    "react-resizable-panels": "^4.15.0",
+    "recharts": "3.8.0",
+    "shadcn": "^4.22.1",
+    "shiki": "^4.5.0",
+    "tw-animate-css": "^1.4.0",
+    "zod": "^4.6.7",
+    "convex": "catalog:",
+    "@convex-dev/auth": "catalog:",
+    "@convex-dev/mcp": "catalog:",
+    "@convex-dev/static-hosting": "catalog:",
+    "@tanstack/react-router": "latest"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4",
+    "@tanstack/eslint-config": "latest",
+    "@turbo/gen": "^2.11.10",
+    "@types/node": "^22",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^10",
+    "tailwindcss": "^4",
+    "typescript": "^6.0.2",
+    "@tanstack/virtual-file-routes": "^1.162.0",
+    "vite": "^8"
+  },
+  "exports": {
+    "./client/styles/globals.css": "./client/styles/globals.css",
+    "./client/lib/*": "./client/lib/*.ts",
+    "./client/components/ui/*": "./client/components/ui/*.tsx",
+    "./client/hooks/*": "./client/hooks/*.ts",
+    "./server/http": "./server/http.ts",
+    "./server/lib/functions": "./server/lib/functions.ts",
+    "./server/lib/static-routes": "./server/lib/static-routes.ts",
+    "./client/vite.config": "./client/vite.config.ts"
+  }
+}

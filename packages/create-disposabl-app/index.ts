@@ -10,6 +10,7 @@ import {
   features,
   platformDependencies,
   platforms,
+  requiredFeatures,
   selectedFolders,
   selectFeatures,
   selectPlatforms,
@@ -30,7 +31,9 @@ type Options = {
 };
 const jsonOutput = process.argv.slice(2).includes("--json");
 const program = new Command("create-disposabl-app")
-  .description("Create an empty Disposabl starter. Web is always included.")
+  .description(
+    "Create a Disposabl starter. Web and authentication are always included.",
+  )
   .version(version, "-v, --version")
   .argument("[appname]", "App name and new directory")
   .option(
@@ -39,9 +42,12 @@ const program = new Command("create-disposabl-app")
   )
   .option(
     "--features <ids>",
-    "Comma-separated feature IDs, or none (default: none)",
+    "Comma-separated optional feature IDs, or none; authentication is always included",
   )
-  .option("-y, --yes", "Skip prompts; default to Web only and no features")
+  .option(
+    "-y, --yes",
+    "Skip prompts; include Web and authentication, with no optional features",
+  )
   .option("--skip-install", "Create files without running bun install")
   .option(
     "--list-options",
@@ -54,7 +60,7 @@ const program = new Command("create-disposabl-app")
   .helpOption("-h, --help")
   .addHelpText(
     "after",
-    "\nPlatforms:\n  web (required), android, ios, windows, linux, macos, mcp,\n  openai-plugin, claude-code-plugin\n  Either plugin automatically includes MCP.\n  Disabled: api, cli, python-sdk, typescript-sdk\n\nFeatures:\n  docs, blog, changelog, authentication\n  Authentication currently records a selection only.\n\nExamples:\n  bun create disposabl-app@latest\n  bun create disposabl-app@latest my-app --yes\n  bun create disposabl-app@latest my-app --platforms web,android,ios,mcp --features docs,authentication --yes\n  bun create disposabl-app@latest my-app --platforms web --features none --skip-install --json\n  bun create disposabl-app@latest --list-options --json\n\nWithout a TTY, the CLI never prompts. Supply an app name.\nPlatform and feature choices are saved in disposabl.json.\nApp folders contain empty package.json files. No appId or Convex deployment is created.\n",
+    "\nPlatforms:\n  web (required), android, ios, windows, linux, macos, mcp,\n  openai-plugin, claude-code-plugin\n  Either plugin automatically includes MCP.\n  Disabled: api, cli, python-sdk, typescript-sdk\n\nOptional features:\n  docs, blog, changelog\n  Authentication is always included, including with --features none.\n\nExamples:\n  bun create disposabl-app@latest\n  bun create disposabl-app@latest my-app --yes\n  bun create disposabl-app@latest my-app --platforms web,android,ios,mcp --features docs --yes\n  bun create disposabl-app@latest my-app --platforms web --features none --skip-install --json\n  bun create disposabl-app@latest --list-options --json\n\nWithout a TTY, the CLI never prompts. Supply an app name.\nPlatform and feature choices are saved in disposabl.json.\nThe starter includes web and backend authentication code. No appId or Convex deployment is created.\n",
   )
   .configureOutput({ writeErr: () => {} })
   .exitOverride();
@@ -74,7 +80,8 @@ function showOptions(json: boolean) {
           platforms,
           platformDependencies,
           features,
-          defaults: { platforms: ["web"], features: [] },
+          requiredFeatures,
+          defaults: { platforms: ["web"], features: selectFeatures() },
           folders: {
             web: "apps/web",
             android: "apps/mobile",
@@ -86,12 +93,7 @@ function showOptions(json: boolean) {
             blog: "apps/blog",
             changelog: "apps/changelog",
           },
-          configOnly: [
-            "mcp",
-            "openai-plugin",
-            "claude-code-plugin",
-            "authentication",
-          ],
+          configOnly: ["mcp", "openai-plugin", "claude-code-plugin"],
         },
         null,
         2,
@@ -111,7 +113,7 @@ function showOptions(json: boolean) {
   for (const option of features)
     console.log("  " + option.id.padEnd(21) + option.hint);
   console.log(
-    "\nDefaults: Web only; no features. Use --platforms and --features with the IDs above.",
+    "\nWeb and authentication are always included. No optional features are selected by default. Use --platforms and --features with the IDs above.",
   );
 }
 
@@ -197,12 +199,14 @@ async function main() {
   if (interactive && options.features === undefined) {
     const selected = answer(
       await p.multiselect({
-        message: "Choose features (optional)",
-        options: features.map((feature) => ({
-          value: feature.id,
-          label: feature.label,
-          hint: feature.hint,
-        })),
+        message: "Choose optional features (authentication is always included)",
+        options: features
+          .filter((feature) => !requiredFeatures.includes(feature.id))
+          .map((feature) => ({
+            value: feature.id,
+            label: feature.label,
+            hint: feature.hint,
+          })),
         required: false,
       }),
     );

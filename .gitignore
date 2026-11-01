@@ -1,0 +1,14 @@
+node_modules/
+.env
+.env.*
+!.env.example
+dist/
+.output/
+.expo/
+.DS_Store
+
+.turbo/
+.tanstack/
+.nitro/
+.vinxi/
+*.tsbuildinfo

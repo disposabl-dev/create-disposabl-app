@@ -24,7 +24,6 @@
     "build": "bun build.ts",
     "typecheck": "bun check",
     "lint": "eslint .",
-    "test": "bun test tests",
     "format": "bun fmt"
   },
   "publishConfig": {

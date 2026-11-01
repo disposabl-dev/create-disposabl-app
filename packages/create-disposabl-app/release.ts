@@ -129,7 +129,7 @@ async function publish(artifact: string) {
       "user.email",
       "41898282+github-actions[bot]@users.noreply.github.com",
     );
-    git("add", manifestPath, "packages/create-disposabl-app/bun.lock");
+    git("add", manifestPath, "bun.lock");
     git(
       "commit",
       "--allow-empty",
