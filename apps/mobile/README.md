@@ -104,9 +104,8 @@ the distribution workflow.
 When iOS is enabled and affected, the Web + Android runner checks the latest
 published iOS release for the same channel, project, bundle ID and runtime.
 A matching IPA with a verified GitHub digest and unexpired provisioning profile
-uses EAS Update. Otherwise, when `IOS_BUILD_ENABLED=true`, a Blacksmith macOS runner
-performs an EAS local release build using the remote signing credentials, then
-publishes its own iOS release.
+uses EAS Update. Otherwise a Blacksmith macOS runner performs an EAS local release
+build using the remote signing credentials, then publishes its own iOS release.
 That runner starts only when a new IPA is needed, after Web + Android finishes.
 
 Each PR needs its own initial IPA because its channel is embedded in the app.
@@ -117,10 +116,7 @@ Update. Local builds are tracked by their GitHub release metadata, not EAS cloud
 build history. Native builds take longer than the update-only path.
 
 Internal distribution needs Apple signing credentials and registered devices.
-After configuring the project's EAS ad hoc credentials, set the GitHub repository
-variable `IOS_BUILD_ENABLED=true`. Until then, CI reports the missing initial IPA
-and avoids allocating a macOS runner that cannot sign it.
-After adding test devices, refresh the EAS ad hoc profile and bump the repository
-variable `IOS_BUILD_REVISION` to rebuild existing PR IPAs even if native code is unchanged.
+CI uses the project's EAS ad hoc credentials automatically. Missing or invalid
+credentials fail the iOS build instead of silently skipping it.
 It does not require TestFlight or an App Store Connect app record. TestFlight is
 a separate distribution option. The pipeline never submits to the App Store.

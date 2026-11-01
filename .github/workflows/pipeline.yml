@@ -15,8 +15,6 @@ env:
   DISPOSABL_MOBILE_CHANNEL: *channel
   EAS_ENVIRONMENT: ${{ github.event_name == 'push' && 'production' || 'preview' }}
   EAS_CLI: eas-cli@27.2.0
-  IOS_BUILD_ENABLED: ${{ vars.IOS_BUILD_ENABLED || 'false' }}
-  IOS_BUILD_REVISION: ${{ vars.IOS_BUILD_REVISION || '1' }}
   BUN_VERSION: &bun-version '1.4.4'
   NODE_VERSION: &node-version '24'
   LINUX_RUNNER: &linux-runner blacksmith-4vcpu-ubuntu-2404
@@ -137,7 +135,7 @@ jobs:
               // Web and mobile use the same backend from this deployment.
               if (/^CONVEX_(URL|SITE_URL)$/.test(key) && value !== process.env[key]) throw new Error(`EAS overrides the deployed backend: ${key}`);
               if (/^(EXPO_PUBLIC_|VITE_)?CONVEX_(URL|SITE_URL)$/.test(key)) continue;
-              if (/^(GITHUB_|RUNNER_|GH_|DISPOSABL_|BUN_|IOS_BUILD_|CI$|NODE_OPTIONS$|PATH$|HOME$|SOURCE(_PATH)?$|CHANNEL$|PLATFORM$|RELEASE_PREFIX$|MACOS_|EAS_(ENVIRONMENT|CLI)$|EXPO_(TOKEN|PROJECT_ID|OWNER|SLUG|NO_DOTENV)$)/.test(key)) throw new Error(`Reserved EAS variable: ${key}`);
+              if (/^(GITHUB_|RUNNER_|GH_|DISPOSABL_|BUN_|CI$|NODE_OPTIONS$|PATH$|HOME$|SOURCE(_PATH)?$|CHANNEL$|PLATFORM$|RELEASE_PREFIX$|MACOS_|EAS_(ENVIRONMENT|CLI)$|EXPO_(TOKEN|PROJECT_ID|OWNER|SLUG|NO_DOTENV)$)/.test(key)) throw new Error(`Reserved EAS variable: ${key}`);
               const delimiter = crypto.randomUUID();
               appendFileSync(process.env.GITHUB_ENV, `${key}<<${delimiter}\n${value}\n${delimiter}\n`);
             }
@@ -204,14 +202,14 @@ jobs:
           gh api "repos/$GH_REPO/releases?per_page=100" --paginate --slurp | jq --arg tag "$RELEASE_PREFIX-$CHANNEL-ios" 'add | map(select(.draft | not) | select(.tag_name == $tag or (.tag_name | startswith($tag + "-")))) | .[0] // {}' > "$RUNNER_TEMP/ios-release.json"
           RUNTIME="$fingerprint" bun -e '
             const config = await Bun.file(`${process.env.RUNNER_TEMP}/ios-config.json`).json();
-            const wanted = {channel: process.env.CHANNEL, projectId: config.extra.eas.projectId, applicationId: config.ios.bundleIdentifier, runtimeVersion: process.env.RUNTIME, provisioningRevision: process.env.IOS_BUILD_REVISION};
+            const wanted = {channel: process.env.CHANNEL, projectId: config.extra.eas.projectId, applicationId: config.ios.bundleIdentifier, runtimeVersion: process.env.RUNTIME};
             const release = await Bun.file(`${process.env.RUNNER_TEMP}/ios-release.json`).json();
             const prior = JSON.parse(/<!-- ios (\{[^\n]+\}) -->/.exec(release.body || "")?.[1] || "null");
             const reusable = prior && Object.keys(wanted).every(k => prior[k] === wanted[k]) && Date.parse(prior.expiresAt) > Date.now() && /^[a-f0-9]{64}$/.test(prior.sha256 || "") && release.assets.some(a => a.name === "ios.ipa" && a.state === "uploaded" && a.size > 0 && a.digest === `sha256:${prior.sha256}`);
             await Bun.write(`${process.env.RUNNER_TEMP}/ios-build`, String(!reusable));
             console.log(`build=${!reusable}\nmanifest=${JSON.stringify(wanted)}`);
           ' >> "$GITHUB_OUTPUT"
-          if [[ $(cat "$RUNNER_TEMP/ios-build") == true ]]; then echo "iOS needs a new signed IPA. Native builds enabled: $IOS_BUILD_ENABLED. Enable IOS_BUILD_ENABLED after configuring EAS ad hoc credentials." >> "$GITHUB_STEP_SUMMARY"; exit 0; fi
+          if [[ $(cat "$RUNNER_TEMP/ios-build") == true ]]; then echo "iOS needs a new signed IPA; the iOS job will build it." >> "$GITHUB_STEP_SUMMARY"; exit 0; fi
           bun x --no-install expo export --platform ios --output-dir dist/update-ios
           test "$(runtime)" = "$fingerprint"
           test "$(gh api "repos/$GH_REPO/$SOURCE_PATH" --jq 'if has("head") then (if .state == "open" then .head.sha else "closed" end) else .object.sha end')" = "$SOURCE"
@@ -298,7 +296,7 @@ jobs:
   ios:
     name: iOS
     needs: web
-    if: needs.web.outputs.ios_build == 'true' && vars.IOS_BUILD_ENABLED == 'true'
+    if: needs.web.outputs.ios_build == 'true'
     permissions: *release-permissions
     runs-on: *macos-runner
     timeout-minutes: 60
