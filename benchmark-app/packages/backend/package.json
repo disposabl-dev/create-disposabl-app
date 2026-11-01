@@ -1,0 +1,37 @@
+{
+  "name": "@disposabl/backend",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "dev:setup": "bun --no-env-file ../disposabl-kit/server/dev-setup.mjs",
+    "dev": "convex dev",
+    "logs": "convex logs",
+    "typecheck": "tsc -p convex",
+    "lint": "bun run typecheck && eslint . --report-unused-disable-directives --max-warnings 0",
+    "format": "prettier --write 'convex/**/*.ts'"
+  },
+  "dependencies": {
+    "@boatdev/convex": "^0.1.0",
+    "@convex-dev/auth": "catalog:",
+    "@convex-dev/mcp": "catalog:",
+    "@convex-dev/static-hosting": "catalog:",
+    "@convex-dev/workflow": "^0.4.10",
+    "@disposabl/disposabl-kit": "workspace:*",
+    "@octokit/rest": "^22.0.1",
+    "@vercel/connect": "^2.5.2",
+    "convex": "catalog:",
+    "libsodium-wrappers": "^0.8.4"
+  },
+  "devDependencies": {
+    "@convex-dev/eslint-plugin": "^5.0.0",
+    "@eslint/eslintrc": "^3.3.6",
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^24.13.3",
+    "@typescript-eslint/eslint-plugin": "^8.66.0",
+    "@typescript-eslint/parser": "^8.66.0",
+    "@typescript/native": "npm:typescript@^7.0.2",
+    "eslint": "^10.8.0",
+    "globals": "^17.9.0",
+    "typescript": "npm:@typescript/typescript6@^6.0.2"
+  }
+}

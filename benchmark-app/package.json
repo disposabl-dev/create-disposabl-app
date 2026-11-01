@@ -1,0 +1,38 @@
+{
+  "name": "app",
+  "private": true,
+  "scripts": {
+    "build": "turbo build",
+    "dev": "turbo dev",
+    "lint": "turbo lint",
+    "format": "turbo format",
+    "typecheck": "turbo typecheck"
+  },
+  "devDependencies": {
+    "prettier": "^3.9.10",
+    "prettier-plugin-tailwindcss": "^0.8.1",
+    "turbo": "^2.11.10",
+    "typescript": "^6.0.2"
+  },
+  "packageManager": "bun@1.4.4",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "catalog": {
+    "@convex-dev/auth": "2.0.0-beta.0",
+    "convex": "^1.44.0",
+    "lucide-react": "^1.61.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "@convex-dev/mcp": "0.1.0-alpha.0",
+    "@convex-dev/static-hosting": "0.2.1"
+  },
+  "patchedDependencies": {
+    "@convex-dev/auth@2.0.0-beta.0": "patches/@convex-dev%2Fauth@2.0.0-beta.0.patch",
+    "@convex-dev/static-hosting@0.2.1": "patches/@convex-dev%2Fstatic-hosting@0.2.1.patch"
+  }
+}
