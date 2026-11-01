@@ -238,10 +238,9 @@ async function main() {
   try {
     if (spawnSync("git", ["--version"], { stdio: "ignore" }).status !== 0)
       throw new Error("Install Git first to create the app's initial commit.");
-    if (
-      !options.skipInstall &&
-      spawnSync("bun", ["--version"], { stdio: "ignore" }).status !== 0
-    )
+    const hasBun =
+      spawnSync("bun", ["--version"], { stdio: "ignore" }).status === 0;
+    if (!options.skipInstall && !hasBun)
       throw new Error(
         "Install Bun first, or pass --skip-install to create the files only.",
       );
@@ -254,6 +253,7 @@ async function main() {
       setup?.installing();
       await install(directory, Boolean(setup?.live));
     }
+    if (hasBun) execFileSync("bun", ["fmt"], { cwd: directory, stdio: "pipe" });
     setup?.finish({
       installation: options.skipInstall ? "Skipped" : "Complete",
     });
