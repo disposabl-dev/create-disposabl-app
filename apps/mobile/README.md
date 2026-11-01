@@ -50,11 +50,11 @@ Set these GitHub repository variables to the project returned by the CLI:
 Add an Expo access token as the `EXPO_TOKEN` GitHub secret. CI loads the EAS
 `preview` environment for PRs, and `production` for `main`.
 The backend deployment supplies the same URLs to web and mobile:
-`VITE_CONVEX_URL` becomes `EXPO_PUBLIC_CONVEX_URL`, and
-`VITE_CONVEX_SITE_URL` becomes `EXPO_PUBLIC_CONVEX_SITE_URL`. CI writes the mobile
-values to `GITHUB_ENV` for fingerprinting, APK builds and EAS Update exports.
-Saved EAS values for these two names are ignored when loading the environment;
-each PR uses its own deployed backend rather than a shared static URL.
+`CONVEX_URL` is the client API origin and `CONVEX_SITE_URL` is the HTTP/auth origin.
+CI exports this pair once, generating the `VITE_` and `EXPO_PUBLIC_` aliases
+for web builds, mobile fingerprinting, APK builds and EAS Update exports.
+Turbo includes the web aliases in build cache keys. Saved EAS aliases are ignored;
+conflicting canonical URLs fail the build. Each PR uses its own deployed backend.
 EAS variables with secret visibility are not available to this local build or
 update flow; native secrets must be supplied through GitHub Actions.
 
@@ -63,17 +63,13 @@ update flow; native secrets must be supplied through GitHub Actions.
 Install Java 17 and the Android SDK, set `JAVA_HOME` and `ANDROID_HOME`, then:
 
 ```sh
-DISPOSABL_ANDROID_CHANNEL=development bun run build:android
+DISPOSABL_MOBILE_CHANNEL=development bunx expo run:android --variant release
 ```
 
-The output is `dist/android/app.apk`. It is a release-mode build with its
-JavaScript bundled, so it runs without Metro. Preview APKs use Expo's public
-debug signing key and a separate application ID. The build checks the runtime
-fingerprint embedded in the APK before accepting it.
-
-For a faster local emulator check, set
-`DISPOSABL_ANDROID_ARCHITECTURES=arm64-v8a` on an ARM emulator, or `x86_64` on an
-Intel emulator. CI leaves this unset to build the template's default ABIs.
+This is a release-mode build with its JavaScript bundled, so it runs without
+Metro. Preview APKs use Expo's public debug signing key and a separate application
+ID. CI's prebuild, Gradle build, caching and embedded fingerprint checks live
+directly in `.github/workflows/pipeline.yml`; there is no Android build helper.
 
 ## Production
 
@@ -105,27 +101,26 @@ the distribution workflow.
 
 ## iOS
 
-When iOS is enabled and affected, the Web runner computes its fingerprint. EAS
-Update runs only when the latest finished internal build for that channel and
-bundle ID is a real-device IPA with the same runtime and an unexpired build.
-Otherwise CI reports that a new IPA is needed and continues without an iOS build.
-A matching EAS build is not proof that the app is installed or signing remains valid.
+When iOS is enabled and affected, the Web + Android runner checks the latest
+published iOS release for the same channel, project, bundle ID and runtime.
+A matching IPA with a verified GitHub digest and unexpired provisioning profile
+uses EAS Update. Otherwise, when `IOS_BUILD_ENABLED=true`, a Blacksmith macOS runner
+performs an EAS local release build using the remote signing credentials, then
+publishes its own iOS release.
+That runner starts only when a new IPA is needed, after Web + Android finishes.
 
 Each PR needs its own initial IPA because its channel is embedded in the app.
-For the initial signed build, set `build.ios-preview.channel` in `eas.json` to the
-same preview name used by CI, for example `pr-2`. Use the same Expo project and
-preview backend URLs as CI, then run from `apps/mobile`:
-
-```bash
-bunx eas-cli@27.2.0 build --platform ios --profile ios-preview
-```
-
-This is an explicit manual EAS cloud build, separate from the Blacksmith preview
-workflow. EAS records its runtime and channel so CI can find it. A local IPA is
-not automatically registered in EAS build history. Install the initial IPA on a
-registered iPhone; subsequent compatible changes use EAS Update. Native changes
-require another manual IPA. No channel-picker UI is added.
+CI sets the EAS profile channel from the workflow's `CHANNEL`, verifies the IPA's
+signature, bundle ID, embedded runtime and channel, and records its profile expiry.
+Install the IPA on a registered iPhone; subsequent compatible changes use EAS
+Update. Local builds are tracked by their GitHub release metadata, not EAS cloud
+build history. Native builds take longer than the update-only path.
 
 Internal distribution needs Apple signing credentials and registered devices.
+After configuring the project's EAS ad hoc credentials, set the GitHub repository
+variable `IOS_BUILD_ENABLED=true`. Until then, CI reports the missing initial IPA
+and avoids allocating a macOS runner that cannot sign it.
+After adding test devices, refresh the EAS ad hoc profile and bump the repository
+variable `IOS_BUILD_REVISION` to rebuild existing PR IPAs even if native code is unchanged.
 It does not require TestFlight or an App Store Connect app record. TestFlight is
 a separate distribution option. The pipeline never submits to the App Store.

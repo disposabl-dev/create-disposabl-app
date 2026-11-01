@@ -1,3 +1,7 @@
+[test]
+# Bundled starter copies and native build outputs are not additional test suites.
+pathIgnorePatterns = ["**/dist/**", "**/out/**", "**/.output/**"]
+
 [fmt]
 # Keep the compact workflow readable; actionlint validates its YAML.
 ignorePatterns = [

@@ -1,6 +1,7 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "ui": "tui",
+  "globalEnv": ["BUN_VERSION", "NODE_VERSION"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
@@ -23,11 +24,26 @@
       "inputs": ["$TURBO_DEFAULT$", "!src/routeTree.gen.ts"],
       "outputs": ["src/routeTree.gen.ts"]
     },
+    "@disposabl/disposabl-kit#build": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/packages/backend/convex/**"]
+    },
+    "@disposabl/disposabl-kit#lint": {
+      "dependsOn": ["^lint"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/packages/backend/convex/**"]
+    },
+    "@disposabl/disposabl-kit#typecheck": {
+      "dependsOn": ["^typecheck"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/packages/backend/convex/**"]
+    },
+    "create-disposabl-app#build": {
+      "cache": false
+    },
     "dev": {
       "cache": false,
       "persistent": true,
       "passThroughEnv": ["VITE_*"]
     }
   },
-  "globalDependencies": ["disposabl.json", "packages/backend/convex/**"]
+  "globalDependencies": ["disposabl.json"]
 }

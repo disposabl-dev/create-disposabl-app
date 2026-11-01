@@ -1,12 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import configure from "../app.config.js";
-import { run } from "./build-android.mjs";
 
 function withEnv(values, action) {
   const previous = { ...process.env };
   for (const key of Object.keys(process.env)) {
-    if (/^(EXPO_|DISPOSABL_)/.test(key)) delete process.env[key];
+    if (/^(EXPO_|DISPOSABL_|CONVEX_)/.test(key)) delete process.env[key];
   }
   Object.assign(process.env, values);
   try {
@@ -48,7 +47,7 @@ test("EAS cannot silently replace a deployed preview backend URL", () => {
     () =>
       withEnv(
         {
-          DISPOSABL_DEPLOYED_CONVEX_URL: "https://correct.convex.cloud",
+          CONVEX_URL: "https://correct.convex.cloud",
           EXPO_PUBLIC_CONVEX_URL: "https://wrong.convex.cloud",
         },
         () => configure({ config: {} }),
@@ -73,15 +72,6 @@ test("invalid version codes and channel input fail before native compilation", (
         configure({ config: {} }),
       ),
     /CHANNEL/,
-  );
-});
-
-test("captured child output is text under Bun and Node", () => {
-  assert.equal(
-    run(process.execPath, ["-e", 'process.stdout.write("ok\\n")'], {
-      stdio: ["ignore", "pipe", "inherit"],
-    }),
-    "ok",
   );
 });
 

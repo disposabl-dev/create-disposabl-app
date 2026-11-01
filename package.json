@@ -2,6 +2,7 @@
   "name": "disposabl-dev",
   "private": true,
   "scripts": {
+    "check": "turbo run typecheck lint && bun fmt --check && bun test --pass-with-no-tests",
     "build": "turbo build",
     "dev": "turbo dev",
     "lint": "turbo lint",

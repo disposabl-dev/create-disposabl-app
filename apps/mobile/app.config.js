@@ -32,7 +32,7 @@ module.exports = ({ config }) => {
     throw new Error("Invalid DISPOSABL_IOS_BUILD_NUMBER");
   // Fail instead of exporting an update against another preview's backend.
   for (const name of ["CONVEX_URL", "CONVEX_SITE_URL"]) {
-    const deployed = process.env[`DISPOSABL_DEPLOYED_${name}`];
+    const deployed = process.env[name];
     const exported = process.env[`EXPO_PUBLIC_${name}`];
     if (deployed && deployed !== exported) {
       throw new Error(
