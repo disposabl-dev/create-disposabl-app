@@ -98,10 +98,27 @@ the distribution workflow.
 
 ## iOS
 
-CI intentionally skips iOS, including fingerprint checks and EAS Update, even
-when `ios` appears in `disposabl.json`. No Apple runner is started.
+When iOS is enabled and affected, the Web runner computes its fingerprint. EAS
+Update runs only when the latest finished internal build for that channel and
+bundle ID is a real-device IPA with the same runtime and an unexpired build.
+Otherwise CI reports that a new IPA is needed and continues without an iOS build.
+A matching EAS build is not proof that the app is installed or signing remains valid.
 
-The local `build:ios` command and internal-distribution EAS profiles remain for
-future work. Signed iPhone builds need Apple signing credentials and registered
-devices. TestFlight is an alternative distribution method and needs an App Store
-Connect app record. Neither is configured or verified by the current pipeline.
+Each PR needs its own initial IPA because its channel is embedded in the app.
+For the initial signed build, set `build.ios-preview.channel` in `eas.json` to the
+same preview name used by CI, for example `pr-2`. Use the same Expo project and
+preview backend URLs as CI, then run from `apps/mobile`:
+
+```bash
+bunx eas-cli@27.2.0 build --platform ios --profile ios-preview
+```
+
+This is an explicit manual EAS cloud build, separate from the Blacksmith preview
+workflow. EAS records its runtime and channel so CI can find it. A local IPA is
+not automatically registered in EAS build history. Install the initial IPA on a
+registered iPhone; subsequent compatible changes use EAS Update. Native changes
+require another manual IPA. No channel-picker UI is added.
+
+Internal distribution needs Apple signing credentials and registered devices.
+It does not require TestFlight or an App Store Connect app record. TestFlight is
+a separate distribution option. The pipeline never submits to the App Store.

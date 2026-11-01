@@ -6,24 +6,34 @@ helpers or local development setup hooks. Backend development uses `convex dev`.
 
 ## Order
 
-1. **Plan** selects enabled, affected native platforms without installing dependencies.
-2. **Web**, **Linux** and **Windows** start in parallel. Web checks the source and
-   deploys backend and web, then checks the Android fingerprint on the same runner.
+1. **Web**, **Linux** and **Windows** start in parallel on 4-vCPU Blacksmith runners.
+   Platform selection runs inline, with no separate Plan job. Each desktop runner
+   checks whether it is enabled and affected before installing dependencies.
+2. Web checks the source and deploys backend and web, then checks the Android
+   fingerprint on the same runner.
 3. A matching project, application ID, channel and fingerprint uses EAS Update.
    A different fingerprint or missing compatible APK builds Android on that same
    runner, reusing its checkout and installed dependencies.
 4. **Release** collects successful outputs into one prerelease, or a stable release
-   for main. Skipped native platforms do not block publishing.
+   for main. It runs on a 2-vCPU Blacksmith runner after all builds finish.
 
-**iOS and macOS are always skipped**, even when listed in `disposabl.json`.
-They have no fingerprint checks, builds, updates or runners in this workflow.
-Local build commands remain available for later development.
+**iOS builds and all macOS work are skipped.** When iOS is enabled and affected,
+Web computes its fingerprint and checks the latest finished internal EAS build
+for the same channel and bundle ID. A matching, unexpired iPhone IPA receives an
+EAS Update; a missing or different runtime is reported as requiring a manual IPA.
+No Apple runner starts. See [iOS setup](../apps/mobile/README.md#ios).
+
+`CHANNEL` at the top is the single preview-name expression. Convex preview names,
+EAS channels, EAS branches and mobile builds all use it. The default is `pr-N` for
+PRs and `production` for main. Runner labels and tool versions are also at the top.
 
 ## Selection
 
-Mobile changes select Android; desktop changes select Linux and Windows. Shared
+Mobile changes select Android and iOS; desktop changes select Linux and Windows. Shared
 packages, lockfiles and platform configuration select all enabled supported
-native targets. Web, backend-only and documentation changes skip native jobs.
+native targets. Web, backend-only and documentation changes skip native installs
+and builds. Desktop runners still start briefly to make that decision; forks skip
+the desktop jobs entirely.
 PR selection uses the whole PR diff so a cancelled earlier commit cannot hide a
 pending native change. Main uses the complete pushed commit range. Fork PRs only
 validate on Blacksmith Linux; they never deploy or publish.
@@ -33,8 +43,9 @@ validate on Blacksmith Linux; they never deploy or publish.
 Every job uses Blacksmith. GitHub Actions schedules the jobs and displays their
 graph; there are no GitHub-hosted or Boat runners.
 
-Blacksmith uses 2 vCPU for selection, Linux, Windows and publishing, and 4 vCPU
-for the shared Web and Android job. Install the Blacksmith GitHub App for the repository.
+A full preview uses three 4-vCPU build runners and one final 2-vCPU publishing
+runner. There is no separate Plan or Android runner. Install the Blacksmith
+GitHub App for the repository.
 
 Bun cache keys include OS, architecture, Bun version and lockfile. Each fresh
 runner installs from that cache; `node_modules` is not transferred between OSes.
@@ -44,12 +55,16 @@ and one-day retention. Superseded PR runs cancel; production runs serialize.
 
 Default branch caches can seed previews; sibling
 PR caches are not automatically shared. No cache access policy is changed here.
+Thirty to forty seconds is a warm update-only target, not a measured guarantee.
 Native compilation and external deployment can take longer than one minute.
+Compare the same commit with warm caches before increasing runner size; use a
+larger runner only when it saves close to half the end-to-end time or more.
+The 4-vCPU configuration is a candidate until comparable cold/warm runs verify it.
 
 ## Configuration
 
 Web requires `CONVEX_DEPLOY_KEY_PREVIEW` for PRs and `CONVEX_DEPLOY_KEY` for main.
-Android requires `EXPO_TOKEN` plus `EXPO_PROJECT_ID`, `EXPO_OWNER` and `EXPO_SLUG`
+Mobile previews require `EXPO_TOKEN` plus `EXPO_PROJECT_ID`, `EXPO_OWNER` and `EXPO_SLUG`
 repository variables. See [mobile setup](../apps/mobile/README.md) for signing.
 Only the Release job gets contents-write permission. Native build failure leaves
 web deployed but prevents publishing a partial native release.

@@ -115,3 +115,24 @@ test("iOS previews share a provisionable identity while their channels remain is
     /BUILD_NUMBER/,
   );
 });
+
+test("preview naming can change without hardcoded PR syntax", () => {
+  const config = withEnv(
+    { EXPO_PROJECT_ID: "test", DISPOSABL_MOBILE_CHANNEL: "preview-42" },
+    () => configure({ config: { ios: { runtimeVersion: "old" } } }),
+  );
+  assert.equal(
+    config.updates.requestHeaders["expo-channel-name"],
+    "preview-42",
+  );
+  assert.deepEqual(config.ios.runtimeVersion, { policy: "fingerprint" });
+  assert.ok(config.android.package.endsWith(".preview42"));
+});
+
+test("manual EAS iOS builds use their profile channel", () => {
+  const config = withEnv(
+    { EXPO_PROJECT_ID: "test", EAS_BUILD_PROFILE: "ios-preview" },
+    () => configure({ config: {} }),
+  );
+  assert.equal(config.updates.requestHeaders["expo-channel-name"], "preview");
+});

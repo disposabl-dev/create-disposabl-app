@@ -7,12 +7,14 @@
     "ios-preview": {
       "distribution": "internal",
       "environment": "preview",
-      "credentialsSource": "remote"
+      "credentialsSource": "remote",
+      "channel": "preview"
     },
     "ios-production": {
       "distribution": "internal",
       "environment": "production",
-      "credentialsSource": "remote"
+      "credentialsSource": "remote",
+      "channel": "production"
     }
   }
 }

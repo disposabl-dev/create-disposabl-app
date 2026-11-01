@@ -11,36 +11,52 @@ concurrency:
   group: preview-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 env:
+  CHANNEL: &channel ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || 'production' }}
+  DISPOSABL_MOBILE_CHANNEL: *channel
+  EAS_ENVIRONMENT: ${{ github.event_name == 'push' && 'production' || 'preview' }}
+  EAS_CLI: eas-cli@27.2.0
+  BUN_VERSION: &bun-version '1.4.4'
+  NODE_VERSION: &node-version '24'
+  LINUX_RUNNER: &linux-runner blacksmith-4vcpu-ubuntu-2404
+  WINDOWS_RUNNER: &windows-runner blacksmith-4vcpu-windows-2025
+  RELEASE_RUNNER: &release-runner blacksmith-2vcpu-ubuntu-2404
+  DISPOSABL_ANDROID_VERSION_CODE: ${{ github.run_number }}
   GH_TOKEN: ${{ github.token }}
   GH_REPO: ${{ github.repository }}
   SOURCE: ${{ github.event.pull_request.head.sha || github.sha }}
   SOURCE_PATH: ${{ github.event_name == 'pull_request' && format('pulls/{0}', github.event.number) || 'git/ref/heads/main' }}
-  CHANNEL: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || 'production' }}
   ARTIFACT: platform-android
   DISPOSABL_RELEASE_VERSION: 1.0.${{ github.run_number }}
 
 jobs:
-  plan:
-    name: Plan
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+  web:
+    name: Web
     outputs:
       android: ${{ steps.platforms.outputs.android }}
       desktop: ${{ steps.platforms.outputs.desktop }}
+    timeout-minutes: 45
+    runs-on: *linux-runner
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      EXPO_PROJECT_ID: ${{ vars.EXPO_PROJECT_ID }}
+      EXPO_OWNER: ${{ vars.EXPO_OWNER }}
+      EXPO_SLUG: ${{ vars.EXPO_SLUG }}
+      EXPO_NO_DOTENV: '1'
     steps:
       - &checkout
         name: Checkout
         uses: actions/checkout@v6
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-          persist-credentials: false
-      - name: Platforms
+        with: {ref: "${{ env.SOURCE }}", persist-credentials: false}
+      - &platforms
+        name: Platforms
+        shell: bash
         id: platforms
         env:
           BEFORE: ${{ github.event.before }}
           PR: ${{ github.event.number }}
           TRUSTED: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
         run: |
-          if [[ "$TRUSTED" != true ]]; then printf 'android=false\ndesktop={"include":[]}\n' >> "$GITHUB_OUTPUT"; exit; fi
+          if [[ "$TRUSTED" != true ]]; then printf 'android=false\nios=false\ndesktop=[]\nselected=false\n' >> "$GITHUB_OUTPUT"; exit; fi
           if [[ -n "$PR" ]]; then
             gh api "repos/$GH_REPO/pulls/$PR/files?per_page=100" --paginate --jq '.[] | .filename, (.previous_filename // empty)' > "$RUNNER_TEMP/changes"
           elif [[ -z "$BEFORE" || "$BEFORE" =~ ^0+$ ]]; then echo disposabl.json > "$RUNNER_TEMP/changes"
@@ -53,46 +69,29 @@ jobs:
             const paths = readFileSync(`${process.env.RUNNER_TEMP}/changes`, "utf8").split("\n").filter(p => !/(^|\/)\.agents\/|\.(md|mdx)$/.test(p));
             const enabled = JSON.parse(readFileSync("disposabl.json", "utf8")).platforms;
             const shared = paths.some(p => /^(bun.lock$|package.json$|disposabl.json$|turbo.json$|bunfig.toml$|patches\/|\.github\/workflows\/pipeline.yml$|packages\/(?!backend\/|create-disposabl-app\/))/.test(p));
-            const runners = ["blacksmith-2vcpu-ubuntu-2404", "blacksmith-2vcpu-windows-2025"];
-            console.log(`android=${enabled.includes("android") && (shared || paths.some(p => p.startsWith("apps/mobile/")))}`);
-            console.log("desktop=" + JSON.stringify({include: ["linux", "windows"].flatMap((platform, i) => enabled.includes(platform) && (shared || paths.some(p => p.startsWith("apps/desktop/"))) ? [{platform, runner: runners[i]}] : [])}));
+            const mobile = shared || paths.some(p => p.startsWith("apps/mobile/"));
+            for (const platform of ["android", "ios"]) console.log(`${platform}=${enabled.includes(platform) && mobile}`);
+            const desktop = ["linux", "windows"].filter(platform => enabled.includes(platform) && (shared || paths.some(p => p.startsWith("apps/desktop/"))));
+            console.log(`desktop=${JSON.stringify(desktop)}\nselected=${desktop.includes(process.env.DISPOSABL_DESKTOP_PLATFORM)}`);
           ' >> "$GITHUB_OUTPUT"
-
-  web:
-    name: Web
-    needs: plan
-    timeout-minutes: 45
-    runs-on: blacksmith-4vcpu-ubuntu-2404
-    env:
-      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-      EXPO_PROJECT_ID: ${{ vars.EXPO_PROJECT_ID }}
-      EXPO_OWNER: ${{ vars.EXPO_OWNER }}
-      EXPO_SLUG: ${{ vars.EXPO_SLUG }}
-      EXPO_NO_DOTENV: '1'
-      EAS_ENVIRONMENT: ${{ github.event_name == 'push' && 'production' || 'preview' }}
-      DISPOSABL_MOBILE_CHANNEL: ${{ github.event_name == 'push' && 'production' || format('pr-{0}', github.event.number) }}
-      DISPOSABL_ANDROID_CHANNEL: ${{ github.event_name == 'push' && 'production' || format('pr-{0}', github.event.number) }}
-      DISPOSABL_ANDROID_VERSION_CODE: ${{ github.run_number }}
-    steps:
-      - *checkout
       - &node
         name: Node
+        if: github.job == 'web' || steps.platforms.outputs.selected == 'true'
         uses: actions/setup-node@v6
-        with:
-          node-version: '24'
-          package-manager-cache: false
+        with: {node-version: *node-version, package-manager-cache: false}
       - &bun
         name: Bun
+        if: github.job == 'web' || steps.platforms.outputs.selected == 'true'
         uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: '1.4.4'
+        with: {bun-version: *bun-version}
       - &cache
         name: Cache
+        if: github.job == 'web' || steps.platforms.outputs.selected == 'true'
         uses: actions/cache@v4
         with:
           path: ~/.bun/install/cache
-          key: bun-${{ runner.os }}-${{ runner.arch }}-1.4.4-${{ hashFiles('bun.lock') }}
-          restore-keys: bun-${{ runner.os }}-${{ runner.arch }}-1.4.4-
+          key: bun-${{ runner.os }}-${{ runner.arch }}-${{ env.BUN_VERSION }}-${{ hashFiles('bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-${{ runner.arch }}-${{ env.BUN_VERSION }}-
       - name: Turbo
         uses: actions/cache@v4
         with:
@@ -101,6 +100,7 @@ jobs:
           restore-keys: turbo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}-
       - &install
         name: Install
+        if: github.job == 'web' || steps.platforms.outputs.selected == 'true'
         run: bun install --frozen-lockfile
       - name: Check
         run: bun x --no-install turbo run typecheck lint && bun fmt --check && bun test --pass-with-no-tests
@@ -119,7 +119,7 @@ jobs:
           bun x --no-install convex deploy --yes "${target[@]}" --cmd-url-env-var-name VITE_CONVEX_URL --cmd 'bun x --no-install --package @convex-dev/auth auth --keys-only $AUTH_TARGET && VITE_CONVEX_SITE_URL="$CONVEX_SITE_URL" bun run --cwd ../.. build --filter=!desktop && printf "url=%s\nsite=%s\n" "$VITE_CONVEX_URL" "$CONVEX_SITE_URL" >> "$GITHUB_OUTPUT"'
           bun x --no-install static-hosting upload $AUTH_TARGET --no-spa --dist ../../apps/web/dist/client
       - name: Expo
-        if: needs.plan.outputs.android == 'true'
+        if: steps.platforms.outputs.android == 'true' || steps.platforms.outputs.ios == 'true'
         env:
           DISPOSABL_DEPLOYED_CONVEX_URL: ${{ steps.deploy.outputs.url }}
           DISPOSABL_DEPLOYED_CONVEX_SITE_URL: ${{ steps.deploy.outputs.site }}
@@ -128,21 +128,33 @@ jobs:
         working-directory: apps/mobile
         run: |
           printf '%s\n' "DISPOSABL_DEPLOYED_CONVEX_URL=$DISPOSABL_DEPLOYED_CONVEX_URL" "DISPOSABL_DEPLOYED_CONVEX_SITE_URL=$DISPOSABL_DEPLOYED_CONVEX_SITE_URL" "EXPO_PUBLIC_CONVEX_URL=$EXPO_PUBLIC_CONVEX_URL" "EXPO_PUBLIC_CONVEX_SITE_URL=$EXPO_PUBLIC_CONVEX_SITE_URL" >> "$GITHUB_ENV"
-          bun x eas-cli@27.2.0 env:pull --environment "$EAS_ENVIRONMENT" --path "$RUNNER_TEMP/expo.env" --non-interactive
+          bun x "$EAS_CLI" env:pull --environment "$EAS_ENVIRONMENT" --path "$RUNNER_TEMP/expo.env" --non-interactive
           bun -e '
             import {parseEnv} from "node:util";
             import {appendFileSync, readFileSync} from "node:fs";
             for (const [key, value] of Object.entries(parseEnv(readFileSync(`${process.env.RUNNER_TEMP}/expo.env`, "utf8")))) {
               // Web and mobile use the same backend from this deployment.
               if (/^EXPO_PUBLIC_CONVEX_(URL|SITE_URL)$/.test(key)) continue;
-              if (/^(GITHUB_|RUNNER_|GH_|DISPOSABL_|BUN_|CI$|NODE_OPTIONS$|PATH$|HOME$|SOURCE(_PATH)?$|CHANNEL$|ARTIFACT$|EAS_ENVIRONMENT$|EXPO_(TOKEN|PROJECT_ID|OWNER|SLUG|NO_DOTENV)$)/.test(key)) throw new Error(`Reserved EAS variable: ${key}`);
+              if (/^(GITHUB_|RUNNER_|GH_|DISPOSABL_|BUN_|CI$|NODE_OPTIONS$|PATH$|HOME$|SOURCE(_PATH)?$|CHANNEL$|ARTIFACT$|EAS_(ENVIRONMENT|CLI)$|EXPO_(TOKEN|PROJECT_ID|OWNER|SLUG|NO_DOTENV)$)/.test(key)) throw new Error(`Reserved EAS variable: ${key}`);
               const delimiter = crypto.randomUUID();
               appendFileSync(process.env.GITHUB_ENV, `${key}<<${delimiter}\n${value}\n${delimiter}\n`);
             }
           '
+      - name: Channel
+        if: steps.platforms.outputs.android == 'true' || steps.platforms.outputs.ios == 'true'
+        working-directory: apps/mobile
+        run: |
+          for ((offset=0; ; offset+=25)); do
+            bun x "$EAS_CLI" channel:list --json --limit 25 --offset "$offset" > "$RUNNER_TEMP/channels.json"
+            if jq -e --arg channel "$CHANNEL" 'any(.currentPage[]; .name == $channel)' "$RUNNER_TEMP/channels.json" > /dev/null; then
+              jq -e --arg channel "$CHANNEL" '.currentPage[] | select(.name == $channel) | (.isPaused == false) and (.updateBranches | length == 1) and (.updateBranches[0].name == $channel) and ((.branchMapping | fromjson).data == [{branchId: .updateBranches[0].id, branchMappingLogic: "true"}])' "$RUNNER_TEMP/channels.json" > /dev/null || { echo 'Preview channel must point only to its same-named branch'; exit 1; }
+              break
+            fi
+            if [[ $(jq '.currentPage | length' "$RUNNER_TEMP/channels.json") -lt 25 ]]; then bun x "$EAS_CLI" channel:create "$CHANNEL" --non-interactive; break; fi
+          done
       - name: Fingerprint
         id: fingerprint
-        if: needs.plan.outputs.android == 'true'
+        if: steps.platforms.outputs.android == 'true'
         run: |
           for ((page=1; ; page++)); do
             gh api "repos/$GH_REPO/releases?per_page=100&page=$page" > "$RUNNER_TEMP/releases.json"
@@ -171,32 +183,41 @@ jobs:
           gh release download "$TAG" --pattern android.apk --dir dist/release
           echo "$SHA  dist/release/android.apk" | sha256sum --check
           cd apps/mobile
-          for ((offset=0; ; offset+=25)); do
-            bun x eas-cli@27.2.0 channel:list --json --limit 25 --offset "$offset" > "$RUNNER_TEMP/channels.json"
-            if jq -e --arg channel "$CHANNEL" 'any(.currentPage[]; .name == $channel)' "$RUNNER_TEMP/channels.json" > /dev/null; then break; fi
-            if [[ $(jq '.currentPage | length' "$RUNNER_TEMP/channels.json") -lt 25 ]]; then bun x eas-cli@27.2.0 channel:create "$CHANNEL" --non-interactive; break; fi
-          done
           bun x --no-install expo export --platform android --output-dir dist/update
           test "$(bun -e 'import {runtimeVersion} from "./scripts/build-android.mjs"; console.log(runtimeVersion())')" = "$RUNTIME"
           test "$(gh api "repos/$GH_REPO/$SOURCE_PATH" --jq 'if has("head") then (if .state == "open" then .head.sha else "closed" end) else .object.sha end')" = "$SOURCE"
-          bun x eas-cli@27.2.0 update --platform android --channel "$CHANNEL" --environment "$EAS_ENVIRONMENT" --skip-bundler --input-dir dist/update --message "$SOURCE" --non-interactive
+          bun x "$EAS_CLI" update --platform android --channel "$CHANNEL" --environment "$EAS_ENVIRONMENT" --skip-bundler --input-dir dist/update --message "$SOURCE" --non-interactive
           jq --arg sha "$SHA" '. + {sha256: $sha, action: "update"}' <<< "$MANIFEST" > ../../dist/release/android.json
+      # iOS updates use an existing per-channel IPA; native iOS builds stay manual.
+      - name: iOS
+        if: steps.platforms.outputs.ios == 'true'
+        working-directory: apps/mobile
+        run: |
+          runtime() { bun x --no-install expo-updates runtimeversion:resolve --platform ios --workflow managed | jq -er '.runtimeVersion | select(test("^[a-f0-9]{40,64}$"))'; }
+          fingerprint=$(runtime)
+          bundle=$(bun x --no-install expo config --json | jq -er '.ios.bundleIdentifier')
+          bun x "$EAS_CLI" build:list --platform ios --status finished --distribution internal --channel "$CHANNEL" --app-identifier "$bundle" --limit 1 --json > "$RUNNER_TEMP/ios.json"
+          if ! jq -e --arg runtime "$fingerprint" '.[0] | .isForIosSimulator == false and .runtime.version == $runtime and ((.artifacts.applicationArchiveUrl // "") | startswith("https://")) and (.expirationDate == null or .expirationDate > (now | todateiso8601))' "$RUNNER_TEMP/ios.json" > /dev/null; then
+            echo "iOS skipped: a signed internal IPA for $CHANNEL with this fingerprint is required. Automatic iOS builds are disabled." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          bun x --no-install expo export --platform ios --output-dir dist/update-ios
+          test "$(runtime)" = "$fingerprint"
+          test "$(gh api "repos/$GH_REPO/$SOURCE_PATH" --jq 'if has("head") then (if .state == "open" then .head.sha else "closed" end) else .object.sha end')" = "$SOURCE"
+          bun x "$EAS_CLI" update --platform ios --channel "$CHANNEL" --environment "$EAS_ENVIRONMENT" --skip-bundler --input-dir dist/update-ios --message "$SOURCE" --non-interactive
+          echo "iOS update published to $CHANNEL." >> "$GITHUB_STEP_SUMMARY"
       - name: Java
         if: steps.fingerprint.outputs.build == 'true'
         uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: '17'
+        with: {distribution: temurin, java-version: '17'}
       - name: SDK
         if: steps.fingerprint.outputs.build == 'true'
         uses: android-actions/setup-android@v3
-        with:
-          packages: platform-tools
+        with: {packages: platform-tools}
       - name: Gradle
         if: steps.fingerprint.outputs.build == 'true'
         uses: gradle/actions/setup-gradle@v4
-        with:
-          cache-read-only: false
+        with: {cache-read-only: false}
       - name: Build
         if: steps.fingerprint.outputs.build == 'true'
         env:
@@ -213,7 +234,7 @@ jobs:
           cp apps/mobile/dist/android/app.apk dist/release/android.apk
           jq --arg sha "$(sha256sum dist/release/android.apk | cut -d' ' -f1)" '. + {sha256: $sha, action: "build"}' <<< "$MANIFEST" > dist/release/android.json
       - name: Upload
-        if: needs.plan.outputs.android == 'true'
+        if: steps.platforms.outputs.android == 'true'
         uses: actions/upload-artifact@v4
         with: &artifact
           name: ${{ env.ARTIFACT }}
@@ -222,14 +243,16 @@ jobs:
           compression-level: 0
           if-no-files-found: error
 
-  # iOS and macOS are intentionally skipped, even when enabled in disposabl.json.
+  # macOS builds are intentionally skipped, even when enabled in disposabl.json.
   desktop:
     name: ${{ matrix.platform }}
-    needs: plan
-    if: fromJSON(needs.plan.outputs.desktop).include[0] != null
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
     strategy:
       fail-fast: false
-      matrix: ${{ fromJSON(needs.plan.outputs.desktop) }}
+      matrix:
+        include:
+          - {platform: linux, runner: *linux-runner}
+          - {platform: windows, runner: *windows-runner}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 20
     env:
@@ -238,29 +261,33 @@ jobs:
       electron_config_cache: ${{ github.workspace }}/.cache/electron
     steps:
       - *checkout
+      - *platforms
       - *node
       - *bun
       - *cache
       - *install
       - name: Electron
+        if: steps.platforms.outputs.selected == 'true'
         uses: actions/cache@v4
         with:
           path: .cache/electron
           key: electron-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}
       - name: Packages
-        if: matrix.platform == 'linux'
+        if: steps.platforms.outputs.selected == 'true' && matrix.platform == 'linux'
         run: command -v fakeroot && command -v rpmbuild && command -v dpkg-deb || { sudo apt-get update && sudo apt-get install -y fakeroot dpkg rpm; }
       - name: Build
+        if: steps.platforms.outputs.selected == 'true'
         run: bun run --cwd apps/desktop preview
       - name: Upload
+        if: steps.platforms.outputs.selected == 'true'
         uses: actions/upload-artifact@v4
         with: *artifact
 
   release:
     name: Release
-    needs: [plan, web, desktop]
-    if: ${{ !cancelled() && needs.web.result == 'success' && (needs.desktop.result == 'success' || needs.desktop.result == 'skipped') && (needs.plan.outputs.android == 'true' || needs.desktop.result == 'success') }}
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    needs: [web, desktop]
+    if: ${{ !cancelled() && needs.web.result == 'success' && (needs.desktop.result == 'success' || needs.desktop.result == 'skipped') && (needs.web.outputs.android == 'true' || fromJSON(needs.web.outputs.desktop)[0] != null) }}
+    runs-on: *release-runner
     permissions:
       contents: write
       pull-requests: read
@@ -270,11 +297,19 @@ jobs:
         with:
           pattern: platform-*
           path: dist/release
-          merge-multiple: true
       - name: Publish
+        env:
+          ANDROID: ${{ needs.web.outputs.android }}
+          DESKTOP: ${{ needs.web.outputs.desktop }}
         run: |
           check_source() { test "$(gh api "repos/$GH_REPO/$SOURCE_PATH" --jq 'if has("head") then (if .state == "open" then .head.sha else "closed" end) else .object.sha end')" = "$SOURCE"; }
           check_source
+          expected=$(jq -r --arg android "$ANDROID" '. + (if $android == "true" then ["android"] else [] end) | .[]' <<< "$DESKTOP")
+          for platform in $expected; do test -d "dist/release/platform-$platform"; test -n "$(find "dist/release/platform-$platform" -type f -size +0c -print -quit)"; done
+          if [[ "$ANDROID" == true ]]; then test -s dist/release/platform-android/android.apk; test -s dist/release/platform-android/android.json; fi
+          find dist/release -mindepth 2 -type f -exec mv -n {} dist/release/ \;
+          find dist/release -mindepth 1 -type d -empty -delete
+          test "$(find dist/release -mindepth 1 -type d | wc -l)" -eq 0
           TAG="app-$CHANNEL-${{ github.run_id }}-${{ github.run_attempt }}"
           echo "Source: $SOURCE" > notes.md
           if [[ -f dist/release/android.json ]]; then echo "<!-- android $(jq -c . dist/release/android.json) -->" >> notes.md; fi

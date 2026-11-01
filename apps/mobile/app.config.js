@@ -5,11 +5,11 @@ module.exports = ({ config }) => {
   const channel =
     process.env.DISPOSABL_MOBILE_CHANNEL ||
     process.env.DISPOSABL_ANDROID_CHANNEL ||
+    (process.env.EAS_BUILD_PROFILE &&
+      require("./eas.json").build[process.env.EAS_BUILD_PROFILE]?.channel) ||
     "development";
-  if (
-    !/^(production|development|pr-\d+|ci-benchmark-[a-z0-9-]+)$/.test(channel)
-  ) {
-    throw new Error("Invalid DISPOSABL_ANDROID_CHANNEL");
+  if (!/^[a-z][a-z0-9-]{0,62}$/.test(channel)) {
+    throw new Error("Invalid DISPOSABL_MOBILE_CHANNEL");
   }
   const projectId = process.env.EXPO_PROJECT_ID || config.extra?.eas?.projectId;
   const suffix = createHash("sha256")
@@ -46,6 +46,7 @@ module.exports = ({ config }) => {
     slug: process.env.EXPO_SLUG || config.slug,
     ios: {
       ...config.ios,
+      ...(projectId ? { runtimeVersion: { policy: "fingerprint" } } : {}),
       bundleIdentifier:
         channel === "production"
           ? config.ios?.bundleIdentifier || `app.disposabl.a${suffix}`
