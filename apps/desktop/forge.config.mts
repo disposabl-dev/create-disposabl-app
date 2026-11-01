@@ -7,9 +7,29 @@ import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
 
+const signedRelease = process.env.DISPOSABL_DESKTOP_PLATFORM === 'macos';
+if (
+  signedRelease &&
+  (!process.env.APPLE_API_KEY ||
+    !process.env.APPLE_API_KEY_ID ||
+    !process.env.APPLE_API_ISSUER)
+)
+  throw new Error('macOS releases require Apple notarization credentials');
+
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
+    appBundleId: process.env.MACOS_BUNDLE_ID || 'dev.disposabl.starter.desktop',
+    ...(signedRelease
+      ? {
+          osxSign: {},
+          osxNotarize: {
+            appleApiKey: process.env.APPLE_API_KEY!,
+            appleApiKeyId: process.env.APPLE_API_KEY_ID!,
+            appleApiIssuer: process.env.APPLE_API_ISSUER!,
+          },
+        }
+      : {}),
     download: {
       cacheRoot: process.env.electron_config_cache,
     },

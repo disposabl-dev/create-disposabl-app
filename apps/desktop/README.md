@@ -40,18 +40,43 @@ on macOS. Linux builders need `fakeroot`, `dpkg`, and `rpm` installed.
 ## CI releases
 
 The single root `.github/workflows/pipeline.yml` selects affected desktop targets from
-`disposabl.json`. Windows x64 and Linux x64 build in parallel after shared checks and web/backend
-deployment. CI always skips macOS, even when enabled in `disposabl.json`. Each runner uses:
+`disposabl.json`. Windows x64, Linux x64 and macOS arm64 build in parallel alongside
+web/backend deployment on Blacksmith. Each runner uses:
 
 ```sh
 DISPOSABL_DESKTOP_PLATFORM=linux DISPOSABL_RELEASE_VERSION=1.0.42 bun run --cwd apps/desktop preview
 ```
 
-Use the matching platform value on Windows. The helper temporarily sets
+Use the matching platform value on Windows or macOS. The helper temporarily sets
 the package version, makes the installers, restores `package.json` even on failure,
 and collects outputs into the repository root `dist/release`. The final pipeline job
 publishes one GitHub prerelease containing the affected enabled platforms. Individual
 Forge jobs do not publish or require a GitHub write token.
 
-Installers are unsigned; macOS builds are not notarized. In-app updates are not
-configured. The release version is `1.0.<workflow run number>`. See the root `.github/README.md` for release behavior.
+Windows and Linux installers are unsigned. Published macOS builds are signed and
+notarized. In-app updates are not configured. The release version is
+`1.0.<workflow run number>`. See the root `.github/README.md` for release behavior.
+
+## macOS signing
+
+Configure these repository secrets, or grant this repository access to equivalent
+organization secrets:
+
+- `MACOS_CERTIFICATES_P12_PRODUCTION`: base64-encoded Developer ID Application
+  certificate and private key exported as `.p12`.
+- `MACOS_CERTIFICATES_PASSWORD_PRODUCTION`: the `.p12` export password.
+- `MACOS_APPLE_API_KEY_P8_PRODUCTION`: the raw App Store Connect API private key.
+- `MACOS_APPLE_API_KEY_ID_PRODUCTION`: its Key ID.
+- `MACOS_APPLE_API_ISSUER_PRODUCTION`: its Issuer ID.
+
+The same credentials sign and notarize prereleases and production releases.
+The suffix is a secret naming convention, not a restriction to production.
+The workflow imports the certificate into a temporary keychain, lets Forge sign,
+notarize and staple the app, and verifies the extracted release ZIP with
+`codesign`, Gatekeeper and `stapler` before upload. The keychain and temporary
+notarization key are cleaned up. Change `MACOS_BUNDLE_ID` at the top of the workflow
+to set your desktop bundle identifier.
+
+Local `make:macos` builds do not require these release credentials. The CI
+`DISPOSABL_DESKTOP_PLATFORM=macos` path requires notarization credentials and fails
+if signing or notarization fails. CI does not build Intel macOS packages.

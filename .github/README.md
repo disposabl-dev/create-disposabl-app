@@ -7,6 +7,7 @@ helpers or local development setup hooks. Backend development uses `convex dev`.
 ## Order
 
 1. **Web**, **Linux** and **Windows** start in parallel on 4-vCPU Blacksmith runners.
+   **macOS** joins them on a 6-vCPU Blacksmith Apple Silicon runner.
    Platform selection runs inline, with no separate Plan job. Each desktop runner
    checks whether it is enabled and affected before installing dependencies.
 2. Web checks the source and deploys backend and web, then checks the Android
@@ -17,11 +18,11 @@ helpers or local development setup hooks. Backend development uses `convex dev`.
 4. **Release** collects successful outputs into one prerelease, or a stable release
    for main. It runs on a 2-vCPU Blacksmith runner after all builds finish.
 
-**iOS builds and all macOS work are skipped.** When iOS is enabled and affected,
+**iOS native builds are skipped.** When iOS is enabled and affected,
 Web computes its fingerprint and checks the latest finished internal EAS build
 for the same channel and bundle ID. A matching, unexpired iPhone IPA receives an
 EAS Update; a missing or different runtime is reported as requiring a manual IPA.
-No Apple runner starts. See [iOS setup](../apps/mobile/README.md#ios).
+The macOS desktop runner does not build iOS. See [iOS setup](../apps/mobile/README.md#ios).
 
 `CHANNEL` at the top is the single preview-name expression. Convex preview names,
 EAS channels, EAS branches and mobile builds all use it. The default is `pr-N` for
@@ -29,7 +30,7 @@ PRs and `production` for main. Runner labels and tool versions are also at the t
 
 ## Selection
 
-Mobile changes select Android and iOS; desktop changes select Linux and Windows. Shared
+Mobile changes select Android and iOS; desktop changes select Linux, Windows and macOS. Shared
 packages, lockfiles and platform configuration select all enabled supported
 native targets. Web, backend-only and documentation changes skip native installs
 and builds. Desktop runners still start briefly to make that decision; forks skip
@@ -43,8 +44,8 @@ validate on Blacksmith Linux; they never deploy or publish.
 Every job uses Blacksmith. GitHub Actions schedules the jobs and displays their
 graph; there are no GitHub-hosted or Boat runners.
 
-A full preview uses three 4-vCPU build runners and one final 2-vCPU publishing
-runner. There is no separate Plan or Android runner. Install the Blacksmith
+A full preview uses three 4-vCPU build runners, one 6-vCPU macOS runner and one
+final 2-vCPU publishing runner. There is no separate Plan or Android runner. Install the Blacksmith
 GitHub App for the repository.
 
 Bun cache keys include OS, architecture, Bun version and lockfile. Each fresh
@@ -66,6 +67,11 @@ The 4-vCPU configuration is a candidate until comparable cold/warm runs verify i
 Web requires `CONVEX_DEPLOY_KEY_PREVIEW` for PRs and `CONVEX_DEPLOY_KEY` for main.
 Mobile previews require `EXPO_TOKEN` plus `EXPO_PROJECT_ID`, `EXPO_OWNER` and `EXPO_SLUG`
 repository variables. See [mobile setup](../apps/mobile/README.md) for signing.
+macOS requires the five [desktop signing secrets](../apps/desktop/README.md#macos-signing).
+Published macOS previews and production builds are signed and notarized with the
+same credentials. Missing credentials or failed notarization fail the macOS job;
+the pipeline never silently publishes an unsigned Mac preview. Apple notarization
+adds external processing time. `MACOS_BUNDLE_ID` configures the app identifier.
 Only the Release job gets contents-write permission. Native build failure leaves
 web deployed but prevents publishing a partial native release.
 

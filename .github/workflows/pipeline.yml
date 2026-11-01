@@ -19,6 +19,8 @@ env:
   NODE_VERSION: &node-version '24'
   LINUX_RUNNER: &linux-runner blacksmith-4vcpu-ubuntu-2404
   WINDOWS_RUNNER: &windows-runner blacksmith-4vcpu-windows-2025
+  MACOS_RUNNER: &macos-runner blacksmith-6vcpu-macos-26
+  MACOS_BUNDLE_ID: dev.disposabl.starter.desktop
   RELEASE_RUNNER: &release-runner blacksmith-2vcpu-ubuntu-2404
   DISPOSABL_ANDROID_VERSION_CODE: ${{ github.run_number }}
   GH_TOKEN: ${{ github.token }}
@@ -71,7 +73,7 @@ jobs:
             const shared = paths.some(p => /^(bun.lock$|package.json$|disposabl.json$|turbo.json$|bunfig.toml$|patches\/|\.github\/workflows\/pipeline.yml$|packages\/(?!backend\/|create-disposabl-app\/))/.test(p));
             const mobile = shared || paths.some(p => p.startsWith("apps/mobile/"));
             for (const platform of ["android", "ios"]) console.log(`${platform}=${enabled.includes(platform) && mobile}`);
-            const desktop = ["linux", "windows"].filter(platform => enabled.includes(platform) && (shared || paths.some(p => p.startsWith("apps/desktop/"))));
+            const desktop = ["linux", "windows", "macos"].filter(platform => enabled.includes(platform) && (shared || paths.some(p => p.startsWith("apps/desktop/"))));
             console.log(`desktop=${JSON.stringify(desktop)}\nselected=${desktop.includes(process.env.DISPOSABL_DESKTOP_PLATFORM)}`);
           ' >> "$GITHUB_OUTPUT"
       - &node
@@ -243,7 +245,6 @@ jobs:
           compression-level: 0
           if-no-files-found: error
 
-  # macOS builds are intentionally skipped, even when enabled in disposabl.json.
   desktop:
     name: ${{ matrix.platform }}
     if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
@@ -253,8 +254,9 @@ jobs:
         include:
           - {platform: linux, runner: *linux-runner}
           - {platform: windows, runner: *windows-runner}
+          - {platform: macos, runner: *macos-runner}
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 20
+    timeout-minutes: 30
     env:
       ARTIFACT: platform-${{ matrix.platform }}
       DISPOSABL_DESKTOP_PLATFORM: ${{ matrix.platform }}
@@ -275,13 +277,45 @@ jobs:
       - name: Packages
         if: steps.platforms.outputs.selected == 'true' && matrix.platform == 'linux'
         run: command -v fakeroot && command -v rpmbuild && command -v dpkg-deb || { sudo apt-get update && sudo apt-get install -y fakeroot dpkg rpm; }
+      # Published previews and production use the same signing identity.
+      - name: Sign
+        if: steps.platforms.outputs.selected == 'true' && matrix.platform == 'macos'
+        uses: apple-actions/import-codesign-certs@v7.2.0
+        with:
+          p12-file-base64: ${{ secrets.MACOS_CERTIFICATES_P12_PRODUCTION }}
+          p12-password: ${{ secrets.MACOS_CERTIFICATES_PASSWORD_PRODUCTION }}
+      - name: Notary
+        if: steps.platforms.outputs.selected == 'true' && matrix.platform == 'macos'
+        env:
+          API_KEY_P8: ${{ secrets.MACOS_APPLE_API_KEY_P8_PRODUCTION }}
+          API_KEY_ID: ${{ secrets.MACOS_APPLE_API_KEY_ID_PRODUCTION }}
+          API_ISSUER: ${{ secrets.MACOS_APPLE_API_ISSUER_PRODUCTION }}
+        run: |
+          : "${API_KEY_P8:?Configure MACOS_APPLE_API_KEY_P8_PRODUCTION}" "${API_KEY_ID:?Configure MACOS_APPLE_API_KEY_ID_PRODUCTION}" "${API_ISSUER:?Configure MACOS_APPLE_API_ISSUER_PRODUCTION}"
+          umask 077
+          printf '%s' "$API_KEY_P8" > "$RUNNER_TEMP/notary.p8"
+          printf 'APPLE_API_KEY=%s\nAPPLE_API_KEY_ID=%s\nAPPLE_API_ISSUER=%s\n' "$RUNNER_TEMP/notary.p8" "$API_KEY_ID" "$API_ISSUER" >> "$GITHUB_ENV"
       - name: Build
         if: steps.platforms.outputs.selected == 'true'
         run: bun run --cwd apps/desktop preview
+      - name: Verify
+        if: steps.platforms.outputs.selected == 'true' && matrix.platform == 'macos'
+        run: |
+          zips=(dist/release/*.zip)
+          test "${#zips[@]}" -eq 1 && test -s "${zips[0]}"
+          ditto -x -k "${zips[0]}" "$RUNNER_TEMP/macos-verify"
+          apps=("$RUNNER_TEMP/macos-verify/"*.app)
+          test "${#apps[@]}" -eq 1 && test -d "${apps[0]}"
+          codesign --verify --deep --strict "${apps[0]}"
+          spctl --assess --type execute --verbose "${apps[0]}"
+          xcrun stapler validate "${apps[0]}"
       - name: Upload
         if: steps.platforms.outputs.selected == 'true'
         uses: actions/upload-artifact@v4
         with: *artifact
+      - name: Clean
+        if: always() && matrix.platform == 'macos'
+        run: rm -f "$RUNNER_TEMP/notary.p8"
 
   release:
     name: Release
