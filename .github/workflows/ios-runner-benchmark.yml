@@ -1,0 +1,133 @@
+name: iOS runner comparison
+on:
+  push:
+    branches: [t3/ios-runner-benchmark]
+    paths: [.github/workflows/ios-runner-benchmark.yml]
+permissions:
+  contents: read
+concurrency:
+  group: ios-runner-benchmark-one-shot
+  cancel-in-progress: false
+env:
+  SOURCE: 95d9d548424977fd9df39d33f087d8dde9afc370
+  CHANNEL: pr-2
+  DISPOSABL_MOBILE_CHANNEL: pr-2
+  EAS_ENVIRONMENT: preview
+  EAS_CLI: eas-cli@27.2.0
+  BUN_VERSION: '1.4.4'
+  NODE_VERSION: '24'
+  DISPOSABL_IOS_BUILD_NUMBER: '23'
+  DISPOSABL_ANDROID_VERSION_CODE: '23'
+  DISPOSABL_RELEASE_VERSION: 1.0.23
+  PLATFORM: ios
+  EXPO_NO_DOTENV: '1'
+  CONVEX_URL: https://dutiful-rhinoceros-182.convex.cloud
+  CONVEX_SITE_URL: https://dutiful-rhinoceros-182.convex.site
+  EXPO_PUBLIC_CONVEX_URL: https://dutiful-rhinoceros-182.convex.cloud
+  EXPO_PUBLIC_CONVEX_SITE_URL: https://dutiful-rhinoceros-182.convex.site
+  MANIFEST: '{"channel":"pr-2","projectId":"7609475b-183a-4488-b1b0-0d7cc35aaaf0","applicationId":"app.disposabl.a97f7be92f4c3.preview","runtimeVersion":"ec9b44c2f9a7292a43a9b0994096ea6d37e27e9d"}'
+jobs:
+  benchmark:
+    name: iOS ${{ matrix.cpus }} vCPU
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {cpus: 6, runner: blacksmith-6vcpu-macos-26}
+          - {cpus: 12, runner: blacksmith-12vcpu-macos-26}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      EXPO_PROJECT_ID: ${{ vars.EXPO_PROJECT_ID }}
+      EXPO_OWNER: ${{ vars.EXPO_OWNER }}
+      EXPO_SLUG: ${{ vars.EXPO_SLUG }}
+    steps:
+      - name: Checkout pinned application source
+        uses: actions/checkout@v6
+        with: {ref: '${{ env.SOURCE }}', persist-credentials: false}
+      - name: Machine
+        run: |
+          git rev-parse HEAD
+          sw_vers
+          sysctl hw.ncpu hw.memsize machdep.cpu.brand_string
+          xcodebuild -version
+          xcode-select -p
+      - name: Node
+        uses: actions/setup-node@v6
+        with: {node-version: '24', package-manager-cache: false}
+      - name: Bun
+        uses: oven-sh/setup-bun@v2
+        with: {bun-version: '1.4.4'}
+      - name: Restore Bun cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ runner.arch }}-${{ env.BUN_VERSION }}-${{ hashFiles('bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-${{ runner.arch }}-${{ env.BUN_VERSION }}-
+      - name: Install
+        run: bun install --frozen-lockfile --filter @disposabl/mobile
+      - name: Expo
+        working-directory: apps/mobile
+        run: |
+          jq --arg channel "$CHANNEL" '.build["ios-" + env.EAS_ENVIRONMENT].channel = $channel' eas.json > "$RUNNER_TEMP/eas.json"
+          mv "$RUNNER_TEMP/eas.json" eas.json
+          bun x "$EAS_CLI" env:pull --environment "$EAS_ENVIRONMENT" --path "$RUNNER_TEMP/expo.env" --non-interactive
+          bun -e '
+            import {parseEnv} from "node:util";
+            import {appendFileSync, readFileSync} from "node:fs";
+            for (const [key, value] of Object.entries(parseEnv(readFileSync(`${process.env.RUNNER_TEMP}/expo.env`, "utf8")))) {
+              // Web and mobile use the same backend from this deployment.
+              if (/^CONVEX_(URL|SITE_URL)$/.test(key) && value !== process.env[key]) throw new Error(`EAS overrides the deployed backend: ${key}`);
+              if (/^(EXPO_PUBLIC_|VITE_)?CONVEX_(URL|SITE_URL)$/.test(key)) continue;
+              if (/^(GITHUB_|RUNNER_|GH_|DISPOSABL_|BUN_|CI$|NODE_OPTIONS$|PATH$|HOME$|SOURCE(_PATH)?$|CHANNEL$|PLATFORM$|RELEASE_PREFIX$|MACOS_|EAS_(ENVIRONMENT|CLI)$|EXPO_(TOKEN|PROJECT_ID|OWNER|SLUG|NO_DOTENV)$)/.test(key)) throw new Error(`Reserved EAS variable: ${key}`);
+              const delimiter = crypto.randomUUID();
+              appendFileSync(process.env.GITHUB_ENV, `${key}<<${delimiter}\n${value}\n${delimiter}\n`);
+            }
+          '
+      - name: Restore Pods cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/Library/Caches/CocoaPods
+          key: pods-${{ runner.arch }}-${{ hashFiles('bun.lock') }}
+          restore-keys: pods-${{ runner.arch }}-
+      - name: Build
+        working-directory: apps/mobile
+        run: |
+          mkdir -p ../../dist/release
+          start=$(date +%s)
+          bun x "$EAS_CLI" build --platform ios --profile "ios-$EAS_ENVIRONMENT" --local --non-interactive --output ../../dist/release/ios.ipa
+          echo "Build seconds: $(($(date +%s) - start))" >> "$GITHUB_STEP_SUMMARY"
+      - name: Verify
+        run: |
+          unzip -q dist/release/ios.ipa -d "$RUNNER_TEMP/ipa"
+          apps=("$RUNNER_TEMP/ipa/Payload/"*.app)
+          test "${#apps[@]}" -eq 1
+          app=${apps[0]}
+          codesign --verify --deep --strict "$app"
+          test "$(plutil -extract CFBundleIdentifier raw -o - "$app/Info.plist")" = "$(jq -r .applicationId <<< "$MANIFEST")"
+          runtime=$(plutil -extract EXUpdatesRuntimeVersion raw -o - "$app/Expo.plist")
+          if [[ "$runtime" == "file:fingerprint" ]]; then
+            fingerprints=()
+            while IFS= read -r path; do fingerprints+=("$path"); done < <(find "$app" -path '*/EXUpdates.bundle/fingerprint' -type f)
+            if [[ ${#fingerprints[@]} -ne 1 ]]; then
+              echo "Expected one EXUpdates.bundle/fingerprint, found ${#fingerprints[@]}" >&2
+              exit 1
+            fi
+            runtime=$(cat "${fingerprints[0]}")
+          fi
+          expected_runtime=$(jq -r .runtimeVersion <<< "$MANIFEST")
+          if [[ "$runtime" != "$expected_runtime" ]]; then
+            echo "iOS runtime version mismatch: expected $expected_runtime, found $runtime" >&2
+            exit 1
+          fi
+          test "$(plutil -extract EXUpdatesRequestHeaders.expo-channel-name raw -o - "$app/Expo.plist")" = "$CHANNEL"
+          security cms -D -i "$app/embedded.mobileprovision" > "$RUNNER_TEMP/profile.plist"
+          expires=$(python3 -c 'import datetime,plistlib,sys; p=plistlib.load(open(sys.argv[1],"rb")); expiry=p["ExpirationDate"].replace(tzinfo=datetime.timezone.utc); assert p.get("ProvisionedDevices") and not p["Entitlements"].get("get-task-allow",False) and expiry>datetime.datetime.now(datetime.timezone.utc); print(expiry.isoformat())' "$RUNNER_TEMP/profile.plist")
+          jq --arg sha "$(shasum -a 256 dist/release/ios.ipa | cut -d' ' -f1)" --arg expires "$expires" '. + {sha256: $sha, expiresAt: $expires}' <<< "$MANIFEST" > dist/release/ios.json
+      - name: Record result
+        run: |
+          echo "Source: $SOURCE" >> "$GITHUB_STEP_SUMMARY"
+          echo "Runner: ${{ matrix.runner }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Signed IPA passed runtime, bundle ID, channel and provisioning verification." >> "$GITHUB_STEP_SUMMARY"
+          stat -f 'IPA bytes: %z' dist/release/ios.ipa >> "$GITHUB_STEP_SUMMARY"
