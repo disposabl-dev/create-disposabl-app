@@ -259,6 +259,7 @@ jobs:
             check_source
             gh release upload "$TAG" dist/release/* --clobber
             while IFS= read -r asset; do
+              asset=${asset%$'\r'}
               if [[ ! -f "dist/release/$asset" ]]; then check_source; gh release delete-asset "$TAG" "$asset" --yes; fi
             done < <(jq -r '.assets[].name' previous.json)
             check_source
