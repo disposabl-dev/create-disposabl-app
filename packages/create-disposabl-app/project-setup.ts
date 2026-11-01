@@ -86,18 +86,56 @@ export function setupTable(
 export function projectSetup(name: string, config: DisposablConfig) {
   const live = Boolean(process.stdout.isTTY);
   const status: Status = { installation: "Pending" };
-  let lines = 0;
+  let previous: string[] = [];
+  let columns = process.stdout.columns;
   let started: number | undefined;
   let timer: ReturnType<typeof setInterval> | undefined;
   function render() {
-    if (live && lines) {
-      moveCursor(process.stdout, 0, -lines);
+    const frame = setupTable(
+      name,
+      config,
+      status,
+      process.stdout.columns,
+    ).split("\n");
+    if (
+      live &&
+      previous.length === frame.length &&
+      columns === process.stdout.columns
+    ) {
+      let update = "";
+      for (let row = 0; row < frame.length; row++) {
+        const before = previous[row]!;
+        const after = frame[row]!;
+        if (before === after) continue;
+        let start = 0;
+        let end = after.length;
+        // Timer rows are unstyled and fixed-width: overwrite only changed digits.
+        if (
+          before.length === after.length &&
+          !before.includes("\x1b") &&
+          !after.includes("\x1b")
+        ) {
+          while (start < end && before[start] === after[start]) start++;
+          while (end > start && before[end - 1] === after[end - 1]) end--;
+        }
+        const distance = frame.length - row;
+        update += `\x1b[${distance}A\x1b[${start + 1}G`;
+        if (start === 0) update += "\x1b[2K";
+        update += after.slice(start, end);
+        update += `\x1b[${distance}B\x1b[1G`;
+      }
+      if (update) process.stdout.write(update);
+      previous = frame;
+      return;
+    }
+    if (live && previous.length) {
+      moveCursor(process.stdout, 0, -previous.length);
       cursorTo(process.stdout, 0);
       clearScreenDown(process.stdout);
     }
-    const frame = setupTable(name, config, status, process.stdout.columns);
-    process.stdout.write(frame + "\n");
-    lines = frame.split("\n").length;
+    process.stdout.write(frame.join("\n") + "\n");
+    previous = frame;
+    columns = process.stdout.columns;
   }
   if (live) render();
   return {

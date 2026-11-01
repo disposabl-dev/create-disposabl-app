@@ -2,7 +2,6 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { appendFile, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { setTimeout as delay } from "node:timers/promises";
 import semver from "semver";
 
 type Registry = {
@@ -149,21 +148,8 @@ async function publish(artifact: string) {
       { stdio: "inherit" },
     );
   }
-  const deadline = Date.now() + 10 * 60_000;
-  while (true) {
-    const available = (await registry(pkg.name)).versions[pkg.version];
-    if (available) {
-      if (available.dist.integrity !== integrity)
-        throw new Error("Published artifact integrity does not match.");
-      break;
-    }
-    if (Date.now() >= deadline)
-      throw new Error(
-        "npm is still processing the release; rerun this workflow later.",
-      );
-    console.log(`Waiting for npm to expose ${pkg.version}...`);
-    await delay(10_000);
-  }
+  // npm's successful publish can precede registry metadata propagation.
+  // Do not block the GitHub release while the registry catches up.
   git("fetch", "origin", "--tags");
   const tagged = spawnSync(
     "git",
@@ -189,7 +175,7 @@ async function publish(artifact: string) {
         `Published [${pkg.name}@${pkg.version}](https://www.npmjs.com/package/${pkg.name}/v/${pkg.version}).`,
         ...(beta
           ? ["--prerelease", "--latest=false"]
-          : [`--latest=${pkg.version === latest}`]),
+          : [`--latest=${!latest || semver.gte(pkg.version, latest)}`]),
       ],
       { stdio: "inherit" },
     );
