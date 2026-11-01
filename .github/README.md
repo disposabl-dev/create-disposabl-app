@@ -15,14 +15,19 @@ helpers or local development setup hooks. Backend development uses `convex dev`.
 3. A matching project, application ID, channel and fingerprint uses EAS Update.
    A different fingerprint or missing compatible APK builds Android on that same
    runner, reusing its checkout and installed dependencies.
-4. **Release** collects successful outputs into one prerelease, or a stable release
-   for main. It runs on a 2-vCPU Blacksmith runner after all builds finish.
+4. Each platform publishes from its existing build runner as soon as its own
+   build and verification succeed. Android publishes from Web; Linux, Windows
+   and macOS publish independently. There is no final Release job or artifact transfer.
 
-Each PR has one published prerelease at `app-<CHANNEL>` (normally `app-pr-N`).
+Each PR has one published prerelease per affected platform at
+`<RELEASE_PREFIX>-<CHANNEL>-<PLATFORM>`, for example `app-pr-2-macos`.
 Successful updates replace its assets and notes, remove obsolete assets and move
-the preview tag to the tested commit. Failed builds leave the previous preview.
+that platform's preview tag to the tested commit. A failed platform build leaves
+its previous preview available and does not block other platforms.
 New releases are drafts only during their initial upload, then become public.
-Production keeps a separate tag per run and is marked as the latest stable release.
+Production publishes regular releases with separate tags per platform and run.
+Platform releases do not compete for GitHub's single Latest label with the CLI's
+semantic-release publication. Desktop package versions remain `1.0.<run number>`.
 
 **iOS native builds are skipped.** When iOS is enabled and affected,
 Web computes its fingerprint and checks the latest finished internal EAS build
@@ -50,15 +55,16 @@ validate on Blacksmith Linux; they never deploy or publish.
 Every job uses Blacksmith. GitHub Actions schedules the jobs and displays their
 graph; there are no GitHub-hosted or Boat runners.
 
-A full preview uses three 4-vCPU build runners, one 6-vCPU macOS runner and one
-final 2-vCPU publishing runner. There is no separate Plan or Android runner. Install the Blacksmith
-GitHub App for the repository.
+A full preview uses three 4-vCPU build runners and one 6-vCPU macOS runner.
+Publishing reuses those machines. There is no separate Plan, Android or Release
+runner. Install the Blacksmith GitHub App for the repository.
 
 Bun cache keys include OS, architecture, Bun version and lockfile. Each fresh
 runner installs from that cache; `node_modules` is not transferred between OSes.
 Turbo caches checks and web builds. Gradle caches dependencies and cacheable build
-outputs; Electron downloads have their own cache. Artifacts use zero compression
-and one-day retention. Superseded PR runs cancel; production runs serialize.
+outputs; Electron downloads have their own cache. Build outputs upload directly
+to GitHub Releases without an intermediate Actions artifact. Superseded PR runs
+cancel; production runs serialize.
 
 Default branch caches can seed previews; sibling
 PR caches are not automatically shared. No cache access policy is changed here.
@@ -80,8 +86,9 @@ Otherwise, both publish an ad hoc signed, unnotarized Apple Silicon DMG with its
 status and installation guidance in the release notes. Configured signing or
 notarization failures still fail the job. Apple notarization adds external
 processing time. `MACOS_BUNDLE_ID` configures the app identifier.
-Only the Release job gets contents-write permission. Native build failure leaves
-web deployed but prevents publishing a partial native release.
+The Web/Android and desktop jobs have contents-write permission for their own
+releases. Forks never deploy or publish; checkout does not persist credentials.
+Each platform verifies its expected files and source commit before publication.
 
 Benchmark branches are separate from this product workflow. Build-only benchmark
 URLs and cache timings do not prove a live backend deployment or device behavior.

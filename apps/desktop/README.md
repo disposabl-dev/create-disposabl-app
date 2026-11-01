@@ -49,9 +49,11 @@ DISPOSABL_DESKTOP_PLATFORM=linux DISPOSABL_RELEASE_VERSION=1.0.42 bun run --cwd 
 
 Use the matching platform value on Windows or macOS. The helper temporarily sets
 the package version, makes the installers, restores `package.json` even on failure,
-and collects outputs into the repository root `dist/release`. The final pipeline job
-publishes one GitHub prerelease containing the affected enabled platforms. Individual
-Forge jobs do not publish or require a GitHub write token.
+and collects outputs into the repository root `dist/release`. Each platform job
+then uploads directly to its own GitHub prerelease using its job-scoped write
+token, without waiting for other platforms. PR tags such as `app-pr-2-macos` stay
+constant while their assets and source commit update after successful builds.
+Main releases use separate platform/run tags. Forge itself does not publish.
 
 Windows and Linux installers are unsigned. macOS builds use ad hoc signing by
 default; Developer ID signing and notarization are optional. In-app updates are not configured. The release version is

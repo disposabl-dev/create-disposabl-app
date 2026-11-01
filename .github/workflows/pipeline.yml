@@ -21,24 +21,24 @@ env:
   WINDOWS_RUNNER: &windows-runner blacksmith-4vcpu-windows-2025
   MACOS_RUNNER: &macos-runner blacksmith-6vcpu-macos-26
   MACOS_BUNDLE_ID: dev.disposabl.starter.desktop
-  RELEASE_RUNNER: &release-runner blacksmith-2vcpu-ubuntu-2404
+  RELEASE_PREFIX: app
   DISPOSABL_ANDROID_VERSION_CODE: ${{ github.run_number }}
   GH_TOKEN: ${{ github.token }}
   GH_REPO: ${{ github.repository }}
   SOURCE: ${{ github.event.pull_request.head.sha || github.sha }}
   SOURCE_PATH: ${{ github.event_name == 'pull_request' && format('pulls/{0}', github.event.number) || 'git/ref/heads/main' }}
-  ARTIFACT: platform-android
   DISPOSABL_RELEASE_VERSION: 1.0.${{ github.run_number }}
 
 jobs:
   web:
     name: Web
-    outputs:
-      android: ${{ steps.platforms.outputs.android }}
-      desktop: ${{ steps.platforms.outputs.desktop }}
+    permissions: &release-permissions
+      contents: write
+      pull-requests: read
     timeout-minutes: 45
     runs-on: *linux-runner
     env:
+      PLATFORM: android
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
       EXPO_PROJECT_ID: ${{ vars.EXPO_PROJECT_ID }}
       EXPO_OWNER: ${{ vars.EXPO_OWNER }}
@@ -137,7 +137,7 @@ jobs:
             for (const [key, value] of Object.entries(parseEnv(readFileSync(`${process.env.RUNNER_TEMP}/expo.env`, "utf8")))) {
               // Web and mobile use the same backend from this deployment.
               if (/^EXPO_PUBLIC_CONVEX_(URL|SITE_URL)$/.test(key)) continue;
-              if (/^(GITHUB_|RUNNER_|GH_|DISPOSABL_|BUN_|CI$|NODE_OPTIONS$|PATH$|HOME$|SOURCE(_PATH)?$|CHANNEL$|ARTIFACT$|EAS_(ENVIRONMENT|CLI)$|EXPO_(TOKEN|PROJECT_ID|OWNER|SLUG|NO_DOTENV)$)/.test(key)) throw new Error(`Reserved EAS variable: ${key}`);
+              if (/^(GITHUB_|RUNNER_|GH_|DISPOSABL_|BUN_|CI$|NODE_OPTIONS$|PATH$|HOME$|SOURCE(_PATH)?$|CHANNEL$|PLATFORM$|RELEASE_PREFIX$|MACOS_|EAS_(ENVIRONMENT|CLI)$|EXPO_(TOKEN|PROJECT_ID|OWNER|SLUG|NO_DOTENV)$)/.test(key)) throw new Error(`Reserved EAS variable: ${key}`);
               const delimiter = crypto.randomUUID();
               appendFileSync(process.env.GITHUB_ENV, `${key}<<${delimiter}\n${value}\n${delimiter}\n`);
             }
@@ -160,7 +160,7 @@ jobs:
         run: |
           for ((page=1; ; page++)); do
             gh api "repos/$GH_REPO/releases?per_page=100&page=$page" > "$RUNNER_TEMP/releases.json"
-            jq --arg tag "app-$CHANNEL" '[.[] | select(.draft | not) | select(.tag_name == $tag or (.tag_name | startswith($tag + "-"))) | select(any(.assets[]; .name == "android.apk"))] | sort_by(.tag_name != $tag) | .[0] // {}' "$RUNNER_TEMP/releases.json" > "$RUNNER_TEMP/release.json"
+            jq --arg tag "$RELEASE_PREFIX-$CHANNEL-android" --arg legacy "$RELEASE_PREFIX-$CHANNEL" '[.[] | select(.draft | not) | select(.tag_name == $tag or .tag_name == $legacy or (.tag_name | startswith($legacy + "-"))) | select(any(.assets[]; .name == "android.apk"))] | sort_by(.tag_name != $tag, .tag_name != $legacy) | .[0] // {}' "$RUNNER_TEMP/releases.json" > "$RUNNER_TEMP/release.json"
             if jq -e '.id' "$RUNNER_TEMP/release.json" > /dev/null || [[ $(jq length "$RUNNER_TEMP/releases.json") -lt 100 ]]; then break; fi
           done
           bun -e '
@@ -235,17 +235,43 @@ jobs:
           mkdir -p dist/release
           cp apps/mobile/dist/android/app.apk dist/release/android.apk
           jq --arg sha "$(sha256sum dist/release/android.apk | cut -d' ' -f1)" '. + {sha256: $sha, action: "build"}' <<< "$MANIFEST" > dist/release/android.json
-      - name: Upload
-        if: steps.platforms.outputs.android == 'true'
-        uses: actions/upload-artifact@v4
-        with: &artifact
-          name: ${{ env.ARTIFACT }}
-          path: dist/release/
-          retention-days: 1
-          compression-level: 0
-          if-no-files-found: error
+      - &publish
+        name: Publish
+        if: (github.job == 'web' && steps.platforms.outputs.android == 'true') || steps.platforms.outputs.selected == 'true'
+        shell: bash
+        run: |
+          check_source() { test "$(gh api "repos/$GH_REPO/$SOURCE_PATH" --jq 'if has("head") then (if .state == "open" then .head.sha else "closed" end) else .object.sha end')" = "$SOURCE"; }
+          check_source
+          for file in dist/release/*; do test -f "$file"; test -s "$file"; done
+          case "$PLATFORM" in
+            android) test -s dist/release/android.apk; test -s dist/release/android.json ;;
+            linux) compgen -G 'dist/release/*.deb' > /dev/null; compgen -G 'dist/release/*.rpm' > /dev/null ;;
+            windows) compgen -G 'dist/release/*.exe' > /dev/null; compgen -G 'dist/release/*.nupkg' > /dev/null; test -s dist/release/RELEASES ;;
+            macos) compgen -G 'dist/release/*.dmg' > /dev/null ;;
+            *) exit 1 ;;
+          esac
+          TAG="$RELEASE_PREFIX-$CHANNEL-$PLATFORM"
+          if [[ '${{ github.event_name }}' == push ]]; then TAG+="-${{ github.run_id }}-${{ github.run_attempt }}"; fi
+          printf "Platform: %s\nSource: %s\n" "$PLATFORM" "$SOURCE" > notes.md
+          if [[ -f dist/release/macos.txt ]]; then cat dist/release/macos.txt >> notes.md; fi
+          if [[ -f dist/release/android.json ]]; then echo "<!-- android $(jq -c . dist/release/android.json) -->" >> notes.md; fi
+          if gh release view "$TAG" --json assets > previous.json; then
+            check_source
+            gh release upload "$TAG" dist/release/* --clobber
+            while IFS= read -r asset; do
+              if [[ ! -f "dist/release/$asset" ]]; then check_source; gh release delete-asset "$TAG" "$asset" --yes; fi
+            done < <(jq -r '.assets[].name' previous.json)
+            check_source
+            if [[ '${{ github.event_name }}' == pull_request ]]; then gh api --method PATCH "repos/$GH_REPO/git/refs/tags/$TAG" -f sha="$SOURCE" -F force=true > /dev/null; fi
+          else
+            gh release create "$TAG" dist/release/* --draft --target "$SOURCE" --title "$CHANNEL / $PLATFORM" --notes-file notes.md --prerelease=${{ github.event_name == 'pull_request' }}
+          fi
+          check_source
+          gh release edit "$TAG" --title "$CHANNEL / $PLATFORM" --notes-file notes.md --draft=false --prerelease=${{ github.event_name == 'pull_request' }} --latest=false
+          echo "Release: https://github.com/$GH_REPO/releases/tag/$TAG" >> "$GITHUB_STEP_SUMMARY"
 
   desktop:
+    permissions: *release-permissions
     name: ${{ matrix.platform }}
     if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
     strategy:
@@ -258,7 +284,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
     env:
-      ARTIFACT: platform-${{ matrix.platform }}
+      PLATFORM: ${{ matrix.platform }}
       DISPOSABL_DESKTOP_PLATFORM: ${{ matrix.platform }}
       MACOS_NOTARIZE: ${{ secrets.MACOS_CERTIFICATES_P12_PRODUCTION != '' && secrets.MACOS_CERTIFICATES_PASSWORD_PRODUCTION != '' && secrets.MACOS_APPLE_API_KEY_P8_PRODUCTION != '' && secrets.MACOS_APPLE_API_KEY_ID_PRODUCTION != '' && secrets.MACOS_APPLE_API_ISSUER_PRODUCTION != '' }}
       electron_config_cache: ${{ github.workspace }}/.cache/electron
@@ -318,56 +344,7 @@ jobs:
             echo 'macOS: Apple Silicon, ad hoc signed and NOT notarized. If blocked, use System Settings > Privacy & Security > Open Anyway. https://support.apple.com/102445' > dist/release/macos.txt
           fi
           cat dist/release/macos.txt >> "$GITHUB_STEP_SUMMARY"
-      - name: Upload
-        if: steps.platforms.outputs.selected == 'true'
-        uses: actions/upload-artifact@v4
-        with: *artifact
+      - *publish
       - name: Clean
         if: always() && matrix.platform == 'macos'
         run: rm -f "$RUNNER_TEMP/notary.p8"
-
-  release:
-    name: Release
-    needs: [web, desktop]
-    if: ${{ !cancelled() && needs.web.result == 'success' && (needs.desktop.result == 'success' || needs.desktop.result == 'skipped') && (needs.web.outputs.android == 'true' || fromJSON(needs.web.outputs.desktop)[0] != null) }}
-    runs-on: *release-runner
-    permissions:
-      contents: write
-      pull-requests: read
-    steps:
-      - name: Download
-        uses: actions/download-artifact@v4
-        with:
-          pattern: platform-*
-          path: dist/release
-      - name: Publish
-        env:
-          ANDROID: ${{ needs.web.outputs.android }}
-          DESKTOP: ${{ needs.web.outputs.desktop }}
-        run: |
-          check_source() { test "$(gh api "repos/$GH_REPO/$SOURCE_PATH" --jq 'if has("head") then (if .state == "open" then .head.sha else "closed" end) else .object.sha end')" = "$SOURCE"; }
-          check_source
-          expected=$(jq -r --arg android "$ANDROID" '. + (if $android == "true" then ["android"] else [] end) | .[]' <<< "$DESKTOP")
-          for platform in $expected; do test -d "dist/release/platform-$platform"; test -n "$(find "dist/release/platform-$platform" -type f -size +0c -print -quit)"; done
-          if [[ "$ANDROID" == true ]]; then test -s dist/release/platform-android/android.apk; test -s dist/release/platform-android/android.json; fi
-          find dist/release -mindepth 2 -type f -exec mv -n {} dist/release/ \;
-          find dist/release -mindepth 1 -type d -empty -delete
-          test "$(find dist/release -mindepth 1 -type d | wc -l)" -eq 0
-          TAG="app-$CHANNEL"
-          if [[ '${{ github.event_name }}' == push ]]; then TAG+="-${{ github.run_id }}-${{ github.run_attempt }}"; fi
-          echo "Source: $SOURCE" > notes.md
-          if [[ -f dist/release/macos.txt ]]; then cat dist/release/macos.txt >> notes.md; fi
-          if [[ -f dist/release/android.json ]]; then echo "<!-- android $(jq -c . dist/release/android.json) -->" >> notes.md; fi
-          if gh release view "$TAG" --json assets > previous.json; then
-            gh release upload "$TAG" dist/release/* --clobber
-            while IFS= read -r asset; do
-              if [[ ! -f "dist/release/$asset" ]]; then gh release delete-asset "$TAG" "$asset" --yes; fi
-            done < <(jq -r '.assets[].name' previous.json)
-            check_source
-            if [[ '${{ github.event_name }}' == pull_request ]]; then gh api --method PATCH "repos/$GH_REPO/git/refs/tags/$TAG" -f sha="$SOURCE" -F force=true > /dev/null; fi
-          else
-            gh release create "$TAG" dist/release/* --draft --target "$SOURCE" --title "$CHANNEL" --notes-file notes.md --prerelease=${{ github.event_name == 'pull_request' }}
-          fi
-          check_source
-          gh release edit "$TAG" --title "$CHANNEL" --notes-file notes.md --draft=false --prerelease=${{ github.event_name == 'pull_request' }} --latest=${{ github.event_name == 'push' }}
-          echo "Release: https://github.com/$GH_REPO/releases/tag/$TAG" >> "$GITHUB_STEP_SUMMARY"

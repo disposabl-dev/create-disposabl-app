@@ -90,11 +90,13 @@ preserve increasing numbers if moving this workflow to another repository.
 An OTA update does not require the signing key because it does not build an APK.
 
 Native builds publish GitHub prereleases for previews and releases for
-production. A draft becomes the successful fingerprint baseline only after its
-APK upload completes. The release job needs `contents: write`, scoped to the
-final aggregate publisher. Fork PRs never run this job. GitHub Actions keeps a one-day build
-artifact; the release holds the durable download. This workflow does not submit
-to Google Play or the App Store.
+production. The Web runner publishes Android directly after its build or update,
+without waiting for desktop. Each PR reuses its Android release, normally
+`app-pr-N-android`, replacing the APK/metadata and moving the tag to the tested
+commit. Only a published APK with matching metadata and digest is reusable.
+The job has `contents: write`; fork PRs never deploy or publish. There is no
+intermediate Actions artifact. This workflow does not submit to Google Play or
+the App Store.
 
 The mobile UI is still the starter screen. Backend URLs are available to mobile
 code through `process.env.EXPO_PUBLIC_CONVEX_URL` and
