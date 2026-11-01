@@ -3,11 +3,10 @@
   "private": true,
   "version": "0.0.0",
   "scripts": {
-    "dev:setup": "bun --no-env-file ../disposabl-kit/server/dev-setup.mjs",
     "dev": "convex dev",
     "logs": "convex logs",
     "typecheck": "tsc -p convex",
-    "lint": "bun run typecheck && eslint . --report-unused-disable-directives --max-warnings 0",
+    "lint": "eslint . --report-unused-disable-directives --max-warnings 0",
     "format": "prettier --write 'convex/**/*.ts'"
   },
   "dependencies": {

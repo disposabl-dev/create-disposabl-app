@@ -65,6 +65,13 @@ export async function createApp(
     const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
     manifest.name = name;
     await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + "\n");
+    if (folders.includes("apps/mobile")) {
+      const appConfigPath = join(destination, "apps/mobile/app.json");
+      const appConfig = JSON.parse(await readFile(appConfigPath, "utf8"));
+      appConfig.expo.name = name;
+      appConfig.expo.slug = name;
+      await writeFile(appConfigPath, JSON.stringify(appConfig, null, 2) + "\n");
+    }
     await writeFile(
       join(destination, "disposabl.json"),
       JSON.stringify(config, null, 2) + "\n",

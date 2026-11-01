@@ -1,0 +1,302 @@
+name: Preview
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+permissions:
+  contents: read
+  pull-requests: read
+concurrency:
+  group: preview-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+env:
+  GH_TOKEN: ${{ github.token }}
+  GH_REPO: ${{ github.repository }}
+  SOURCE: ${{ github.event.pull_request.head.sha || github.sha }}
+  SOURCE_PATH: ${{ github.event_name == 'pull_request' && format('pulls/{0}', github.event.number) || 'git/ref/heads/main' }}
+  CHANNEL: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || 'production' }}
+  ARTIFACT: platform-android
+  DISPOSABL_RELEASE_VERSION: 1.0.${{ github.run_number }}
+
+jobs:
+  web:
+    name: Web
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    outputs:
+      android: ${{ steps.platforms.outputs.android }}
+      desktop: ${{ steps.platforms.outputs.desktop }}
+      url: ${{ steps.deploy.outputs.url }}
+      site: ${{ steps.deploy.outputs.site }}
+    steps:
+      - &checkout
+        name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - &node
+        name: Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - &bun
+        name: Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.4'
+      - &cache
+        name: Cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ runner.arch }}-1.4.4-${{ hashFiles('bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-${{ runner.arch }}-1.4.4-
+      - name: Turbo
+        uses: actions/cache@v4
+        with:
+          path: .turbo/cache
+          key: turbo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}-${{ github.sha }}
+          restore-keys: turbo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}-
+      - &install
+        name: Install
+        run: bun install --frozen-lockfile
+      - name: Check
+        run: bun x --no-install turbo run typecheck lint && bun fmt --check && bun test --pass-with-no-tests
+      - name: Deploy
+        id: deploy
+        env:
+          TRUSTED: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
+          CONVEX_DEPLOY_KEY: ${{ github.event_name == 'push' && secrets.CONVEX_DEPLOY_KEY || secrets.CONVEX_DEPLOY_KEY_PREVIEW }}
+        run: |
+          if [[ "$TRUSTED" != true ]]; then VITE_CONVEX_URL=https://ci.invalid VITE_CONVEX_SITE_URL=https://ci.invalid bun run build --filter=!desktop; exit; fi
+          : "${CONVEX_DEPLOY_KEY:?Configure the Convex deployment secret for this repository}"
+          cd packages/backend
+          export AUTH_TARGET=--prod
+          target=()
+          if [[ "$CHANNEL" != production ]]; then export AUTH_TARGET="--preview-name $CHANNEL"; target=(--preview-name "$CHANNEL"); fi
+          bun x --no-install convex deploy --yes "${target[@]}" --cmd-url-env-var-name VITE_CONVEX_URL --cmd 'bun x --no-install --package @convex-dev/auth auth --keys-only $AUTH_TARGET && VITE_CONVEX_SITE_URL="$CONVEX_SITE_URL" bun run --cwd ../.. build --filter=!desktop && printf "url=%s\nsite=%s\n" "$VITE_CONVEX_URL" "$CONVEX_SITE_URL" >> "$GITHUB_OUTPUT"'
+          bun x --no-install static-hosting upload $AUTH_TARGET --no-spa --dist ../../apps/web/dist/client
+      - name: Platforms
+        id: platforms
+        env:
+          BEFORE: ${{ github.event.before }}
+          PR: ${{ github.event.number }}
+          TRUSTED: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
+        run: |
+          if [[ "$TRUSTED" != true ]]; then printf 'android=false\ndesktop={"include":[]}\n' >> "$GITHUB_OUTPUT"; exit; fi
+          if [[ -n "$PR" ]]; then
+            gh api "repos/$GH_REPO/pulls/$PR/files?per_page=100" --paginate --jq '.[] | .filename, (.previous_filename // empty)' > "$RUNNER_TEMP/changes"
+          elif [[ -z "$BEFORE" || "$BEFORE" =~ ^0+$ ]]; then echo disposabl.json > "$RUNNER_TEMP/changes"
+          else
+            git -c credential.helper= -c 'credential.helper=!gh auth git-credential' fetch --depth=1 origin "$BEFORE"
+            git diff --name-only --no-renames "$BEFORE" "$SOURCE" > "$RUNNER_TEMP/changes"
+          fi
+          bun -e '
+            const paths = (await Bun.file(`${process.env.RUNNER_TEMP}/changes`).text()).split("\n").filter(p => !/(^|\/)\.agents\/|\.(md|mdx)$/.test(p));
+            const enabled = (await Bun.file("disposabl.json").json()).platforms;
+            const shared = paths.some(p => /^(bun.lock$|package.json$|disposabl.json$|turbo.json$|bunfig.toml$|patches\/|\.github\/workflows\/pipeline.yml$|packages\/(?!backend\/|create-disposabl-app\/))/.test(p));
+            const runners = ["blacksmith-2vcpu-ubuntu-2404", "blacksmith-2vcpu-windows-2025"];
+            console.log(`android=${enabled.includes("android") && (shared || paths.some(p => p.startsWith("apps/mobile/")))}`);
+            console.log("desktop=" + JSON.stringify({include: ["linux", "windows"].flatMap((platform, i) => enabled.includes(platform) && (shared || paths.some(p => p.startsWith("apps/desktop/"))) ? [{platform, runner: runners[i]}] : [])}));
+          ' >> "$GITHUB_OUTPUT"
+
+  # iOS and macOS are intentionally skipped, even when enabled in disposabl.json.
+  android:
+    name: Android
+    needs: web
+    if: needs.web.outputs.android == 'true'
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    outputs:
+      build: ${{ steps.fingerprint.outputs.build }}
+      runtime: ${{ steps.fingerprint.outputs.runtime }}
+      manifest: ${{ steps.fingerprint.outputs.manifest }}
+    env: &mobile
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      EXPO_PROJECT_ID: ${{ vars.EXPO_PROJECT_ID }}
+      EXPO_OWNER: ${{ vars.EXPO_OWNER }}
+      EXPO_SLUG: ${{ vars.EXPO_SLUG }}
+      EXPO_NO_DOTENV: '1'
+      EAS_ENVIRONMENT: ${{ github.event_name == 'push' && 'production' || 'preview' }}
+      DISPOSABL_MOBILE_CHANNEL: ${{ github.event_name == 'push' && 'production' || format('pr-{0}', github.event.number) }}
+      DISPOSABL_ANDROID_CHANNEL: ${{ github.event_name == 'push' && 'production' || format('pr-{0}', github.event.number) }}
+      DISPOSABL_ANDROID_VERSION_CODE: ${{ github.run_number }}
+      DISPOSABL_DEPLOYED_CONVEX_URL: ${{ needs.web.outputs.url }}
+      DISPOSABL_DEPLOYED_CONVEX_SITE_URL: ${{ needs.web.outputs.site }}
+      EXPO_PUBLIC_CONVEX_URL: ${{ needs.web.outputs.url }}
+      EXPO_PUBLIC_CONVEX_SITE_URL: ${{ needs.web.outputs.site }}
+    steps:
+      - *checkout
+      - *node
+      - *bun
+      - *cache
+      - *install
+      - &expo
+        name: Expo
+        working-directory: apps/mobile
+        run: |
+          bun x eas-cli@27.2.0 env:pull --environment "$EAS_ENVIRONMENT" --path "$RUNNER_TEMP/expo.env" --non-interactive
+          bun -e '
+            import {parseEnv} from "node:util";
+            import {appendFileSync, readFileSync} from "node:fs";
+            for (const [key, value] of Object.entries(parseEnv(readFileSync(`${process.env.RUNNER_TEMP}/expo.env`, "utf8")))) {
+              if (/^(GITHUB_|RUNNER_|GH_|DISPOSABL_|BUN_|CI$|NODE_OPTIONS$|PATH$|HOME$|SOURCE(_PATH)?$|CHANNEL$|ARTIFACT$|EAS_ENVIRONMENT$|EXPO_(TOKEN|PROJECT_ID|OWNER|SLUG|NO_DOTENV)$)/.test(key)) throw new Error(`Reserved EAS variable: ${key}`);
+              const delimiter = crypto.randomUUID();
+              appendFileSync(process.env.GITHUB_ENV, `${key}<<${delimiter}\n${value}\n${delimiter}\n`);
+            }
+          '
+      - name: Fingerprint
+        id: fingerprint
+        run: |
+          for ((page=1; ; page++)); do
+            gh api "repos/$GH_REPO/releases?per_page=100&page=$page" > "$RUNNER_TEMP/releases.json"
+            jq --arg prefix "app-$CHANNEL-" '[.[] | select(.draft | not) | select(.tag_name | startswith($prefix)) | select(any(.assets[]; .name == "android.apk"))][0] // {}' "$RUNNER_TEMP/releases.json" > "$RUNNER_TEMP/release.json"
+            if jq -e '.id' "$RUNNER_TEMP/release.json" > /dev/null || [[ $(jq length "$RUNNER_TEMP/releases.json") -lt 100 ]]; then break; fi
+          done
+          bun -e '
+            import {runtimeVersion, run} from "./apps/mobile/scripts/build-android.mjs";
+            const config = JSON.parse(run("bun", ["x", "--no-install", "expo", "config", "--json"], {stdio: ["ignore", "pipe", "inherit"]}));
+            if (!config.extra?.eas?.projectId) throw new Error("Link an Expo project first");
+            const wanted = {channel: process.env.CHANNEL, projectId: config.extra.eas.projectId, applicationId: config.android.package, runtimeVersion: runtimeVersion()};
+            const release = await Bun.file(`${process.env.RUNNER_TEMP}/release.json`).json();
+            const prior = JSON.parse(/<!-- android (\{[^\n]+\}) -->/.exec(release.body || "")?.[1] || "null");
+            const reusable = prior && Object.keys(wanted).every(k => prior[k] === wanted[k]) && /^[a-f0-9]{64}$/.test(prior.sha256 || "") && release.assets.some(a => a.name === "android.apk" && a.state === "uploaded" && a.size > 0 && a.digest === `sha256:${prior.sha256}`);
+            console.log(`build=${!reusable}\nruntime=${wanted.runtimeVersion}\nmanifest=${JSON.stringify(wanted)}\ntag=${reusable ? release.tag_name : ""}\nsha=${reusable ? prior.sha256 : ""}`);
+          ' >> "$GITHUB_OUTPUT"
+      - name: Update
+        if: steps.fingerprint.outputs.build == 'false'
+        env:
+          TAG: ${{ steps.fingerprint.outputs.tag }}
+          SHA: ${{ steps.fingerprint.outputs.sha }}
+          RUNTIME: ${{ steps.fingerprint.outputs.runtime }}
+          MANIFEST: ${{ steps.fingerprint.outputs.manifest }}
+        run: |
+          mkdir -p dist/release
+          gh release download "$TAG" --pattern android.apk --dir dist/release
+          echo "$SHA  dist/release/android.apk" | sha256sum --check
+          cd apps/mobile
+          for ((offset=0; ; offset+=25)); do
+            bun x eas-cli@27.2.0 channel:list --json --limit 25 --offset "$offset" > "$RUNNER_TEMP/channels.json"
+            if jq -e --arg channel "$CHANNEL" 'any(.currentPage[]; .name == $channel)' "$RUNNER_TEMP/channels.json" > /dev/null; then break; fi
+            if [[ $(jq '.currentPage | length' "$RUNNER_TEMP/channels.json") -lt 25 ]]; then bun x eas-cli@27.2.0 channel:create "$CHANNEL" --non-interactive; break; fi
+          done
+          bun x --no-install expo export --platform android --output-dir dist/update
+          test "$(bun -e 'import {runtimeVersion} from "./scripts/build-android.mjs"; console.log(runtimeVersion())')" = "$RUNTIME"
+          test "$(gh api "repos/$GH_REPO/$SOURCE_PATH" --jq 'if has("head") then (if .state == "open" then .head.sha else "closed" end) else .object.sha end')" = "$SOURCE"
+          bun x eas-cli@27.2.0 update --platform android --channel "$CHANNEL" --environment "$EAS_ENVIRONMENT" --skip-bundler --input-dir dist/update --message "$SOURCE" --non-interactive
+          jq --arg sha "$SHA" '. + {sha256: $sha, action: "update"}' <<< "$MANIFEST" > ../../dist/release/android.json
+      - name: Upload
+        if: steps.fingerprint.outputs.build == 'false'
+        uses: actions/upload-artifact@v4
+        with:
+          name: platform-android
+          path: dist/release/
+          retention-days: 1
+          compression-level: 0
+          if-no-files-found: error
+
+  apk:
+    name: APK
+    needs: [web, android]
+    if: needs.android.outputs.build == 'true'
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 45
+    env: *mobile
+    steps:
+      - *checkout
+      - *node
+      - *bun
+      - *cache
+      - *install
+      - *expo
+      - name: Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: SDK
+        uses: android-actions/setup-android@v3
+      - name: Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
+      - name: Build
+        env:
+          DISPOSABL_ANDROID_RUNTIME: ${{ needs.android.outputs.runtime }}
+          MANIFEST: ${{ needs.android.outputs.manifest }}
+          ANDROID_KEYSTORE_BASE64: ${{ github.event_name == 'push' && secrets.ANDROID_KEYSTORE_BASE64 || '' }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ github.event_name == 'push' && secrets.ANDROID_KEYSTORE_PASSWORD || '' }}
+          ANDROID_KEY_ALIAS: ${{ github.event_name == 'push' && secrets.ANDROID_KEY_ALIAS || '' }}
+          ANDROID_KEY_PASSWORD: ${{ github.event_name == 'push' && secrets.ANDROID_KEY_PASSWORD || '' }}
+        run: |
+          test "$(gh api "repos/$GH_REPO/$SOURCE_PATH" --jq 'if has("head") then (if .state == "open" then .head.sha else "closed" end) else .object.sha end')" = "$SOURCE"
+          bun run --cwd apps/mobile build:android
+          mkdir -p dist/release
+          cp apps/mobile/dist/android/app.apk dist/release/android.apk
+          jq --arg sha "$(sha256sum dist/release/android.apk | cut -d' ' -f1)" '. + {sha256: $sha, action: "build"}' <<< "$MANIFEST" > dist/release/android.json
+      - &upload
+        name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ARTIFACT }}
+          path: dist/release/
+          retention-days: 1
+          compression-level: 0
+          if-no-files-found: error
+
+  desktop:
+    name: ${{ matrix.platform }}
+    needs: web
+    if: fromJSON(needs.web.outputs.desktop).include[0] != null
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.web.outputs.desktop) }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    env:
+      ARTIFACT: platform-${{ matrix.platform }}
+      DISPOSABL_DESKTOP_PLATFORM: ${{ matrix.platform }}
+      electron_config_cache: ${{ github.workspace }}/.cache/electron
+    steps:
+      - *checkout
+      - *node
+      - *bun
+      - *cache
+      - *install
+      - name: Electron
+        uses: actions/cache@v4
+        with:
+          path: .cache/electron
+          key: electron-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}
+      - name: Packages
+        if: matrix.platform == 'linux'
+        run: command -v fakeroot && command -v rpmbuild && command -v dpkg-deb || { sudo apt-get update && sudo apt-get install -y fakeroot dpkg rpm; }
+      - name: Build
+        run: bun run --cwd apps/desktop preview
+      - *upload
+
+  release:
+    name: Release
+    needs: [web, android, apk, desktop]
+    if: ${{ !cancelled() && !contains(needs.*.result, 'failure') && (needs.android.result == 'success' || needs.desktop.result == 'success') }}
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    permissions:
+      contents: write
+      pull-requests: read
+    steps:
+      - name: Download
+        uses: actions/download-artifact@v4
+        with:
+          pattern: platform-*
+          path: dist/release
+          merge-multiple: true
+      - name: Publish
+        run: |
+          check_source() { test "$(gh api "repos/$GH_REPO/$SOURCE_PATH" --jq 'if has("head") then (if .state == "open" then .head.sha else "closed" end) else .object.sha end')" = "$SOURCE"; }
+          check_source
+          TAG="app-$CHANNEL-${{ github.run_id }}-${{ github.run_attempt }}"
+          echo "Source: $SOURCE" > notes.md
+          if [[ -f dist/release/android.json ]]; then echo "<!-- android $(jq -c . dist/release/android.json) -->" >> notes.md; fi
+          gh release create "$TAG" dist/release/* --draft --target "$SOURCE" --title "$CHANNEL" --notes-file notes.md --prerelease=${{ github.event_name == 'pull_request' }}
+          check_source && gh release edit "$TAG" --draft=false --latest=false

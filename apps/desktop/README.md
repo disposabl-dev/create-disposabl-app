@@ -37,22 +37,21 @@ platform and architecture combinations, including Windows ARM and Intel macOS.
 Build Windows installers on Windows, Linux packages on Linux, and macOS packages
 on macOS. Linux builders need `fakeroot`, `dpkg`, and `rpm` installed.
 
-## GitHub releases
+## CI releases
 
-The GitHub publisher uploads to `disposabl-dev/create-disposabl-app`. Desktop
-releases use `desktop-v<version>` tags to avoid collisions with the generator's
-`v<version>` releases. The version comes from this workspace's `package.json`.
-Uploads create a draft release for review before making the downloads public.
-
-With `GITHUB_TOKEN` supplied in the environment, run the matching `make:*` script
-on each platform, followed by:
+The single root `.github/workflows/pipeline.yml` selects affected desktop targets from
+`disposabl.json`. Windows x64 and Linux x64 build in parallel after shared checks and web/backend
+deployment. CI always skips macOS, even when enabled in `disposabl.json`. Each runner uses:
 
 ```sh
-bun run --cwd apps/desktop release --from-make
+DISPOSABL_DESKTOP_PLATFORM=linux DISPOSABL_RELEASE_VERSION=1.0.42 bun run --cwd apps/desktop preview
 ```
 
-The token needs repository contents write access. Each platform uploads to the
-same draft for that version. Create the draft with one platform first, then upload
-the other platforms to avoid racing release creation. Code signing, notarization,
-and in-app updates are not configured.
+Use the matching platform value on Windows. The helper temporarily sets
+the package version, makes the installers, restores `package.json` even on failure,
+and collects outputs into the repository root `dist/release`. The final pipeline job
+publishes one GitHub prerelease containing the affected enabled platforms. Individual
+Forge jobs do not publish or require a GitHub write token.
 
+Installers are unsigned; macOS builds are not notarized. In-app updates are not
+configured. The release version is `1.0.<workflow run number>`. See the root `.github/README.md` for release behavior.

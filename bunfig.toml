@@ -1,5 +1,8 @@
 [fmt]
+# Keep the compact workflow readable; actionlint validates its YAML.
 ignorePatterns = [
+  ".github/workflows/pipeline.yml",
   "**/routeTree.gen.ts",
-  "**/convex/_generated/**"
+  "**/convex/_generated/**",
+  "**/.agents/**",
 ]

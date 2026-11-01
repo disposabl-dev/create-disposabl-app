@@ -1,57 +1,58 @@
-# CI and deployment
+# Preview pipeline
 
-The app runs GitHub Actions on Boat's 4-CPU runner. Install the
-[Boat CI GitHub App](https://docs.boat.dev/ci) for the repository with
-`boat ci connect` before pushing. This connects the installation to the current
-Boat billing account. It does not require a personal GitHub token or a Boat API
-key in the workflow.
+`pipeline.yml` runs directly in this repository and is included in generated apps.
+All preview decisions are visible in the workflow. There are no `preview.mjs`
+helpers or local development setup hooks. Backend development uses `convex dev`.
 
-Boat CI requires a paid Boat plan. Public repositories also require explicit
-enablement in Boat and an allowlist of GitHub users. Fork pull requests use
-`ubuntu-latest` and build without deployment secrets.
+## Order
 
-Keep these repository or organization secrets in GitHub Actions:
+1. **Web** checks the source and deploys backend and web.
+2. **Android**, **Linux** and **Windows** start independently after Web succeeds,
+   when enabled in `disposabl.json` and affected by the changes.
+3. Android checks the latest released APK on a 2-vCPU Blacksmith runner. A matching
+   project, application ID, channel and fingerprint uses EAS Update on that runner.
+   A different fingerprint or missing compatible APK starts **APK** on 4 vCPU.
+4. **Release** collects successful outputs into one prerelease, or a stable release
+   for main. Skipped native jobs do not block publishing.
 
-- `CONVEX_DEPLOY_KEY`: production deploy key.
-- `CONVEX_DEPLOY_KEY_PREVIEW`: project preview deploy key.
+**iOS and macOS are always skipped**, even when listed in `disposabl.json`.
+They have no fingerprint checks, builds, updates or runners in this workflow.
+Local build commands remain available for later development.
 
-Do not move them to Boat environments. Boat CI deliberately does not inherit
-those environments. GitHub supplies the workflow's secrets and job token.
-`actions/cache` continues to store the Turbo cache through GitHub Actions.
+## Selection
 
-Same-repository pull requests deploy branch previews. Pushing to `main` deploys
-production. Set the GitHub Actions repository variable `DISPOSABL_CI_RUNNER` to
-`boat-small` for 2 CPUs, `boat` for 4 CPUs, or `ubuntu-latest` for GitHub's runner.
-Without the variable, normal jobs use `boat`.
+Mobile changes select Android; desktop changes select Linux and Windows. Shared
+packages, lockfiles and platform configuration select all enabled supported
+native targets. Web, backend-only and documentation changes skip native jobs.
+PR selection uses the whole PR diff so a cancelled earlier commit cannot hide a
+pending native change. Main uses the complete pushed commit range. Fork PRs only
+validate on Blacksmith Linux; they never deploy or publish.
 
-## Compare runners
+## Runners and caches
 
-Run **CI and deploy** manually on the same branch and commit for each of
-`ubuntu-latest`, `boat-small`, and `boat`. The workflow must first exist on the
-default branch. Keep the lockfile and inputs identical.
+Every job uses Blacksmith. GitHub Actions schedules the jobs and displays their
+graph; there are no GitHub-hosted or Boat runners.
 
-Use a new `cache_scope`, such as `comparison-20261101-a`, for the first round.
-Each runner has a separate Turbo cache namespace. Repeat with the same scope
-and commit to measure a warm cache. The scope controls Turbo caching, not any
-provider's preinstalled tools or package download caches. Check cache restore
-logs and Turbo's hit counts before labeling a result warm.
+Blacksmith uses 2 vCPU for Android checks, Linux, Windows and publishing, and
+4 vCPU for Web and APK builds. Install the Blacksmith GitHub App for the repository.
 
-The default manual run installs, checks, tests, and builds without deployment
-credentials. Enable `preview` to measure the full deployment path using the
-preview key. Manual runs never deploy production. Each runner gets a separate
-`ci-benchmark-<runner>` preview. Manual runs on the same runner serialize across
-branches, so two branches cannot deploy to the same benchmark preview at once.
+Bun cache keys include OS, architecture, Bun version and lockfile. Each fresh
+runner installs from that cache; `node_modules` is not transferred between OSes.
+Turbo caches checks and web builds. Gradle caches dependencies and cacheable build
+outputs; Electron downloads have their own cache. Artifacts use zero compression
+and one-day retention. Superseded PR runs cancel; production runs serialize.
 
-Record the workflow/run URL, commit, attempt, actual CPU/RAM details from
-**Record machine**, cache state, and step timings. For each job, compute queue
-time as `started_at - created_at` and runtime as `completed_at - started_at`
-from GitHub's jobs API. Also record time from workflow creation to job creation
-and workflow creation to job completion, so workflow scheduling delay is not
-hidden. For reruns, use that attempt's start and jobs instead of the original
-workflow creation time.
+Default branch caches can seed previews; sibling
+PR caches are not automatically shared. No cache access policy is changed here.
+Native compilation and external deployment can take longer than one minute.
 
-The deployment log prints `Web build seconds` separately from the combined
-backend deployment, web build, and upload step. `boat ci job <job-id> --json`
-provides Boat's own provisioning/wait/runtime measurements. Do not add its wait
-time to GitHub's queue time: the intervals can overlap. Compare multiple cold
-and warm rounds before choosing a default based on speed.
+## Configuration
+
+Web requires `CONVEX_DEPLOY_KEY_PREVIEW` for PRs and `CONVEX_DEPLOY_KEY` for main.
+Android requires `EXPO_TOKEN` plus `EXPO_PROJECT_ID`, `EXPO_OWNER` and `EXPO_SLUG`
+repository variables. See [mobile setup](../apps/mobile/README.md) for signing.
+Only the Release job gets contents-write permission. Native build failure leaves
+web deployed but prevents publishing a partial native release.
+
+Benchmark branches are separate from this product workflow. Build-only benchmark
+URLs and cache timings do not prove a live backend deployment or device behavior.

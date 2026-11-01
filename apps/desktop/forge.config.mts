@@ -5,15 +5,11 @@ import { MakerDeb } from '@electron-forge/maker-deb';
 import { MakerRpm } from '@electron-forge/maker-rpm';
 import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
-import { PublisherGitHub } from '@electron-forge/publisher-github';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
 
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
-    // Native bundle metadata needs a numeric version; package.json retains the PR suffix.
-    appVersion: process.env.DESKTOP_VERSION?.split('-')[0],
-    buildVersion: process.env.DESKTOP_VERSION?.split('-')[0],
     download: {
       cacheRoot: process.env.electron_config_cache,
     },
@@ -37,17 +33,6 @@ const config: ForgeConfig = {
     new MakerZIP({}, ['darwin']),
     new MakerRpm({}),
     new MakerDeb({}),
-  ],
-  publishers: [
-    new PublisherGitHub({
-      repository: {
-        owner: 'disposabl-dev',
-        name: 'create-disposabl-app',
-      },
-      tagPrefix: 'desktop-v',
-      draft: true,
-      prerelease: false,
-    }),
   ],
   plugins: [
     new VitePlugin({

@@ -23,12 +23,7 @@
       "inputs": ["$TURBO_DEFAULT$", "!src/routeTree.gen.ts"],
       "outputs": ["src/routeTree.gen.ts"]
     },
-    "@disposabl/backend#dev:setup": {
-      "cache": false,
-      "passThroughEnv": ["CONVEX_DEPLOY_KEY"]
-    },
     "dev": {
-      "dependsOn": ["@disposabl/backend#dev:setup"],
       "cache": false,
       "persistent": true,
       "passThroughEnv": ["VITE_*"]

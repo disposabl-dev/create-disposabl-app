@@ -12,3 +12,5 @@ dist/
 .nitro/
 .vinxi/
 *.tsbuildinfo
+
+.cache/
