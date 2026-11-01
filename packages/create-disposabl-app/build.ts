@@ -54,6 +54,10 @@ await cp(join(root, "LICENSE"), join(dir, "LICENSE"));
         recursive: true,
         filter: (path) => path !== join(root, ".github/workflows/publish.yml"),
       });
+      await rename(
+        join(templateDir, ".github/workflows/pipeline.yml.template"),
+        join(templateDir, ".github/workflows/pipeline.yml"),
+      );
     } else if (entry === "packages") {
       for (const pkg of await readdir(join(root, entry))) {
         if (pkg !== "create-disposabl-app") {

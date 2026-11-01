@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   pipeline:
-    if: github.event.deleted != true && github.repository != 'disposabl-dev/create-disposabl-app'
+    if: github.event.deleted != true
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
