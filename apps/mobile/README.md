@@ -8,9 +8,10 @@ compatible changes.
 Select `android` in the root `disposabl.json`. When mobile or shared dependencies
 change, CI computes the Expo fingerprint in the Web job after web/backend
 deployment, reusing its runner and dependency install. The first run builds an
-installable APK on that same 4-vCPU runner. Later runs with the same fingerprint
-publish EAS Update there; native changes build another APK without another
-checkout or dependency install. Linux and Windows build alongside this job.
+installable APK in a separate 4-vCPU Android job. Later runs with the same fingerprint
+publish EAS Update from Web. Native jobs install only the mobile workspace using
+the shared dependency cache. Android and iOS native builds run in parallel.
+Linux and Windows start alongside Web.
 All CI jobs run on Blacksmith. See [.github/README.md](../../.github/README.md)
 for the job order and cache behavior.
 
@@ -86,7 +87,7 @@ preserve increasing numbers if moving this workflow to another repository.
 An OTA update does not require the signing key because it does not build an APK.
 
 Native builds publish GitHub prereleases for previews and releases for
-production. The Web runner publishes Android directly after its build or update,
+production. Web publishes Android after an update; the Android job publishes after a native build,
 without waiting for desktop. Each PR reuses its Android release, normally
 `app-pr-N-android`, replacing the APK/metadata and moving the tag to the tested
 commit. Only a published APK with matching metadata and digest is reusable.
@@ -101,12 +102,16 @@ the distribution workflow.
 
 ## iOS
 
-When iOS is enabled and affected, the Web + Android runner checks the latest
+When iOS is enabled and affected, the Web runner checks the latest
 published iOS release for the same channel, project, bundle ID and runtime.
 A matching IPA with a verified GitHub digest and unexpired provisioning profile
 uses EAS Update. Otherwise a Blacksmith macOS runner performs an EAS local release
 build using the remote signing credentials, then publishes its own iOS release.
-That runner starts only when a new IPA is needed, after Web + Android finishes.
+That runner starts only when a new IPA is needed, after Web finishes, in parallel with any Android native build.
+
+For an existing PR preview, platform selection compares against that platform's
+last published source commit. Unchanged mobile code skips both native builds and
+EAS Update. A successful iOS update advances the release's source commit and tag.
 
 Each PR needs its own initial IPA because its channel is embedded in the app.
 CI sets the EAS profile channel from the workflow's `CHANNEL`, verifies the IPA's

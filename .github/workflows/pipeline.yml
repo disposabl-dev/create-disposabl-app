@@ -32,13 +32,16 @@ env:
 
 jobs:
   web:
-    name: Web + Android
+    name: Web
     permissions: &release-permissions
       contents: write
       pull-requests: read
     timeout-minutes: 45
     runs-on: *linux-runner
     outputs:
+      android_build: ${{ steps.fingerprint.outputs.build }}
+      android_runtime: ${{ steps.fingerprint.outputs.runtime }}
+      android_manifest: ${{ steps.fingerprint.outputs.manifest }}
       ios_build: ${{ steps.ios.outputs.build }}
       ios_manifest: ${{ steps.ios.outputs.manifest }}
       convex_url: ${{ steps.deploy.outputs.CONVEX_URL }}
@@ -64,6 +67,7 @@ jobs:
           PR: ${{ github.event.number }}
           TRUSTED: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
         run: |
+          if [[ "$GITHUB_JOB" == android || "$GITHUB_JOB" == ios ]]; then exit; fi
           if [[ "$TRUSTED" != true ]]; then printf 'android=false\nios=false\ndesktop=[]\nselected=false\n' >> "$GITHUB_OUTPUT"; exit; fi
           if [[ -n "$PR" ]]; then
             gh api "repos/$GH_REPO/pulls/$PR/files?per_page=100" --paginate --jq '.[] | .filename, (.previous_filename // empty)' > "$RUNNER_TEMP/changes"
@@ -74,12 +78,27 @@ jobs:
           fi
           node --input-type=module -e '
             import {readFileSync} from "node:fs";
-            const paths = readFileSync(`${process.env.RUNNER_TEMP}/changes`, "utf8").split("\n").filter(p => !/(^|\/)\.agents\/|\.(md|mdx)$/.test(p));
+            import {execFileSync} from "node:child_process";
+            const relevant = p => p && !/(^|\/)\.agents\/|\.(md|mdx)$/.test(p);
+            const paths = readFileSync(`${process.env.RUNNER_TEMP}/changes`, "utf8").split(/\r?\n/).filter(relevant);
             const enabled = JSON.parse(readFileSync("disposabl.json", "utf8")).platforms;
-            const shared = paths.some(p => /^(bun.lock$|package.json$|disposabl.json$|turbo.json$|bunfig.toml$|patches\/|\.github\/workflows\/pipeline.yml$|packages\/(?!backend\/|create-disposabl-app\/))/.test(p));
-            const mobile = shared || paths.some(p => p.startsWith("apps/mobile/"));
-            for (const platform of ["android", "ios"]) console.log(`${platform}=${enabled.includes(platform) && mobile}`);
-            const desktop = ["linux", "windows", "macos"].filter(platform => enabled.includes(platform) && (shared || paths.some(p => p.startsWith("apps/desktop/"))));
+            const api = path => JSON.parse(execFileSync("gh", ["api", `repos/${process.env.GH_REPO}/${path}`], {encoding: "utf8", stdio: ["ignore", "pipe", "ignore"]}));
+            const changes = platform => {
+              if (!process.env.PR) return paths;
+              try {
+                const release = api(`releases/tags/${process.env.RELEASE_PREFIX}-${process.env.CHANNEL}-${platform}`);
+                const base = /^Source: ([a-f0-9]{40})$/m.exec(release.body || "")?.[1];
+                if (release.draft || !base) return paths;
+                if (base === process.env.SOURCE) return [];
+                const diff = api(`compare/${base}...${process.env.SOURCE}`);
+                // GitHub caps comparison files at 300; never skip on a truncated result.
+                return !["ahead", "identical"].includes(diff.status) || !Array.isArray(diff.files) || diff.files.length >= 300 ? ["disposabl.json"] : diff.files.flatMap(f => [f.filename, f.previous_filename]).filter(relevant);
+              } catch { return paths; }
+            };
+            const affected = (platform, directory) => enabled.includes(platform) && changes(platform).some(p => p.startsWith(directory) || /^(bun.lock$|package.json$|disposabl.json$|turbo.json$|bunfig.toml$|patches\/|\.github\/workflows\/pipeline.yml$|packages\/(?!backend\/|create-disposabl-app\/))/.test(p));
+            const target = process.env.DISPOSABL_DESKTOP_PLATFORM;
+            for (const platform of ["android", "ios"]) console.log(`${platform}=${!target && affected(platform, "apps/mobile/")}`);
+            const desktop = ["linux", "windows", "macos"].filter(platform => target === platform && affected(platform, "apps/desktop/"));
             console.log(`desktop=${JSON.stringify(desktop)}\nselected=${desktop.includes(process.env.DISPOSABL_DESKTOP_PLATFORM)}`);
           ' >> "$GITHUB_OUTPUT"
       - &node
@@ -103,7 +122,7 @@ jobs:
       - &install
         name: Install
         if: github.job != 'desktop' || steps.platforms.outputs.selected == 'true'
-        run: bun install --frozen-lockfile ${{ github.job == 'desktop' && '--filter desktop' || github.job == 'ios' && '--filter @disposabl/mobile' || '' }}
+        run: bun install --frozen-lockfile ${{ github.job == 'desktop' && '--filter desktop' || (github.job == 'ios' || github.job == 'android') && '--filter @disposabl/mobile' || '' }}
       - name: Check
         run: bun run check
       - name: Deploy
@@ -122,7 +141,7 @@ jobs:
           bun x --no-install static-hosting upload $AUTH_TARGET --no-spa --dist ../../apps/web/dist/client
       - &expo
         name: Expo
-        if: github.job == 'ios' || steps.platforms.outputs.android == 'true' || steps.platforms.outputs.ios == 'true'
+        if: github.job == 'ios' || github.job == 'android' || steps.platforms.outputs.android == 'true' || steps.platforms.outputs.ios == 'true'
         working-directory: apps/mobile
         run: |
           jq --arg channel "$CHANNEL" '.build["ios-" + env.EAS_ENVIRONMENT].channel = $channel' eas.json > "$RUNNER_TEMP/eas.json"
@@ -214,50 +233,17 @@ jobs:
           test "$(runtime)" = "$fingerprint"
           test "$(gh api "repos/$GH_REPO/$SOURCE_PATH" --jq 'if has("head") then (if .state == "open" then .head.sha else "closed" end) else .object.sha end')" = "$SOURCE"
           bun x "$EAS_CLI" update --platform ios --channel "$CHANNEL" --environment "$EAS_ENVIRONMENT" --skip-bundler --input-dir dist/update-ios --message "$SOURCE" --non-interactive
-          echo "iOS update published to $CHANNEL." >> "$GITHUB_STEP_SUMMARY"
-      - name: Java
-        if: steps.fingerprint.outputs.build == 'true'
-        uses: actions/setup-java@v5
-        with: {distribution: temurin, java-version: '17'}
-      - name: SDK
-        if: steps.fingerprint.outputs.build == 'true'
-        uses: android-actions/setup-android@v3
-        with: {packages: platform-tools}
-      - name: Gradle
-        if: steps.fingerprint.outputs.build == 'true'
-        uses: gradle/actions/setup-gradle@v4
-        with: {cache-read-only: false}
-      - name: Build
-        if: steps.fingerprint.outputs.build == 'true'
-        working-directory: apps/mobile
-        env:
-          RUNTIME: ${{ steps.fingerprint.outputs.runtime }}
-          DISPOSABL_ANDROID_CHANNEL: *channel
-          MANIFEST: ${{ steps.fingerprint.outputs.manifest }}
-          ANDROID_KEYSTORE_BASE64: ${{ github.event_name == 'push' && secrets.ANDROID_KEYSTORE_BASE64 || '' }}
-          ANDROID_KEYSTORE_PASSWORD: ${{ github.event_name == 'push' && secrets.ANDROID_KEYSTORE_PASSWORD || '' }}
-          ANDROID_KEY_ALIAS: ${{ github.event_name == 'push' && secrets.ANDROID_KEY_ALIAS || '' }}
-          ANDROID_KEY_PASSWORD: ${{ github.event_name == 'push' && secrets.ANDROID_KEY_PASSWORD || '' }}
-        run: |
-          test "$(gh api "repos/$GH_REPO/$SOURCE_PATH" --jq 'if has("head") then (if .state == "open" then .head.sha else "closed" end) else .object.sha end')" = "$SOURCE"
-          if [[ "$CHANNEL" == production ]]; then
-            : "${ANDROID_KEYSTORE_BASE64:?}" "${ANDROID_KEYSTORE_PASSWORD:?}" "${ANDROID_KEY_ALIAS:?}" "${ANDROID_KEY_PASSWORD:?}"
-            export ANDROID_KEYSTORE_PATH="$RUNNER_TEMP/android-release.jks"
-            trap 'rm -f "$ANDROID_KEYSTORE_PATH"' EXIT
-            (umask 077; printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$ANDROID_KEYSTORE_PATH")
+          if [[ "$CHANNEL" != production ]]; then
+            test "$(gh api "repos/$GH_REPO/$SOURCE_PATH" --jq .head.sha)" = "$SOURCE"
+            tag=$(jq -r .tag_name "$RUNNER_TEMP/ios-release.json")
+            jq -r --arg source "$SOURCE" '.body | sub("(?m)^Source: [a-f0-9]+"; "Source: " + $source)' "$RUNNER_TEMP/ios-release.json" > "$RUNNER_TEMP/ios-notes.md"
+            gh api --method PATCH "repos/$GH_REPO/git/refs/tags/$tag" -f sha="$SOURCE" -F force=true > /dev/null
+            gh release edit "$tag" --notes-file "$RUNNER_TEMP/ios-notes.md"
           fi
-          bun x --no-install expo prebuild --platform android --no-install
-          test "$(bun x --no-install expo-updates runtimeversion:resolve --platform android --workflow managed | jq -er .runtimeVersion)" = "$RUNTIME"
-          (cd android && ./gradlew :app:assembleRelease --no-daemon --build-cache)
-          apk=android/app/build/outputs/apk/release/app-release.apk
-          test "$(unzip -p "$apk" assets/fingerprint)" = "$RUNTIME"
-          test "$(bun x --no-install expo-updates runtimeversion:resolve --platform android --workflow managed | jq -er .runtimeVersion)" = "$RUNTIME"
-          mkdir -p ../../dist/release
-          cp "$apk" ../../dist/release/android.apk
-          jq --arg sha "$(sha256sum "$apk" | cut -d' ' -f1)" '. + {sha256: $sha, action: "build"}' <<< "$MANIFEST" > ../../dist/release/android.json
+          echo "iOS update published to $CHANNEL." >> "$GITHUB_STEP_SUMMARY"
       - &publish
         name: Publish
-        if: github.job == 'ios' || (github.job == 'web' && steps.platforms.outputs.android == 'true') || steps.platforms.outputs.selected == 'true'
+        if: github.job == 'ios' || github.job == 'android' || (github.job == 'web' && hashFiles('dist/release/android.json') != '') || steps.platforms.outputs.selected == 'true'
         shell: bash
         run: |
           check_source() { test "$(gh api "repos/$GH_REPO/$SOURCE_PATH" --jq 'if has("head") then (if .state == "open" then .head.sha else "closed" end) else .object.sha end')" = "$SOURCE"; }
@@ -292,6 +278,70 @@ jobs:
           check_source
           gh release edit "$TAG" --title "$CHANNEL / $PLATFORM" --notes-file notes.md --draft=false --prerelease=${{ github.event_name == 'pull_request' }} --latest=false
           echo "Release: https://github.com/$GH_REPO/releases/tag/$TAG" >> "$GITHUB_STEP_SUMMARY"
+
+  android:
+    name: Android
+    needs: web
+    if: needs.web.outputs.android_build == 'true'
+    permissions: *release-permissions
+    runs-on: *linux-runner
+    timeout-minutes: 60
+    env:
+      PLATFORM: android
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      EXPO_PROJECT_ID: ${{ vars.EXPO_PROJECT_ID }}
+      EXPO_OWNER: ${{ vars.EXPO_OWNER }}
+      EXPO_SLUG: ${{ vars.EXPO_SLUG }}
+      EXPO_NO_DOTENV: '1'
+      CONVEX_URL: ${{ needs.web.outputs.convex_url }}
+      CONVEX_SITE_URL: ${{ needs.web.outputs.convex_site_url }}
+      EXPO_PUBLIC_CONVEX_URL: ${{ needs.web.outputs.convex_url }}
+      EXPO_PUBLIC_CONVEX_SITE_URL: ${{ needs.web.outputs.convex_site_url }}
+    steps:
+      - *checkout
+      - *platforms
+      - *node
+      - *bun
+      - *cache
+      - *install
+      - *expo
+      - name: Java
+        uses: actions/setup-java@v5
+        with: {distribution: temurin, java-version: '17'}
+      - name: SDK
+        uses: android-actions/setup-android@v3
+        with: {packages: platform-tools}
+      - name: Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with: {cache-read-only: false}
+      - name: Build
+        working-directory: apps/mobile
+        env:
+          RUNTIME: ${{ needs.web.outputs.android_runtime }}
+          DISPOSABL_ANDROID_CHANNEL: *channel
+          MANIFEST: ${{ needs.web.outputs.android_manifest }}
+          ANDROID_KEYSTORE_BASE64: ${{ github.event_name == 'push' && secrets.ANDROID_KEYSTORE_BASE64 || '' }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ github.event_name == 'push' && secrets.ANDROID_KEYSTORE_PASSWORD || '' }}
+          ANDROID_KEY_ALIAS: ${{ github.event_name == 'push' && secrets.ANDROID_KEY_ALIAS || '' }}
+          ANDROID_KEY_PASSWORD: ${{ github.event_name == 'push' && secrets.ANDROID_KEY_PASSWORD || '' }}
+        run: |
+          test "$(gh api "repos/$GH_REPO/$SOURCE_PATH" --jq 'if has("head") then (if .state == "open" then .head.sha else "closed" end) else .object.sha end')" = "$SOURCE"
+          if [[ "$CHANNEL" == production ]]; then
+            : "${ANDROID_KEYSTORE_BASE64:?}" "${ANDROID_KEYSTORE_PASSWORD:?}" "${ANDROID_KEY_ALIAS:?}" "${ANDROID_KEY_PASSWORD:?}"
+            export ANDROID_KEYSTORE_PATH="$RUNNER_TEMP/android-release.jks"
+            trap 'rm -f "$ANDROID_KEYSTORE_PATH"' EXIT
+            (umask 077; printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$ANDROID_KEYSTORE_PATH")
+          fi
+          bun x --no-install expo prebuild --platform android --no-install
+          test "$(bun x --no-install expo-updates runtimeversion:resolve --platform android --workflow managed | jq -er .runtimeVersion)" = "$RUNTIME"
+          (cd android && ./gradlew :app:assembleRelease --no-daemon --build-cache)
+          apk=android/app/build/outputs/apk/release/app-release.apk
+          test "$(unzip -p "$apk" assets/fingerprint)" = "$RUNTIME"
+          test "$(bun x --no-install expo-updates runtimeversion:resolve --platform android --workflow managed | jq -er .runtimeVersion)" = "$RUNTIME"
+          mkdir -p ../../dist/release
+          cp "$apk" ../../dist/release/android.apk
+          jq --arg sha "$(sha256sum "$apk" | cut -d' ' -f1)" '. + {sha256: $sha, action: "build"}' <<< "$MANIFEST" > ../../dist/release/android.json
+      - *publish
 
   ios:
     name: iOS
