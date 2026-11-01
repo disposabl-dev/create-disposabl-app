@@ -20,6 +20,7 @@
     },
     "@disposabl/web#typecheck": {
       "dependsOn": ["^typecheck"],
+      "inputs": ["$TURBO_DEFAULT$", "!src/routeTree.gen.ts"],
       "outputs": ["src/routeTree.gen.ts"]
     },
     "@disposabl/backend#dev:setup": {
