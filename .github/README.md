@@ -18,6 +18,12 @@ helpers or local development setup hooks. Backend development uses `convex dev`.
 4. **Release** collects successful outputs into one prerelease, or a stable release
    for main. It runs on a 2-vCPU Blacksmith runner after all builds finish.
 
+Each PR has one published prerelease at `app-<CHANNEL>` (normally `app-pr-N`).
+Successful updates replace its assets and notes, remove obsolete assets and move
+the preview tag to the tested commit. Failed builds leave the previous preview.
+New releases are drafts only during their initial upload, then become public.
+Production keeps a separate tag per run and is marked as the latest stable release.
+
 **iOS native builds are skipped.** When iOS is enabled and affected,
 Web computes its fingerprint and checks the latest finished internal EAS build
 for the same channel and bundle ID. A matching, unexpired iPhone IPA receives an
@@ -70,7 +76,7 @@ repository variables. See [mobile setup](../apps/mobile/README.md) for signing.
 macOS signing and notarization use the five optional
 [desktop signing secrets](../apps/desktop/README.md#macos-signing). With all five
 present, both previews and production are Developer ID signed and notarized.
-Otherwise, both publish an ad hoc signed, unnotarized Apple Silicon ZIP with its
+Otherwise, both publish an ad hoc signed, unnotarized Apple Silicon DMG with its
 status and installation guidance in the release notes. Configured signing or
 notarization failures still fail the job. Apple notarization adds external
 processing time. `MACOS_BUNDLE_ID` configures the app identifier.

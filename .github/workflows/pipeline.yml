@@ -160,7 +160,7 @@ jobs:
         run: |
           for ((page=1; ; page++)); do
             gh api "repos/$GH_REPO/releases?per_page=100&page=$page" > "$RUNNER_TEMP/releases.json"
-            jq --arg prefix "app-$CHANNEL-" '[.[] | select(.draft | not) | select(.tag_name | startswith($prefix)) | select(any(.assets[]; .name == "android.apk"))][0] // {}' "$RUNNER_TEMP/releases.json" > "$RUNNER_TEMP/release.json"
+            jq --arg tag "app-$CHANNEL" '[.[] | select(.draft | not) | select(.tag_name == $tag or (.tag_name | startswith($tag + "-"))) | select(any(.assets[]; .name == "android.apk"))] | sort_by(.tag_name != $tag) | .[0] // {}' "$RUNNER_TEMP/releases.json" > "$RUNNER_TEMP/release.json"
             if jq -e '.id' "$RUNNER_TEMP/release.json" > /dev/null || [[ $(jq length "$RUNNER_TEMP/releases.json") -lt 100 ]]; then break; fi
           done
           bun -e '
@@ -302,9 +302,11 @@ jobs:
       - name: Verify
         if: steps.platforms.outputs.selected == 'true' && matrix.platform == 'macos'
         run: |
-          zips=(dist/release/*.zip)
-          test "${#zips[@]}" -eq 1 && test -s "${zips[0]}"
-          ditto -x -k "${zips[0]}" "$RUNNER_TEMP/macos-verify"
+          images=(dist/release/*.dmg)
+          test "${#images[@]}" -eq 1 && test -s "${images[0]}"
+          mkdir -p "$RUNNER_TEMP/macos-verify"
+          hdiutil attach "${images[0]}" -readonly -nobrowse -mountpoint "$RUNNER_TEMP/macos-verify"
+          trap 'hdiutil detach "$RUNNER_TEMP/macos-verify"' EXIT
           apps=("$RUNNER_TEMP/macos-verify/"*.app)
           test "${#apps[@]}" -eq 1 && test -d "${apps[0]}"
           codesign --verify --deep --strict "${apps[0]}"
@@ -351,9 +353,21 @@ jobs:
           find dist/release -mindepth 2 -type f -exec mv -n {} dist/release/ \;
           find dist/release -mindepth 1 -type d -empty -delete
           test "$(find dist/release -mindepth 1 -type d | wc -l)" -eq 0
-          TAG="app-$CHANNEL-${{ github.run_id }}-${{ github.run_attempt }}"
+          TAG="app-$CHANNEL"
+          if [[ '${{ github.event_name }}' == push ]]; then TAG+="-${{ github.run_id }}-${{ github.run_attempt }}"; fi
           echo "Source: $SOURCE" > notes.md
           if [[ -f dist/release/macos.txt ]]; then cat dist/release/macos.txt >> notes.md; fi
           if [[ -f dist/release/android.json ]]; then echo "<!-- android $(jq -c . dist/release/android.json) -->" >> notes.md; fi
-          gh release create "$TAG" dist/release/* --draft --target "$SOURCE" --title "$CHANNEL" --notes-file notes.md --prerelease=${{ github.event_name == 'pull_request' }}
-          check_source && gh release edit "$TAG" --draft=false --latest=false
+          if gh release view "$TAG" --json assets > previous.json; then
+            gh release upload "$TAG" dist/release/* --clobber
+            while IFS= read -r asset; do
+              if [[ ! -f "dist/release/$asset" ]]; then gh release delete-asset "$TAG" "$asset" --yes; fi
+            done < <(jq -r '.assets[].name' previous.json)
+            check_source
+            if [[ '${{ github.event_name }}' == pull_request ]]; then gh api --method PATCH "repos/$GH_REPO/git/refs/tags/$TAG" -f sha="$SOURCE" -F force=true > /dev/null; fi
+          else
+            gh release create "$TAG" dist/release/* --draft --target "$SOURCE" --title "$CHANNEL" --notes-file notes.md --prerelease=${{ github.event_name == 'pull_request' }}
+          fi
+          check_source
+          gh release edit "$TAG" --title "$CHANNEL" --notes-file notes.md --draft=false --prerelease=${{ github.event_name == 'pull_request' }} --latest=${{ github.event_name == 'push' }}
+          echo "Release: https://github.com/$GH_REPO/releases/tag/$TAG" >> "$GITHUB_STEP_SUMMARY"

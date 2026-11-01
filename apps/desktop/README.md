@@ -30,7 +30,7 @@ the project scripts; Forge and Electron still use Node.js.
 | -------- | -------------------- | ------------------------------------------ | -------------- |
 | Windows  | x64                  | Squirrel `Setup.exe`, `.nupkg`, `RELEASES` | `make:windows` |
 | Linux    | x64                  | `.deb` and `.rpm`                          | `make:linux`   |
-| macOS    | arm64, Apple Silicon | `.zip` containing the `.app`               | `make:macos`   |
+| macOS    | arm64, Apple Silicon | `.dmg` containing the `.app`               | `make:macos`   |
 
 Run each script with `bun run --cwd apps/desktop <script>`. Packaging rejects other
 platform and architecture combinations, including Windows ARM and Intel macOS.
@@ -72,12 +72,12 @@ secrets, or grant this repository access to equivalent organization secrets:
 With all five secrets present, the same credentials sign and notarize prereleases
 and production releases. The suffix is a naming convention. The workflow imports
 the certificate into a temporary keychain, lets Forge sign, notarize and staple
-the app, and checks the extracted ZIP with `codesign`, Gatekeeper and `stapler`.
+the app, and checks the app mounted from the DMG with `codesign`, Gatekeeper and `stapler`.
 The keychain and temporary notarization key are cleaned up. Configured signing or
 notarization failures stop publication; they do not silently downgrade the app.
 
 Without the complete credential set, previews and production still publish an ad
-hoc signed ZIP. This signature does not verify the developer's identity. The
+hoc signed DMG. This signature does not verify the developer's identity. The
 release notes identify it as unnotarized and link to Apple's installation guidance.
 Users may need **System Settings > Privacy & Security > Open Anyway**; managed Macs
 may disallow this. Local `make:macos` builds also use ad hoc signing by default.

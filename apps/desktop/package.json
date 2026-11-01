@@ -36,9 +36,9 @@
   "devDependencies": {
     "@electron-forge/cli": "8.0.1",
     "@electron-forge/maker-deb": "8.0.1",
+    "@electron-forge/maker-dmg": "8.0.1",
     "@electron-forge/maker-rpm": "8.0.1",
     "@electron-forge/maker-squirrel": "8.0.1",
-    "@electron-forge/maker-zip": "8.0.1",
     "@electron-forge/plugin-fuses": "8.0.1",
     "@electron-forge/plugin-vite": "8.0.1",
     "@electron-forge/shared-types": "8.0.1",
