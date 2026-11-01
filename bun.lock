@@ -130,7 +130,7 @@
     },
     "packages/create-disposabl-app": {
       "name": "create-disposabl-app",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "bin": {
         "create-disposabl-app": "dist/index.js",
       },
