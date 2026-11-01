@@ -92,8 +92,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.bun/install/cache
-          key: bun-${{ runner.os }}-${{ runner.arch }}-${{ env.BUN_VERSION }}-${{ hashFiles('bun.lock') }}
-          restore-keys: bun-${{ runner.os }}-${{ runner.arch }}-${{ env.BUN_VERSION }}-
+          key: bun-${{ github.job == 'desktop' && 'desktop-' || '' }}${{ runner.os }}-${{ runner.arch }}-${{ env.BUN_VERSION }}-${{ hashFiles('bun.lock') }}
+          restore-keys: bun-${{ github.job == 'desktop' && 'desktop-' || '' }}${{ runner.os }}-${{ runner.arch }}-${{ env.BUN_VERSION }}-
       - name: Turbo
         uses: actions/cache@v4
         with:
@@ -103,14 +103,14 @@ jobs:
       - &install
         name: Install
         if: github.job == 'web' || steps.platforms.outputs.selected == 'true'
-        run: bun install --frozen-lockfile
+        run: bun install --frozen-lockfile ${{ github.job == 'desktop' && '--filter desktop' || '' }}
       - name: Check
         run: bun x --no-install turbo run typecheck lint && bun fmt --check && bun test --pass-with-no-tests
       - name: Deploy
         id: deploy
         env:
           TRUSTED: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
-          CONVEX_DEPLOY_KEY: ${{ github.event_name == 'push' && secrets.CONVEX_DEPLOY_KEY || secrets.CONVEX_DEPLOY_KEY_PREVIEW }}
+          CONVEX_DEPLOY_KEY: ${{ secrets[github.event_name == 'push' && 'CONVEX_DEPLOY_KEY' || 'CONVEX_DEPLOY_KEY_PREVIEW'] }}
         run: |
           if [[ "$TRUSTED" != true ]]; then VITE_CONVEX_URL=https://ci.invalid VITE_CONVEX_SITE_URL=https://ci.invalid bun run build --filter=!desktop; exit; fi
           : "${CONVEX_DEPLOY_KEY:?Configure the Convex deployment secret for this repository}"

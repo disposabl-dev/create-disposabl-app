@@ -14,7 +14,12 @@ export const mobileRoot = fileURLToPath(new URL("../", import.meta.url));
 export function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
     cwd: mobileRoot,
-    env: process.env,
+    env: {
+      ...process.env,
+      DISPOSABL_ANDROID_CHANNEL:
+        process.env.DISPOSABL_MOBILE_CHANNEL ||
+        process.env.DISPOSABL_ANDROID_CHANNEL,
+    },
     stdio: "inherit",
     encoding: "utf8",
     maxBuffer: 32 * 1024 * 1024,
