@@ -260,6 +260,7 @@ jobs:
     env:
       ARTIFACT: platform-${{ matrix.platform }}
       DISPOSABL_DESKTOP_PLATFORM: ${{ matrix.platform }}
+      MACOS_NOTARIZE: ${{ secrets.MACOS_CERTIFICATES_P12_PRODUCTION != '' && secrets.MACOS_CERTIFICATES_PASSWORD_PRODUCTION != '' && secrets.MACOS_APPLE_API_KEY_P8_PRODUCTION != '' && secrets.MACOS_APPLE_API_KEY_ID_PRODUCTION != '' && secrets.MACOS_APPLE_API_ISSUER_PRODUCTION != '' }}
       electron_config_cache: ${{ github.workspace }}/.cache/electron
     steps:
       - *checkout
@@ -277,15 +278,15 @@ jobs:
       - name: Packages
         if: steps.platforms.outputs.selected == 'true' && matrix.platform == 'linux'
         run: command -v fakeroot && command -v rpmbuild && command -v dpkg-deb || { sudo apt-get update && sudo apt-get install -y fakeroot dpkg rpm; }
-      # Published previews and production use the same signing identity.
+      # Apple credentials are optional for both previews and production.
       - name: Sign
-        if: steps.platforms.outputs.selected == 'true' && matrix.platform == 'macos'
+        if: steps.platforms.outputs.selected == 'true' && matrix.platform == 'macos' && env.MACOS_NOTARIZE == 'true'
         uses: apple-actions/import-codesign-certs@v7.2.0
         with:
           p12-file-base64: ${{ secrets.MACOS_CERTIFICATES_P12_PRODUCTION }}
           p12-password: ${{ secrets.MACOS_CERTIFICATES_PASSWORD_PRODUCTION }}
       - name: Notary
-        if: steps.platforms.outputs.selected == 'true' && matrix.platform == 'macos'
+        if: steps.platforms.outputs.selected == 'true' && matrix.platform == 'macos' && env.MACOS_NOTARIZE == 'true'
         env:
           API_KEY_P8: ${{ secrets.MACOS_APPLE_API_KEY_P8_PRODUCTION }}
           API_KEY_ID: ${{ secrets.MACOS_APPLE_API_KEY_ID_PRODUCTION }}
@@ -307,8 +308,14 @@ jobs:
           apps=("$RUNNER_TEMP/macos-verify/"*.app)
           test "${#apps[@]}" -eq 1 && test -d "${apps[0]}"
           codesign --verify --deep --strict "${apps[0]}"
-          spctl --assess --type execute --verbose "${apps[0]}"
-          xcrun stapler validate "${apps[0]}"
+          if [[ "$MACOS_NOTARIZE" == true ]]; then
+            spctl --assess --type execute --verbose "${apps[0]}"
+            xcrun stapler validate "${apps[0]}"
+            echo 'macOS: Apple Silicon, Developer ID signed and notarized.' > dist/release/macos.txt
+          else
+            echo 'macOS: Apple Silicon, ad hoc signed and NOT notarized. If blocked, use System Settings > Privacy & Security > Open Anyway. https://support.apple.com/102445' > dist/release/macos.txt
+          fi
+          cat dist/release/macos.txt >> "$GITHUB_STEP_SUMMARY"
       - name: Upload
         if: steps.platforms.outputs.selected == 'true'
         uses: actions/upload-artifact@v4
@@ -346,6 +353,7 @@ jobs:
           test "$(find dist/release -mindepth 1 -type d | wc -l)" -eq 0
           TAG="app-$CHANNEL-${{ github.run_id }}-${{ github.run_attempt }}"
           echo "Source: $SOURCE" > notes.md
+          if [[ -f dist/release/macos.txt ]]; then cat dist/release/macos.txt >> notes.md; fi
           if [[ -f dist/release/android.json ]]; then echo "<!-- android $(jq -c . dist/release/android.json) -->" >> notes.md; fi
           gh release create "$TAG" dist/release/* --draft --target "$SOURCE" --title "$CHANNEL" --notes-file notes.md --prerelease=${{ github.event_name == 'pull_request' }}
           check_source && gh release edit "$TAG" --draft=false --latest=false

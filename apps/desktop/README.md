@@ -53,14 +53,14 @@ and collects outputs into the repository root `dist/release`. The final pipeline
 publishes one GitHub prerelease containing the affected enabled platforms. Individual
 Forge jobs do not publish or require a GitHub write token.
 
-Windows and Linux installers are unsigned. Published macOS builds are signed and
-notarized. In-app updates are not configured. The release version is
+Windows and Linux installers are unsigned. macOS builds use ad hoc signing by
+default; Developer ID signing and notarization are optional. In-app updates are not configured. The release version is
 `1.0.<workflow run number>`. See the root `.github/README.md` for release behavior.
 
 ## macOS signing
 
-Configure these repository secrets, or grant this repository access to equivalent
-organization secrets:
+To enable Developer ID signing and notarization, configure all five repository
+secrets, or grant this repository access to equivalent organization secrets:
 
 - `MACOS_CERTIFICATES_P12_PRODUCTION`: base64-encoded Developer ID Application
   certificate and private key exported as `.p12`.
@@ -69,14 +69,18 @@ organization secrets:
 - `MACOS_APPLE_API_KEY_ID_PRODUCTION`: its Key ID.
 - `MACOS_APPLE_API_ISSUER_PRODUCTION`: its Issuer ID.
 
-The same credentials sign and notarize prereleases and production releases.
-The suffix is a secret naming convention, not a restriction to production.
-The workflow imports the certificate into a temporary keychain, lets Forge sign,
-notarize and staple the app, and verifies the extracted release ZIP with
-`codesign`, Gatekeeper and `stapler` before upload. The keychain and temporary
-notarization key are cleaned up. Change `MACOS_BUNDLE_ID` at the top of the workflow
-to set your desktop bundle identifier.
+With all five secrets present, the same credentials sign and notarize prereleases
+and production releases. The suffix is a naming convention. The workflow imports
+the certificate into a temporary keychain, lets Forge sign, notarize and staple
+the app, and checks the extracted ZIP with `codesign`, Gatekeeper and `stapler`.
+The keychain and temporary notarization key are cleaned up. Configured signing or
+notarization failures stop publication; they do not silently downgrade the app.
 
-Local `make:macos` builds do not require these release credentials. The CI
-`DISPOSABL_DESKTOP_PLATFORM=macos` path requires notarization credentials and fails
-if signing or notarization fails. CI does not build Intel macOS packages.
+Without the complete credential set, previews and production still publish an ad
+hoc signed ZIP. This signature does not verify the developer's identity. The
+release notes identify it as unnotarized and link to Apple's installation guidance.
+Users may need **System Settings > Privacy & Security > Open Anyway**; managed Macs
+may disallow this. Local `make:macos` builds also use ad hoc signing by default.
+
+Change `MACOS_BUNDLE_ID` at the top of the workflow to set your desktop bundle
+identifier. CI builds only Apple Silicon (`arm64`), never Intel macOS packages.

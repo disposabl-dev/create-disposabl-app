@@ -7,7 +7,8 @@ import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
 
-const signedRelease = process.env.DISPOSABL_DESKTOP_PLATFORM === 'macos';
+const signedRelease =
+  process.platform === 'darwin' && process.env.MACOS_NOTARIZE === 'true';
 if (
   signedRelease &&
   (!process.env.APPLE_API_KEY ||
@@ -20,9 +21,22 @@ const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
     appBundleId: process.env.MACOS_BUNDLE_ID || 'dev.disposabl.starter.desktop',
+    ...(process.platform === 'darwin'
+      ? {
+          osxSign: signedRelease
+            ? {}
+            : {
+                identity: '-',
+                identityValidation: false,
+                optionsForFile: () => ({
+                  hardenedRuntime: false,
+                  timestamp: 'none',
+                }),
+              },
+        }
+      : {}),
     ...(signedRelease
       ? {
-          osxSign: {},
           osxNotarize: {
             appleApiKey: process.env.APPLE_API_KEY!,
             appleApiKeyId: process.env.APPLE_API_KEY_ID!,

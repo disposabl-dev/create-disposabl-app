@@ -67,11 +67,13 @@ The 4-vCPU configuration is a candidate until comparable cold/warm runs verify i
 Web requires `CONVEX_DEPLOY_KEY_PREVIEW` for PRs and `CONVEX_DEPLOY_KEY` for main.
 Mobile previews require `EXPO_TOKEN` plus `EXPO_PROJECT_ID`, `EXPO_OWNER` and `EXPO_SLUG`
 repository variables. See [mobile setup](../apps/mobile/README.md) for signing.
-macOS requires the five [desktop signing secrets](../apps/desktop/README.md#macos-signing).
-Published macOS previews and production builds are signed and notarized with the
-same credentials. Missing credentials or failed notarization fail the macOS job;
-the pipeline never silently publishes an unsigned Mac preview. Apple notarization
-adds external processing time. `MACOS_BUNDLE_ID` configures the app identifier.
+macOS signing and notarization use the five optional
+[desktop signing secrets](../apps/desktop/README.md#macos-signing). With all five
+present, both previews and production are Developer ID signed and notarized.
+Otherwise, both publish an ad hoc signed, unnotarized Apple Silicon ZIP with its
+status and installation guidance in the release notes. Configured signing or
+notarization failures still fail the job. Apple notarization adds external
+processing time. `MACOS_BUNDLE_ID` configures the app identifier.
 Only the Release job gets contents-write permission. Native build failure leaves
 web deployed but prevents publishing a partial native release.
 
