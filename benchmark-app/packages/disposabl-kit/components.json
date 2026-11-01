@@ -1,0 +1,23 @@
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "base-vega",
+  "rsc": false,
+  "tsx": true,
+  "tailwind": {
+    "config": "",
+    "css": "client/styles/globals.css",
+    "baseColor": "neutral",
+    "cssVariables": true
+  },
+  "iconLibrary": "lucide",
+  "aliases": {
+    "components": "@disposabl/disposabl-kit/client/components/ui",
+    "utils": "@disposabl/disposabl-kit/client/lib/utils",
+    "hooks": "@disposabl/disposabl-kit/client/hooks",
+    "lib": "@disposabl/disposabl-kit/client/lib",
+    "ui": "@disposabl/disposabl-kit/client/components/ui"
+  },
+  "rtl": false,
+  "menuColor": "default",
+  "menuAccent": "subtle"
+}

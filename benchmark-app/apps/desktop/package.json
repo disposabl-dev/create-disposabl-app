@@ -1,0 +1,55 @@
+{
+  "name": "desktop",
+  "productName": "desktop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "My Electron application description",
+  "keywords": [],
+  "license": "MIT",
+  "author": {
+    "name": "vivek-yast",
+    "email": "vivek@yast.ai"
+  },
+  "main": ".vite/build/main.cjs",
+  "packageManager": "bun@1.4.4",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "dev": "electron-forge start",
+    "start": "electron-forge start",
+    "build": "electron-forge package",
+    "package": "electron-forge package",
+    "make": "electron-forge make",
+    "make:windows": "electron-forge make --platform=win32 --arch=x64",
+    "make:linux": "electron-forge make --platform=linux --arch=x64",
+    "make:macos": "electron-forge make --platform=darwin --arch=arm64",
+    "lint": "oxlint && oxfmt --check",
+    "lint:fix": "oxlint --fix && oxfmt --write",
+    "format": "oxfmt --write",
+    "typecheck": "tsc --noEmit",
+    "preview": "bun build-ci.mjs"
+  },
+  "dependencies": {
+    "electron-squirrel-startup": "^1.0.1"
+  },
+  "devDependencies": {
+    "@electron-forge/cli": "8.0.1",
+    "@electron-forge/maker-deb": "8.0.1",
+    "@electron-forge/maker-rpm": "8.0.1",
+    "@electron-forge/maker-squirrel": "8.0.1",
+    "@electron-forge/maker-zip": "8.0.1",
+    "@electron-forge/plugin-fuses": "8.0.1",
+    "@electron-forge/plugin-vite": "8.0.1",
+    "@electron-forge/shared-types": "8.0.1",
+    "@electron/fuses": "^2.1.3",
+    "@types/electron-squirrel-startup": "^1.0.2",
+    "@types/node": "^24",
+    "electron": "45.2.1",
+    "oxfmt": "^0.75.0",
+    "oxlint": "^1.90.0",
+    "typescript": "^6.0.2",
+    "vite": "^8",
+    "@electron-forge/publisher-github": "8.0.1"
+  }
+}

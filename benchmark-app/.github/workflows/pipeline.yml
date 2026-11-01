@@ -1,0 +1,137 @@
+name: CI and deploy
+on:
+  pull_request: { branches: [main] }
+  push: { branches: [main] }
+permissions: { contents: read, pull-requests: read }
+concurrency:
+  group: preview-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+env:
+  CI_RUNNER: ${{ vars.DISPOSABL_CI_RUNNER || 'blacksmith-4vcpu-ubuntu-2404' }}
+  GH_TOKEN: ${{ github.token }}
+  GH_REPO: ${{ github.repository }}
+  CHANNEL: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || 'production' }}
+  SOURCE: ${{ github.event.pull_request.head.sha || github.sha }}
+  DISPOSABL_RELEASE_VERSION: 1.0.${{ github.run_number }}
+  electron_config_cache: ${{ github.workspace }}/.cache/electron
+jobs:
+  deploy:
+    runs-on: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && 'ubuntu-latest' || vars.DISPOSABL_CI_RUNNER || 'blacksmith-4vcpu-ubuntu-2404' }}
+    timeout-minutes: 30
+    outputs:
+      {
+        matrix: "${{ steps.deploy.outputs.matrix }}",
+        url: "${{ steps.deploy.outputs.url }}",
+        site: "${{ steps.deploy.outputs.site }}",
+      }
+    steps:
+      - &checkout {
+          uses: actions/checkout@v6,
+          with:
+            {
+              ref: "${{ github.event.pull_request.head.sha || github.sha }}",
+              persist-credentials: false,
+            },
+        }
+      - &node {
+          uses: actions/setup-node@v6,
+          with: { node-version: "24", package-manager-cache: false },
+        }
+      - &bun { uses: oven-sh/setup-bun@v2, with: { bun-version: "1.4.4" } }
+      - &cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ runner.arch }}-1.4.4-${{ hashFiles('bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-${{ runner.arch }}-1.4.4-
+      - uses: actions/cache@v4
+        with:
+          path: .turbo/cache
+          key: turbo-${{ runner.os }}-${{ hashFiles('bun.lock') }}-${{ github.sha }}
+          restore-keys: turbo-${{ runner.os }}-${{ hashFiles('bun.lock') }}-
+      - run: bun install --frozen-lockfile
+      - run: |
+          bun x --no-install turbo run typecheck lint && bun fmt --check
+          bun test --pass-with-no-tests
+      - id: deploy
+        run: bun packages/disposabl-kit/server/preview.mjs
+        env:
+          CONVEX_DEPLOY_KEY: ${{ github.event_name == 'push' && secrets.CONVEX_DEPLOY_KEY || secrets.CONVEX_DEPLOY_KEY_PREVIEW }}
+  build:
+    needs: deploy
+    if: fromJSON(needs.deploy.outputs.matrix).include[0] != null
+    strategy:
+      {
+        fail-fast: false,
+        matrix: "${{ fromJSON(needs.deploy.outputs.matrix) }}",
+      }
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    env:
+      PLATFORM: ${{ matrix.platform }}
+      DISPOSABL_DESKTOP_PLATFORM: ${{ matrix.platform }}
+      DISPOSABL_DEPLOYED_CONVEX_URL: ${{ needs.deploy.outputs.url }}
+      DISPOSABL_DEPLOYED_CONVEX_SITE_URL: ${{ needs.deploy.outputs.site }}
+      EXPO_NO_DOTENV: "1"
+      EXPO_TOKEN: ${{ (matrix.platform == 'android' || matrix.platform == 'ios') && secrets.EXPO_TOKEN || '' }}
+      EXPO_PROJECT_ID: ${{ vars.EXPO_PROJECT_ID }}
+      EXPO_OWNER: ${{ vars.EXPO_OWNER }}
+      EXPO_SLUG: ${{ vars.EXPO_SLUG }}
+      ANDROID_KEYSTORE_BASE64: ${{ matrix.platform == 'android' && github.event_name == 'push' && secrets.ANDROID_KEYSTORE_BASE64 || '' }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ matrix.platform == 'android' && github.event_name == 'push' && secrets.ANDROID_KEYSTORE_PASSWORD || '' }}
+      ANDROID_KEY_ALIAS: ${{ matrix.platform == 'android' && github.event_name == 'push' && secrets.ANDROID_KEY_ALIAS || '' }}
+      ANDROID_KEY_PASSWORD: ${{ matrix.platform == 'android' && github.event_name == 'push' && secrets.ANDROID_KEY_PASSWORD || '' }}
+    steps:
+      - *checkout
+      - *node
+      - *bun
+      - *cache
+      - uses: actions/cache@v4
+        with:
+          {
+            path: ".cache/electron\n~/Library/Caches/CocoaPods",
+            key: "native-${{ runner.os }}-${{ runner.arch }}-${{ matrix.platform }}-${{ hashFiles('bun.lock') }}",
+          }
+      - run: bun install --frozen-lockfile
+      - id: prepare
+        if: matrix.platform == 'android'
+        run: bun run --cwd apps/mobile preview prepare
+      - {
+          uses: actions/setup-java@v5,
+          if: "steps.prepare.outputs.android_build == 'true'",
+          with: { distribution: temurin, java-version: "17" },
+        }
+      - {
+          uses: android-actions/setup-android@v3,
+          if: "steps.prepare.outputs.android_build == 'true'",
+        }
+      - uses: gradle/actions/setup-gradle@v4
+        if: steps.prepare.outputs.android_build == 'true'
+        with: { cache-read-only: false }
+      - if: matrix.platform == 'linux'
+        run: sudo apt-get update && sudo apt-get install -y fakeroot dpkg rpm
+      - run: bun run --cwd "${{ matrix.directory }}" preview
+      - uses: actions/upload-artifact@v4
+        with:
+          {
+            name: "platform-${{ matrix.platform }}",
+            path: dist/release/,
+            if-no-files-found: error,
+            retention-days: 1,
+            compression-level: 0,
+          }
+  release:
+    needs: [deploy, build]
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    permissions: { contents: write, pull-requests: read }
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { pattern: platform-*, path: dist/release, merge-multiple: true }
+      - run: |
+          TAG="app-$CHANNEL-${{ github.run_id }}-${{ github.run_attempt }}"
+          current=$(gh api "repos/$GH_REPO/${{ github.event_name == 'pull_request' && format('pulls/{0}', github.event.number) || 'git/ref/heads/main' }}" --jq '.head.sha // .object.sha')
+          test "$current" = "$SOURCE"
+          echo "Source: $SOURCE" > notes.md
+          if [ -f dist/release/android.json ]; then echo "<!-- android $(jq -c . dist/release/android.json) -->" >> notes.md; fi
+          gh release create "$TAG" dist/release/* --draft --target "$SOURCE" --title "$CHANNEL" --notes-file notes.md --prerelease=${{ github.event_name == 'pull_request' }}
+          gh release edit "$TAG" --draft=false --latest=false
