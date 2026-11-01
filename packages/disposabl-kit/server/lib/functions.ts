@@ -26,9 +26,15 @@ const withPlatforms = <TDefinition, TResult extends object>(
       mcp?: boolean;
     },
   ): TResult => {
+    const mcpEnabled =
+      definition.platforms === undefined
+        ? definition.mcp === true
+        : definition.platforms === true ||
+          (typeof definition.platforms === "object" &&
+            definition.platforms.mcp === true);
     return Object.assign(builder(definition), {
       platforms: definition.platforms,
-      mcp: definition.mcp ?? definition.platforms?.mcp ?? false,
+      mcp: mcpEnabled ? (definition.mcp ?? true) : false,
       args: definition.args,
       returns: definition.returns,
     });

@@ -36,8 +36,6 @@ const config = defineConfig(({ mode }) => {
       tailwindcss(),
       tanstackStart({
         router: kitRouter,
-        // A separate mask keeps shell generation from replacing the prerendered home page.
-        spa: { enabled: true, maskPath: "/?shell" },
         prerender: {
           enabled: true,
           autoStaticPathsDiscovery: true,

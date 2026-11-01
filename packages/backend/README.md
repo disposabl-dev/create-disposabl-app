@@ -23,3 +23,11 @@ npm create convex@latest -t bare
 App drafts require `website`; `cli`, `typescript`, and `python` require `api`, and `openai` and `claude` require `mcp`. App lists currently return at most 100 records. Existing records without platforms read as `website`.
 
 Boat requires `BOAT_API_KEY` in the Convex deployment. Set `SANDBOX_OPENAI_API_KEY` to a separately scoped, budget-limited OpenAI API key before sending a message; it is exposed to code inside the sandbox. Creation and resume use `noEnv: true`. Codex credentials are written to protected files in its sandbox home, and healthy running sandboxes are reused without stopping them. The user-scoped MCP key is revoked on completion or after one hour, so long-running prompts can lose MCP access. An uncertain prompt submission stays locked for review instead of being retried automatically. Live sandbox provisioning, Codex credential loading, and dispatch have not been verified.
+
+# MCP tools
+
+Run `bun run dev` at the workspace root to start Turbo, or in this directory to start only the backend with `convex dev`.
+
+The function builders still accept `platforms: true`, per-platform flags, and the legacy `mcp` flag. MCP server creation is still controlled by `disposabl.json`.
+
+Tool discovery and platform generation are removed for now. The MCP server receives `createMcpTools({})`, so its tool list stays empty even when MCP is enabled and internal functions have `platforms: true`. The tool adapter remains available for future use.

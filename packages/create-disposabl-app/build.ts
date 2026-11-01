@@ -60,26 +60,6 @@ await cp(join(root, "LICENSE"), join(dir, "LICENSE"));
       await copySource(join(root, entry), join(templateDir, entry));
     }
   }
-  const manifestPath = join(templateDir, "package.json");
-  if (!(await Bun.file(manifestPath).exists())) {
-    await Bun.write(
-      manifestPath,
-      JSON.stringify(
-        {
-          name: "disposabl-app",
-          private: true,
-          type: "module",
-          packageManager: "bun@1.4.4",
-          workspaces: ["apps/*", "packages/*"],
-          scripts: {
-            dev: "bun run --parallel --if-present --filter './apps/*' dev",
-          },
-        },
-        null,
-        2,
-      ) + "\n",
-    );
-  }
   // npm omits .gitignore files from packed templates.
   if (await Bun.file(join(templateDir, ".gitignore")).exists()) {
     await rename(

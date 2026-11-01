@@ -1,6 +1,6 @@
 import config from "../../../../disposabl.json";
 
-export type Platforms = { api?: boolean; mcp?: boolean };
+export type Platforms = boolean | { api?: boolean; mcp?: boolean };
 
 /** The generated app config is the source of truth for enabled transports. */
 export function getPlatforms() {
