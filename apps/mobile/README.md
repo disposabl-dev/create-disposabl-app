@@ -1,10 +1,11 @@
 # Mobile previews and updates
 
 Select `android` in the root `disposabl.json`. When mobile or shared dependencies
-change, CI computes the Expo fingerprint after web/backend deployment. The first
-run builds an installable APK on the selected Linux runner. Later runs with the
-same fingerprint publish EAS Update on the 2-vCPU check runner; native changes
-start a separate 4-vCPU APK build.
+change, CI computes the Expo fingerprint in the Web job after web/backend
+deployment, reusing its runner and dependency install. The first run builds an
+installable APK on that same 4-vCPU runner. Later runs with the same fingerprint
+publish EAS Update there; native changes build another APK without another
+checkout or dependency install. Linux and Windows build alongside this job.
 All CI jobs run on Blacksmith. See [.github/README.md](../../.github/README.md)
 for the job order and cache behavior.
 

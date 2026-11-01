@@ -6,14 +6,14 @@ helpers or local development setup hooks. Backend development uses `convex dev`.
 
 ## Order
 
-1. **Web** checks the source and deploys backend and web.
-2. **Android**, **Linux** and **Windows** start independently after Web succeeds,
-   when enabled in `disposabl.json` and affected by the changes.
-3. Android checks the latest released APK on a 2-vCPU Blacksmith runner. A matching
-   project, application ID, channel and fingerprint uses EAS Update on that runner.
-   A different fingerprint or missing compatible APK starts **APK** on 4 vCPU.
+1. **Plan** selects enabled, affected native platforms without installing dependencies.
+2. **Web**, **Linux** and **Windows** start in parallel. Web checks the source and
+   deploys backend and web, then checks the Android fingerprint on the same runner.
+3. A matching project, application ID, channel and fingerprint uses EAS Update.
+   A different fingerprint or missing compatible APK builds Android on that same
+   runner, reusing its checkout and installed dependencies.
 4. **Release** collects successful outputs into one prerelease, or a stable release
-   for main. Skipped native jobs do not block publishing.
+   for main. Skipped native platforms do not block publishing.
 
 **iOS and macOS are always skipped**, even when listed in `disposabl.json`.
 They have no fingerprint checks, builds, updates or runners in this workflow.
@@ -33,8 +33,8 @@ validate on Blacksmith Linux; they never deploy or publish.
 Every job uses Blacksmith. GitHub Actions schedules the jobs and displays their
 graph; there are no GitHub-hosted or Boat runners.
 
-Blacksmith uses 2 vCPU for Android checks, Linux, Windows and publishing, and
-4 vCPU for Web and APK builds. Install the Blacksmith GitHub App for the repository.
+Blacksmith uses 2 vCPU for selection, Linux, Windows and publishing, and 4 vCPU
+for the shared Web and Android job. Install the Blacksmith GitHub App for the repository.
 
 Bun cache keys include OS, architecture, Bun version and lockfile. Each fresh
 runner installs from that cache; `node_modules` is not transferred between OSes.

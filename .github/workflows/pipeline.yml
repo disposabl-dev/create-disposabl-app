@@ -20,14 +20,12 @@ env:
   DISPOSABL_RELEASE_VERSION: 1.0.${{ github.run_number }}
 
 jobs:
-  web:
-    name: Web
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+  plan:
+    name: Plan
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     outputs:
       android: ${{ steps.platforms.outputs.android }}
       desktop: ${{ steps.platforms.outputs.desktop }}
-      url: ${{ steps.deploy.outputs.url }}
-      site: ${{ steps.deploy.outputs.site }}
     steps:
       - &checkout
         name: Checkout
@@ -35,6 +33,48 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+      - name: Platforms
+        id: platforms
+        env:
+          BEFORE: ${{ github.event.before }}
+          PR: ${{ github.event.number }}
+          TRUSTED: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
+        run: |
+          if [[ "$TRUSTED" != true ]]; then printf 'android=false\ndesktop={"include":[]}\n' >> "$GITHUB_OUTPUT"; exit; fi
+          if [[ -n "$PR" ]]; then
+            gh api "repos/$GH_REPO/pulls/$PR/files?per_page=100" --paginate --jq '.[] | .filename, (.previous_filename // empty)' > "$RUNNER_TEMP/changes"
+          elif [[ -z "$BEFORE" || "$BEFORE" =~ ^0+$ ]]; then echo disposabl.json > "$RUNNER_TEMP/changes"
+          else
+            git -c credential.helper= -c 'credential.helper=!gh auth git-credential' fetch --depth=1 origin "$BEFORE"
+            git diff --name-only --no-renames "$BEFORE" "$SOURCE" > "$RUNNER_TEMP/changes"
+          fi
+          node --input-type=module -e '
+            import {readFileSync} from "node:fs";
+            const paths = readFileSync(`${process.env.RUNNER_TEMP}/changes`, "utf8").split("\n").filter(p => !/(^|\/)\.agents\/|\.(md|mdx)$/.test(p));
+            const enabled = JSON.parse(readFileSync("disposabl.json", "utf8")).platforms;
+            const shared = paths.some(p => /^(bun.lock$|package.json$|disposabl.json$|turbo.json$|bunfig.toml$|patches\/|\.github\/workflows\/pipeline.yml$|packages\/(?!backend\/|create-disposabl-app\/))/.test(p));
+            const runners = ["blacksmith-2vcpu-ubuntu-2404", "blacksmith-2vcpu-windows-2025"];
+            console.log(`android=${enabled.includes("android") && (shared || paths.some(p => p.startsWith("apps/mobile/")))}`);
+            console.log("desktop=" + JSON.stringify({include: ["linux", "windows"].flatMap((platform, i) => enabled.includes(platform) && (shared || paths.some(p => p.startsWith("apps/desktop/"))) ? [{platform, runner: runners[i]}] : [])}));
+          ' >> "$GITHUB_OUTPUT"
+
+  web:
+    name: Web
+    needs: plan
+    timeout-minutes: 45
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      EXPO_PROJECT_ID: ${{ vars.EXPO_PROJECT_ID }}
+      EXPO_OWNER: ${{ vars.EXPO_OWNER }}
+      EXPO_SLUG: ${{ vars.EXPO_SLUG }}
+      EXPO_NO_DOTENV: '1'
+      EAS_ENVIRONMENT: ${{ github.event_name == 'push' && 'production' || 'preview' }}
+      DISPOSABL_MOBILE_CHANNEL: ${{ github.event_name == 'push' && 'production' || format('pr-{0}', github.event.number) }}
+      DISPOSABL_ANDROID_CHANNEL: ${{ github.event_name == 'push' && 'production' || format('pr-{0}', github.event.number) }}
+      DISPOSABL_ANDROID_VERSION_CODE: ${{ github.run_number }}
+    steps:
+      - *checkout
       - &node
         name: Node
         uses: actions/setup-node@v6
@@ -78,64 +118,16 @@ jobs:
           if [[ "$CHANNEL" != production ]]; then export AUTH_TARGET="--preview-name $CHANNEL"; target=(--preview-name "$CHANNEL"); fi
           bun x --no-install convex deploy --yes "${target[@]}" --cmd-url-env-var-name VITE_CONVEX_URL --cmd 'bun x --no-install --package @convex-dev/auth auth --keys-only $AUTH_TARGET && VITE_CONVEX_SITE_URL="$CONVEX_SITE_URL" bun run --cwd ../.. build --filter=!desktop && printf "url=%s\nsite=%s\n" "$VITE_CONVEX_URL" "$CONVEX_SITE_URL" >> "$GITHUB_OUTPUT"'
           bun x --no-install static-hosting upload $AUTH_TARGET --no-spa --dist ../../apps/web/dist/client
-      - name: Platforms
-        id: platforms
+      - name: Expo
+        if: needs.plan.outputs.android == 'true'
         env:
-          BEFORE: ${{ github.event.before }}
-          PR: ${{ github.event.number }}
-          TRUSTED: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
-        run: |
-          if [[ "$TRUSTED" != true ]]; then printf 'android=false\ndesktop={"include":[]}\n' >> "$GITHUB_OUTPUT"; exit; fi
-          if [[ -n "$PR" ]]; then
-            gh api "repos/$GH_REPO/pulls/$PR/files?per_page=100" --paginate --jq '.[] | .filename, (.previous_filename // empty)' > "$RUNNER_TEMP/changes"
-          elif [[ -z "$BEFORE" || "$BEFORE" =~ ^0+$ ]]; then echo disposabl.json > "$RUNNER_TEMP/changes"
-          else
-            git -c credential.helper= -c 'credential.helper=!gh auth git-credential' fetch --depth=1 origin "$BEFORE"
-            git diff --name-only --no-renames "$BEFORE" "$SOURCE" > "$RUNNER_TEMP/changes"
-          fi
-          bun -e '
-            const paths = (await Bun.file(`${process.env.RUNNER_TEMP}/changes`).text()).split("\n").filter(p => !/(^|\/)\.agents\/|\.(md|mdx)$/.test(p));
-            const enabled = (await Bun.file("disposabl.json").json()).platforms;
-            const shared = paths.some(p => /^(bun.lock$|package.json$|disposabl.json$|turbo.json$|bunfig.toml$|patches\/|\.github\/workflows\/pipeline.yml$|packages\/(?!backend\/|create-disposabl-app\/))/.test(p));
-            const runners = ["blacksmith-2vcpu-ubuntu-2404", "blacksmith-2vcpu-windows-2025"];
-            console.log(`android=${enabled.includes("android") && (shared || paths.some(p => p.startsWith("apps/mobile/")))}`);
-            console.log("desktop=" + JSON.stringify({include: ["linux", "windows"].flatMap((platform, i) => enabled.includes(platform) && (shared || paths.some(p => p.startsWith("apps/desktop/"))) ? [{platform, runner: runners[i]}] : [])}));
-          ' >> "$GITHUB_OUTPUT"
-
-  # iOS and macOS are intentionally skipped, even when enabled in disposabl.json.
-  android:
-    name: Android
-    needs: web
-    if: needs.web.outputs.android == 'true'
-    runs-on: blacksmith-2vcpu-ubuntu-2404
-    outputs:
-      build: ${{ steps.fingerprint.outputs.build }}
-      runtime: ${{ steps.fingerprint.outputs.runtime }}
-      manifest: ${{ steps.fingerprint.outputs.manifest }}
-    env: &mobile
-      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-      EXPO_PROJECT_ID: ${{ vars.EXPO_PROJECT_ID }}
-      EXPO_OWNER: ${{ vars.EXPO_OWNER }}
-      EXPO_SLUG: ${{ vars.EXPO_SLUG }}
-      EXPO_NO_DOTENV: '1'
-      EAS_ENVIRONMENT: ${{ github.event_name == 'push' && 'production' || 'preview' }}
-      DISPOSABL_MOBILE_CHANNEL: ${{ github.event_name == 'push' && 'production' || format('pr-{0}', github.event.number) }}
-      DISPOSABL_ANDROID_CHANNEL: ${{ github.event_name == 'push' && 'production' || format('pr-{0}', github.event.number) }}
-      DISPOSABL_ANDROID_VERSION_CODE: ${{ github.run_number }}
-      DISPOSABL_DEPLOYED_CONVEX_URL: ${{ needs.web.outputs.url }}
-      DISPOSABL_DEPLOYED_CONVEX_SITE_URL: ${{ needs.web.outputs.site }}
-      EXPO_PUBLIC_CONVEX_URL: ${{ needs.web.outputs.url }}
-      EXPO_PUBLIC_CONVEX_SITE_URL: ${{ needs.web.outputs.site }}
-    steps:
-      - *checkout
-      - *node
-      - *bun
-      - *cache
-      - *install
-      - &expo
-        name: Expo
+          DISPOSABL_DEPLOYED_CONVEX_URL: ${{ steps.deploy.outputs.url }}
+          DISPOSABL_DEPLOYED_CONVEX_SITE_URL: ${{ steps.deploy.outputs.site }}
+          EXPO_PUBLIC_CONVEX_URL: ${{ steps.deploy.outputs.url }}
+          EXPO_PUBLIC_CONVEX_SITE_URL: ${{ steps.deploy.outputs.site }}
         working-directory: apps/mobile
         run: |
+          printf '%s\n' "DISPOSABL_DEPLOYED_CONVEX_URL=$DISPOSABL_DEPLOYED_CONVEX_URL" "DISPOSABL_DEPLOYED_CONVEX_SITE_URL=$DISPOSABL_DEPLOYED_CONVEX_SITE_URL" "EXPO_PUBLIC_CONVEX_URL=$EXPO_PUBLIC_CONVEX_URL" "EXPO_PUBLIC_CONVEX_SITE_URL=$EXPO_PUBLIC_CONVEX_SITE_URL" >> "$GITHUB_ENV"
           bun x eas-cli@27.2.0 env:pull --environment "$EAS_ENVIRONMENT" --path "$RUNNER_TEMP/expo.env" --non-interactive
           bun -e '
             import {parseEnv} from "node:util";
@@ -148,6 +140,7 @@ jobs:
           '
       - name: Fingerprint
         id: fingerprint
+        if: needs.plan.outputs.android == 'true'
         run: |
           for ((page=1; ; page++)); do
             gh api "repos/$GH_REPO/releases?per_page=100&page=$page" > "$RUNNER_TEMP/releases.json"
@@ -186,45 +179,27 @@ jobs:
           test "$(gh api "repos/$GH_REPO/$SOURCE_PATH" --jq 'if has("head") then (if .state == "open" then .head.sha else "closed" end) else .object.sha end')" = "$SOURCE"
           bun x eas-cli@27.2.0 update --platform android --channel "$CHANNEL" --environment "$EAS_ENVIRONMENT" --skip-bundler --input-dir dist/update --message "$SOURCE" --non-interactive
           jq --arg sha "$SHA" '. + {sha256: $sha, action: "update"}' <<< "$MANIFEST" > ../../dist/release/android.json
-      - name: Upload
-        if: steps.fingerprint.outputs.build == 'false'
-        uses: actions/upload-artifact@v4
-        with:
-          name: platform-android
-          path: dist/release/
-          retention-days: 1
-          compression-level: 0
-          if-no-files-found: error
-
-  apk:
-    name: APK
-    needs: [web, android]
-    if: needs.android.outputs.build == 'true'
-    runs-on: blacksmith-4vcpu-ubuntu-2404
-    timeout-minutes: 45
-    env: *mobile
-    steps:
-      - *checkout
-      - *node
-      - *bun
-      - *cache
-      - *install
-      - *expo
       - name: Java
+        if: steps.fingerprint.outputs.build == 'true'
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
       - name: SDK
+        if: steps.fingerprint.outputs.build == 'true'
         uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
       - name: Gradle
+        if: steps.fingerprint.outputs.build == 'true'
         uses: gradle/actions/setup-gradle@v4
         with:
           cache-read-only: false
       - name: Build
+        if: steps.fingerprint.outputs.build == 'true'
         env:
-          DISPOSABL_ANDROID_RUNTIME: ${{ needs.android.outputs.runtime }}
-          MANIFEST: ${{ needs.android.outputs.manifest }}
+          DISPOSABL_ANDROID_RUNTIME: ${{ steps.fingerprint.outputs.runtime }}
+          MANIFEST: ${{ steps.fingerprint.outputs.manifest }}
           ANDROID_KEYSTORE_BASE64: ${{ github.event_name == 'push' && secrets.ANDROID_KEYSTORE_BASE64 || '' }}
           ANDROID_KEYSTORE_PASSWORD: ${{ github.event_name == 'push' && secrets.ANDROID_KEYSTORE_PASSWORD || '' }}
           ANDROID_KEY_ALIAS: ${{ github.event_name == 'push' && secrets.ANDROID_KEY_ALIAS || '' }}
@@ -235,23 +210,24 @@ jobs:
           mkdir -p dist/release
           cp apps/mobile/dist/android/app.apk dist/release/android.apk
           jq --arg sha "$(sha256sum dist/release/android.apk | cut -d' ' -f1)" '. + {sha256: $sha, action: "build"}' <<< "$MANIFEST" > dist/release/android.json
-      - &upload
-        name: Upload
+      - name: Upload
+        if: needs.plan.outputs.android == 'true'
         uses: actions/upload-artifact@v4
-        with:
+        with: &artifact
           name: ${{ env.ARTIFACT }}
           path: dist/release/
           retention-days: 1
           compression-level: 0
           if-no-files-found: error
 
+  # iOS and macOS are intentionally skipped, even when enabled in disposabl.json.
   desktop:
     name: ${{ matrix.platform }}
-    needs: web
-    if: fromJSON(needs.web.outputs.desktop).include[0] != null
+    needs: plan
+    if: fromJSON(needs.plan.outputs.desktop).include[0] != null
     strategy:
       fail-fast: false
-      matrix: ${{ fromJSON(needs.web.outputs.desktop) }}
+      matrix: ${{ fromJSON(needs.plan.outputs.desktop) }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 20
     env:
@@ -274,12 +250,14 @@ jobs:
         run: command -v fakeroot && command -v rpmbuild && command -v dpkg-deb || { sudo apt-get update && sudo apt-get install -y fakeroot dpkg rpm; }
       - name: Build
         run: bun run --cwd apps/desktop preview
-      - *upload
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with: *artifact
 
   release:
     name: Release
-    needs: [web, android, apk, desktop]
-    if: ${{ !cancelled() && !contains(needs.*.result, 'failure') && (needs.android.result == 'success' || needs.desktop.result == 'success') }}
+    needs: [plan, web, desktop]
+    if: ${{ !cancelled() && needs.web.result == 'success' && (needs.desktop.result == 'success' || needs.desktop.result == 'skipped') && (needs.plan.outputs.android == 'true' || needs.desktop.result == 'success') }}
     runs-on: blacksmith-2vcpu-ubuntu-2404
     permissions:
       contents: write
