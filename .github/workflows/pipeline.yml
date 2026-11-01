@@ -19,6 +19,8 @@ jobs:
           path: ~/.bun/install/cache
           key: boatbench-d30ee8ce-bun-${{ runner.os }}-${{ runner.arch }}-1.4.4-${{ hashFiles('benchmark-app/bun.lock') }}
       - run: nproc; uname -a; time bun install --frozen-lockfile
+      - run: time bun run lint
+      - run: time bun run typecheck
       - run: time bun run build --filter=!desktop
         env: {VITE_CONVEX_URL: 'https://ci.invalid', VITE_CONVEX_SITE_URL: 'https://ci.invalid'}
   desktop:
@@ -55,8 +57,12 @@ jobs:
       - uses: actions/setup-java@v4
         with: {distribution: temurin, java-version: '17'}
       - uses: android-actions/setup-android@v3
-      - uses: gradle/actions/setup-gradle@v4
-        with: {cache-read-only: false, cache-encryption-key: ''}
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: boatbench-d30ee8ce-gradle-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('benchmark-app/bun.lock') }}
       - uses: actions/cache@v4
         with:
           path: ~/.bun/install/cache
