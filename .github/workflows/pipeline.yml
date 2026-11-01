@@ -390,7 +390,21 @@ jobs:
           app=${apps[0]}
           codesign --verify --deep --strict "$app"
           test "$(plutil -extract CFBundleIdentifier raw -o - "$app/Info.plist")" = "$(jq -r .applicationId <<< "$MANIFEST")"
-          test "$(plutil -extract EXUpdatesRuntimeVersion raw -o - "$app/Expo.plist")" = "$(jq -r .runtimeVersion <<< "$MANIFEST")"
+          runtime=$(plutil -extract EXUpdatesRuntimeVersion raw -o - "$app/Expo.plist")
+          if [[ "$runtime" == "file:fingerprint" ]]; then
+            fingerprints=()
+            while IFS= read -r path; do fingerprints+=("$path"); done < <(find "$app" -path '*/EXUpdates.bundle/fingerprint' -type f)
+            if [[ ${#fingerprints[@]} -ne 1 ]]; then
+              echo "Expected one EXUpdates.bundle/fingerprint, found ${#fingerprints[@]}" >&2
+              exit 1
+            fi
+            runtime=$(cat "${fingerprints[0]}")
+          fi
+          expected_runtime=$(jq -r .runtimeVersion <<< "$MANIFEST")
+          if [[ "$runtime" != "$expected_runtime" ]]; then
+            echo "iOS runtime version mismatch: expected $expected_runtime, found $runtime" >&2
+            exit 1
+          fi
           test "$(plutil -extract EXUpdatesRequestHeaders.expo-channel-name raw -o - "$app/Expo.plist")" = "$CHANNEL"
           security cms -D -i "$app/embedded.mobileprovision" > "$RUNNER_TEMP/profile.plist"
           expires=$(python3 -c 'import datetime,plistlib,sys; p=plistlib.load(open(sys.argv[1],"rb")); expiry=p["ExpirationDate"].replace(tzinfo=datetime.timezone.utc); assert p.get("ProvisionedDevices") and not p["Entitlements"].get("get-task-allow",False) and expiry>datetime.datetime.now(datetime.timezone.utc); print(expiry.isoformat())' "$RUNNER_TEMP/profile.plist")
