@@ -15,7 +15,7 @@ jobs:
           - {name: web, runner: blacksmith-4vcpu-ubuntu-2404}
           - {name: linux, runner: blacksmith-2vcpu-ubuntu-2404}
           - {name: windows, runner: blacksmith-2vcpu-windows-2025}
-          - {name: darwin, runner: blacksmith-6vcpu-macos-26}
+          - {name: macos, runner: blacksmith-6vcpu-macos-26}
           - {name: android, runner: blacksmith-4vcpu-ubuntu-2404}
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.runner }}
@@ -37,9 +37,9 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: ~/.bun/install/cache
-          key: benchmark-20261101-bun-${{ runner.os }}-${{ runner.arch }}-1.4.4-${{ hashFiles('benchmark-app/bun.lock') }}
+          key: benchmark-clean-20261101b-bun-${{ runner.os }}-${{ runner.arch }}-1.4.4-${{ hashFiles('benchmark-app/bun.lock') }}
       - uses: actions/cache@v4
-        if: contains(fromJSON('["linux", "windows", "darwin"]'), matrix.name)
+        if: contains(fromJSON('["linux", "windows", "macos"]'), matrix.name)
         with:
           path: |
             ~/.cache/electron
@@ -48,7 +48,7 @@ jobs:
             ~/Library/Caches/electron-builder
             ~\AppData\Local\electron\Cache
             ~\AppData\Local\electron-builder\Cache
-          key: benchmark-20261101-electron-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('benchmark-app/bun.lock') }}
+          key: benchmark-clean-20261101b-electron-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('benchmark-app/bun.lock') }}
       - uses: actions/setup-java@v4
         if: matrix.name == 'android'
         with: {distribution: temurin, java-version: '17'}
@@ -68,9 +68,9 @@ jobs:
         run: bun install --frozen-lockfile
       - name: Web build
         if: matrix.name == 'web'
-        run: bun run build --filter=!desktop
+        run: bun run lint && bun run typecheck && bun run build --filter=!desktop
       - name: Desktop build
-        if: contains(fromJSON('["linux", "windows", "darwin"]'), matrix.name)
+        if: contains(fromJSON('["linux", "windows", "macos"]'), matrix.name)
         run: bun run --cwd apps/desktop preview
       - name: Android build
         if: matrix.name == 'android'
