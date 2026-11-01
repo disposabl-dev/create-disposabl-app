@@ -133,6 +133,8 @@ jobs:
             import {parseEnv} from "node:util";
             import {appendFileSync, readFileSync} from "node:fs";
             for (const [key, value] of Object.entries(parseEnv(readFileSync(`${process.env.RUNNER_TEMP}/expo.env`, "utf8")))) {
+              // Web and mobile use the same backend from this deployment.
+              if (/^EXPO_PUBLIC_CONVEX_(URL|SITE_URL)$/.test(key)) continue;
               if (/^(GITHUB_|RUNNER_|GH_|DISPOSABL_|BUN_|CI$|NODE_OPTIONS$|PATH$|HOME$|SOURCE(_PATH)?$|CHANNEL$|ARTIFACT$|EAS_ENVIRONMENT$|EXPO_(TOKEN|PROJECT_ID|OWNER|SLUG|NO_DOTENV)$)/.test(key)) throw new Error(`Reserved EAS variable: ${key}`);
               const delimiter = crypto.randomUUID();
               appendFileSync(process.env.GITHUB_ENV, `${key}<<${delimiter}\n${value}\n${delimiter}\n`);

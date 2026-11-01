@@ -44,9 +44,12 @@ Set these GitHub repository variables to the project returned by the CLI:
 
 Add an Expo access token as the `EXPO_TOKEN` GitHub secret. CI loads the EAS
 `preview` environment for PRs, and `production` for `main`.
-The web deployment supplies `EXPO_PUBLIC_CONVEX_URL` and
-`EXPO_PUBLIC_CONVEX_SITE_URL`. Do not define those two names in a shared EAS
-environment: the check fails if they override the current deployment's URLs.
+The backend deployment supplies the same URLs to web and mobile:
+`VITE_CONVEX_URL` becomes `EXPO_PUBLIC_CONVEX_URL`, and
+`VITE_CONVEX_SITE_URL` becomes `EXPO_PUBLIC_CONVEX_SITE_URL`. CI writes the mobile
+values to `GITHUB_ENV` for fingerprinting, APK builds and EAS Update exports.
+Saved EAS values for these two names are ignored when loading the environment;
+each PR uses its own deployed backend rather than a shared static URL.
 EAS variables with secret visibility are not available to this local build or
 update flow; native secrets must be supplied through GitHub Actions.
 
