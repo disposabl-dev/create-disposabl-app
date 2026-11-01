@@ -1,0 +1,100 @@
+name: CI and deploy
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  pipeline:
+    if: github.event.deleted != true && github.repository != 'disposabl-dev/create-disposabl-app'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Install Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          package-manager-cache: false
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.4"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Check formatting
+        run: bun fmt --check
+
+      - name: Test
+        # The starter currently has no tests. Run any tests added later.
+        run: bun test --pass-with-no-tests
+
+      - name: Build
+        env:
+          VITE_CONVEX_URL: https://ci.invalid
+          VITE_CONVEX_SITE_URL: https://ci.invalid
+        run: bun run build
+
+      - name: Deploy production
+        id: production
+        if: github.event_name == 'push'
+        working-directory: packages/backend
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
+        run: |
+          bun x --no-install convex deploy --yes \
+            --cmd-url-env-var-name VITE_CONVEX_URL \
+            --cmd '
+              bun x --no-install --package @convex-dev/auth auth --keys-only --prod &&
+              VITE_CONVEX_SITE_URL="$CONVEX_SITE_URL" bun run --cwd ../.. build &&
+              echo "url=$CONVEX_SITE_URL" >> "$GITHUB_OUTPUT"
+            '
+          bun x --no-install static-hosting upload --prod --no-spa --dist ../../apps/web/dist/client
+
+      - name: Deploy preview
+        id: preview
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        working-directory: packages/backend
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY_PREVIEW }}
+          PREVIEW_NAME: ${{ github.head_ref }}
+        run: |
+          bun x --no-install convex deploy --yes --preview-name "$PREVIEW_NAME" \
+            --cmd-url-env-var-name VITE_CONVEX_URL \
+            --cmd '
+              bun x --no-install --package @convex-dev/auth auth --keys-only --preview-name "$PREVIEW_NAME" &&
+              VITE_CONVEX_SITE_URL="$CONVEX_SITE_URL" bun run --cwd ../.. build &&
+              echo "url=$CONVEX_SITE_URL" >> "$GITHUB_OUTPUT"
+            '
+          bun x --no-install static-hosting upload --preview-name "$PREVIEW_NAME" --no-spa --dist ../../apps/web/dist/client
+
+      - name: Show deployment URL
+        if: steps.production.outcome == 'success' || steps.preview.outcome == 'success'
+        env:
+          DEPLOYMENT_URL: ${{ steps.production.outputs.url || steps.preview.outputs.url }}
+        run: |
+          printf 'Deployed app: %s\n' "$DEPLOYMENT_URL"
+          printf '### Deployment\n\n[Open app](%s)\n' "$DEPLOYMENT_URL" >> "$GITHUB_STEP_SUMMARY"

@@ -15,11 +15,12 @@ import {
   type DisposablConfig,
 } from "./options";
 
-export async function createProject(
+export async function createApp(
   template: string,
   destination: string,
   name: string,
   config: DisposablConfig,
+  overwrite = false,
 ) {
   config = {
     ...config,
@@ -35,7 +36,9 @@ export async function createProject(
       );
     }
   }
-  // mkdir without recursive mode refuses existing destinations, even empty ones.
+  // Overwrite is allowed only after explicit confirmation in the CLI.
+  if (overwrite) await rm(destination, { recursive: true, force: true });
+  // Refuse a destination that appeared after choosing an available name.
   await mkdir(destination);
   try {
     for (const entry of await readdir(template)) {

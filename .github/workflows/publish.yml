@@ -3,13 +3,14 @@ name: Publish npm package
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
   publish:
-    if: github.repository == 'disposabl-dev/create-disposabl-app'
+    if: github.repository == 'disposabl-dev/create-disposabl-app' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -25,6 +26,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          persist-credentials: false
       - uses: actions/setup-node@v6
         with:
           node-version: "24"
@@ -33,21 +35,14 @@ jobs:
         with:
           bun-version: "1.4.4"
       - run: bun install --frozen-lockfile
-      - name: Prepare semver release
-        id: release
-        run: bun release.ts prepare
       - run: bun fmt --check
       - run: bun run typecheck
       - run: bun run lint
-      - run: bun run build
-      - name: Pack npm artifact
-        id: pack
-        run: |
-          tarball=$(npm pack --ignore-scripts --silent)
-          echo "tarball=$PWD/$tarball" >> "$GITHUB_OUTPUT"
-      - name: Publish npm package and GitHub Release
-        if: steps.release.outputs.version != ''
-        run: bun release.ts publish "$TARBALL"
+      # semantic-release sets the package version, builds, tags this commit, and publishes.
+      # Recovery after a publish failure: check npm and GitHub for the tagged version first.
+      # A tagged version is skipped on rerun; restore missing artifacts from that exact commit/version.
+      - run: bun run semantic-release
         env:
-          TARBALL: ${{ steps.pack.outputs.tarball }}
-          GH_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
+          # Bun owns dependency installation; npm only versions and publishes this package.
+          npm_config_workspaces_update: "false"

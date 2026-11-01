@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-import { spawn, spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
+import { lstatSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Command, CommanderError } from "commander";
@@ -19,7 +19,7 @@ import {
 } from "./options";
 import { createPlatformPrompt } from "./platform-prompt";
 import { projectSetup } from "./project-setup";
-import { createProject } from "./scaffold";
+import { createApp } from "./scaffold";
 
 type Options = {
   yes?: boolean;
@@ -66,6 +66,9 @@ const program = new Command("create-disposabl-app")
   .exitOverride();
 
 class Cancelled extends Error {}
+const pathExists = (path: string) =>
+  lstatSync(path, { throwIfNoEntry: false }) !== undefined;
+
 function answer<T>(value: T): Exclude<T, symbol> {
   if (p.isCancel(value))
     throw new Cancelled("Cancelled. No files were created.");
@@ -169,11 +172,7 @@ async function main() {
           message: "App name",
           placeholder: "my-app",
           defaultValue: "my-app",
-          validate: (value) =>
-            validateName(value ?? "") ||
-            (existsSync(resolve(value ?? ""))
-              ? "That directory already exists. Choose a new name."
-              : undefined),
+          validate: (value) => validateName(value ?? ""),
         }),
       );
   }
@@ -183,13 +182,28 @@ async function main() {
     );
   const invalidName = validateName(name);
   if (invalidName) throw new Error(invalidName);
-  const directory = resolve(name);
-  if (existsSync(directory))
-    throw new Error(
-      "Directory already exists: " +
-        directory +
-        ". Choose a new name; existing files are never overwritten.",
-    );
+  let directory = resolve(name);
+  let overwrite = false;
+  if (pathExists(directory)) {
+    overwrite =
+      interactive &&
+      answer(
+        await p.confirm({
+          message: `"${name}" already exists. Delete its contents and replace it?`,
+          initialValue: false,
+        }),
+      );
+    if (!overwrite) {
+      const requestedName = name;
+      let suffix = 2;
+      do {
+        const ending = `-${suffix++}`;
+        name = requestedName.slice(0, 214 - ending.length) + ending;
+        directory = resolve(name);
+      } while (pathExists(directory));
+      if (!options.json) p.log.info(`Using "${name}" instead.`);
+    }
+  }
   if (interactive && options.platforms === undefined) {
     const selected = answer((await createPlatformPrompt().prompt()) ?? []);
     chosenPlatforms = selectPlatforms(
@@ -222,6 +236,8 @@ async function main() {
   const setup = options.json ? undefined : projectSetup(name, config);
   let installationStarted = false;
   try {
+    if (spawnSync("git", ["--version"], { stdio: "ignore" }).status !== 0)
+      throw new Error("Install Git first to create the app's initial commit.");
     if (
       !options.skipInstall &&
       spawnSync("bun", ["--version"], { stdio: "ignore" }).status !== 0
@@ -232,7 +248,7 @@ async function main() {
     const template = fileURLToPath(
       new URL("./templates/default", import.meta.url),
     );
-    await createProject(template, directory, name, config);
+    await createApp(template, directory, name, config, overwrite);
     if (!options.skipInstall) {
       installationStarted = true;
       setup?.installing();
@@ -247,6 +263,30 @@ async function main() {
     });
     throw error;
   }
+  const git = (...args: string[]) =>
+    execFileSync("git", args, { cwd: directory, stdio: "pipe" });
+  git("init", "--initial-branch=main");
+  git("add", "--all");
+  const hasIdentity =
+    spawnSync("git", ["var", "GIT_AUTHOR_IDENT"], {
+      cwd: directory,
+      stdio: "ignore",
+    }).status === 0;
+  git(
+    ...(hasIdentity
+      ? []
+      : [
+          "-c",
+          "user.name=create-disposabl-app",
+          "-c",
+          "user.email=create-disposabl-app@users.noreply.github.com",
+        ]),
+    "-c",
+    "commit.gpgsign=false",
+    "commit",
+    "-m",
+    "Initial commit",
+  );
   const folders = selectedFolders(config);
   if (options.json) {
     console.log(

@@ -24,7 +24,6 @@ await cp(join(root, "LICENSE"), join(dir, "LICENSE"));
       filter: (path) =>
         ![
           ".git",
-          ".github",
           "node_modules",
           "dist",
           ".turbo",
@@ -45,9 +44,17 @@ await cp(join(root, "LICENSE"), join(dir, "LICENSE"));
     });
   for (const item of await readdir(root, { withFileTypes: true })) {
     const entry = item.name;
-    if (item.isDirectory() && !["apps", "packages", "patches"].includes(entry))
+    if (
+      item.isDirectory() &&
+      ![".github", "apps", "packages", "patches"].includes(entry)
+    )
       continue;
-    if (entry === "packages") {
+    if (entry === ".github") {
+      await cp(join(root, entry), join(templateDir, entry), {
+        recursive: true,
+        filter: (path) => path !== join(root, ".github/workflows/publish.yml"),
+      });
+    } else if (entry === "packages") {
       for (const pkg of await readdir(join(root, entry))) {
         if (pkg !== "create-disposabl-app") {
           await copySource(

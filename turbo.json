@@ -36,11 +36,19 @@
         "^typecheck"
       ]
     },
+    "@disposabl/backend#dev:setup": {
+      "cache": false,
+      "passThroughEnv": [
+        "CONVEX_DEPLOY_KEY"
+      ]
+    },
     "dev": {
+      "dependsOn": [
+        "@disposabl/backend#dev:setup"
+      ],
       "cache": false,
       "persistent": true,
       "passThroughEnv": [
-        "CONVEX_*",
         "VITE_*"
       ]
     }

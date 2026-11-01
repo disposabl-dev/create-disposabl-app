@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "scripts": {
+    "dev:setup": "bun --no-env-file ../disposabl-kit/server/dev-setup.mjs",
     "dev": "convex dev",
     "logs": "convex logs",
     "typecheck": "tsc -p convex",
