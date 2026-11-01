@@ -1,5 +1,10 @@
 # Mobile previews and updates
 
+Mobile previews are release builds with embedded JavaScript, not development
+clients. Android uses `assembleRelease`; iOS internal profiles explicitly disable
+`developmentClient`. They run without Metro or Expo Go and use EAS Update for
+compatible changes.
+
 Select `android` in the root `disposabl.json`. When mobile or shared dependencies
 change, CI computes the Expo fingerprint in the Web job after web/backend
 deployment, reusing its runner and dependency install. The first run builds an

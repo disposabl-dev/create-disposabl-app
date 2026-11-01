@@ -5,12 +5,14 @@
   },
   "build": {
     "ios-preview": {
+      "developmentClient": false,
       "distribution": "internal",
       "environment": "preview",
       "credentialsSource": "remote",
       "channel": "preview"
     },
     "ios-production": {
+      "developmentClient": false,
       "distribution": "internal",
       "environment": "production",
       "credentialsSource": "remote",
