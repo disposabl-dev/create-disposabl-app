@@ -39,7 +39,8 @@ logs and Turbo's hit counts before labeling a result warm.
 The default manual run installs, checks, tests, and builds without deployment
 credentials. Enable `preview` to measure the full deployment path using the
 preview key. Manual runs never deploy production. Each runner gets a separate
-`ci-benchmark-<runner>` preview. Runs on the same branch and runner serialize.
+`ci-benchmark-<runner>` preview. Manual runs on the same runner serialize across
+branches, so two branches cannot deploy to the same benchmark preview at once.
 
 Record the workflow/run URL, commit, attempt, actual CPU/RAM details from
 **Record machine**, cache state, and step timings. For each job, compute queue

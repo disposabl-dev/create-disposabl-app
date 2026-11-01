@@ -26,7 +26,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}-${{ inputs.runner || 'default' }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && 'manual' || github.head_ref || github.ref_name }}-${{ inputs.runner || 'default' }}
   cancel-in-progress: false
 
 jobs:
@@ -35,6 +35,8 @@ jobs:
     # Install the Boat CI GitHub App first. Fork PRs use GitHub-hosted runners.
     # DISPOSABL_CI_RUNNER can select boat-small or ubuntu-latest for normal runs.
     runs-on: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && 'ubuntu-latest' || inputs.runner || vars.DISPOSABL_CI_RUNNER || 'boat' }}
+    env:
+      CI_RUNNER: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && 'ubuntu-latest' || inputs.runner || vars.DISPOSABL_CI_RUNNER || 'boat' }}
     timeout-minutes: 30
     steps:
       - name: Check out repository
@@ -64,9 +66,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .turbo/cache
-          key: turbo-${{ inputs.cache_scope || 'ci' }}-${{ inputs.runner || vars.DISPOSABL_CI_RUNNER || 'boat' }}-${{ runner.os }}-${{ runner.arch }}-node24-bun1.4.4-${{ github.sha }}
+          key: turbo-${{ inputs.cache_scope || 'ci' }}-${{ env.CI_RUNNER }}-${{ runner.os }}-${{ runner.arch }}-node24-bun1.4.4-${{ github.sha }}
           restore-keys: |
-            turbo-${{ inputs.cache_scope || 'ci' }}-${{ inputs.runner || vars.DISPOSABL_CI_RUNNER || 'boat' }}-${{ runner.os }}-${{ runner.arch }}-node24-bun1.4.4-
+            turbo-${{ inputs.cache_scope || 'ci' }}-${{ env.CI_RUNNER }}-${{ runner.os }}-${{ runner.arch }}-node24-bun1.4.4-
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
