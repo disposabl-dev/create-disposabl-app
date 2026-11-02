@@ -24,6 +24,9 @@ import type * as connections_actions_oauth from "../connections/actions/oauth.js
 import type * as connections_index from "../connections/index.js";
 import type * as connections_internal from "../connections/internal.js";
 import type * as connections_validator from "../connections/validator.js";
+import type * as downloads_action from "../downloads/action.js";
+import type * as downloads_http from "../downloads/http.js";
+import type * as downloads_internal from "../downloads/internal.js";
 import type * as github_actions_http from "../github/actions/http.js";
 import type * as github_actions_internal from "../github/actions/internal.js";
 import type * as github_actions_oidc from "../github/actions/oidc.js";
@@ -66,6 +69,9 @@ declare const fullApi: ApiFromModules<{
   "connections/index": typeof connections_index;
   "connections/internal": typeof connections_internal;
   "connections/validator": typeof connections_validator;
+  "downloads/action": typeof downloads_action;
+  "downloads/http": typeof downloads_http;
+  "downloads/internal": typeof downloads_internal;
   "github/actions/http": typeof github_actions_http;
   "github/actions/internal": typeof github_actions_internal;
   "github/actions/oidc": typeof github_actions_oidc;
