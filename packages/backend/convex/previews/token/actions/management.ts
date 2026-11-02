@@ -133,7 +133,7 @@ export async function ensureDevelopment(
   };
 }
 
-export async function ensureProduction(token: string, projectId: number) {
+export async function productionDeployment(token: string, projectId: number) {
   const path = `/projects/${projectId}`;
   const lookup = () =>
     management<Deployment>(token, `${path}/deployment?defaultProd=true`);
@@ -163,5 +163,20 @@ export async function ensureProduction(token: string, projectId: number) {
     deployment.projectId !== projectId
   )
     throw new Error("Expected this app's production deployment.");
-  return deployment.name;
+  const url = new URL(deployment.deploymentUrl);
+  if (
+    !/^[a-z0-9-]+$/.test(deployment.name) ||
+    url.origin !== `https://${deployment.name}.convex.cloud` ||
+    url.pathname !== "/" ||
+    url.search ||
+    url.hash ||
+    url.username ||
+    url.password
+  )
+    throw new Error("Unexpected Convex production URL.");
+  return deployment;
+}
+
+export async function ensureProduction(token: string, projectId: number) {
+  return (await productionDeployment(token, projectId)).name;
 }

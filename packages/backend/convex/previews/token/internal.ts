@@ -13,6 +13,8 @@ export const create = internalAction({
     appId: v.string(),
     ...deployment.fields,
     deployKey: v.string(),
+    productionConvexSiteUrl: v.optional(v.string()),
+    repositoryUrl: v.optional(v.string()),
   }),
   handler: async (
     ctx,
@@ -24,5 +26,7 @@ export const create = internalAction({
     convexUrl: string;
     convexSiteUrl: string;
     deployKey: string;
+    productionConvexSiteUrl?: string;
+    repositoryUrl?: string;
   }> => ctx.runAction(internal.previews.token.actions.create.create, args),
 });

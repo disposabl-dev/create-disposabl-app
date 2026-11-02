@@ -9,7 +9,7 @@ import { internal } from "../../../_generated/api";
 import { credential } from "../../../connections/actions/credentials";
 import { previewIdentity, deployment } from "../../../validator";
 import { validateReference } from "../../internal";
-import { ensureDevelopment } from "./management";
+import { ensureDevelopment, productionDeployment } from "./management";
 
 export const create = internalAction({
   args: { ...identityFields, ...previewIdentity },
@@ -17,6 +17,8 @@ export const create = internalAction({
     appId: v.string(),
     ...deployment.fields,
     deployKey: v.string(),
+    productionConvexSiteUrl: v.optional(v.string()),
+    repositoryUrl: v.optional(v.string()),
   }),
   handler: async (
     ctx,
@@ -28,6 +30,8 @@ export const create = internalAction({
     convexUrl: string;
     convexSiteUrl: string;
     deployKey: string;
+    productionConvexSiteUrl?: string;
+    repositoryUrl?: string;
   }> => {
     validateReference(args.reference);
     const identity = { userId: args.userId, appId: args.appId };
@@ -44,8 +48,13 @@ export const create = internalAction({
         userId: args.userId,
         appId: args.appId,
       });
+      const token = (await credential(ctx, args.userId, "convex")).token;
+      const production = await productionDeployment(token, projectId);
+      const app = await ctx.runQuery(internal.apps.internal.get, identity);
+      if (!app.githubOwner || !app.githubRepo)
+        throw new Error("App repository setup is incomplete.");
       const { deployKey, ...deployment } = await ensureDevelopment(
-        (await credential(ctx, args.userId, "convex")).token,
+        token,
         projectId,
         args.reference,
       );
@@ -53,7 +62,16 @@ export const create = internalAction({
         ...args,
         deployment,
       });
-      return { appId: args.appId, ...deployment, deployKey };
+      return {
+        appId: args.appId,
+        ...deployment,
+        deployKey,
+        productionConvexSiteUrl: production.deploymentUrl.replace(
+          /\.convex\.cloud\/?$/,
+          ".convex.site",
+        ),
+        repositoryUrl: `https://github.com/${app.githubOwner}/${app.githubRepo}.git`,
+      };
     } finally {
       await ctx.runMutation(internal.apps.operations.internal.finish, {
         ...identity,

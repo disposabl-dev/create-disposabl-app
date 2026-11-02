@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Application API",
-    "version": "2.0.0"
+    "version": "3.0.0"
   },
   "security": [
     {
@@ -1007,6 +1007,12 @@
                       "type": "string"
                     },
                     "deployKey": {
+                      "type": "string"
+                    },
+                    "productionConvexSiteUrl": {
+                      "type": "string"
+                    },
+                    "repositoryUrl": {
                       "type": "string"
                     }
                   },

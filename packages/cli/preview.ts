@@ -31,6 +31,8 @@ type Development = {
   convexUrl: string;
   convexSiteUrl: string;
   deployKey: string;
+  productionConvexSiteUrl?: string;
+  repositoryUrl?: string;
 };
 async function updateEnv(
   file: string,
@@ -86,6 +88,45 @@ export async function configureDevelopment(
     value.convexSiteUrl !== `https://${value.name}.convex.site`
   )
     throw new Error("Development URLs do not match the deployment.");
+  if (
+    value.productionConvexSiteUrl &&
+    !/^https:\/\/[a-z0-9-]+\.convex\.site$/.test(value.productionConvexSiteUrl)
+  )
+    throw new Error("Unexpected production Convex site URL.");
+  if (value.repositoryUrl) {
+    const repository =
+      /^https:\/\/github\.com\/([a-zA-Z0-9-]+)\/([a-zA-Z0-9_.-]+)\.git$/.exec(
+        value.repositoryUrl,
+      );
+    if (!repository) throw new Error("Unexpected GitHub repository URL.");
+    const remote = spawnSync("git", ["remote", "get-url", "origin"], {
+      cwd: root,
+      encoding: "utf8",
+    });
+    if (remote.status === 0) {
+      const current = remote.stdout.trim();
+      const match =
+        /^(?:https:\/\/github\.com\/|git@github\.com:|ssh:\/\/git@github\.com\/)([^/]+)\/([^/]+?)(?:\.git)?\/?$/i.exec(
+          current,
+        );
+      if (
+        !match ||
+        `${match[1]}/${match[2]}`.toLowerCase() !==
+          `${repository[1]}/${repository[2]}`.toLowerCase()
+      )
+        throw new Error(
+          "Existing origin points to a different repository; it was not changed.",
+        );
+    } else {
+      const added = spawnSync(
+        "git",
+        ["remote", "add", "origin", value.repositoryUrl],
+        { cwd: root, encoding: "utf8" },
+      );
+      if (added.status !== 0)
+        throw new Error(`Could not add origin: ${added.stderr.trim()}`);
+    }
+  }
   const files = ["packages/backend/.env.local", "apps/web/.env.local"];
   if (config.platforms.some((p: string) => p === "android" || p === "ios"))
     files.push("apps/mobile/.env.local");
@@ -100,6 +141,16 @@ export async function configureDevelopment(
     });
     if (ignored.status !== 0 || tracked.status !== 1)
       throw new Error(`${file} must be untracked and ignored by Git.`);
+  }
+  if (
+    value.productionConvexSiteUrl &&
+    config.productionConvexSiteUrl !== value.productionConvexSiteUrl
+  ) {
+    config.productionConvexSiteUrl = value.productionConvexSiteUrl;
+    await writeFile(
+      join(root, "disposabl.json"),
+      JSON.stringify(config, null, 2) + "\n",
+    );
   }
   await updateEnv(
     join(root, files[0]!),
