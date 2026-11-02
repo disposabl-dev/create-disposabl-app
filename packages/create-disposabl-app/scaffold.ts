@@ -200,6 +200,13 @@ main().catch((error) => {
     const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
     manifest.name = name;
     await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + "\n");
+    if (folders.includes("apps/desktop")) {
+      const desktopPath = join(destination, "apps/desktop/package.json");
+      const desktop = JSON.parse(await readFile(desktopPath, "utf8"));
+      desktop.productName = name;
+      desktop.description = `${name} desktop app`;
+      await writeFile(desktopPath, JSON.stringify(desktop, null, 2) + "\n");
+    }
     if (folders.includes("apps/mobile")) {
       const appConfigPath = join(destination, "apps/mobile/app.json");
       const appConfig = JSON.parse(await readFile(appConfigPath, "utf8"));

@@ -151,6 +151,14 @@ export async function configureDevelopment(
       join(root, "disposabl.json"),
       JSON.stringify(config, null, 2) + "\n",
     );
+    const formatted = spawnSync("bun", ["fmt", "disposabl.json"], {
+      cwd: root,
+      stdio: "pipe",
+    });
+    if (formatted.status !== 0)
+      throw new Error(
+        "Could not format disposabl.json after configuring development.",
+      );
   }
   await updateEnv(
     join(root, files[0]!),

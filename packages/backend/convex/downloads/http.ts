@@ -13,8 +13,8 @@ export const download = httpAction(async (ctx, request) => {
     );
     if (match) {
       const location = await ctx.runAction(internal.downloads.action.resolve, {
-        appId: match[1],
-        platform: match[2],
+        appId: match.at(1) ?? "",
+        platform: match.at(2) ?? "",
       });
       if (location)
         return new Response(null, {

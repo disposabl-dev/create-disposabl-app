@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Application API",
-    "version": "3.0.0"
+    "version": "3.1.0"
   },
   "security": [
     {
@@ -383,6 +383,106 @@
                     }
                   },
                   "required": ["page", "continueCursor", "isDone"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid arguments"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient scope"
+          },
+          "500": {
+            "description": "Internal error"
+          }
+        }
+      }
+    },
+    "/api/apps/update": {
+      "post": {
+        "operationId": "appsUpdate",
+        "x-convex-function": "apps/internal:update",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "appId": {
+                    "type": "string"
+                  },
+                  "platforms": {
+                    "type": "array",
+                    "items": {
+                      "enum": [
+                        "web",
+                        "android",
+                        "ios",
+                        "macos",
+                        "windows",
+                        "linux",
+                        "api",
+                        "mcp",
+                        "typescript-sdk",
+                        "cli"
+                      ]
+                    }
+                  }
+                },
+                "required": ["appId", "platforms"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "appId": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "platforms": {
+                      "type": "array",
+                      "items": {
+                        "enum": [
+                          "web",
+                          "android",
+                          "ios",
+                          "macos",
+                          "windows",
+                          "linux",
+                          "api",
+                          "mcp",
+                          "typescript-sdk",
+                          "cli"
+                        ]
+                      }
+                    },
+                    "githubOwner": {
+                      "type": "string"
+                    },
+                    "githubRepo": {
+                      "type": "string"
+                    },
+                    "createdAt": {
+                      "type": "number"
+                    }
+                  },
+                  "required": ["appId", "name", "platforms", "createdAt"],
                   "additionalProperties": false
                 }
               }

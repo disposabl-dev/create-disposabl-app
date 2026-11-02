@@ -70,28 +70,6 @@
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
 }
-@font-face {
-  font-family: "Disposabl Landing Sans";
-  src: url("./assets/landing/general-sans-400.woff2") format("woff2");
-  font-weight: 400;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Disposabl Landing Sans";
-  src: url("./assets/landing/general-sans-500.woff2") format("woff2");
-  font-weight: 500;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Disposabl Landing Sans";
-  src: url("./assets/landing/general-sans-600.woff2") format("woff2");
-  font-weight: 600;
-  font-display: swap;
-}
-@theme inline {
-  --font-landing: "Disposabl Landing Sans", sans-serif;
-}
-
 @keyframes disposabl-draw-check {
   to {
     stroke-dashoffset: 0;

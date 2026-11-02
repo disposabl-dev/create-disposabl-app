@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { internalQuery } from "../_generated/server";
+import { internalQuery } from "@disposabl/disposabl-kit/server/lib/functions";
 
 export const candidate = internalQuery({
   args: { appId: v.string(), platform: v.string() },

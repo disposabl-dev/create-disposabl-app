@@ -1,11 +1,11 @@
 "use node";
 
 import { v } from "convex/values";
-import { internalAction } from "../_generated/server";
+import { internalAction } from "@disposabl/disposabl-kit/server/lib/functions";
 import { internal } from "../_generated/api";
 import { githubRequest, githubToken } from "../github/actions/tokens";
 
-const suffixes: Record<string, string[]> = {
+const suffixes: Partial<Record<string, string[]>> = {
   android: [".apk"],
   ios: [".ipa"],
   macos: [".dmg"],
@@ -92,7 +92,7 @@ export const resolve = internalAction({
       (a) =>
         a.browser_download_url === candidate.artifactUrl &&
         a.state === "uploaded" &&
-        suffixes[args.platform].some((s) => a.name.endsWith(s)) &&
+        suffixes[args.platform]?.some((s) => a.name.endsWith(s)) &&
         Number.isSafeInteger(a.id) &&
         a.id > 0,
     );

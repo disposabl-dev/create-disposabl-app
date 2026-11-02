@@ -8,7 +8,8 @@ import {
   paginationResultValidator,
 } from "convex/server";
 import { ConvexError, v, type Infer } from "convex/values";
-import { appArgs, appResult } from "../validator";
+import { appArgs, appResult, platform } from "../validator";
+import { validatePlatforms } from "@disposabl/disposabl-kit/platforms";
 import { githubConnection } from "../validator";
 import type { Doc } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
@@ -59,6 +60,21 @@ export const get = internalQuery({
   returns: appResult,
   handler: async (ctx, { userId, appId }) =>
     presentApp(await ownedApp(ctx, userId, appId)),
+});
+export const update = internalMutation({
+  platforms: true,
+  args: { ...identityFields, appId: v.string(), platforms: v.array(platform) },
+  returns: appResult,
+  handler: async (ctx, { userId, appId, platforms }) => {
+    const app = await ownedApp(ctx, userId, appId);
+    if (app.operation)
+      throw new ConvexError(
+        "Wait for app setup to finish before changing platforms.",
+      );
+    const selected = validatePlatforms(platforms);
+    await ctx.db.patch("apps", app._id, { platforms: selected });
+    return presentApp({ ...app, platforms: selected });
+  },
 });
 export { remove as delete } from "./actions/delete";
 
