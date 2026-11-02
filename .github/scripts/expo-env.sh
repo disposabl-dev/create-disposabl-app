@@ -8,9 +8,12 @@ if [[ -z "$EXPO_PROJECT_ID" ]]; then
     | if $owner != "" then .expo.owner = $owner else . end
   ' app.json > "$RUNNER_TEMP/expo-project/app.json"
   printf '{"name":"expo-project","private":true}\n' > "$RUNNER_TEMP/expo-project/package.json"
-  account=()
-  [[ -z "${EXPO_OWNER:-}" ]] || account=(--account "$EXPO_OWNER")
-  (cd "$RUNNER_TEMP/expo-project" && bun x "$EAS_CLI" init --force --non-interactive --json --no-icon "${account[@]}") > "$RUNNER_TEMP/expo-project.json"
+  (
+    cd "$RUNNER_TEMP/expo-project"
+    set -- init --force --non-interactive --json --no-icon
+    [[ -z "${EXPO_OWNER:-}" ]] || set -- "$@" --account "$EXPO_OWNER"
+    bun x "$EAS_CLI" "$@"
+  ) > "$RUNNER_TEMP/expo-project.json"
   EXPO_PROJECT_ID=$(jq -er .projectId "$RUNNER_TEMP/expo-project.json")
   EXPO_OWNER=$(jq -er .owner "$RUNNER_TEMP/expo-project.json")
   EXPO_SLUG=$(jq -er .slug "$RUNNER_TEMP/expo-project.json")
