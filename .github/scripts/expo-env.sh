@@ -1,5 +1,22 @@
 #!/usr/bin/env bash
 set -euo pipefail
+if [[ -z "$EXPO_PROJECT_ID" ]]; then
+  # Initialize with static config; app.config.js reads the resulting environment.
+  mkdir -p "$RUNNER_TEMP/expo-project"
+  jq --slurpfile app ../../disposabl.json --arg owner "${EXPO_OWNER:-}" '
+    {expo: {name: .expo.name, slug: (if $app[0].appId then "app-" + $app[0].appId else .expo.slug end)}}
+    | if $owner != "" then .expo.owner = $owner else . end
+  ' app.json > "$RUNNER_TEMP/expo-project/app.json"
+  printf '{"name":"expo-project","private":true}\n' > "$RUNNER_TEMP/expo-project/package.json"
+  account=()
+  [[ -z "${EXPO_OWNER:-}" ]] || account=(--account "$EXPO_OWNER")
+  (cd "$RUNNER_TEMP/expo-project" && bun x "$EAS_CLI" init --force --non-interactive --json --no-icon "${account[@]}") > "$RUNNER_TEMP/expo-project.json"
+  EXPO_PROJECT_ID=$(jq -er .projectId "$RUNNER_TEMP/expo-project.json")
+  EXPO_OWNER=$(jq -er .owner "$RUNNER_TEMP/expo-project.json")
+  EXPO_SLUG=$(jq -er .slug "$RUNNER_TEMP/expo-project.json")
+  export EXPO_PROJECT_ID EXPO_OWNER EXPO_SLUG
+  printf 'EXPO_PROJECT_ID=%s\nEXPO_OWNER=%s\nEXPO_SLUG=%s\n' "$EXPO_PROJECT_ID" "$EXPO_OWNER" "$EXPO_SLUG" >> "$GITHUB_ENV"
+fi
 jq --arg channel "$CHANNEL" '.build["ios-" + env.EAS_ENVIRONMENT].channel = $channel' eas.json > "$RUNNER_TEMP/eas.json"
 mv "$RUNNER_TEMP/eas.json" eas.json
 bun x "$EAS_CLI" env:pull --environment "$EAS_ENVIRONMENT" --path "$RUNNER_TEMP/expo.env" --non-interactive

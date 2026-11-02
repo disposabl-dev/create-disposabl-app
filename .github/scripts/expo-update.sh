@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
+artifact=android.apk
+[[ "$CHANNEL" != production ]] || artifact=android.aab
 mkdir -p dist/release
-gh release download "$TAG" --pattern android.apk --dir dist/release
-echo "$SHA  dist/release/android.apk" | sha256sum --check
+gh release download "$TAG" --pattern "$artifact" --dir dist/release
+echo "$SHA  dist/release/$artifact" | sha256sum --check
 cd apps/mobile
 bun x --no-install expo export --platform android --output-dir dist/update
 test "$(bun x --no-install expo-updates runtimeversion:resolve --platform android --workflow managed | jq -er .runtimeVersion)" = "$RUNTIME"

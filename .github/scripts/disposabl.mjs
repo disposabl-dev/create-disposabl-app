@@ -74,7 +74,7 @@ if (config.appId) {
       process.exit(0);
     }
     const suffix = {
-      android: ".apk",
+      android: process.env.CHANNEL === "production" ? ".aab" : ".apk",
       ios: ".ipa",
       macos: ".dmg",
       windows: ".exe",

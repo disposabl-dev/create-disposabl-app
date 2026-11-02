@@ -9,10 +9,19 @@ if [[ "$CHANNEL" == production ]]; then
 fi
 bun x --no-install expo prebuild --platform android --no-install
 test "$(bun x --no-install expo-updates runtimeversion:resolve --platform android --workflow managed | jq -er .runtimeVersion)" = "$RUNTIME"
-(cd android && ./gradlew :app:assembleRelease --no-daemon --build-cache)
-apk=android/app/build/outputs/apk/release/app-release.apk
-test "$(unzip -p "$apk" assets/fingerprint)" = "$RUNTIME"
+task=assembleRelease
+artifact=android.apk
+binary=android/app/build/outputs/apk/release/app-release.apk
+fingerprint=assets/fingerprint
+if [[ "$CHANNEL" == production ]]; then
+  task=bundleRelease
+  artifact=android.aab
+  binary=android/app/build/outputs/bundle/release/app-release.aab
+  fingerprint=base/assets/fingerprint
+fi
+(cd android && ./gradlew ":app:$task" --no-daemon --build-cache)
+test "$(unzip -p "$binary" "$fingerprint")" = "$RUNTIME"
 test "$(bun x --no-install expo-updates runtimeversion:resolve --platform android --workflow managed | jq -er .runtimeVersion)" = "$RUNTIME"
 mkdir -p ../../dist/release
-cp "$apk" ../../dist/release/android.apk
-jq --arg sha "$(sha256sum "$apk" | cut -d' ' -f1)" '. + {sha256: $sha, action: "build"}' <<< "$MANIFEST" > ../../dist/release/android.json
+cp "$binary" "../../dist/release/$artifact"
+jq --arg sha "$(sha256sum "$binary" | cut -d' ' -f1)" '. + {sha256: $sha, action: "build"}' <<< "$MANIFEST" > ../../dist/release/android.json

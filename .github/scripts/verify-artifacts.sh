@@ -4,7 +4,7 @@ check_source() { test "$(gh api "repos/$GH_REPO/$SOURCE_PATH" --jq 'if has("head
 check_source
 for file in dist/release/*; do test -f "$file"; test -s "$file"; done
 case "$PLATFORM" in
-  android) test -s dist/release/android.apk; test -s dist/release/android.json ;;
+  android) artifact=android.apk; [[ "$CHANNEL" != production ]] || artifact=android.aab; test -s "dist/release/$artifact"; test -s dist/release/android.json ;;
   ios) test -s dist/release/ios.ipa; test -s dist/release/ios.json ;;
   linux) compgen -G 'dist/release/*.deb' > /dev/null; compgen -G 'dist/release/*.rpm' > /dev/null ;;
   windows) compgen -G 'dist/release/*.exe' > /dev/null; compgen -G 'dist/release/*.nupkg' > /dev/null; test -s dist/release/RELEASES ;;
