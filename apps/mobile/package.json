@@ -4,10 +4,12 @@
   "main": "expo-router/entry",
   "dependencies": {
     "@convex-dev/auth": "catalog:",
+    "@disposabl/disposabl-kit": "workspace:*",
     "@expo/ui": "~58.0.23",
     "convex": "catalog:",
     "expo": "~58.0.19",
     "expo-constants": "~58.0.13",
+    "expo-dev-client": "~58.0.18",
     "expo-device": "~58.0.5",
     "expo-font": "~58.0.10",
     "expo-glass-effect": "~58.0.5",
@@ -27,8 +29,7 @@
     "react-native-reanimated": "4.7.1",
     "react-native-safe-area-context": "~5.10.1",
     "react-native-screens": "~4.30.0",
-    "react-native-worklets": "0.13.0",
-    "@disposabl/disposabl-kit": "workspace:*"
+    "react-native-worklets": "0.13.0"
   },
   "devDependencies": {
     "@types/react": "~19.3.0",
@@ -37,11 +38,11 @@
     "typescript": "~6.0.3"
   },
   "scripts": {
-    "start": "expo start",
+    "start": "expo start --dev-client",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "lint": "cd ../.. && apps/mobile/node_modules/.bin/eslint --config apps/mobile/eslint.config.js apps/mobile/src packages/disposabl-kit/mobile",
-    "dev": "expo start",
+    "dev": "expo start --dev-client",
     "typecheck": "tsc --noEmit",
     "build:ios": "bunx eas-cli@27.2.0 build --platform ios --profile ios-preview --local"
   },

@@ -1,13 +1,12 @@
 import { useConvexAuth } from "convex/react";
 import { router, Stack } from "expo-router";
-import { Text } from "react-native";
+import { Image, Text } from "react-native";
 import { AuthButton, AuthScreen, styles } from "../components/auth-ui";
 
 export function HomeScreen() {
   return (
     <AuthScreen>
-      <Text style={styles.title}>Welcome to Disposabl</Text>
-      <Text style={styles.body}>This home screen is public.</Text>
+      <HomeIntro />
       <AccountLinks />
     </AuthScreen>
   );
@@ -43,8 +42,24 @@ export function PublicHomeScreen() {
   return (
     <AuthScreen>
       <Stack.Screen options={{ title: "Disposabl" }} />
-      <Text style={styles.title}>Welcome to Disposabl</Text>
-      <Text style={styles.body}>This home screen is public.</Text>
+      <HomeIntro />
     </AuthScreen>
+  );
+}
+
+function HomeIntro() {
+  return (
+    <>
+      <Image
+        source={require("../lib/logo.png")}
+        style={{ width: 96, height: 96 }}
+        accessibilityLabel="Disposabl logo"
+      />
+      <Text style={styles.title}>Welcome to Disposabl</Text>
+      <Text style={styles.body}>
+        Your app starts here. Make this space your own and build something
+        useful.
+      </Text>
+    </>
   );
 }
