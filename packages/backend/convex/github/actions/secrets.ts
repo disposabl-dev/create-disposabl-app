@@ -1,6 +1,5 @@
 "use node";
 
-import sodium from "libsodium-wrappers";
 import {
   identityFields,
   internalAction,
@@ -69,6 +68,7 @@ export const configure = internalAction({
       token,
       `${path}/public-key`,
     );
+    const { default: sodium } = await import("libsodium-wrappers");
     await sodium.ready;
     const save = async (name: string, value: string) => {
       const encrypted = sodium.crypto_box_seal(
