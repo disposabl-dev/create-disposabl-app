@@ -8,6 +8,8 @@ import {
   createPlatforms,
 } from "../disposabl-kit/server/lib/platform-spec";
 
+import config from "../../disposabl.json";
+
 const root = fileURLToPath(new URL(".", import.meta.url));
 const convex = join(root, "convex");
 const output = join(root, "generated");
@@ -92,6 +94,13 @@ export async function generate(acceptBreaking = false) {
   });
   if (formatted.status !== 0)
     throw new Error("Could not format generated contract");
+  if (config.platforms.includes("typescript-sdk")) {
+    const sdk = spawnSync(process.execPath, ["run", "generate"], {
+      cwd: join(root, "../sdk"),
+      stdio: "inherit",
+    });
+    if (sdk.status !== 0) throw new Error("SDK generation failed");
+  }
   console.log(
     `Generated ${Object.keys(next.paths).length} operations, contract ${next.info.version}.`,
   );

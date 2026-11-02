@@ -87,6 +87,8 @@ function showOptions(json: boolean) {
           defaults: { platforms: ["web"], features: selectFeatures() },
           folders: {
             web: "apps/web",
+            cli: "packages/cli",
+            "typescript-sdk": "packages/sdk",
             android: "apps/mobile",
             ios: "apps/mobile",
             windows: "apps/desktop",
@@ -96,7 +98,7 @@ function showOptions(json: boolean) {
             blog: "apps/blog",
             changelog: "apps/changelog",
           },
-          configOnly: ["mcp", "openai-plugin", "claude-code-plugin"],
+          configOnly: ["api", "mcp", "openai-plugin", "claude-code-plugin"],
         },
         null,
         2,
