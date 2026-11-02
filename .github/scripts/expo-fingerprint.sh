@@ -15,5 +15,14 @@ bun -e '
   const release = await Bun.file(`${process.env.RUNNER_TEMP}/release.json`).json();
   const prior = JSON.parse(/<!-- android (\{[^\n]+\}) -->/.exec(release.body || "")?.[1] || "null");
   const reusable = prior && Object.keys(wanted).every(k => prior[k] === wanted[k]) && /^[a-f0-9]{64}$/.test(prior.sha256 || "") && release.assets.some(a => a.name === "android.apk" && a.state === "uploaded" && a.size > 0 && a.digest === `sha256:${prior.sha256}`);
-  console.log(`build=${!reusable}\nruntime=${wanted.runtimeVersion}\nmanifest=${JSON.stringify(wanted)}\ntag=${reusable ? release.tag_name : ""}\nsha=${reusable ? prior.sha256 : ""}`);
+  const blocked = !reusable && process.env.CHANNEL === "production" && process.env.ANDROID_SIGNING_READY !== "true";
+  if (blocked) {
+    const reason = "Configure Android production signing credentials before building an APK.";
+    console.error(`::notice::${reason}`);
+    const report = Bun.spawnSync(["node", ".github/scripts/disposabl.mjs", "report", "android", "blocked", reason], {
+      cwd: process.env.GITHUB_WORKSPACE, stdout: "inherit", stderr: "inherit",
+    });
+    if (report.exitCode) throw new Error("Cannot report Android prerequisites.");
+  }
+  console.log(`build=${blocked ? "blocked" : !reusable}\nruntime=${wanted.runtimeVersion}\nmanifest=${JSON.stringify(wanted)}\ntag=${reusable ? release.tag_name : ""}\nsha=${reusable ? prior.sha256 : ""}`);
 ' >> "$GITHUB_OUTPUT"
