@@ -19,7 +19,7 @@ env:
   NODE_VERSION: &node-version "24"
   LINUX_RUNNER: &linux-runner ubuntu-latest
   WEB_RUNNER: &web-runner ubuntu-latest
-  WINDOWS_RUNNER: blacksmith-2vcpu-windows-2025
+  WINDOWS_RUNNER: windows-2025
   RELEASE_PREFIX: app
   DISPOSABL_ANDROID_VERSION_CODE: ${{ github.run_number }}
   GH_TOKEN: ${{ github.token }}
