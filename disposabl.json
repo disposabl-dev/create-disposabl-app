@@ -4,13 +4,13 @@
     "web",
     "android",
     "ios",
-    "windows",
-    "macos",
-    "linux",
     "api",
     "mcp",
     "cli",
     "typescript-sdk"
   ],
-  "features": ["authentication", "docs"]
+  "features": [
+    "authentication",
+    "docs"
+  ]
 }

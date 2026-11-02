@@ -39,10 +39,6 @@ export function selectPlatforms(input = "web"): Platform[] {
           JSON.stringify(id) +
           ". Use --list-options to see valid IDs.",
       );
-    if (option.status === "disabled")
-      throw new Error(
-        option.label + " is not available yet and cannot be selected.",
-      );
   }
   return resolvePlatforms(requested);
 }
@@ -73,12 +69,6 @@ export function selectedFolders(config: DisposablConfig): string[] {
     )
   )
     result.push("apps/mobile");
-  if (
-    config.platforms.some((platform) =>
-      ["windows", "linux", "macos"].includes(platform),
-    )
-  )
-    result.push("apps/desktop");
   for (const feature of config.features) {
     if (feature !== "authentication") result.push("apps/" + feature);
   }

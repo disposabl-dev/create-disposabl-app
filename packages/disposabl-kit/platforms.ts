@@ -2,38 +2,15 @@ export const platforms = [
   { id: "web", label: "Web", group: "Required", status: "required" },
   { id: "android", label: "Android", group: "Mobile", status: "available" },
   { id: "ios", label: "iOS", group: "Mobile", status: "available" },
-  { id: "windows", label: "Windows", group: "Desktop", status: "available" },
-  { id: "linux", label: "Linux", group: "Desktop", status: "available" },
-  { id: "macos", label: "macOS", group: "Desktop", status: "available" },
   {
     id: "mcp",
     label: "MCP",
-    group: "MCP & plugins",
+    group: "Developer tools",
     status: "available",
     description: "Tools for AI assistants",
   },
-  {
-    id: "openai-plugin",
-    label: "OpenAI Plugin",
-    description: "Tools and skills for OpenAI",
-    group: "MCP & plugins",
-    status: "available",
-  },
-  {
-    id: "claude-code-plugin",
-    label: "Claude Code Plugin",
-    description: "Tools and skills for Claude Code",
-    group: "MCP & plugins",
-    status: "available",
-  },
   { id: "api", label: "API", group: "Developer tools", status: "available" },
   { id: "cli", label: "CLI", group: "Developer tools", status: "available" },
-  {
-    id: "python-sdk",
-    label: "Python SDK",
-    group: "Coming soon",
-    status: "disabled",
-  },
   {
     id: "typescript-sdk",
     label: "TypeScript SDK",
@@ -48,10 +25,7 @@ export const requiredPlatform: Platform = "web";
 export const platformDependencies: Partial<
   Record<Platform, readonly Platform[]>
 > = {
-  "openai-plugin": ["mcp"],
-  "claude-code-plugin": ["mcp"],
   cli: ["api"],
-  "python-sdk": ["api"],
   "typescript-sdk": ["api"],
 };
 
