@@ -1,5 +1,43 @@
 # Mobile previews and updates
 
+## Local development and authentication
+
+Mobile uses the same Convex Auth v2 username/password accounts as the website.
+The home screen opens native login and signup forms in `src/app/(auth)/`.
+After login, `users.current` returns the caller's username and user ID from
+Convex. Logout clears the saved session through Convex Auth. Session tokens are
+stored with Expo SecureStore and namespaced by deployment, so they survive app
+restarts without mixing accounts between backends.
+
+For a new worktree, install dependencies with `bun install`, then select an
+isolated Convex dev deployment. Substitute your own team, project, and branch:
+
+```sh
+cd packages/backend
+bunx convex deployment create YOUR_TEAM:YOUR_PROJECT:dev/YOUR_BRANCH --type dev --select
+bun run predev
+bunx convex dev --once
+```
+
+Copy the generated `CONVEX_URL` and `CONVEX_SITE_URL` from
+`packages/backend/.env.local` into `apps/mobile/.env.local` as
+`EXPO_PUBLIC_CONVEX_URL` and `EXPO_PUBLIC_CONVEX_SITE_URL`. Use the same pair in
+`apps/web/.env.local` as `VITE_CONVEX_URL` and `VITE_CONVEX_SITE_URL`.
+These files are ignored by Git. Run `bun run dev` from the repository root to
+start the backend, website, and Metro. Restart Metro after changing these URLs.
+The cloud URL connects the mobile client; the site URL is available for HTTP
+endpoints and is not needed for the native password flow.
+
+Use a development build containing `expo-secure-store`, or an SDK 58-compatible
+Expo Go installation. No browser redirect or custom token exchange is needed
+for username/password login. OAuth would require a separate browser flow.
+
+Checked npm and the Convex Auth `reboot` branch on 2026-11-02. The latest v2 beta
+is still `2.0.0-beta.0`. Its React provider already supports async SecureStore
+storage. The relevant upstream provider and session code at
+`db15c82e6f568d7717563783447010f9a5534359` adds no native password requirement,
+so this integration uses the published package without another auth patch.
+
 Mobile previews are release builds with embedded JavaScript, not development
 clients. Android uses `assembleRelease`; iOS internal profiles explicitly disable
 `developmentClient`. They run without Metro or Expo Go and use EAS Update for
@@ -95,10 +133,10 @@ The job has `contents: write`; fork PRs never deploy or publish. There is no
 intermediate Actions artifact. This workflow does not submit to Google Play or
 the App Store.
 
-The mobile UI is still the starter screen. Backend URLs are available to mobile
-code through `process.env.EXPO_PUBLIC_CONVEX_URL` and
-`process.env.EXPO_PUBLIC_CONVEX_SITE_URL`; mobile authentication is not added by
-the distribution workflow.
+Backend URLs are available to mobile code through
+`process.env.EXPO_PUBLIC_CONVEX_URL` and
+`process.env.EXPO_PUBLIC_CONVEX_SITE_URL`. The distribution workflow supplies
+them to the same native authentication flow used during development.
 
 ## iOS
 
