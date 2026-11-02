@@ -7,6 +7,7 @@ import modules from "../../backend/generated/platforms";
 import openapi from "../../backend/generated/openapi.json";
 import config from "../../../disposabl.json";
 import { validatePlatforms } from "../platforms";
+import { registerDocsRoutes } from "./lib/docs";
 import { createOpenApi, createPlatforms } from "./lib/platform-spec";
 import { registerPageRoutes } from "./lib/static";
 
@@ -93,6 +94,7 @@ export default function createHttpRouter() {
         }),
       });
   }
+  if (config.features.includes("docs")) registerDocsRoutes(http);
   registerPageRoutes(http);
   return http;
 }

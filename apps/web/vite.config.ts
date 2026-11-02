@@ -1,3 +1,4 @@
+import { docsPlugin } from "@disposabl/disposabl-kit/client/lib/docs";
 import kitRouter from "@disposabl/disposabl-kit/client/vite.config";
 import {
   createPrerenderFilter,
@@ -37,6 +38,7 @@ const config = defineConfig(({ mode }) => {
     define: { "import.meta.env.VITE_CONVEX_SITE_URL": JSON.stringify(siteUrl) },
     resolve: { tsconfigPaths: true },
     plugins: [
+      docsPlugin(),
       devtools({ consolePiping: { enabled: false } }),
       tailwindcss(),
       tanstackStart({

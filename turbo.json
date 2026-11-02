@@ -52,6 +52,10 @@
     "generate:watch": {
       "cache": false,
       "persistent": true
+    },
+    "@disposabl/web#build": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/apps/docs/**"]
     }
   },
   "globalDependencies": ["disposabl.json"]
