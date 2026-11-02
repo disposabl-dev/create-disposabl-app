@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { createFileRoute, Outlet } from "@tanstack/react-router";
 import { ConvexAuthProvider } from "@convex-dev/auth/react";
-import { ConvexReactClient } from "convex/react";
+import { ConvexProvider, ConvexReactClient } from "convex/react";
+import { authenticationEnabled } from "../../features";
 import { api } from "../../../backend/convex/_generated/api";
 
 export const Route = createFileRoute("/_providers")({
@@ -17,6 +18,26 @@ function Providers() {
   });
 
   return (
+    <AuthProvider client={client} enabled={authenticationEnabled}>
+      <Outlet />
+    </AuthProvider>
+  );
+}
+
+export function AuthProvider({
+  client,
+  enabled,
+  children,
+}: {
+  client: ConvexReactClient;
+  enabled: boolean;
+  children: React.ReactNode;
+}) {
+  if (!enabled) {
+    return <ConvexProvider client={client}>{children}</ConvexProvider>;
+  }
+
+  return (
     <ConvexAuthProvider
       client={client}
       api={{
@@ -24,7 +45,7 @@ function Providers() {
         signOut: api.auth.signOut,
       }}
     >
-      <Outlet />
+      {children}
     </ConvexAuthProvider>
   );
 }

@@ -7,7 +7,7 @@ export const Route = createFileRoute("/_providers/_authenticated/todos/")({
   errorComponent: () => <p role="alert">Unable to load todos.</p>,
 });
 
-function Todos() {
+export function Todos() {
   const todos = useQuery(api.todos.index.list, {});
 
   return (

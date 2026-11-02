@@ -16,12 +16,12 @@ export const features = [
   {
     id: "authentication",
     label: "Authentication",
-    hint: "Always included",
+    hint: "Frontend sign-in and sign-up",
   },
 ] as const;
 
 export type Feature = (typeof features)[number]["id"];
-export const requiredFeatures: readonly Feature[] = ["authentication"];
+export const requiredFeatures: readonly Feature[] = [];
 export type DisposablConfig = {
   version: string;
   platforms: Platform[];
@@ -49,7 +49,7 @@ export function selectPlatforms(input = "web"): Platform[] {
   return resolvePlatforms(requested);
 }
 
-export function selectFeatures(input = "none"): Feature[] {
+export function selectFeatures(input = "authentication"): Feature[] {
   const requested = input === "none" ? [] : parseList(input);
   for (const id of requested) {
     if (!features.some((feature) => feature.id === id)) {
@@ -61,10 +61,7 @@ export function selectFeatures(input = "none"): Feature[] {
     }
   }
   return features
-    .filter(
-      (option) =>
-        requiredFeatures.includes(option.id) || requested.includes(option.id),
-    )
+    .filter((option) => requested.includes(option.id))
     .map((option) => option.id);
 }
 

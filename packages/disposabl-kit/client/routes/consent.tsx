@@ -14,7 +14,7 @@ export const Route = createFileRoute("/_providers/consent")({
   component: ConsentPage,
 });
 
-function ConsentPage() {
+export function ConsentPage() {
   const { request: requestId } = Route.useSearch();
   const request = useQuery(
     api.mcp.getAuthRequest,
