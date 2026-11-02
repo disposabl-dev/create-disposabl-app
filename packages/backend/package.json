@@ -24,7 +24,7 @@
     "libsodium-wrappers": "^0.8.4"
   },
   "devDependencies": {
-    "@convex-dev/eslint-plugin": "^5.0.0",
+    "@convex-dev/eslint-plugin": "^5.0.1",
     "@eslint/eslintrc": "^3.3.6",
     "@eslint/js": "^10.0.1",
     "@types/node": "^24.13.3",

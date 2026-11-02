@@ -27,11 +27,11 @@
   ],
   "catalog": {
     "@convex-dev/auth": "2.0.0-beta.0",
-    "convex": "^1.44.0",
+    "convex": "^1.49.0",
     "lucide-react": "^1.61.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
-    "@convex-dev/mcp": "0.1.0-alpha.0",
+    "@convex-dev/mcp": "0.1.0-alpha.7",
     "@convex-dev/static-hosting": "0.2.1"
   },
   "patchedDependencies": {
