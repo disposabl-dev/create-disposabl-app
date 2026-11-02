@@ -21,11 +21,20 @@
     "generate": "openapi-ts && bun fmt src/generated",
     "build": "bun run generate && tsc -p tsconfig.build.json",
     "typecheck": "bun run generate && tsc --noEmit",
-    "lint": "bun check"
+    "lint": "bun check",
+    "release": "semantic-release"
   },
   "devDependencies": {
     "@hey-api/openapi-ts": "0.99.0",
     "typescript": "6.0.3",
-    "@types/bun": "1.4.4"
+    "@types/bun": "1.4.4",
+    "semantic-release": "25.0.9",
+    "@semantic-release/exec": "7.1.0",
+    "conventional-changelog-conventionalcommits": "9.3.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/disposabl-dev/create-disposabl-app.git",
+    "directory": "packages/sdk"
   }
 }

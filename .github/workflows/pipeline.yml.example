@@ -1,4 +1,4 @@
-name: Preview
+name: Pipeline
 on:
   pull_request:
     branches: [main]
@@ -126,6 +126,11 @@ jobs:
         run: bun install --frozen-lockfile ${{ github.job == 'desktop' && '--filter desktop' || (github.job == 'ios' || github.job == 'android') && '--filter @disposabl/mobile' || '' }}
       - name: Check
         run: bun run check
+      - name: Build selected clients
+        run: |
+          for package in cli sdk; do
+            if test -f "packages/$package/package.json"; then bun run --cwd "packages/$package" build; fi
+          done
       - name: Deploy
         id: deploy
         env:
@@ -490,3 +495,52 @@ jobs:
       - name: Clean
         if: always() && matrix.platform == 'macos'
         run: rm -f "$RUNNER_TEMP/notary.p8"
+
+  packages:
+    name: Package / ${{ matrix.package }}
+    needs: web
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    concurrency:
+      group: npm-${{ matrix.package }}
+      cancel-in-progress: false
+      queue: max
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [cli, sdk]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Selected package
+        id: selected
+        run: echo "exists=$(test -f packages/${{ matrix.package }}/package.json && echo true || echo false)" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@v6
+        if: steps.selected.outputs.exists == 'true'
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - uses: oven-sh/setup-bun@v2
+        if: steps.selected.outputs.exists == 'true'
+        with:
+          bun-version: '1.4.4'
+      - name: Install and generate
+        if: steps.selected.outputs.exists == 'true'
+        run: |
+          bun install --frozen-lockfile
+          bun run generate
+      - name: Validate package
+        if: steps.selected.outputs.exists == 'true'
+        run: bun run --cwd packages/${{ matrix.package }} typecheck
+      - name: Publish
+        if: steps.selected.outputs.exists == 'true'
+        working-directory: packages/${{ matrix.package }}
+        run: bun run release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          npm_config_workspaces_update: 'false'
