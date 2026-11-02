@@ -211,10 +211,10 @@ jobs:
     needs: web
     if: github.event_name == 'pull_request' && needs.web.outputs.ios == 'true'
     permissions: *release-permissions
-    runs-on: macos-15
+    runs-on: xcode-27
     timeout-minutes: 90
     env:
-      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
+      DEVELOPER_DIR: /Applications/Xcode_27.2.0.app/Contents/Developer
       CONVEX_URL: ${{ needs.web.outputs.convex_url }}
       CONVEX_SITE_URL: ${{ needs.web.outputs.convex_site_url }}
       EXPO_PUBLIC_CONVEX_URL: ${{ needs.web.outputs.convex_url }}

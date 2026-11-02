@@ -1,3 +1,4 @@
+import { resolve } from 'node:path';
 import manifest from './package.json' with { type: 'json' };
 import type { ForgeConfig } from '@electron-forge/shared-types';
 import { MakerSquirrel } from '@electron-forge/maker-squirrel';
@@ -11,6 +12,13 @@ import { FuseV1Options, FuseVersion } from '@electron/fuses';
 const executableName = manifest.productName
   .toLowerCase()
   .replace(/[^a-z0-9-]/g, '-');
+
+// specTemplate is supported by electron-installer-redhat but absent from Forge's types.
+const rpmOptions = {
+  name: executableName,
+  bin: executableName,
+  specTemplate: resolve('rpm.spec.ejs'),
+};
 
 const signedRelease =
   process.platform === 'darwin' && process.env.MACOS_NOTARIZE === 'true';
@@ -72,7 +80,7 @@ const config: ForgeConfig = {
   makers: [
     new MakerSquirrel({ setupIcon: 'src/assets/icon.ico' }),
     new MakerDMG({ format: 'ULFO' }),
-    new MakerRpm({ options: { name: executableName, bin: executableName } }),
+    new MakerRpm({ options: rpmOptions }),
     new MakerDeb({ options: { name: executableName, bin: executableName } }),
   ],
   plugins: [
