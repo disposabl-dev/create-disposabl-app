@@ -52,6 +52,13 @@
     "generate:watch": {
       "cache": false,
       "persistent": true
+    },
+    "@disposabl/docs#build": {
+      "cache": false
+    },
+    "@disposabl/web#build": {
+      "dependsOn": ["^build"],
+      "cache": false
     }
   },
   "globalDependencies": ["disposabl.json"]

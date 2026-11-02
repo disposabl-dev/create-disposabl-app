@@ -12,5 +12,5 @@
     "cli",
     "typescript-sdk"
   ],
-  "features": ["authentication"]
+  "features": ["authentication", "docs"]
 }
