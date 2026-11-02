@@ -37,9 +37,9 @@ handler maps clean URLs to directory indexes, redirects `/docs` to `/docs/`, and
 returns 404 for missing pages. Fumapress runs at build time; production needs no
 Waku server. Deploy backend changes when enabling or disabling the docs feature.
 
-The docs-only command `bun run --cwd apps/docs build:docs` is available for
-working on the Fumapress site in isolation. It is deliberately not a separate
-Turbo `build` task, which would race with the web build.
+Run `bun run --cwd apps/docs build` to build docs on their own. The root build
+excludes the standalone docs task because the web build already builds and copies
+docs when enabled.
 
 With `docs` disabled, the web build skips Fumapress and emits no docs directory.
 The generator also omits this workspace and its dependencies. Search runs in the

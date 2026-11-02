@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build:docs": "fumapress build",
+    "build": "fumapress build",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "check": "bun run generate && turbo run typecheck lint && bun fmt --check && bun test --pass-with-no-tests",
-    "build": "turbo build",
+    "build": "turbo build --filter=!@disposabl/docs",
     "dev": "turbo dev",
     "lint": "turbo lint",
     "format": "turbo format",
