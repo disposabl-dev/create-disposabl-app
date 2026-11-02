@@ -3,28 +3,10 @@ import { useQuery } from "convex/react";
 import { Link, router } from "expo-router";
 import { useState } from "react";
 import { Text, View } from "react-native";
-import { authenticationEnabled } from "../../features";
 import { AuthButton, AuthScreen, styles } from "../components/auth-ui";
 import { api } from "../lib/convex";
 
 export function AccountScreen() {
-  if (!authenticationEnabled) {
-    return (
-      <AuthScreen>
-        <Text style={styles.title}>Account</Text>
-        <Text style={styles.body}>
-          Authentication is disabled. This screen is publicly accessible.
-        </Text>
-        <Link href="/" style={styles.link}>
-          Back to home
-        </Link>
-      </AuthScreen>
-    );
-  }
-  return <SignedInAccount />;
-}
-
-function SignedInAccount() {
   const user = useQuery(api.users.current);
   const { signOut } = useAuthActions();
   const [pending, setPending] = useState(false);

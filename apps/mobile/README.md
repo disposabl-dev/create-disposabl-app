@@ -15,11 +15,14 @@ username and user ID from Convex. Logout clears the session and returns home.
 Expo SecureStore persists tokens per deployment across app restarts.
 
 Include `"authentication"` in root `disposabl.json` features to enable frontend
-auth. Without it, web and mobile use a plain Convex provider, hide authentication
-UI, and allow routes without a sign-in check. The example account screen shows
-public content instead of querying private user data. Backend authentication
-and its access checks remain installed and enforced in both modes. Rebuild
-preview/release apps after changing the feature list.
+auth. The generator omits login, signup, consent, and auth-dependent sample
+screens when this feature is not selected. Missing routes return not found;
+they do not redirect home. Mobile gets a public home and route-group layout.
+The root provider selects Convex with or without auth; individual screens do
+not check the feature flag. Backend authentication and its access checks remain
+installed and enforced. Removing auth from an existing app also means deleting
+its auth routes and replacing any auth-dependent UI, as the generator does for
+new apps. Rebuild preview/release apps after changing routes or features.
 
 Expo autolinking deduplicates React, Convex, and Convex Auth between the app and
 kit so native screens use the app's React version and a single auth context.

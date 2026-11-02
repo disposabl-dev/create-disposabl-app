@@ -1,7 +1,6 @@
 import { useConvexAuth } from "convex/react";
 import { router } from "expo-router";
 import { Text } from "react-native";
-import { authenticationEnabled } from "../../features";
 import { AuthButton, AuthScreen, styles } from "../components/auth-ui";
 
 export function HomeScreen() {
@@ -9,14 +8,7 @@ export function HomeScreen() {
     <AuthScreen>
       <Text style={styles.title}>Welcome to Disposabl</Text>
       <Text style={styles.body}>This home screen is public.</Text>
-      {authenticationEnabled ? (
-        <AccountLinks />
-      ) : (
-        <AuthButton
-          title="Open account screen"
-          onPress={() => router.push("/(authenticated)/account")}
-        />
-      )}
+      <AccountLinks />
     </AuthScreen>
   );
 }
@@ -44,5 +36,14 @@ function AccountLinks() {
         onPress={() => router.push("/(auth)/signup")}
       />
     </>
+  );
+}
+
+export function PublicHomeScreen() {
+  return (
+    <AuthScreen>
+      <Text style={styles.title}>Welcome to Disposabl</Text>
+      <Text style={styles.body}>This home screen is public.</Text>
+    </AuthScreen>
   );
 }

@@ -29,7 +29,7 @@ export function MobileLayout() {
   if (!authenticationEnabled) {
     return (
       <ConvexProvider client={client}>
-        <Routes />
+        <PublicLayout />
       </ConvexProvider>
     );
   }
@@ -55,7 +55,7 @@ function Routes({ isAuthenticated = false }: { isAuthenticated?: boolean }) {
   return (
     <Stack screenOptions={{ headerTintColor: "#161b2e" }}>
       <Stack.Screen name="index" options={{ title: "Disposabl" }} />
-      <Stack.Protected guard={authenticationEnabled && !isAuthenticated}>
+      <Stack.Protected guard={!isAuthenticated}>
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
       </Stack.Protected>
       <Stack.Screen name="(authenticated)" options={{ headerShown: false }} />
@@ -64,7 +64,6 @@ function Routes({ isAuthenticated = false }: { isAuthenticated?: boolean }) {
 }
 
 export function AuthLayout() {
-  if (!authenticationEnabled) return <Redirect href="/" />;
   return (
     <Stack screenOptions={{ headerTintColor: "#161b2e" }}>
       <Stack.Screen name="login" options={{ title: "Log in" }} />
@@ -76,10 +75,6 @@ export function AuthLayout() {
 // The route-group layout is the boundary: every descendant inherits this check.
 // Public sibling routes need no guard and no separate route registry.
 export function AuthenticatedLayout() {
-  return authenticationEnabled ? <RequireSession /> : <AccountRoutes />;
-}
-
-function RequireSession() {
   const { isLoading, isAuthenticated } = useConvexAuth();
   if (isLoading) {
     return (
@@ -98,4 +93,9 @@ function AccountRoutes() {
       <Stack.Screen name="account" options={{ title: "Account" }} />
     </Stack>
   );
+}
+
+/** A route group without a session requirement. */
+export function PublicLayout() {
+  return <Stack screenOptions={{ headerTintColor: "#161b2e" }} />;
 }
