@@ -1,5 +1,6 @@
 import { cp, mkdir, readdir, rename, rm } from "node:fs/promises";
 import { basename, join } from "node:path";
+import manifest from "./package.json";
 
 const dir = import.meta.dir;
 const root = join(dir, "../..");
@@ -18,6 +19,23 @@ const cli = await Bun.build({
   naming: "disposabl.js",
   target: "node",
   external: ["commander", "proper-lockfile", "@modelcontextprotocol/sdk"],
+  plugins: [
+    {
+      name: "bundled-cli-version",
+      setup(build) {
+        build.onLoad(
+          { filter: /packages\/cli\/package\.json$/ },
+          async ({ path }) => ({
+            loader: "json",
+            contents: JSON.stringify({
+              ...(await Bun.file(path).json()),
+              version: manifest.version,
+            }),
+          }),
+        );
+      },
+    },
+  ],
 });
 if (!cli.success)
   throw new AggregateError(cli.logs, "Disposabl CLI build failed");
