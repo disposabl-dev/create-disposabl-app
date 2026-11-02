@@ -20,6 +20,7 @@ if (
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
+    icon: 'src/assets/icon',
     appBundleId: process.env.MACOS_BUNDLE_ID || 'dev.disposabl.starter.desktop',
     ...(process.platform === 'darwin'
       ? {
@@ -63,7 +64,7 @@ const config: ForgeConfig = {
     },
   },
   makers: [
-    new MakerSquirrel({}),
+    new MakerSquirrel({ setupIcon: 'src/assets/icon.ico' }),
     new MakerDMG({ format: 'ULFO' }),
     new MakerRpm({}),
     new MakerDeb({}),
