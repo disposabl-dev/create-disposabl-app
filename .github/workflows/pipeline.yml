@@ -34,6 +34,8 @@ env:
 jobs:
   web:
     name: Web
+    # Fork code must not run in a job with deployment credentials.
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
     permissions: &release-permissions
       contents: write
       pull-requests: read
@@ -98,7 +100,7 @@ jobs:
             };
             const affected = (platform, directory) => enabled.includes(platform) && changes(platform).some(p => p.startsWith(directory) || /^(bun.lock$|package.json$|disposabl.json$|turbo.json$|bunfig.toml$|patches\/|\.github\/workflows\/pipeline.yml$|packages\/(?!backend\/|create-disposabl-app\/))/.test(p));
             const target = process.env.DISPOSABL_DESKTOP_PLATFORM;
-            for (const platform of ["android", "ios"]) console.log(`${platform}=${!target && affected(platform, "apps/mobile/")}`);
+            for (const platform of ["android", "ios"]) console.log(`${platform}=${platform === "android" && !target && affected(platform, "apps/mobile/")}`); // Restore iOS selection when builds resume.
             const desktop = ["linux", "windows", "macos"].filter(platform => target === platform && affected(platform, "apps/desktop/"));
             console.log(`desktop=${JSON.stringify(desktop)}\nselected=${desktop.includes(process.env.DISPOSABL_DESKTOP_PLATFORM)}`);
           ' >> "$GITHUB_OUTPUT"
@@ -352,7 +354,8 @@ jobs:
   ios:
     name: iOS
     needs: web
-    if: needs.web.outputs.ios_build == 'true'
+    # Temporarily disabled to avoid macOS and iOS build costs; remove false && to restore.
+    if: false && needs.web.outputs.ios_build == 'true'
     permissions: *release-permissions
     runs-on: *macos-runner
     timeout-minutes: 60
@@ -427,7 +430,8 @@ jobs:
         include:
           - {platform: linux, runner: *linux-runner}
           - {platform: windows, runner: *windows-runner}
-          - {platform: macos, runner: *macos-runner}
+          # Restore this matrix entry when macOS builds resume.
+          # - {platform: macos, runner: *macos-runner}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
     env:
