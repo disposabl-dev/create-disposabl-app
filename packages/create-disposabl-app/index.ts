@@ -31,9 +31,7 @@ type Options = {
 };
 const jsonOutput = process.argv.slice(2).includes("--json");
 const program = new Command("create-disposabl-app")
-  .description(
-    "Create a Disposabl starter. Web and authentication are always included.",
-  )
+  .description("Create a Disposabl starter. Web is always included.")
   .version(version, "-v, --version")
   .argument("[appname]", "App name and new directory")
   .option(
@@ -42,11 +40,11 @@ const program = new Command("create-disposabl-app")
   )
   .option(
     "--features <ids>",
-    "Comma-separated optional feature IDs, or none; authentication is always included",
+    "Comma-separated feature IDs, or none (default: authentication)",
   )
   .option(
     "-y, --yes",
-    "Skip prompts; include Web and authentication, with no optional features",
+    "Skip prompts; include Web and authentication by default",
   )
   .option("--skip-install", "Create files without running bun install")
   .option(
@@ -60,7 +58,7 @@ const program = new Command("create-disposabl-app")
   .helpOption("-h, --help")
   .addHelpText(
     "after",
-    "\nPlatforms:\n  web (required), android, ios, windows, linux, macos, api, mcp,\n  cli, typescript-sdk, openai-plugin, claude-code-plugin\n  CLI and TypeScript SDK automatically include API.\n  Either plugin automatically includes MCP.\n  Disabled: python-sdk\n\nOptional features:\n  docs, blog, changelog\n  Authentication is always included, including with --features none.\n\nExamples:\n  bun create disposabl-app@latest\n  bun create disposabl-app@latest my-app --yes\n  bun create disposabl-app@latest my-app --platforms web,android,ios,mcp --features docs --yes\n  bun create disposabl-app@latest my-app --platforms web --features none --skip-install --json\n  bun create disposabl-app@latest --list-options --json\n\nWithout a TTY, the CLI never prompts. Supply an app name.\nPlatform and feature choices are saved in disposabl.json.\nThe starter includes web and backend authentication code. No appId or Convex deployment is created.\n",
+    "\nPlatforms:\n  web (required), android, ios, windows, linux, macos, api, mcp,\n  cli, typescript-sdk, openai-plugin, claude-code-plugin\n  CLI and TypeScript SDK automatically include API.\n  Either plugin automatically includes MCP.\n  Disabled: python-sdk\n\nOptional features:\n  authentication, docs, blog, changelog\n  Authentication is enabled by default. Use --features none to disable frontend authentication.\n\nExamples:\n  bun create disposabl-app@latest\n  bun create disposabl-app@latest my-app --yes\n  bun create disposabl-app@latest my-app --platforms web,android,ios,mcp --features docs --yes\n  bun create disposabl-app@latest my-app --platforms web --features none --skip-install --json\n  bun create disposabl-app@latest --list-options --json\n\nWithout a TTY, the CLI never prompts. Supply an app name.\nPlatform and feature choices are saved in disposabl.json.\nBackend authentication code is always included. No appId or Convex deployment is created.\n",
   )
   .configureOutput({ writeErr: () => {} })
   .exitOverride();
@@ -118,7 +116,7 @@ function showOptions(json: boolean) {
   for (const option of features)
     console.log("  " + option.id.padEnd(21) + option.hint);
   console.log(
-    "\nWeb and authentication are always included. No optional features are selected by default. Use --platforms and --features with the IDs above.",
+    "\nWeb is always included. Authentication is enabled by default. Use --platforms and --features with the IDs above.",
   );
 }
 
@@ -215,14 +213,13 @@ async function main() {
   if (interactive && options.features === undefined) {
     const selected = answer(
       await p.multiselect({
-        message: "Choose optional features (authentication is always included)",
-        options: features
-          .filter((feature) => !requiredFeatures.includes(feature.id))
-          .map((feature) => ({
-            value: feature.id,
-            label: feature.label,
-            hint: feature.hint,
-          })),
+        message: "Choose optional features",
+        initialValues: ["authentication"],
+        options: features.map((feature) => ({
+          value: feature.id,
+          label: feature.label,
+          hint: feature.hint,
+        })),
         required: false,
       }),
     );

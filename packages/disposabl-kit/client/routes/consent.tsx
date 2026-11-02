@@ -2,6 +2,7 @@ import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useAction, useConvexAuth, useQuery } from "convex/react";
 import { api } from "../../../backend/convex/_generated/api";
+import { authenticationEnabled } from "../../features";
 import { Button } from "../components/ui/button";
 
 export const Route = createFileRoute("/_providers/consent")({
@@ -14,7 +15,24 @@ export const Route = createFileRoute("/_providers/consent")({
   component: ConsentPage,
 });
 
-function ConsentPage() {
+export function ConsentPage({
+  enabled = authenticationEnabled,
+}: { enabled?: boolean } = {}) {
+  if (!enabled) {
+    return (
+      <main>
+        <h1>Connect your agent</h1>
+        <p>
+          Agent authorization requires frontend authentication, which is
+          disabled for this app.
+        </p>
+      </main>
+    );
+  }
+  return <AuthenticatedConsentPage />;
+}
+
+function AuthenticatedConsentPage() {
   const { request: requestId } = Route.useSearch();
   const request = useQuery(
     api.mcp.getAuthRequest,

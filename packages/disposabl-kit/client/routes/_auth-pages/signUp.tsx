@@ -1,8 +1,14 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  Link,
+  redirect,
+  useNavigate,
+} from "@tanstack/react-router";
 import { DEFAULT_MIN_PASSWORD_LENGTH } from "@convex-dev/auth/methods/username-password";
 import { useSignUpWithUsernamePassword } from "@convex-dev/auth/methods/username-password/react";
 import { api } from "../../../../backend/convex/_generated/api";
 import { useState } from "react";
+import { authenticationEnabled } from "../../../features";
 import { getReturnTo } from "../../lib/return-to";
 
 export function SignUp() {
@@ -107,6 +113,9 @@ export function SignUp() {
 }
 
 export const Route = createFileRoute("/_providers/signup")({
+  beforeLoad: () => {
+    if (!authenticationEnabled) throw redirect({ to: "/" });
+  },
   validateSearch: (
     search: Record<string, unknown>,
   ): { request?: string; returnTo?: string } => ({
