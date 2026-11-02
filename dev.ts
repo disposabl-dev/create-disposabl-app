@@ -9,7 +9,8 @@ const backendEnv = () => read(join(backend, ".env.local")).then(parseEnv);
 let env = await backendEnv();
 if (!env.CONVEX_DEPLOYMENT && !env.CONVEX_DEPLOY_KEY) {
   const configure = Bun.spawn(
-    ["bun", "x", "--no-install", "convex", "dev", "--once"],
+    // Configure the deployment first; backend predev installs auth keys before pushing.
+    ["bun", "x", "--no-install", "convex", "dev", "--once", "--skip-push"],
     {
       cwd: backend,
       stdin: "inherit",

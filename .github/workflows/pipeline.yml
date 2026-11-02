@@ -117,16 +117,16 @@ jobs:
         name: Expo
         if: github.job == 'android' || steps.platforms.outputs.android == 'true'
         working-directory: apps/mobile
-        run: bash "$GITHUB_WORKSPACE/.github/scripts/mobile.sh expo-env"
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/mobile.sh" expo-env
       - name: Channel
         if: steps.platforms.outputs.android == 'true'
         working-directory: apps/mobile
-        run: bash "$GITHUB_WORKSPACE/.github/scripts/mobile.sh expo-channel"
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/mobile.sh" expo-channel
       - name: Fingerprint
         id: fingerprint
         if: steps.platforms.outputs.android == 'true'
         working-directory: apps/mobile
-        run: bash "$GITHUB_WORKSPACE/.github/scripts/mobile.sh expo-fingerprint"
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/mobile.sh" expo-fingerprint
       - name: Update
         if: steps.fingerprint.outputs.build == 'false'
         env:
@@ -134,12 +134,12 @@ jobs:
           SHA: ${{ steps.fingerprint.outputs.sha }}
           RUNTIME: ${{ steps.fingerprint.outputs.runtime }}
           MANIFEST: ${{ steps.fingerprint.outputs.manifest }}
-        run: bash "$GITHUB_WORKSPACE/.github/scripts/mobile.sh expo-update"
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/mobile.sh" expo-update
       - &publish
         name: Publish
         if: github.job == 'android' || (github.job == 'web' && hashFiles('dist/release/android.json') != '') || github.job == 'desktop'
         shell: bash
-        run: bash "$GITHUB_WORKSPACE/.github/scripts/release.sh verify-artifacts"
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/release.sh" verify-artifacts
       - &artifacts
         name: Upload release artifacts
         if: hashFiles('dist/release/*') != ''
@@ -197,7 +197,7 @@ jobs:
           ANDROID_KEYSTORE_PASSWORD: ${{ github.event_name == 'push' && secrets.ANDROID_KEYSTORE_PASSWORD || '' }}
           ANDROID_KEY_ALIAS: ${{ github.event_name == 'push' && secrets.ANDROID_KEY_ALIAS || '' }}
           ANDROID_KEY_PASSWORD: ${{ github.event_name == 'push' && secrets.ANDROID_KEY_PASSWORD || '' }}
-        run: bash "$GITHUB_WORKSPACE/.github/scripts/mobile.sh android-build"
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/mobile.sh" android-build
       - *publish
       - *artifacts
       - name: Report Android failure
