@@ -8,6 +8,7 @@ import {
   paginationResultValidator,
 } from "convex/server";
 import { ConvexError, v, type Infer } from "convex/values";
+import { assertActive } from "../apps/operations/internal";
 import { ownedApp } from "../apps/internal";
 import {
   deployment,
@@ -173,6 +174,7 @@ export const finish = internalMutation({
 /** Only the GitHub OIDC HTTP handler can report build outcomes. */
 export const report = internalMutation({
   args: {
+    ...identityFields,
     appId: v.string(),
     githubOwner: v.string(),
     githubRepo: v.string(),
@@ -184,12 +186,9 @@ export const report = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const app = await ctx.db
-      .query("apps")
-      .withIndex("by_appId", (q) => q.eq("appId", args.appId))
-      .unique();
+    const app = await ownedApp(ctx, args.userId, args.appId);
+    assertActive(app);
     if (
-      !app ||
       app.githubOwner !== args.githubOwner ||
       app.githubRepo !== args.githubRepo
     )
@@ -221,6 +220,7 @@ export const report = internalMutation({
         return null;
     }
     const {
+      userId: _user,
       appId: _app,
       githubOwner: _owner,
       githubRepo: _repo,

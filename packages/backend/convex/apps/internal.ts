@@ -29,6 +29,7 @@ export const insert = internalMutation({
       appId: args.appId,
       name,
       platforms,
+      expoAccountId: null,
     });
     return presentApp((await ctx.db.get("apps", id))!);
   },
@@ -59,27 +60,7 @@ export const get = internalQuery({
   handler: async (ctx, { userId, appId }) =>
     presentApp(await ownedApp(ctx, userId, appId)),
 });
-const remove = internalMutation({
-  platforms: true,
-  args: { ...identityFields, appId: v.string() },
-  returns: v.null(),
-  handler: async (ctx, { userId, appId }) => {
-    const app = await ownedApp(ctx, userId, appId);
-    for await (const preview of ctx.db
-      .query("previews")
-      .withIndex("by_appId_reference", (q) => q.eq("appId", appId))) {
-      await ctx.db.delete("previews", preview._id);
-    }
-    const production = await ctx.db
-      .query("appReleases")
-      .withIndex("by_appId", (q) => q.eq("appId", appId))
-      .unique();
-    if (production) await ctx.db.delete("appReleases", production._id);
-    await ctx.db.delete("apps", app._id);
-    return null;
-  },
-});
-export { remove as delete };
+export { remove as delete } from "./actions/delete";
 
 function assertAppId(appId: string) {
   if (
@@ -120,6 +101,7 @@ export const githubApp = internalQuery({
       githubOwner: v.string(),
       githubRepo: v.string(),
       installationId: v.string(),
+      userId: v.string(),
     }),
   ),
   handler: async (ctx, { appId }) => {
@@ -141,6 +123,7 @@ export const githubApp = internalQuery({
           githubOwner: app.githubOwner,
           githubRepo: app.githubRepo,
           installationId,
+          userId: app.userId,
         }
       : null;
   },

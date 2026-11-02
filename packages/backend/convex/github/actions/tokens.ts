@@ -47,6 +47,11 @@ export async function vercelIdentity() {
   const { token } = (await response.json()) as { token: string };
   return token;
 }
+export class GitHubError extends Error {
+  constructor(readonly status: number) {
+    super(`GitHub request failed (${status}).`);
+  }
+}
 export async function githubRequest<T>(
   token: string,
   path: string,
@@ -65,8 +70,7 @@ export async function githubRequest<T>(
     },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
-  if (!response.ok)
-    throw new Error(`GitHub request failed (${response.status}).`);
+  if (!response.ok) throw new GitHubError(response.status);
   return (
     response.status === 204 || response.headers.get("content-length") === "0"
       ? undefined

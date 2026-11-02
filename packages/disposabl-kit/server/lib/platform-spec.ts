@@ -56,6 +56,7 @@ export function createPlatforms(
       )
         throw new Error(`${id}: expected function kind, args and returns`);
       const { userId, ...args } = fn.args;
+      if (!userId) throw new Error(`${id}: platform functions require userId`);
       const type = fn.isQuery ? "query" : fn.isMutation ? "mutation" : "action";
       spec.push({
         name: id,
@@ -72,7 +73,7 @@ export function createPlatforms(
         handler: async (ctx, input, user) => {
           const params = {
             ...input,
-            ...(userId ? { userId: user.userId } : {}),
+            userId: user.userId,
           };
           if (type === "query")
             return ctx.runQuery(reference<"query">(id), params);
@@ -145,7 +146,14 @@ export function createPlatforms(
           { headers: { "Content-Type": "application/json" } },
         );
       } catch (error) {
-        if (error instanceof SyntaxError || error instanceof ConvexError)
+        if (error instanceof ConvexError)
+          return Response.json(
+            {
+              error: error.data,
+            },
+            { status: 400 },
+          );
+        if (error instanceof SyntaxError)
           return Response.json({ error: "invalid_request" }, { status: 400 });
         console.error(error);
         return Response.json({ error: "internal_error" }, { status: 500 });

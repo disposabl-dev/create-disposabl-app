@@ -11,7 +11,7 @@ import {
   provider,
 } from "./validator";
 
-async function userId(ctx: QueryCtx | MutationCtx | ActionCtx) {
+async function requireUser(ctx: QueryCtx | MutationCtx | ActionCtx) {
   const id = await getAuthUserId(ctx);
   if (!id) throw new ConvexError("Sign in to manage your connections.");
   return id;
@@ -21,7 +21,7 @@ export const status = query({
   returns: connectionStatus,
   handler: async (ctx): Promise<Infer<typeof connectionStatus>> =>
     ctx.runQuery(internal.connections.internal.status, {
-      userId: await userId(ctx),
+      userId: await requireUser(ctx),
     }),
 });
 export const start = action({
@@ -30,7 +30,7 @@ export const start = action({
   handler: async (ctx, args): Promise<string> =>
     ctx.runAction(internal.connections.actions.oauth.start, {
       ...args,
-      userId: await userId(ctx),
+      userId: await requireUser(ctx),
     }),
 });
 export const complete = action({
@@ -39,7 +39,7 @@ export const complete = action({
   handler: async (ctx, args): Promise<Infer<typeof completion>> =>
     ctx.runAction(internal.connections.actions.oauth.complete, {
       ...args,
-      userId: await userId(ctx),
+      userId: await requireUser(ctx),
     }),
 });
 export const selectGithub = action({
@@ -48,7 +48,7 @@ export const selectGithub = action({
   handler: async (ctx, args): Promise<null> =>
     ctx.runAction(internal.connections.actions.github.selectGithub, {
       ...args,
-      userId: await userId(ctx),
+      userId: await requireUser(ctx),
     }),
 });
 export const expoAccounts = action({
@@ -57,7 +57,7 @@ export const expoAccounts = action({
   handler: async (ctx, args): Promise<Infer<typeof account>[]> =>
     ctx.runAction(internal.connections.actions.expo.expoAccounts, {
       ...args,
-      userId: await userId(ctx),
+      userId: await requireUser(ctx),
     }),
 });
 export const connectExpo = action({
@@ -66,7 +66,7 @@ export const connectExpo = action({
   handler: async (ctx, args): Promise<null> =>
     ctx.runAction(internal.connections.actions.expo.connectExpo, {
       ...args,
-      userId: await userId(ctx),
+      userId: await requireUser(ctx),
     }),
 });
 export const disconnect = mutation({
@@ -75,6 +75,6 @@ export const disconnect = mutation({
   handler: async (ctx, args): Promise<null> =>
     ctx.runMutation(internal.connections.internal.disconnect, {
       ...args,
-      userId: await userId(ctx),
+      userId: await requireUser(ctx),
     }),
 });

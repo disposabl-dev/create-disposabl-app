@@ -74,6 +74,7 @@ export type AppsCreateResponse = AppsCreateResponses[keyof AppsCreateResponses];
 export type AppsDeleteData = {
   body: {
     appId: string;
+    dangerouslyDeleteApp: true;
   };
   path?: never;
   query?: never;

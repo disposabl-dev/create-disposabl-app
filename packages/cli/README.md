@@ -10,7 +10,7 @@ disposabl apps list --paginationOpts '{"numItems":20,"cursor":null}'
 disposabl apps get --appId <uuid>
 disposabl previews token create --configure .
 disposabl previews get
-disposabl apps delete --appId <uuid>
+disposabl apps delete --appId <uuid> --dangerously-delete-app
 disposabl logout
 ```
 
@@ -21,3 +21,5 @@ Save the returned app UUID as `appId` in `disposabl.json`. Preview commands read
 Credentials live under `~/.config/disposabl` with restricted file permissions. `DISPOSABL_CONFIG_DIR` changes the local credential directory. `DISPOSABL_API_KEY` provides an automation credential. The service origin has no public override.
 
 Use `--json` for machine-readable preview output. Other commands return JSON; `--help` lists their arguments.
+
+App deletion permanently removes linked GitHub, Convex, and Expo projects, then previews and the app record. Apps with production releases cannot be deleted. Expo requires a signed-in user and password confirmation; the CLI opens the official EAS deletion flow when needed. API/MCP callers receive the project ID and must complete this Expo step before retrying. If cleanup is interrupted, run the same command again; keep the owning accounts connected until it finishes.

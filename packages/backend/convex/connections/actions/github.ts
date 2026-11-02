@@ -109,10 +109,8 @@ export const selectGithub = internalAction({
       installationId,
       permissions.map((p) => `${p}:write`),
     );
-    const id = await ctx.runQuery(internal.users.internal.current, { userId });
-    if (!id) throw new ConvexError("Sign in to connect GitHub.");
     await ctx.runMutation(internal.github.internal.connect, {
-      userId: id.id,
+      userId,
       ...chosen,
     });
     return null;

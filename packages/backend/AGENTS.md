@@ -7,6 +7,8 @@
 ## Modules
 
 - `index.ts`: web/mobile functions. Resolve `userId`, then call the internal function with the same name.
+- Authenticate only at entry points: web/mobile `index.ts` uses `getAuthUserId` (or a `requireUser` helper); API/MCP verifies the caller before dispatch. Never accept a client-supplied `userId`.
+- Internal functions validate their `userId` argument and trust the authenticated caller. Keep resource ownership and business rules there; do not repeat session/auth checks.
 - `internal.ts`: shared queries and mutations. Use `platforms: true` to expose functions to enabled platforms in `disposabl.json`.
 - `actions/`: all actions, including ordinary and `"use node"` actions. Never put queries or mutations in a Node action file.
 - Re-export ordinary platform actions from `internal.ts`. Call Node actions through `ctx.runAction`; never import a Node file into the default runtime.

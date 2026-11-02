@@ -19,7 +19,8 @@ export async function management<T>(
     signal: AbortSignal.timeout(30_000),
   });
   if (!response.ok) throw new ManagementError(response.status);
-  return response.json() as Promise<T>;
+  const text = await response.text();
+  return (text ? JSON.parse(text) : undefined) as T;
 }
 /** Recover a project after a lost create response; names include the immutable app UUID. */
 export async function ensureProject(

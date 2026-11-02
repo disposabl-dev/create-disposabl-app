@@ -8,6 +8,7 @@ import {
 import { v } from "convex/values";
 import { internal } from "../../_generated/api";
 import { credential, unseal } from "../../connections/actions/credentials";
+import { ensureExpo } from "../../apps/actions/expo";
 import { validateExpo } from "../../connections/actions/expo";
 import {
   management,
@@ -19,7 +20,7 @@ export const configure = internalAction({
   args: { ...identityFields, appId: v.string(), projectId: v.number() },
   returns: v.null(),
   handler: async (ctx, args) => {
-    await ctx.runQuery(internal.apps.internal.get, {
+    const details = await ctx.runQuery(internal.apps.internal.get, {
       userId: args.userId,
       appId: args.appId,
     });
@@ -100,13 +101,45 @@ export const configure = internalAction({
       userId: args.userId,
       provider: "expo",
     });
-    if (expo) {
+    if (
+      expo &&
+      details.platforms.some(
+        (platform) => platform === "android" || platform === "ios",
+      )
+    ) {
       const token = unseal(expo.token, `${args.userId}:expo`);
       const accounts = await validateExpo(token);
       if (!accounts.some((account) => account.id === expo.accountId))
         throw new Error(
           "Reconnect your Expo account before setting up mobile builds.",
         );
+      const linked = await ctx.runQuery(
+        internal.apps.operations.internal.linked,
+        {
+          userId: args.userId,
+          appId: args.appId,
+        },
+      );
+      await ctx.runMutation(internal.apps.operations.internal.saveExpo, {
+        userId: args.userId,
+        appId: args.appId,
+        accountId: expo.accountId,
+      });
+      const project = await ensureExpo(
+        token,
+        expo.accountId,
+        expo.name,
+        args.appId,
+        linked.expoProjectId,
+      );
+      await ctx.runMutation(internal.apps.operations.internal.saveExpo, {
+        userId: args.userId,
+        appId: args.appId,
+        projectId: project.id,
+        accountId: expo.accountId,
+      });
+      await save("EXPO_PROJECT_ID", project.id);
+      await save("EXPO_SLUG", project.slug);
       await save("EXPO_TOKEN", token);
       await save("EXPO_OWNER", expo.name);
     }

@@ -1,5 +1,6 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+import { pendingDelete } from "./apps/validator";
 import { deployment, platform, releases } from "./validator";
 
 export default defineSchema({
@@ -28,6 +29,15 @@ export default defineSchema({
     githubOwner: v.optional(v.string()),
     githubRepo: v.optional(v.string()),
     convexProjectId: v.optional(v.number()),
+    expoProjectId: v.optional(v.string()),
+    expoAccountId: v.optional(v.union(v.string(), v.null())),
+    operation: v.optional(
+      v.object({
+        kind: v.union(v.literal("setup"), v.literal("delete")),
+        until: v.number(),
+        pending: v.optional(pendingDelete),
+      }),
+    ),
   })
     .index("by_appId", ["appId"])
     .index("by_userId", ["userId"]),

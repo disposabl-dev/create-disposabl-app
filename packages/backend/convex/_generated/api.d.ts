@@ -8,9 +8,14 @@
  * @module
  */
 
+import type * as apps_actions_cleanup from "../apps/actions/cleanup.js";
 import type * as apps_actions_create from "../apps/actions/create.js";
+import type * as apps_actions_delete from "../apps/actions/delete.js";
+import type * as apps_actions_expo from "../apps/actions/expo.js";
 import type * as apps_actions_setup from "../apps/actions/setup.js";
 import type * as apps_internal from "../apps/internal.js";
+import type * as apps_operations_internal from "../apps/operations/internal.js";
+import type * as apps_validator from "../apps/validator.js";
 import type * as auth from "../auth.js";
 import type * as connections_actions_credentials from "../connections/actions/credentials.js";
 import type * as connections_actions_expo from "../connections/actions/expo.js";
@@ -44,9 +49,14 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  "apps/actions/cleanup": typeof apps_actions_cleanup;
   "apps/actions/create": typeof apps_actions_create;
+  "apps/actions/delete": typeof apps_actions_delete;
+  "apps/actions/expo": typeof apps_actions_expo;
   "apps/actions/setup": typeof apps_actions_setup;
   "apps/internal": typeof apps_internal;
+  "apps/operations/internal": typeof apps_operations_internal;
+  "apps/validator": typeof apps_validator;
   auth: typeof auth;
   "connections/actions/credentials": typeof connections_actions_credentials;
   "connections/actions/expo": typeof connections_actions_expo;

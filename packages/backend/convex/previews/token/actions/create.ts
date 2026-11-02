@@ -30,25 +30,36 @@ export const create = internalAction({
     deployKey: string;
   }> => {
     validateReference(args.reference);
-    // Authorization precedes all external calls. Tokens never enter the database.
-    await ctx.runQuery(internal.apps.internal.get, {
-      userId: args.userId,
-      appId: args.appId,
-    });
-    await ctx.runMutation(internal.previews.internal.create, args);
-    const projectId = await ctx.runAction(internal.apps.actions.setup.setup, {
-      userId: args.userId,
-      appId: args.appId,
-    });
-    const { deployKey, ...deployment } = await ensureDevelopment(
-      (await credential(ctx, args.userId, "convex")).token,
-      projectId,
-      args.reference,
+    const identity = { userId: args.userId, appId: args.appId };
+    const { until } = await ctx.runMutation(
+      internal.apps.operations.internal.begin,
+      {
+        ...identity,
+        kind: "setup",
+      },
     );
-    await ctx.runMutation(internal.previews.internal.finish, {
-      ...args,
-      deployment,
-    });
-    return { appId: args.appId, ...deployment, deployKey };
+    try {
+      await ctx.runMutation(internal.previews.internal.create, args);
+      const projectId = await ctx.runAction(internal.apps.actions.setup.setup, {
+        userId: args.userId,
+        appId: args.appId,
+      });
+      const { deployKey, ...deployment } = await ensureDevelopment(
+        (await credential(ctx, args.userId, "convex")).token,
+        projectId,
+        args.reference,
+      );
+      await ctx.runMutation(internal.previews.internal.finish, {
+        ...args,
+        deployment,
+      });
+      return { appId: args.appId, ...deployment, deployKey };
+    } finally {
+      await ctx.runMutation(internal.apps.operations.internal.finish, {
+        ...identity,
+        until,
+        retryDelete: false,
+      });
+    }
   },
 });

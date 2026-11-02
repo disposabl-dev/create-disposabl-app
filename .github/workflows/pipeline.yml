@@ -49,9 +49,9 @@ jobs:
       PLATFORM: android
       ANDROID_SIGNING_READY: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' && secrets.ANDROID_KEYSTORE_PASSWORD != '' && secrets.ANDROID_KEY_ALIAS != '' && secrets.ANDROID_KEY_PASSWORD != '' }}
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-      EXPO_PROJECT_ID: ${{ vars.EXPO_PROJECT_ID }}
+      EXPO_PROJECT_ID: ${{ secrets.EXPO_PROJECT_ID || vars.EXPO_PROJECT_ID }}
       EXPO_OWNER: ${{ secrets.EXPO_OWNER || vars.EXPO_OWNER }}
-      EXPO_SLUG: ${{ vars.EXPO_SLUG }}
+      EXPO_SLUG: ${{ secrets.EXPO_SLUG || vars.EXPO_SLUG }}
       EXPO_NO_DOTENV: "1"
     steps:
       - &checkout
@@ -159,9 +159,9 @@ jobs:
     env:
       PLATFORM: android
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-      EXPO_PROJECT_ID: ${{ vars.EXPO_PROJECT_ID }}
+      EXPO_PROJECT_ID: ${{ secrets.EXPO_PROJECT_ID || vars.EXPO_PROJECT_ID }}
       EXPO_OWNER: ${{ secrets.EXPO_OWNER || vars.EXPO_OWNER }}
-      EXPO_SLUG: ${{ vars.EXPO_SLUG }}
+      EXPO_SLUG: ${{ secrets.EXPO_SLUG || vars.EXPO_SLUG }}
       EXPO_NO_DOTENV: "1"
       CONVEX_URL: ${{ needs.web.outputs.convex_url }}
       CONVEX_SITE_URL: ${{ needs.web.outputs.convex_site_url }}

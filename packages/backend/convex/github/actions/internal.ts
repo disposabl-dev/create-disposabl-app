@@ -96,6 +96,11 @@ async function authorize(ctx: ActionCtx, appId: string, token: string) {
     claims.head_ref !== workflowRun.head_branch
   )
     throw new Error("Unexpected preview branch.");
+  await ctx.runMutation(internal.apps.operations.internal.workflow, {
+    userId: app.userId,
+    appId,
+    production,
+  });
   return {
     app,
     repository,
@@ -178,6 +183,7 @@ export const report = internalAction({
     const { token: _token, ...result } = args;
     await ctx.runMutation(internal.previews.internal.report, {
       ...result,
+      userId: verified.app.userId,
       githubOwner: verified.app.githubOwner,
       githubRepo: verified.app.githubRepo,
       reference: verified.reference,

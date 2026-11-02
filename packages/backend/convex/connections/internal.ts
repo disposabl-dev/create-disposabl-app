@@ -116,8 +116,7 @@ export const begin = internalMutation({
   returns: v.null(),
   handler: async (ctx, { userId, ...state }) => {
     const id = ctx.db.normalizeId("users", userId);
-    if (!id || !(await ctx.db.get("users", id)))
-      throw new ConvexError("Sign in to connect an account.");
+    if (!id) throw new ConvexError("Invalid userId.");
     await ctx.db.patch("users", id, {
       connectionState: { ...state, expiresAt: Date.now() + 10 * 60_000 },
     });

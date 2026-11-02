@@ -1,3 +1,4 @@
+import { completeExpoDeletion } from "./delete";
 import { Command } from "commander";
 import manifest from "./package.json";
 import {
@@ -125,6 +126,7 @@ export async function runCli(
               "--wait",
               "Open Connections and continue when GitHub and Convex are connected",
             );
+          const deleteApp = path === "/api/apps/delete";
           const previewGet = path === "/api/previews/get";
           const tokenCreate = path === "/api/previews/token/create";
           if (previewGet)
@@ -151,6 +153,13 @@ export async function runCli(
                   }),
                 );
           for (const field of fields) {
+            if (deleteApp && field.name === "dangerouslyDeleteApp") {
+              command.option(
+                "--dangerously-delete-app",
+                "Permanently delete this preview app and its GitHub, Convex and Expo projects",
+              );
+              continue;
+            }
             const flag = `--${field.name} <value>`;
             if (
               field.required &&
@@ -166,6 +175,10 @@ export async function runCli(
             else command.option(flag, field.name);
           }
           command.action(async (options) => {
+            if (deleteApp && options.dangerouslyDeleteApp !== true)
+              throw new Error(
+                "Permanent deletion requires --dangerously-delete-app. Apps with production releases cannot be deleted.",
+              );
             if ((previewGet || tokenCreate) && !options.appId) {
               const config = JSON.parse(
                 await readFile(
@@ -186,7 +199,8 @@ export async function runCli(
                 .filter((field) => options[field.name] !== undefined)
                 .map((field) => [
                   field.name,
-                  field.schema.type === "string"
+                  field.schema.type === "string" ||
+                  typeof options[field.name] === "boolean"
                     ? options[field.name]
                     : JSON.parse(options[field.name]),
                 ]),
@@ -201,7 +215,7 @@ export async function runCli(
               fetch(target, {
                 method: method.toUpperCase(),
                 redirect: "error",
-                signal: AbortSignal.timeout(30_000),
+                signal: AbortSignal.timeout(deleteApp ? 300_000 : 30_000),
                 headers: {
                   Authorization: `Bearer ${await accessToken(base, refresh)}`,
                   "Content-Type": "application/json",
@@ -211,6 +225,13 @@ export async function runCli(
             let result = await send();
             if (result.status === 401 && !process.env.DISPOSABL_API_KEY)
               result = await send(true);
+            if (deleteApp && result.status === 400) {
+              const body = await result.clone().json();
+              if (body.error?.code === "expo_delete_requires_login") {
+                await completeExpoDeletion(body.error.projectId);
+                result = await send();
+              }
+            }
             if (!result.ok)
               throw new Error(
                 `API request failed (${result.status}): ${await result.text()}`,
