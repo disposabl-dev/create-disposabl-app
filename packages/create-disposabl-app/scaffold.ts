@@ -63,7 +63,6 @@ export async function createApp(
         "packages/disposabl-kit/client/routes/_auth-pages",
         "packages/disposabl-kit/client/routes/consent.tsx",
         "apps/web/src/router/_authenticated/dashboard.api-keys.tsx",
-        "apps/web/tests/auth-branches.test.tsx",
         "apps/mobile/src/app/(auth)",
         "apps/mobile/src/app/(authenticated)/account.tsx",
       ]) {
@@ -114,8 +113,7 @@ export const Route = createFileRoute("/_providers/_authenticated/dashboard")({
       delete turbo.tasks["@disposabl/docs#build"];
       delete turbo.tasks["@disposabl/web#build"];
       await writeFile(turboPath, JSON.stringify(turbo, null, 2) + "\n");
-      for (const file of ["docs.ts", "docs.test.ts"])
-        await rm(join(destination, "packages/disposabl-kit/server/lib", file));
+      await rm(join(destination, "packages/disposabl-kit/server/lib/docs.ts"));
     }
     for (const kind of ["cli", "sdk"]) {
       const folder = join(destination, "packages", kind);
