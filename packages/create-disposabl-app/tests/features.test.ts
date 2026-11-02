@@ -46,8 +46,13 @@ test("auth-disabled output omits frontend auth routes while retaining backend au
       await mkdir(dirname(join(template, file)), { recursive: true });
       await writeFile(join(template, file), "original source\n");
     }
+    for (const file of ["apps/web/vite.config.ts", "packages/disposabl-kit/client/lib/prerender.ts", "packages/disposabl-kit/server/http.ts", "packages/disposabl-kit/server/lib/docs.ts", "packages/disposabl-kit/server/lib/docs.test.ts"]) {
+      await mkdir(dirname(join(template, file)), { recursive: true });
+      await writeFile(join(template, file), "original source\n");
+    }
+    await writeFile(join(template, "turbo.json"), JSON.stringify({ tasks: {} }));
     for (const folder of ["", "apps/web", "apps/mobile"]) {
-      await writeFile(join(template, folder, "package.json"), "{}");
+      await writeFile(join(template, folder, "package.json"), JSON.stringify({ devDependencies: {} }));
     }
     await writeFile(join(template, "apps/mobile/app.json"), '{"expo":{}}');
     for (const enabled of [true, false]) {
