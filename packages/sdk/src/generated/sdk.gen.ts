@@ -9,15 +9,33 @@ import type {
   TDataShape,
 } from "./client/index.js";
 import type {
-  TodosCreateData,
-  TodosCreateErrors,
-  TodosCreateResponses,
-  TodosGetData,
-  TodosGetErrors,
-  TodosGetResponses,
-  TodosListData,
-  TodosListErrors,
-  TodosListResponses,
+  AccountCurrentData,
+  AccountCurrentErrors,
+  AccountCurrentResponses,
+  AppsCreateData,
+  AppsCreateErrors,
+  AppsCreateResponses,
+  AppsDeleteData,
+  AppsDeleteErrors,
+  AppsDeleteResponses,
+  AppsGetData,
+  AppsGetErrors,
+  AppsGetResponses,
+  AppsListData,
+  AppsListErrors,
+  AppsListResponses,
+  PreviewsGetData,
+  PreviewsGetErrors,
+  PreviewsGetResponses,
+  PreviewsListData,
+  PreviewsListErrors,
+  PreviewsListResponses,
+  PreviewsTokenCreateData,
+  PreviewsTokenCreateErrors,
+  PreviewsTokenCreateResponses,
+  PreviewsUpdateData,
+  PreviewsUpdateErrors,
+  PreviewsUpdateResponses,
 } from "./types.gen.js";
 
 export type Options<
@@ -38,16 +56,29 @@ export type Options<
   meta?: keyof ClientMeta extends never ? Record<string, unknown> : ClientMeta;
 };
 
-export const todosCreate = <ThrowOnError extends boolean = false>(
-  options: Options<TodosCreateData, ThrowOnError>,
-): RequestResult<TodosCreateResponses, TodosCreateErrors, ThrowOnError> =>
-  (options.client ?? client).post<
-    TodosCreateResponses,
-    TodosCreateErrors,
+export const accountCurrent = <ThrowOnError extends boolean = false>(
+  options?: Options<AccountCurrentData, ThrowOnError>,
+): RequestResult<AccountCurrentResponses, AccountCurrentErrors, ThrowOnError> =>
+  (options?.client ?? client).get<
+    AccountCurrentResponses,
+    AccountCurrentErrors,
     ThrowOnError
   >({
     security: [{ scheme: "bearer", type: "http" }],
-    url: "/api/todos/create",
+    url: "/api/account/current",
+    ...options,
+  });
+
+export const appsCreate = <ThrowOnError extends boolean = false>(
+  options: Options<AppsCreateData, ThrowOnError>,
+): RequestResult<AppsCreateResponses, AppsCreateErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    AppsCreateResponses,
+    AppsCreateErrors,
+    ThrowOnError
+  >({
+    security: [{ scheme: "bearer", type: "http" }],
+    url: "/api/apps/create",
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -55,28 +86,113 @@ export const todosCreate = <ThrowOnError extends boolean = false>(
     },
   });
 
-export const todosGet = <ThrowOnError extends boolean = false>(
-  options: Options<TodosGetData, ThrowOnError>,
-): RequestResult<TodosGetResponses, TodosGetErrors, ThrowOnError> =>
-  (options.client ?? client).get<
-    TodosGetResponses,
-    TodosGetErrors,
+export const appsDelete = <ThrowOnError extends boolean = false>(
+  options: Options<AppsDeleteData, ThrowOnError>,
+): RequestResult<AppsDeleteResponses, AppsDeleteErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    AppsDeleteResponses,
+    AppsDeleteErrors,
     ThrowOnError
   >({
     security: [{ scheme: "bearer", type: "http" }],
-    url: "/api/todos/get",
+    url: "/api/apps/delete",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+export const appsGet = <ThrowOnError extends boolean = false>(
+  options: Options<AppsGetData, ThrowOnError>,
+): RequestResult<AppsGetResponses, AppsGetErrors, ThrowOnError> =>
+  (options.client ?? client).get<AppsGetResponses, AppsGetErrors, ThrowOnError>(
+    {
+      security: [{ scheme: "bearer", type: "http" }],
+      url: "/api/apps/get",
+      ...options,
+    },
+  );
+
+export const appsList = <ThrowOnError extends boolean = false>(
+  options: Options<AppsListData, ThrowOnError>,
+): RequestResult<AppsListResponses, AppsListErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    AppsListResponses,
+    AppsListErrors,
+    ThrowOnError
+  >({
+    querySerializer: {
+      parameters: { paginationOpts: { object: { style: "form" } } },
+    },
+    security: [{ scheme: "bearer", type: "http" }],
+    url: "/api/apps/list",
     ...options,
   });
 
-export const todosList = <ThrowOnError extends boolean = false>(
-  options?: Options<TodosListData, ThrowOnError>,
-): RequestResult<TodosListResponses, TodosListErrors, ThrowOnError> =>
-  (options?.client ?? client).get<
-    TodosListResponses,
-    TodosListErrors,
+export const previewsGet = <ThrowOnError extends boolean = false>(
+  options: Options<PreviewsGetData, ThrowOnError>,
+): RequestResult<PreviewsGetResponses, PreviewsGetErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    PreviewsGetResponses,
+    PreviewsGetErrors,
     ThrowOnError
   >({
     security: [{ scheme: "bearer", type: "http" }],
-    url: "/api/todos/list",
+    url: "/api/previews/get",
     ...options,
+  });
+
+export const previewsList = <ThrowOnError extends boolean = false>(
+  options: Options<PreviewsListData, ThrowOnError>,
+): RequestResult<PreviewsListResponses, PreviewsListErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    PreviewsListResponses,
+    PreviewsListErrors,
+    ThrowOnError
+  >({
+    querySerializer: {
+      parameters: { paginationOpts: { object: { style: "form" } } },
+    },
+    security: [{ scheme: "bearer", type: "http" }],
+    url: "/api/previews/list",
+    ...options,
+  });
+
+export const previewsUpdate = <ThrowOnError extends boolean = false>(
+  options: Options<PreviewsUpdateData, ThrowOnError>,
+): RequestResult<PreviewsUpdateResponses, PreviewsUpdateErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    PreviewsUpdateResponses,
+    PreviewsUpdateErrors,
+    ThrowOnError
+  >({
+    security: [{ scheme: "bearer", type: "http" }],
+    url: "/api/previews/update",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+export const previewsTokenCreate = <ThrowOnError extends boolean = false>(
+  options: Options<PreviewsTokenCreateData, ThrowOnError>,
+): RequestResult<
+  PreviewsTokenCreateResponses,
+  PreviewsTokenCreateErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    PreviewsTokenCreateResponses,
+    PreviewsTokenCreateErrors,
+    ThrowOnError
+  >({
+    security: [{ scheme: "bearer", type: "http" }],
+    url: "/api/previews/token/create",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
   });

@@ -11,6 +11,8 @@ const app = defineApp({
   env: {
     AUTH_PRIVATE_KEY: v.string(),
     AUTH_JWKS: v.string(),
+    CONVEX_TEAM_ID: v.optional(v.string()),
+    CONVEX_TEAM_TOKEN: v.optional(v.string()),
   },
 });
 

@@ -22,13 +22,5 @@
   {
     "path": "/dashboard/api-keys",
     "authenticated": true
-  },
-  {
-    "path": "/todos/",
-    "authenticated": true
-  },
-  {
-    "path": "/todos/$id",
-    "authenticated": true
   }
 ]

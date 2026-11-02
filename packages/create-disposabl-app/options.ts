@@ -21,6 +21,7 @@ export const features = [
 export type Feature = (typeof features)[number]["id"];
 export const requiredFeatures: readonly Feature[] = [];
 export type DisposablConfig = {
+  appId?: string;
   version: string;
   platforms: Platform[];
   features: Feature[];

@@ -59,7 +59,6 @@ test("auth-disabled output omits frontend auth routes while retaining backend au
     "packages/disposabl-kit/client/routes/_auth-pages/login.tsx",
     "packages/disposabl-kit/client/routes/_auth-pages/signUp.tsx",
     "packages/disposabl-kit/client/routes/consent.tsx",
-    "apps/web/src/router/_authenticated/todos/index.tsx",
     "apps/web/src/router/_authenticated/dashboard.api-keys.tsx",
     "apps/mobile/src/app/(auth)/login.tsx",
     "apps/mobile/src/app/(auth)/signup.tsx",

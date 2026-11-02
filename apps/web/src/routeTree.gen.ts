@@ -17,8 +17,6 @@ import { Route as DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPa
 import { Route as DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesSignUpRouteImport } from './../../../packages/disposabl-kit/client/routes/_auth-pages/signUp'
 import { Route as AuthenticatedDashboardRouteImport } from './router/_authenticated/dashboard'
 import { Route as AuthenticatedDashboardDotapiKeysRouteImport } from './router/_authenticated/dashboard.api-keys'
-import { Route as AuthenticatedTodosIndexRouteImport } from './router/_authenticated/todos/index'
-import { Route as AuthenticatedTodosIdRouteImport } from './router/_authenticated/todos/$id'
 
 const DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRoute =
   DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRouteImport.update(
@@ -80,18 +78,6 @@ const AuthenticatedDashboardDotapiKeysRoute =
     path: '/api-keys',
     getParentRoute: () => AuthenticatedDashboardRoute,
   } as any)
-const AuthenticatedTodosIndexRoute = AuthenticatedTodosIndexRouteImport.update({
-  id: '/todos/',
-  path: '/todos/',
-  getParentRoute: () =>
-    DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthenticatedRouteRoute,
-} as any)
-const AuthenticatedTodosIdRoute = AuthenticatedTodosIdRouteImport.update({
-  id: '/todos/$id',
-  path: '/todos/$id',
-  getParentRoute: () =>
-    DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthenticatedRouteRoute,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -100,8 +86,6 @@ export interface FileRoutesByFullPath {
   '/signup': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesSignUpRoute
   '/dashboard': typeof AuthenticatedDashboardRouteWithChildren
   '/dashboard/api-keys': typeof AuthenticatedDashboardDotapiKeysRoute
-  '/todos/$id': typeof AuthenticatedTodosIdRoute
-  '/todos/': typeof AuthenticatedTodosIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -110,8 +94,6 @@ export interface FileRoutesByTo {
   '/signup': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesSignUpRoute
   '/dashboard': typeof AuthenticatedDashboardRouteWithChildren
   '/dashboard/api-keys': typeof AuthenticatedDashboardDotapiKeysRoute
-  '/todos/$id': typeof AuthenticatedTodosIdRoute
-  '/todos': typeof AuthenticatedTodosIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -123,8 +105,6 @@ export interface FileRoutesById {
   '/_providers/': typeof IndexRoute
   '/_providers/_authenticated/dashboard': typeof AuthenticatedDashboardRouteWithChildren
   '/_providers/_authenticated/dashboard/api-keys': typeof AuthenticatedDashboardDotapiKeysRoute
-  '/_providers/_authenticated/todos/$id': typeof AuthenticatedTodosIdRoute
-  '/_providers/_authenticated/todos/': typeof AuthenticatedTodosIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -135,8 +115,6 @@ export interface FileRouteTypes {
     | '/signup'
     | '/dashboard'
     | '/dashboard/api-keys'
-    | '/todos/$id'
-    | '/todos/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -145,8 +123,6 @@ export interface FileRouteTypes {
     | '/signup'
     | '/dashboard'
     | '/dashboard/api-keys'
-    | '/todos/$id'
-    | '/todos'
   id:
     | '__root__'
     | '/_providers'
@@ -157,8 +133,6 @@ export interface FileRouteTypes {
     | '/_providers/'
     | '/_providers/_authenticated/dashboard'
     | '/_providers/_authenticated/dashboard/api-keys'
-    | '/_providers/_authenticated/todos/$id'
-    | '/_providers/_authenticated/todos/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -223,20 +197,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardDotapiKeysRouteImport
       parentRoute: typeof AuthenticatedDashboardRoute
     }
-    '/_providers/_authenticated/todos/': {
-      id: '/_providers/_authenticated/todos/'
-      path: '/todos'
-      fullPath: '/todos/'
-      preLoaderRoute: typeof AuthenticatedTodosIndexRouteImport
-      parentRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthenticatedRouteRoute
-    }
-    '/_providers/_authenticated/todos/$id': {
-      id: '/_providers/_authenticated/todos/$id'
-      path: '/todos/$id'
-      fullPath: '/todos/$id'
-      preLoaderRoute: typeof AuthenticatedTodosIdRouteImport
-      parentRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthenticatedRouteRoute
-    }
   }
 }
 
@@ -257,15 +217,11 @@ const AuthenticatedDashboardRouteWithChildren =
 
 interface DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthenticatedRouteRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRouteWithChildren
-  AuthenticatedTodosIdRoute: typeof AuthenticatedTodosIdRoute
-  AuthenticatedTodosIndexRoute: typeof AuthenticatedTodosIndexRoute
 }
 
 const DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthenticatedRouteRouteChildren: DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthenticatedRouteRouteChildren =
   {
     AuthenticatedDashboardRoute: AuthenticatedDashboardRouteWithChildren,
-    AuthenticatedTodosIdRoute: AuthenticatedTodosIdRoute,
-    AuthenticatedTodosIndexRoute: AuthenticatedTodosIndexRoute,
   }
 
 const DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthenticatedRouteRouteWithChildren =
@@ -306,12 +262,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}

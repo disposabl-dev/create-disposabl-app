@@ -18,7 +18,6 @@ function Dashboard() {
     <main className="mx-auto max-w-xl space-y-4 p-6">
       <h1 className="text-2xl font-semibold">Dashboard</h1>
       <nav className="flex gap-4">
-        <Link to="/todos">Todos</Link>
         {config.platforms.includes("api") && (
           <Link to="/dashboard/api-keys">API keys</Link>
         )}

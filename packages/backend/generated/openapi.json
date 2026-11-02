@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Application API",
-    "version": "0.1.0"
+    "version": "3.0.0"
   },
   "security": [
     {
@@ -18,35 +18,43 @@
     }
   },
   "paths": {
-    "/api/todos/create": {
-      "post": {
-        "operationId": "todosCreate",
-        "x-convex-function": "todos/internal:create",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "title": {
-                    "type": "string"
-                  }
-                },
-                "required": ["title"],
-                "additionalProperties": false
-              }
-            }
-          }
-        },
+    "/api/account/current": {
+      "get": {
+        "operationId": "accountCurrent",
+        "x-convex-function": "account/internal:current",
+        "parameters": [],
         "responses": {
           "200": {
             "description": "Success",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "string",
-                  "description": "ID of a document in \"todos\""
+                  "anyOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "description": "ID of a document in \"users\""
+                        },
+                        "username": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": ["id", "username"],
+                      "additionalProperties": false
+                    }
+                  ]
                 }
               }
             }
@@ -66,20 +74,398 @@
         }
       }
     },
-    "/api/todos/get": {
+    "/api/apps/create": {
+      "post": {
+        "operationId": "appsCreate",
+        "x-convex-function": "apps/internal:create",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "platforms": {
+                    "type": "array",
+                    "items": {
+                      "enum": [
+                        "web",
+                        "android",
+                        "ios",
+                        "macos",
+                        "windows",
+                        "linux",
+                        "api",
+                        "mcp",
+                        "typescript-sdk",
+                        "cli"
+                      ]
+                    }
+                  },
+                  "appId": {
+                    "type": "string"
+                  }
+                },
+                "required": ["name", "platforms"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "appId": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "platforms": {
+                      "type": "array",
+                      "items": {
+                        "enum": [
+                          "web",
+                          "android",
+                          "ios",
+                          "macos",
+                          "windows",
+                          "linux",
+                          "api",
+                          "mcp",
+                          "typescript-sdk",
+                          "cli"
+                        ]
+                      }
+                    },
+                    "createdAt": {
+                      "type": "number"
+                    }
+                  },
+                  "required": ["appId", "name", "platforms", "createdAt"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid arguments"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient scope"
+          },
+          "500": {
+            "description": "Internal error"
+          }
+        }
+      }
+    },
+    "/api/apps/delete": {
+      "post": {
+        "operationId": "appsDelete",
+        "x-convex-function": "apps/internal:delete",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "appId": {
+                    "type": "string"
+                  }
+                },
+                "required": ["appId"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "null"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid arguments"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient scope"
+          },
+          "500": {
+            "description": "Internal error"
+          }
+        }
+      }
+    },
+    "/api/apps/get": {
       "get": {
-        "operationId": "todosGet",
-        "x-convex-function": "todos/internal:get",
+        "operationId": "appsGet",
+        "x-convex-function": "apps/internal:get",
         "parameters": [
           {
-            "name": "id",
+            "name": "appId",
             "in": "query",
             "required": true,
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "string",
-                  "description": "ID of a document in \"todos\""
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "appId": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "platforms": {
+                      "type": "array",
+                      "items": {
+                        "enum": [
+                          "web",
+                          "android",
+                          "ios",
+                          "macos",
+                          "windows",
+                          "linux",
+                          "api",
+                          "mcp",
+                          "typescript-sdk",
+                          "cli"
+                        ]
+                      }
+                    },
+                    "createdAt": {
+                      "type": "number"
+                    }
+                  },
+                  "required": ["appId", "name", "platforms", "createdAt"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid arguments"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient scope"
+          },
+          "500": {
+            "description": "Internal error"
+          }
+        }
+      }
+    },
+    "/api/apps/list": {
+      "get": {
+        "operationId": "appsList",
+        "x-convex-function": "apps/internal:list",
+        "parameters": [
+          {
+            "name": "paginationOpts",
+            "in": "query",
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "numItems": {
+                      "type": "number"
+                    },
+                    "cursor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "endCursor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "id": {
+                      "type": "number"
+                    },
+                    "maximumRowsRead": {
+                      "type": "number"
+                    },
+                    "maximumBytesRead": {
+                      "type": "number"
+                    }
+                  },
+                  "required": ["numItems", "cursor"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "page": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "appId": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "platforms": {
+                            "type": "array",
+                            "items": {
+                              "enum": [
+                                "web",
+                                "android",
+                                "ios",
+                                "macos",
+                                "windows",
+                                "linux",
+                                "api",
+                                "mcp",
+                                "typescript-sdk",
+                                "cli"
+                              ]
+                            }
+                          },
+                          "createdAt": {
+                            "type": "number"
+                          }
+                        },
+                        "required": ["appId", "name", "platforms", "createdAt"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "continueCursor": {
+                      "type": "string"
+                    },
+                    "isDone": {
+                      "type": "boolean"
+                    },
+                    "splitCursor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "pageStatus": {
+                      "anyOf": [
+                        {
+                          "const": "SplitRecommended"
+                        },
+                        {
+                          "const": "SplitRequired"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": ["page", "continueCursor", "isDone"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid arguments"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient scope"
+          },
+          "500": {
+            "description": "Internal error"
+          }
+        }
+      }
+    },
+    "/api/previews/get": {
+      "get": {
+        "operationId": "previewsGet",
+        "x-convex-function": "previews/internal:get",
+        "parameters": [
+          {
+            "name": "appId",
+            "in": "query",
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "name": "reference",
+            "in": "query",
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
                 }
               }
             }
@@ -95,21 +481,984 @@
                     {
                       "type": "object",
                       "properties": {
-                        "userId": {
+                        "appId": {
                           "type": "string"
                         },
-                        "title": {
+                        "reference": {
                           "type": "string"
                         },
-                        "_id": {
-                          "type": "string",
-                          "description": "ID of a document in \"todos\""
+                        "githubUrl": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         },
-                        "_creationTime": {
+                        "platforms": {
+                          "type": "object",
+                          "properties": {
+                            "web": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "enabled": {
+                                      "const": false
+                                    }
+                                  },
+                                  "required": ["enabled"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "enabled": {
+                                      "const": true
+                                    },
+                                    "url": {
+                                      "type": "string"
+                                    },
+                                    "latest": {
+                                      "type": "object",
+                                      "properties": {
+                                        "revision": {
+                                          "type": "number"
+                                        },
+                                        "status": {
+                                          "enum": [
+                                            "pending",
+                                            "building",
+                                            "ready",
+                                            "failed"
+                                          ]
+                                        },
+                                        "version": {
+                                          "type": "string"
+                                        },
+                                        "commitSha": {
+                                          "type": "string"
+                                        },
+                                        "url": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "githubReleaseUrl": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "artifactUrl": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "updateUrl": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        }
+                                      },
+                                      "required": ["revision", "status"],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "required": ["enabled"],
+                                  "additionalProperties": false
+                                }
+                              ]
+                            },
+                            "android": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "enabled": {
+                                      "const": false
+                                    }
+                                  },
+                                  "required": ["enabled"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "enabled": {
+                                      "const": true
+                                    },
+                                    "url": {
+                                      "type": "string"
+                                    },
+                                    "latest": {
+                                      "type": "object",
+                                      "properties": {
+                                        "revision": {
+                                          "type": "number"
+                                        },
+                                        "status": {
+                                          "enum": [
+                                            "pending",
+                                            "building",
+                                            "ready",
+                                            "failed"
+                                          ]
+                                        },
+                                        "version": {
+                                          "type": "string"
+                                        },
+                                        "commitSha": {
+                                          "type": "string"
+                                        },
+                                        "url": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "githubReleaseUrl": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "artifactUrl": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "updateUrl": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        }
+                                      },
+                                      "required": ["revision", "status"],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "required": ["enabled"],
+                                  "additionalProperties": false
+                                }
+                              ]
+                            },
+                            "ios": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "enabled": {
+                                      "const": false
+                                    }
+                                  },
+                                  "required": ["enabled"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "enabled": {
+                                      "const": true
+                                    },
+                                    "url": {
+                                      "type": "string"
+                                    },
+                                    "latest": {
+                                      "type": "object",
+                                      "properties": {
+                                        "revision": {
+                                          "type": "number"
+                                        },
+                                        "status": {
+                                          "enum": [
+                                            "pending",
+                                            "building",
+                                            "ready",
+                                            "failed"
+                                          ]
+                                        },
+                                        "version": {
+                                          "type": "string"
+                                        },
+                                        "commitSha": {
+                                          "type": "string"
+                                        },
+                                        "url": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "githubReleaseUrl": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "artifactUrl": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "updateUrl": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        }
+                                      },
+                                      "required": ["revision", "status"],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "required": ["enabled"],
+                                  "additionalProperties": false
+                                }
+                              ]
+                            },
+                            "macos": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "enabled": {
+                                      "const": false
+                                    }
+                                  },
+                                  "required": ["enabled"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "enabled": {
+                                      "const": true
+                                    },
+                                    "url": {
+                                      "type": "string"
+                                    },
+                                    "latest": {
+                                      "type": "object",
+                                      "properties": {
+                                        "revision": {
+                                          "type": "number"
+                                        },
+                                        "status": {
+                                          "enum": [
+                                            "pending",
+                                            "building",
+                                            "ready",
+                                            "failed"
+                                          ]
+                                        },
+                                        "version": {
+                                          "type": "string"
+                                        },
+                                        "commitSha": {
+                                          "type": "string"
+                                        },
+                                        "url": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "githubReleaseUrl": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "artifactUrl": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "updateUrl": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        }
+                                      },
+                                      "required": ["revision", "status"],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "required": ["enabled"],
+                                  "additionalProperties": false
+                                }
+                              ]
+                            },
+                            "windows": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "enabled": {
+                                      "const": false
+                                    }
+                                  },
+                                  "required": ["enabled"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "enabled": {
+                                      "const": true
+                                    },
+                                    "url": {
+                                      "type": "string"
+                                    },
+                                    "latest": {
+                                      "type": "object",
+                                      "properties": {
+                                        "revision": {
+                                          "type": "number"
+                                        },
+                                        "status": {
+                                          "enum": [
+                                            "pending",
+                                            "building",
+                                            "ready",
+                                            "failed"
+                                          ]
+                                        },
+                                        "version": {
+                                          "type": "string"
+                                        },
+                                        "commitSha": {
+                                          "type": "string"
+                                        },
+                                        "url": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "githubReleaseUrl": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "artifactUrl": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "updateUrl": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        }
+                                      },
+                                      "required": ["revision", "status"],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "required": ["enabled"],
+                                  "additionalProperties": false
+                                }
+                              ]
+                            },
+                            "linux": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "enabled": {
+                                      "const": false
+                                    }
+                                  },
+                                  "required": ["enabled"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "enabled": {
+                                      "const": true
+                                    },
+                                    "url": {
+                                      "type": "string"
+                                    },
+                                    "latest": {
+                                      "type": "object",
+                                      "properties": {
+                                        "revision": {
+                                          "type": "number"
+                                        },
+                                        "status": {
+                                          "enum": [
+                                            "pending",
+                                            "building",
+                                            "ready",
+                                            "failed"
+                                          ]
+                                        },
+                                        "version": {
+                                          "type": "string"
+                                        },
+                                        "commitSha": {
+                                          "type": "string"
+                                        },
+                                        "url": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "githubReleaseUrl": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "artifactUrl": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "updateUrl": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        }
+                                      },
+                                      "required": ["revision", "status"],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "required": ["enabled"],
+                                  "additionalProperties": false
+                                }
+                              ]
+                            },
+                            "api": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "enabled": {
+                                      "const": false
+                                    }
+                                  },
+                                  "required": ["enabled"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "enabled": {
+                                      "const": true
+                                    },
+                                    "url": {
+                                      "type": "string"
+                                    },
+                                    "latest": {
+                                      "type": "object",
+                                      "properties": {
+                                        "revision": {
+                                          "type": "number"
+                                        },
+                                        "status": {
+                                          "enum": [
+                                            "pending",
+                                            "building",
+                                            "ready",
+                                            "failed"
+                                          ]
+                                        },
+                                        "version": {
+                                          "type": "string"
+                                        },
+                                        "commitSha": {
+                                          "type": "string"
+                                        },
+                                        "url": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "githubReleaseUrl": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "artifactUrl": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "updateUrl": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        }
+                                      },
+                                      "required": ["revision", "status"],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "required": ["enabled"],
+                                  "additionalProperties": false
+                                }
+                              ]
+                            },
+                            "mcp": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "enabled": {
+                                      "const": false
+                                    }
+                                  },
+                                  "required": ["enabled"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "enabled": {
+                                      "const": true
+                                    },
+                                    "url": {
+                                      "type": "string"
+                                    },
+                                    "latest": {
+                                      "type": "object",
+                                      "properties": {
+                                        "revision": {
+                                          "type": "number"
+                                        },
+                                        "status": {
+                                          "enum": [
+                                            "pending",
+                                            "building",
+                                            "ready",
+                                            "failed"
+                                          ]
+                                        },
+                                        "version": {
+                                          "type": "string"
+                                        },
+                                        "commitSha": {
+                                          "type": "string"
+                                        },
+                                        "url": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "githubReleaseUrl": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "artifactUrl": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "updateUrl": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        }
+                                      },
+                                      "required": ["revision", "status"],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "required": ["enabled"],
+                                  "additionalProperties": false
+                                }
+                              ]
+                            },
+                            "sdk": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "enabled": {
+                                      "const": false
+                                    }
+                                  },
+                                  "required": ["enabled"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "enabled": {
+                                      "const": true
+                                    },
+                                    "url": {
+                                      "type": "string"
+                                    },
+                                    "latest": {
+                                      "type": "object",
+                                      "properties": {
+                                        "revision": {
+                                          "type": "number"
+                                        },
+                                        "status": {
+                                          "enum": [
+                                            "pending",
+                                            "building",
+                                            "ready",
+                                            "failed"
+                                          ]
+                                        },
+                                        "version": {
+                                          "type": "string"
+                                        },
+                                        "commitSha": {
+                                          "type": "string"
+                                        },
+                                        "url": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "githubReleaseUrl": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "artifactUrl": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "updateUrl": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        }
+                                      },
+                                      "required": ["revision", "status"],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "required": ["enabled"],
+                                  "additionalProperties": false
+                                }
+                              ]
+                            },
+                            "cli": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "enabled": {
+                                      "const": false
+                                    }
+                                  },
+                                  "required": ["enabled"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "enabled": {
+                                      "const": true
+                                    },
+                                    "url": {
+                                      "type": "string"
+                                    },
+                                    "latest": {
+                                      "type": "object",
+                                      "properties": {
+                                        "revision": {
+                                          "type": "number"
+                                        },
+                                        "status": {
+                                          "enum": [
+                                            "pending",
+                                            "building",
+                                            "ready",
+                                            "failed"
+                                          ]
+                                        },
+                                        "version": {
+                                          "type": "string"
+                                        },
+                                        "commitSha": {
+                                          "type": "string"
+                                        },
+                                        "url": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "githubReleaseUrl": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "artifactUrl": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "updateUrl": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        }
+                                      },
+                                      "required": ["revision", "status"],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "required": ["enabled"],
+                                  "additionalProperties": false
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "web",
+                            "android",
+                            "ios",
+                            "macos",
+                            "windows",
+                            "linux",
+                            "api",
+                            "mcp",
+                            "sdk",
+                            "cli"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "deployment": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string"
+                            },
+                            "reference": {
+                              "type": "string"
+                            },
+                            "convexUrl": {
+                              "type": "string"
+                            },
+                            "convexSiteUrl": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "name",
+                            "reference",
+                            "convexUrl",
+                            "convexSiteUrl"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "updatedAt": {
                           "type": "number"
                         }
                       },
-                      "required": ["userId", "title", "_id", "_creationTime"],
+                      "required": [
+                        "appId",
+                        "reference",
+                        "platforms",
+                        "updatedAt"
+                      ],
                       "additionalProperties": false
                     },
                     {
@@ -135,38 +1484,2278 @@
         }
       }
     },
-    "/api/todos/list": {
+    "/api/previews/list": {
       "get": {
-        "operationId": "todosList",
-        "x-convex-function": "todos/internal:list",
-        "parameters": [],
+        "operationId": "previewsList",
+        "x-convex-function": "previews/internal:list",
+        "parameters": [
+          {
+            "name": "appId",
+            "in": "query",
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "name": "paginationOpts",
+            "in": "query",
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "numItems": {
+                      "type": "number"
+                    },
+                    "cursor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "endCursor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "id": {
+                      "type": "number"
+                    },
+                    "maximumRowsRead": {
+                      "type": "number"
+                    },
+                    "maximumBytesRead": {
+                      "type": "number"
+                    }
+                  },
+                  "required": ["numItems", "cursor"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Success",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "userId": {
-                        "type": "string"
-                      },
-                      "title": {
-                        "type": "string"
-                      },
-                      "_id": {
-                        "type": "string",
-                        "description": "ID of a document in \"todos\""
-                      },
-                      "_creationTime": {
-                        "type": "number"
+                  "type": "object",
+                  "properties": {
+                    "page": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "appId": {
+                            "type": "string"
+                          },
+                          "reference": {
+                            "type": "string"
+                          },
+                          "githubUrl": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "platforms": {
+                            "type": "object",
+                            "properties": {
+                              "web": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "enabled": {
+                                        "const": false
+                                      }
+                                    },
+                                    "required": ["enabled"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "enabled": {
+                                        "const": true
+                                      },
+                                      "url": {
+                                        "type": "string"
+                                      },
+                                      "latest": {
+                                        "type": "object",
+                                        "properties": {
+                                          "revision": {
+                                            "type": "number"
+                                          },
+                                          "status": {
+                                            "enum": [
+                                              "pending",
+                                              "building",
+                                              "ready",
+                                              "failed"
+                                            ]
+                                          },
+                                          "version": {
+                                            "type": "string"
+                                          },
+                                          "commitSha": {
+                                            "type": "string"
+                                          },
+                                          "url": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "githubReleaseUrl": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "artifactUrl": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "updateUrl": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          }
+                                        },
+                                        "required": ["revision", "status"],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "required": ["enabled"],
+                                    "additionalProperties": false
+                                  }
+                                ]
+                              },
+                              "android": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "enabled": {
+                                        "const": false
+                                      }
+                                    },
+                                    "required": ["enabled"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "enabled": {
+                                        "const": true
+                                      },
+                                      "url": {
+                                        "type": "string"
+                                      },
+                                      "latest": {
+                                        "type": "object",
+                                        "properties": {
+                                          "revision": {
+                                            "type": "number"
+                                          },
+                                          "status": {
+                                            "enum": [
+                                              "pending",
+                                              "building",
+                                              "ready",
+                                              "failed"
+                                            ]
+                                          },
+                                          "version": {
+                                            "type": "string"
+                                          },
+                                          "commitSha": {
+                                            "type": "string"
+                                          },
+                                          "url": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "githubReleaseUrl": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "artifactUrl": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "updateUrl": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          }
+                                        },
+                                        "required": ["revision", "status"],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "required": ["enabled"],
+                                    "additionalProperties": false
+                                  }
+                                ]
+                              },
+                              "ios": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "enabled": {
+                                        "const": false
+                                      }
+                                    },
+                                    "required": ["enabled"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "enabled": {
+                                        "const": true
+                                      },
+                                      "url": {
+                                        "type": "string"
+                                      },
+                                      "latest": {
+                                        "type": "object",
+                                        "properties": {
+                                          "revision": {
+                                            "type": "number"
+                                          },
+                                          "status": {
+                                            "enum": [
+                                              "pending",
+                                              "building",
+                                              "ready",
+                                              "failed"
+                                            ]
+                                          },
+                                          "version": {
+                                            "type": "string"
+                                          },
+                                          "commitSha": {
+                                            "type": "string"
+                                          },
+                                          "url": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "githubReleaseUrl": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "artifactUrl": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "updateUrl": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          }
+                                        },
+                                        "required": ["revision", "status"],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "required": ["enabled"],
+                                    "additionalProperties": false
+                                  }
+                                ]
+                              },
+                              "macos": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "enabled": {
+                                        "const": false
+                                      }
+                                    },
+                                    "required": ["enabled"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "enabled": {
+                                        "const": true
+                                      },
+                                      "url": {
+                                        "type": "string"
+                                      },
+                                      "latest": {
+                                        "type": "object",
+                                        "properties": {
+                                          "revision": {
+                                            "type": "number"
+                                          },
+                                          "status": {
+                                            "enum": [
+                                              "pending",
+                                              "building",
+                                              "ready",
+                                              "failed"
+                                            ]
+                                          },
+                                          "version": {
+                                            "type": "string"
+                                          },
+                                          "commitSha": {
+                                            "type": "string"
+                                          },
+                                          "url": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "githubReleaseUrl": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "artifactUrl": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "updateUrl": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          }
+                                        },
+                                        "required": ["revision", "status"],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "required": ["enabled"],
+                                    "additionalProperties": false
+                                  }
+                                ]
+                              },
+                              "windows": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "enabled": {
+                                        "const": false
+                                      }
+                                    },
+                                    "required": ["enabled"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "enabled": {
+                                        "const": true
+                                      },
+                                      "url": {
+                                        "type": "string"
+                                      },
+                                      "latest": {
+                                        "type": "object",
+                                        "properties": {
+                                          "revision": {
+                                            "type": "number"
+                                          },
+                                          "status": {
+                                            "enum": [
+                                              "pending",
+                                              "building",
+                                              "ready",
+                                              "failed"
+                                            ]
+                                          },
+                                          "version": {
+                                            "type": "string"
+                                          },
+                                          "commitSha": {
+                                            "type": "string"
+                                          },
+                                          "url": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "githubReleaseUrl": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "artifactUrl": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "updateUrl": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          }
+                                        },
+                                        "required": ["revision", "status"],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "required": ["enabled"],
+                                    "additionalProperties": false
+                                  }
+                                ]
+                              },
+                              "linux": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "enabled": {
+                                        "const": false
+                                      }
+                                    },
+                                    "required": ["enabled"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "enabled": {
+                                        "const": true
+                                      },
+                                      "url": {
+                                        "type": "string"
+                                      },
+                                      "latest": {
+                                        "type": "object",
+                                        "properties": {
+                                          "revision": {
+                                            "type": "number"
+                                          },
+                                          "status": {
+                                            "enum": [
+                                              "pending",
+                                              "building",
+                                              "ready",
+                                              "failed"
+                                            ]
+                                          },
+                                          "version": {
+                                            "type": "string"
+                                          },
+                                          "commitSha": {
+                                            "type": "string"
+                                          },
+                                          "url": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "githubReleaseUrl": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "artifactUrl": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "updateUrl": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          }
+                                        },
+                                        "required": ["revision", "status"],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "required": ["enabled"],
+                                    "additionalProperties": false
+                                  }
+                                ]
+                              },
+                              "api": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "enabled": {
+                                        "const": false
+                                      }
+                                    },
+                                    "required": ["enabled"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "enabled": {
+                                        "const": true
+                                      },
+                                      "url": {
+                                        "type": "string"
+                                      },
+                                      "latest": {
+                                        "type": "object",
+                                        "properties": {
+                                          "revision": {
+                                            "type": "number"
+                                          },
+                                          "status": {
+                                            "enum": [
+                                              "pending",
+                                              "building",
+                                              "ready",
+                                              "failed"
+                                            ]
+                                          },
+                                          "version": {
+                                            "type": "string"
+                                          },
+                                          "commitSha": {
+                                            "type": "string"
+                                          },
+                                          "url": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "githubReleaseUrl": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "artifactUrl": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "updateUrl": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          }
+                                        },
+                                        "required": ["revision", "status"],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "required": ["enabled"],
+                                    "additionalProperties": false
+                                  }
+                                ]
+                              },
+                              "mcp": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "enabled": {
+                                        "const": false
+                                      }
+                                    },
+                                    "required": ["enabled"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "enabled": {
+                                        "const": true
+                                      },
+                                      "url": {
+                                        "type": "string"
+                                      },
+                                      "latest": {
+                                        "type": "object",
+                                        "properties": {
+                                          "revision": {
+                                            "type": "number"
+                                          },
+                                          "status": {
+                                            "enum": [
+                                              "pending",
+                                              "building",
+                                              "ready",
+                                              "failed"
+                                            ]
+                                          },
+                                          "version": {
+                                            "type": "string"
+                                          },
+                                          "commitSha": {
+                                            "type": "string"
+                                          },
+                                          "url": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "githubReleaseUrl": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "artifactUrl": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "updateUrl": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          }
+                                        },
+                                        "required": ["revision", "status"],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "required": ["enabled"],
+                                    "additionalProperties": false
+                                  }
+                                ]
+                              },
+                              "sdk": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "enabled": {
+                                        "const": false
+                                      }
+                                    },
+                                    "required": ["enabled"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "enabled": {
+                                        "const": true
+                                      },
+                                      "url": {
+                                        "type": "string"
+                                      },
+                                      "latest": {
+                                        "type": "object",
+                                        "properties": {
+                                          "revision": {
+                                            "type": "number"
+                                          },
+                                          "status": {
+                                            "enum": [
+                                              "pending",
+                                              "building",
+                                              "ready",
+                                              "failed"
+                                            ]
+                                          },
+                                          "version": {
+                                            "type": "string"
+                                          },
+                                          "commitSha": {
+                                            "type": "string"
+                                          },
+                                          "url": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "githubReleaseUrl": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "artifactUrl": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "updateUrl": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          }
+                                        },
+                                        "required": ["revision", "status"],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "required": ["enabled"],
+                                    "additionalProperties": false
+                                  }
+                                ]
+                              },
+                              "cli": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "enabled": {
+                                        "const": false
+                                      }
+                                    },
+                                    "required": ["enabled"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "enabled": {
+                                        "const": true
+                                      },
+                                      "url": {
+                                        "type": "string"
+                                      },
+                                      "latest": {
+                                        "type": "object",
+                                        "properties": {
+                                          "revision": {
+                                            "type": "number"
+                                          },
+                                          "status": {
+                                            "enum": [
+                                              "pending",
+                                              "building",
+                                              "ready",
+                                              "failed"
+                                            ]
+                                          },
+                                          "version": {
+                                            "type": "string"
+                                          },
+                                          "commitSha": {
+                                            "type": "string"
+                                          },
+                                          "url": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "githubReleaseUrl": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "artifactUrl": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "updateUrl": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          }
+                                        },
+                                        "required": ["revision", "status"],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "required": ["enabled"],
+                                    "additionalProperties": false
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "web",
+                              "android",
+                              "ios",
+                              "macos",
+                              "windows",
+                              "linux",
+                              "api",
+                              "mcp",
+                              "sdk",
+                              "cli"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "deployment": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string"
+                              },
+                              "reference": {
+                                "type": "string"
+                              },
+                              "convexUrl": {
+                                "type": "string"
+                              },
+                              "convexSiteUrl": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "reference",
+                              "convexUrl",
+                              "convexSiteUrl"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "updatedAt": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "appId",
+                          "reference",
+                          "platforms",
+                          "updatedAt"
+                        ],
+                        "additionalProperties": false
                       }
                     },
-                    "required": ["userId", "title", "_id", "_creationTime"],
+                    "continueCursor": {
+                      "type": "string"
+                    },
+                    "isDone": {
+                      "type": "boolean"
+                    },
+                    "splitCursor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "pageStatus": {
+                      "anyOf": [
+                        {
+                          "const": "SplitRecommended"
+                        },
+                        {
+                          "const": "SplitRequired"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": ["page", "continueCursor", "isDone"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid arguments"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient scope"
+          },
+          "500": {
+            "description": "Internal error"
+          }
+        }
+      }
+    },
+    "/api/previews/update": {
+      "post": {
+        "operationId": "previewsUpdate",
+        "x-convex-function": "previews/internal:update",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "appId": {
+                    "type": "string"
+                  },
+                  "reference": {
+                    "type": "string"
+                  },
+                  "platform": {
+                    "enum": [
+                      "web",
+                      "android",
+                      "ios",
+                      "macos",
+                      "windows",
+                      "linux",
+                      "api",
+                      "mcp",
+                      "typescript-sdk",
+                      "cli"
+                    ]
+                  },
+                  "latest": {
+                    "type": "object",
+                    "properties": {
+                      "revision": {
+                        "type": "number"
+                      },
+                      "status": {
+                        "enum": ["pending", "building", "ready", "failed"]
+                      },
+                      "version": {
+                        "type": "string"
+                      },
+                      "commitSha": {
+                        "type": "string"
+                      },
+                      "url": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "githubReleaseUrl": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "artifactUrl": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "updateUrl": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": ["revision", "status"],
                     "additionalProperties": false
+                  },
+                  "githubUrl": {
+                    "type": "string"
                   }
+                },
+                "required": ["appId", "reference", "platform", "latest"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "appId": {
+                      "type": "string"
+                    },
+                    "reference": {
+                      "type": "string"
+                    },
+                    "githubUrl": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "platforms": {
+                      "type": "object",
+                      "properties": {
+                        "web": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "enabled": {
+                                  "const": false
+                                }
+                              },
+                              "required": ["enabled"],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "enabled": {
+                                  "const": true
+                                },
+                                "url": {
+                                  "type": "string"
+                                },
+                                "latest": {
+                                  "type": "object",
+                                  "properties": {
+                                    "revision": {
+                                      "type": "number"
+                                    },
+                                    "status": {
+                                      "enum": [
+                                        "pending",
+                                        "building",
+                                        "ready",
+                                        "failed"
+                                      ]
+                                    },
+                                    "version": {
+                                      "type": "string"
+                                    },
+                                    "commitSha": {
+                                      "type": "string"
+                                    },
+                                    "url": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "githubReleaseUrl": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "artifactUrl": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "updateUrl": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "required": ["revision", "status"],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": ["enabled"],
+                              "additionalProperties": false
+                            }
+                          ]
+                        },
+                        "android": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "enabled": {
+                                  "const": false
+                                }
+                              },
+                              "required": ["enabled"],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "enabled": {
+                                  "const": true
+                                },
+                                "url": {
+                                  "type": "string"
+                                },
+                                "latest": {
+                                  "type": "object",
+                                  "properties": {
+                                    "revision": {
+                                      "type": "number"
+                                    },
+                                    "status": {
+                                      "enum": [
+                                        "pending",
+                                        "building",
+                                        "ready",
+                                        "failed"
+                                      ]
+                                    },
+                                    "version": {
+                                      "type": "string"
+                                    },
+                                    "commitSha": {
+                                      "type": "string"
+                                    },
+                                    "url": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "githubReleaseUrl": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "artifactUrl": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "updateUrl": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "required": ["revision", "status"],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": ["enabled"],
+                              "additionalProperties": false
+                            }
+                          ]
+                        },
+                        "ios": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "enabled": {
+                                  "const": false
+                                }
+                              },
+                              "required": ["enabled"],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "enabled": {
+                                  "const": true
+                                },
+                                "url": {
+                                  "type": "string"
+                                },
+                                "latest": {
+                                  "type": "object",
+                                  "properties": {
+                                    "revision": {
+                                      "type": "number"
+                                    },
+                                    "status": {
+                                      "enum": [
+                                        "pending",
+                                        "building",
+                                        "ready",
+                                        "failed"
+                                      ]
+                                    },
+                                    "version": {
+                                      "type": "string"
+                                    },
+                                    "commitSha": {
+                                      "type": "string"
+                                    },
+                                    "url": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "githubReleaseUrl": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "artifactUrl": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "updateUrl": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "required": ["revision", "status"],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": ["enabled"],
+                              "additionalProperties": false
+                            }
+                          ]
+                        },
+                        "macos": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "enabled": {
+                                  "const": false
+                                }
+                              },
+                              "required": ["enabled"],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "enabled": {
+                                  "const": true
+                                },
+                                "url": {
+                                  "type": "string"
+                                },
+                                "latest": {
+                                  "type": "object",
+                                  "properties": {
+                                    "revision": {
+                                      "type": "number"
+                                    },
+                                    "status": {
+                                      "enum": [
+                                        "pending",
+                                        "building",
+                                        "ready",
+                                        "failed"
+                                      ]
+                                    },
+                                    "version": {
+                                      "type": "string"
+                                    },
+                                    "commitSha": {
+                                      "type": "string"
+                                    },
+                                    "url": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "githubReleaseUrl": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "artifactUrl": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "updateUrl": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "required": ["revision", "status"],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": ["enabled"],
+                              "additionalProperties": false
+                            }
+                          ]
+                        },
+                        "windows": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "enabled": {
+                                  "const": false
+                                }
+                              },
+                              "required": ["enabled"],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "enabled": {
+                                  "const": true
+                                },
+                                "url": {
+                                  "type": "string"
+                                },
+                                "latest": {
+                                  "type": "object",
+                                  "properties": {
+                                    "revision": {
+                                      "type": "number"
+                                    },
+                                    "status": {
+                                      "enum": [
+                                        "pending",
+                                        "building",
+                                        "ready",
+                                        "failed"
+                                      ]
+                                    },
+                                    "version": {
+                                      "type": "string"
+                                    },
+                                    "commitSha": {
+                                      "type": "string"
+                                    },
+                                    "url": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "githubReleaseUrl": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "artifactUrl": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "updateUrl": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "required": ["revision", "status"],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": ["enabled"],
+                              "additionalProperties": false
+                            }
+                          ]
+                        },
+                        "linux": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "enabled": {
+                                  "const": false
+                                }
+                              },
+                              "required": ["enabled"],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "enabled": {
+                                  "const": true
+                                },
+                                "url": {
+                                  "type": "string"
+                                },
+                                "latest": {
+                                  "type": "object",
+                                  "properties": {
+                                    "revision": {
+                                      "type": "number"
+                                    },
+                                    "status": {
+                                      "enum": [
+                                        "pending",
+                                        "building",
+                                        "ready",
+                                        "failed"
+                                      ]
+                                    },
+                                    "version": {
+                                      "type": "string"
+                                    },
+                                    "commitSha": {
+                                      "type": "string"
+                                    },
+                                    "url": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "githubReleaseUrl": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "artifactUrl": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "updateUrl": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "required": ["revision", "status"],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": ["enabled"],
+                              "additionalProperties": false
+                            }
+                          ]
+                        },
+                        "api": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "enabled": {
+                                  "const": false
+                                }
+                              },
+                              "required": ["enabled"],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "enabled": {
+                                  "const": true
+                                },
+                                "url": {
+                                  "type": "string"
+                                },
+                                "latest": {
+                                  "type": "object",
+                                  "properties": {
+                                    "revision": {
+                                      "type": "number"
+                                    },
+                                    "status": {
+                                      "enum": [
+                                        "pending",
+                                        "building",
+                                        "ready",
+                                        "failed"
+                                      ]
+                                    },
+                                    "version": {
+                                      "type": "string"
+                                    },
+                                    "commitSha": {
+                                      "type": "string"
+                                    },
+                                    "url": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "githubReleaseUrl": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "artifactUrl": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "updateUrl": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "required": ["revision", "status"],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": ["enabled"],
+                              "additionalProperties": false
+                            }
+                          ]
+                        },
+                        "mcp": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "enabled": {
+                                  "const": false
+                                }
+                              },
+                              "required": ["enabled"],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "enabled": {
+                                  "const": true
+                                },
+                                "url": {
+                                  "type": "string"
+                                },
+                                "latest": {
+                                  "type": "object",
+                                  "properties": {
+                                    "revision": {
+                                      "type": "number"
+                                    },
+                                    "status": {
+                                      "enum": [
+                                        "pending",
+                                        "building",
+                                        "ready",
+                                        "failed"
+                                      ]
+                                    },
+                                    "version": {
+                                      "type": "string"
+                                    },
+                                    "commitSha": {
+                                      "type": "string"
+                                    },
+                                    "url": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "githubReleaseUrl": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "artifactUrl": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "updateUrl": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "required": ["revision", "status"],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": ["enabled"],
+                              "additionalProperties": false
+                            }
+                          ]
+                        },
+                        "sdk": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "enabled": {
+                                  "const": false
+                                }
+                              },
+                              "required": ["enabled"],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "enabled": {
+                                  "const": true
+                                },
+                                "url": {
+                                  "type": "string"
+                                },
+                                "latest": {
+                                  "type": "object",
+                                  "properties": {
+                                    "revision": {
+                                      "type": "number"
+                                    },
+                                    "status": {
+                                      "enum": [
+                                        "pending",
+                                        "building",
+                                        "ready",
+                                        "failed"
+                                      ]
+                                    },
+                                    "version": {
+                                      "type": "string"
+                                    },
+                                    "commitSha": {
+                                      "type": "string"
+                                    },
+                                    "url": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "githubReleaseUrl": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "artifactUrl": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "updateUrl": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "required": ["revision", "status"],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": ["enabled"],
+                              "additionalProperties": false
+                            }
+                          ]
+                        },
+                        "cli": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "enabled": {
+                                  "const": false
+                                }
+                              },
+                              "required": ["enabled"],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "enabled": {
+                                  "const": true
+                                },
+                                "url": {
+                                  "type": "string"
+                                },
+                                "latest": {
+                                  "type": "object",
+                                  "properties": {
+                                    "revision": {
+                                      "type": "number"
+                                    },
+                                    "status": {
+                                      "enum": [
+                                        "pending",
+                                        "building",
+                                        "ready",
+                                        "failed"
+                                      ]
+                                    },
+                                    "version": {
+                                      "type": "string"
+                                    },
+                                    "commitSha": {
+                                      "type": "string"
+                                    },
+                                    "url": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "githubReleaseUrl": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "artifactUrl": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "updateUrl": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "required": ["revision", "status"],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": ["enabled"],
+                              "additionalProperties": false
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "web",
+                        "android",
+                        "ios",
+                        "macos",
+                        "windows",
+                        "linux",
+                        "api",
+                        "mcp",
+                        "sdk",
+                        "cli"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "deployment": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "reference": {
+                          "type": "string"
+                        },
+                        "convexUrl": {
+                          "type": "string"
+                        },
+                        "convexSiteUrl": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "reference",
+                        "convexUrl",
+                        "convexSiteUrl"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "updatedAt": {
+                      "type": "number"
+                    }
+                  },
+                  "required": ["appId", "reference", "platforms", "updatedAt"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid arguments"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient scope"
+          },
+          "500": {
+            "description": "Internal error"
+          }
+        }
+      }
+    },
+    "/api/previews/token/create": {
+      "post": {
+        "operationId": "previewsTokenCreate",
+        "x-convex-function": "previews/token/internal:create",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "appId": {
+                    "type": "string"
+                  },
+                  "reference": {
+                    "type": "string"
+                  }
+                },
+                "required": ["appId", "reference"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "appId": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "reference": {
+                      "type": "string"
+                    },
+                    "convexUrl": {
+                      "type": "string"
+                    },
+                    "convexSiteUrl": {
+                      "type": "string"
+                    },
+                    "deployKey": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "appId",
+                    "name",
+                    "reference",
+                    "convexUrl",
+                    "convexSiteUrl",
+                    "deployKey"
+                  ],
+                  "additionalProperties": false
                 }
               }
             }

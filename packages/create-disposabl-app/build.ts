@@ -12,6 +12,15 @@ const result = await Bun.build({
   external: ["commander", "@clack/core", "@clack/prompts", "picocolors"],
 });
 if (!result.success) throw new AggregateError(result.logs, "CLI build failed");
+const cli = await Bun.build({
+  entrypoints: [join(root, "packages/cli/index.ts")],
+  outdir,
+  naming: "disposabl.js",
+  target: "node",
+  external: ["commander", "proper-lockfile", "@modelcontextprotocol/sdk"],
+});
+if (!cli.success)
+  throw new AggregateError(cli.logs, "Disposabl CLI build failed");
 await cp(join(root, "LICENSE"), join(dir, "LICENSE"));
 
 // Bundle the complete starter; the CLI keeps only the selected app folders.

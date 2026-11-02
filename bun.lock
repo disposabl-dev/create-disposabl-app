@@ -181,12 +181,15 @@
       "version": "0.0.0-development",
       "bin": {
         "create-disposabl-app": "dist/index.js",
+        "disposabl": "dist/disposabl.js",
       },
       "dependencies": {
         "@clack/core": "1.5.1",
         "@clack/prompts": "1.8.1",
+        "@modelcontextprotocol/sdk": "1.32.2",
         "commander": "15.0.0",
         "picocolors": "1.1.1",
+        "proper-lockfile": "4.1.2",
       },
       "devDependencies": {
         "@eslint/js": "10.0.1",

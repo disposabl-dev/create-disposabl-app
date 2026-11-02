@@ -20,8 +20,11 @@ import {
 import { createPlatformPrompt } from "./platform-prompt";
 import { projectSetup } from "./project-setup";
 import { createApp } from "./scaffold";
+import { setupApp } from "./setup";
 
 type Options = {
+  setup?: boolean;
+  reference?: string;
   yes?: boolean;
   platforms?: string;
   features?: string;
@@ -46,6 +49,11 @@ const program = new Command("create-disposabl-app")
     "-y, --yes",
     "Skip prompts; include Web and authentication by default",
   )
+  .option("--setup", "Sign in to Disposabl and configure a development preview")
+  .option(
+    "--reference <name>",
+    "Branch or worktree name for setup (including main)",
+  )
   .option("--skip-install", "Create files without running bun install")
   .option(
     "--list-options",
@@ -58,7 +66,7 @@ const program = new Command("create-disposabl-app")
   .helpOption("-h, --help")
   .addHelpText(
     "after",
-    "\nPlatforms:\n  web (required), android, ios, api, mcp, cli, typescript-sdk\n  CLI and TypeScript SDK automatically include API.\n\nOptional features:\n  authentication, docs\n  Authentication is enabled by default. Use --features none to disable frontend authentication.\n\nExamples:\n  bun create disposabl-app@latest\n  bun create disposabl-app@latest my-app --yes\n  bun create disposabl-app@latest my-app --platforms web,android,ios,mcp --features docs --yes\n  bun create disposabl-app@latest my-app --platforms web --features none --skip-install --json\n  bun create disposabl-app@latest --list-options --json\n\nWithout a TTY, the CLI never prompts. Supply an app name.\nPlatform and feature choices are saved in disposabl.json.\nBackend authentication code is always included. No appId or Convex deployment is created.\n",
+    "\nPlatforms:\n  web (required), android, ios, api, mcp, cli, typescript-sdk\n  CLI and TypeScript SDK automatically include API.\n\nOptional features:\n  authentication, docs\n  Authentication is enabled by default. Use --features none to disable frontend authentication.\n\nExamples:\n  bun create disposabl-app@latest\n  bun create disposabl-app@latest my-app --yes\n  bun create disposabl-app@latest my-app --platforms web,android,ios,mcp --features docs --yes\n  bun create disposabl-app@latest my-app --platforms web --features none --skip-install --json\n  bun create disposabl-app@latest --list-options --json\n\nWithout a TTY, the CLI never prompts. Supply an app name.\nPlatform and feature choices are saved in disposabl.json.\nBackend authentication code is always included. Use --setup --reference main to create an app UUID and development environment through https://disposabl.dev.\n",
   )
   .configureOutput({ writeErr: () => {} })
   .exitOverride();
@@ -222,6 +230,40 @@ async function main() {
       selected.length ? selected.join(",") : "none",
     );
   }
+  const managedSetup =
+    options.setup ??
+    (interactive &&
+      answer(
+        await p.confirm({
+          message: "Set up this app with Disposabl?",
+          initialValue: false,
+        }),
+      ));
+  let reference = options.reference;
+  if (managedSetup && interactive && !reference)
+    reference = answer(
+      await p.text({
+        message: "Branch or worktree name",
+        defaultValue: "main",
+        placeholder: "main",
+        validate: (value) =>
+          !value?.trim()
+            ? "Enter a branch, worktree name, or main."
+            : undefined,
+      }),
+    );
+  if (
+    managedSetup &&
+    (!reference ||
+      reference !== reference.trim() ||
+      reference.length > 200 ||
+      [...reference].some(
+        (char) => char.charCodeAt(0) <= 32 || char.charCodeAt(0) === 127,
+      ))
+  )
+    throw new Error(
+      "Setup requires --reference with a branch, worktree name, or main.",
+    );
   const config: DisposablConfig = {
     version: version,
     platforms: chosenPlatforms,
@@ -260,6 +302,7 @@ async function main() {
   const git = (...args: string[]) =>
     execFileSync("git", args, { cwd: directory, stdio: "pipe" });
   git("init", "--initial-branch=main");
+  if (managedSetup) config.appId = await setupApp(directory, name, reference!);
   git("add", "--all");
   const hasIdentity =
     spawnSync("git", ["var", "GIT_AUTHOR_IDENT"], {

@@ -62,7 +62,6 @@ export async function createApp(
       for (const path of [
         "packages/disposabl-kit/client/routes/_auth-pages",
         "packages/disposabl-kit/client/routes/consent.tsx",
-        "apps/web/src/router/_authenticated/todos",
         "apps/web/src/router/_authenticated/dashboard.api-keys.tsx",
         "apps/web/tests/auth-branches.test.tsx",
         "apps/mobile/src/app/(auth)",

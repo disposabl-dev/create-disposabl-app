@@ -299,3 +299,8 @@ export const accessToken = (url: string, refresh = false) =>
   withCredentials(url, () => unlockedAccessToken(url, refresh));
 export const logout = (url: string) =>
   withCredentials(url, () => unlockedLogout(url));
+
+export const hasCredentials = async (url: string) =>
+  Boolean(
+    process.env.DISPOSABL_API_KEY || (await load(url)).tokens?.access_token,
+  );
