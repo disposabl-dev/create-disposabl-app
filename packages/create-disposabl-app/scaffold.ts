@@ -57,6 +57,25 @@ export async function createApp(
           force: true,
         });
     }
+    // Provider connections belong to Disposabl's setup, not the generated app.
+    await rm(
+      join(
+        destination,
+        "apps/web/src/router/_authenticated/dashboard.connections.tsx",
+      ),
+      { force: true },
+    );
+    const dashboard = join(
+      destination,
+      "apps/web/src/router/_authenticated/dashboard.tsx",
+    );
+    await writeFile(
+      dashboard,
+      (await readFile(dashboard, "utf8")).replace(
+        '        <Link to="/dashboard/connections">Connections</Link>\n',
+        "",
+      ),
+    );
     if (!config.features.includes("authentication")) {
       // These are auth screens and starter examples, not backend capabilities.
       for (const path of [
