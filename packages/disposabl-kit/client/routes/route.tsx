@@ -1,3 +1,4 @@
+import { Logo } from "../components/logo";
 import { useState } from "react";
 import { createFileRoute, Outlet } from "@tanstack/react-router";
 import { ConvexAuthProvider } from "@convex-dev/auth/react";
@@ -59,11 +60,7 @@ function SiteHeader() {
         aria-label="Main navigation"
       >
         <a href="/" aria-label="Disposabl home">
-          <img
-            src="/disposabl-logo.svg"
-            alt="Disposabl"
-            className="h-9 w-auto"
-          />
+          <Logo />
         </a>
         {authenticationEnabled && <AuthLinks />}
       </nav>
