@@ -1,4 +1,5 @@
 import { relative, resolve } from "node:path";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import {
   layout,
@@ -14,15 +15,25 @@ const kitRoute = (file: string) =>
   );
 
 // Both Vite and `tsr generate` use this route tree.
-export const routes = rootRoute("__root.tsx", [
-  layout("_providers", kitRoute("route.tsx"), [
-    physical("."),
-    route("/login", kitRoute("_auth-pages/login.tsx")),
-    route("/signup", kitRoute("_auth-pages/signUp.tsx")),
-    route("/consent", kitRoute("consent.tsx")),
-    layout("_authenticated", kitRoute("_authenticated/route.tsx"), []),
-  ]),
-]);
+export const createRoutes = (enabled: boolean) =>
+  rootRoute("__root.tsx", [
+    layout("_providers", kitRoute("route.tsx"), [
+      physical("."),
+      ...(enabled
+        ? [
+            route("/login", kitRoute("_auth-pages/login.tsx")),
+            route("/signup", kitRoute("_auth-pages/signUp.tsx")),
+            route("/consent", kitRoute("consent.tsx")),
+          ]
+        : []),
+      layout("_authenticated", kitRoute("_authenticated/route.tsx"), []),
+    ]),
+  ]);
+
+const config = JSON.parse(
+  readFileSync(new URL("../../../disposabl.json", import.meta.url), "utf8"),
+) as { features: string[] };
+export const routes = createRoutes(config.features.includes("authentication"));
 
 export default {
   routesDirectory: "router",

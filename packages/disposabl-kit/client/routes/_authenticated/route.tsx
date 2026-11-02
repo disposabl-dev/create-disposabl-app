@@ -40,5 +40,6 @@ function SignInRedirect() {
   });
   // Keep the destination stable while navigating away from the protected route.
   const [returnTo] = useState(href);
-  return <Navigate to="/login" search={{ returnTo }} />;
+  // The login route is intentionally absent from the generated types when auth is disabled.
+  return <Navigate to={"/login" as never} search={{ returnTo } as never} />;
 }

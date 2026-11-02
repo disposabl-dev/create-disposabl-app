@@ -1,13 +1,7 @@
-import {
-  createFileRoute,
-  Link,
-  redirect,
-  useNavigate,
-} from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useSignInWithUsernamePassword } from "@convex-dev/auth/methods/username-password/react";
 import { api } from "../../../../backend/convex/_generated/api";
 import { useState } from "react";
-import { authenticationEnabled } from "../../../features";
 import { getReturnTo } from "../../lib/return-to";
 
 export function LogIn() {
@@ -107,9 +101,6 @@ export function LogIn() {
 }
 
 export const Route = createFileRoute("/_providers/login")({
-  beforeLoad: () => {
-    if (!authenticationEnabled) throw redirect({ to: "/" });
-  },
   validateSearch: (
     search: Record<string, unknown>,
   ): { request?: string; returnTo?: string } => ({
