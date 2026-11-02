@@ -8,8 +8,7 @@ import {
 import ts from "typescript";
 
 /** Read route metadata without executing route components in the Vite config. */
-function routeMatcher(source: string) {
-  const root = createRootRoute();
+export function pageRoutes(source: string) {
   const paths = new Map<string, boolean>();
   const file = ts.createSourceFile("routes.ts", source, ts.ScriptTarget.Latest);
 
@@ -52,6 +51,14 @@ function routeMatcher(source: string) {
     throw new Error(
       "No page routes found in the generated TanStack route tree.",
     );
+  return [...paths].map(([path, authenticated]) => ({ path, authenticated }));
+}
+
+function routeMatcher(source: string) {
+  const root = createRootRoute();
+  const paths = new Map(
+    pageRoutes(source).map(({ path, authenticated }) => [path, authenticated]),
+  );
 
   const router = createRouter({
     routeTree: root.addChildren(
