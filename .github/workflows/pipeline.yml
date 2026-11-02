@@ -17,8 +17,8 @@ env:
   EAS_CLI: eas-cli@27.2.0
   BUN_VERSION: &bun-version "1.4.4"
   NODE_VERSION: &node-version "24"
-  LINUX_RUNNER: &linux-runner blacksmith-4vcpu-ubuntu-2404
-  WEB_RUNNER: &web-runner blacksmith-2vcpu-ubuntu-2404
+  LINUX_RUNNER: &linux-runner ubuntu-latest
+  WEB_RUNNER: &web-runner ubuntu-latest
   WINDOWS_RUNNER: blacksmith-2vcpu-windows-2025
   RELEASE_PREFIX: app
   DISPOSABL_ANDROID_VERSION_CODE: ${{ github.run_number }}
@@ -50,7 +50,7 @@ jobs:
       ANDROID_SIGNING_READY: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' && secrets.ANDROID_KEYSTORE_PASSWORD != '' && secrets.ANDROID_KEY_ALIAS != '' && secrets.ANDROID_KEY_PASSWORD != '' }}
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
       EXPO_PROJECT_ID: ${{ vars.EXPO_PROJECT_ID }}
-      EXPO_OWNER: ${{ vars.EXPO_OWNER }}
+      EXPO_OWNER: ${{ secrets.EXPO_OWNER || vars.EXPO_OWNER }}
       EXPO_SLUG: ${{ vars.EXPO_SLUG }}
       EXPO_NO_DOTENV: "1"
     steps:
@@ -101,7 +101,15 @@ jobs:
         env:
           TRUSTED: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
           CONVEX_DEPLOY_KEY: ${{ secrets[github.event_name == 'push' && 'CONVEX_DEPLOY_KEY' || 'CONVEX_DEPLOY_KEY_PREVIEW'] }}
-        run: bash "$GITHUB_WORKSPACE/.github/scripts/web-deploy.sh"
+        run: |
+          if [[ "$TRUSTED" != true ]]; then VITE_CONVEX_URL=https://ci.invalid VITE_CONVEX_SITE_URL=https://ci.invalid bun run build --filter=@disposabl/web; exit; fi
+          : "${CONVEX_DEPLOY_KEY:?Configure the Convex deployment secret for this repository}"
+          cd packages/backend
+          export AUTH_TARGET=--prod
+          target=()
+          if [[ "$CHANNEL" != production ]]; then export AUTH_TARGET="--preview-name $CHANNEL"; target=(--preview-name "$CHANNEL"); fi
+          bun x --no-install convex deploy --yes "${target[@]}" --cmd-url-env-var-name CONVEX_URL --cmd 'for name in CONVEX_URL CONVEX_SITE_URL; do value=$(printenv "$name"); test -n "$value" || exit 1; for prefix in "" VITE_ EXPO_PUBLIC_; do export "$prefix$name=$value"; printf "%s=%s\n" "$prefix$name" "$value" | tee -a "$GITHUB_ENV" >> "$GITHUB_OUTPUT"; done; done; bun x --no-install --package @convex-dev/auth auth --keys-only $AUTH_TARGET && bun run --cwd ../.. build --filter=@disposabl/web'
+          bun x --no-install static-hosting upload $AUTH_TARGET --no-spa --dist ../../apps/web/dist/client
       - name: Report web result
         if: always()
         run: node .github/scripts/disposabl.mjs report web,api,mcp ${{ steps.deploy.outcome == 'success' && 'ready' || 'failed' }}
@@ -109,16 +117,16 @@ jobs:
         name: Expo
         if: github.job == 'android' || steps.platforms.outputs.android == 'true'
         working-directory: apps/mobile
-        run: bash "$GITHUB_WORKSPACE/.github/scripts/expo-env.sh"
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/mobile.sh expo-env"
       - name: Channel
         if: steps.platforms.outputs.android == 'true'
         working-directory: apps/mobile
-        run: bash "$GITHUB_WORKSPACE/.github/scripts/expo-channel.sh"
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/mobile.sh expo-channel"
       - name: Fingerprint
         id: fingerprint
         if: steps.platforms.outputs.android == 'true'
         working-directory: apps/mobile
-        run: bash "$GITHUB_WORKSPACE/.github/scripts/expo-fingerprint.sh"
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/mobile.sh expo-fingerprint"
       - name: Update
         if: steps.fingerprint.outputs.build == 'false'
         env:
@@ -126,12 +134,12 @@ jobs:
           SHA: ${{ steps.fingerprint.outputs.sha }}
           RUNTIME: ${{ steps.fingerprint.outputs.runtime }}
           MANIFEST: ${{ steps.fingerprint.outputs.manifest }}
-        run: bash "$GITHUB_WORKSPACE/.github/scripts/expo-update.sh"
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/mobile.sh expo-update"
       - &publish
         name: Publish
         if: github.job == 'android' || (github.job == 'web' && hashFiles('dist/release/android.json') != '') || github.job == 'desktop'
         shell: bash
-        run: bash "$GITHUB_WORKSPACE/.github/scripts/verify-artifacts.sh"
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/release.sh verify-artifacts"
       - &artifacts
         name: Upload release artifacts
         if: hashFiles('dist/release/*') != ''
@@ -152,7 +160,7 @@ jobs:
       PLATFORM: android
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
       EXPO_PROJECT_ID: ${{ vars.EXPO_PROJECT_ID }}
-      EXPO_OWNER: ${{ vars.EXPO_OWNER }}
+      EXPO_OWNER: ${{ secrets.EXPO_OWNER || vars.EXPO_OWNER }}
       EXPO_SLUG: ${{ vars.EXPO_SLUG }}
       EXPO_NO_DOTENV: "1"
       CONVEX_URL: ${{ needs.web.outputs.convex_url }}
@@ -189,7 +197,7 @@ jobs:
           ANDROID_KEYSTORE_PASSWORD: ${{ github.event_name == 'push' && secrets.ANDROID_KEYSTORE_PASSWORD || '' }}
           ANDROID_KEY_ALIAS: ${{ github.event_name == 'push' && secrets.ANDROID_KEY_ALIAS || '' }}
           ANDROID_KEY_PASSWORD: ${{ github.event_name == 'push' && secrets.ANDROID_KEY_PASSWORD || '' }}
-        run: bash "$GITHUB_WORKSPACE/.github/scripts/android-build.sh"
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/mobile.sh android-build"
       - *publish
       - *artifacts
       - name: Report Android failure
@@ -263,7 +271,7 @@ jobs:
       - *install
       - *app-token
       - name: Publish package if configured
-        run: bash .github/scripts/package-release.sh
+        run: bash .github/scripts/release.sh package-release
 
   # The publisher executes scripts from main only; the authorizer verifies workflow_sha.
   publish:
@@ -289,7 +297,7 @@ jobs:
         run: node .github/scripts/disposabl.mjs token
       - name: Select release source
         id: source
-        run: bash .github/scripts/release-source.sh
+        run: bash .github/scripts/release.sh release-source
       - uses: actions/download-artifact@v4
         if: steps.source.outputs.current == 'true'
         with:
@@ -297,4 +305,4 @@ jobs:
           path: artifacts
       - name: Publish verified build artifacts
         if: steps.source.outputs.current == 'true'
-        run: bash .github/scripts/release-publish.sh
+        run: bash .github/scripts/release.sh release-publish
