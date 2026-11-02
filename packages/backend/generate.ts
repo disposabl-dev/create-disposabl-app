@@ -9,6 +9,7 @@ import {
 } from "../disposabl-kit/server/lib/platform-spec";
 
 import config from "../../disposabl.json";
+import { pageRoutes } from "../disposabl-kit/client/lib/prerender";
 
 const root = fileURLToPath(new URL(".", import.meta.url));
 const convex = join(root, "convex");
@@ -84,6 +85,19 @@ export async function generate(acceptBreaking = false) {
       .join("\n") +
     `\nexport default {${paths.map((path, index) => `${JSON.stringify(path)}: m${index}`).join(",")}};\n`;
   await mkdir(output, { recursive: true });
+  await writeChanged(
+    join(output, "pages.json"),
+    JSON.stringify(
+      pageRoutes(
+        await readFile(
+          join(root, "../../apps/web/src/routeTree.gen.ts"),
+          "utf8",
+        ),
+      ),
+      null,
+      2,
+    ) + "\n",
+  );
   await writeChanged(
     join(output, "openapi.json"),
     JSON.stringify(next, null, 2) + "\n",

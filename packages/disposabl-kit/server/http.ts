@@ -1,6 +1,5 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { McpServer } from "@convex-dev/mcp";
-import { registerStaticRoutes } from "@convex-dev/static-hosting";
 import { httpActionGeneric, httpRouter } from "convex/server";
 import { components } from "../../backend/convex/_generated/api";
 import { env } from "../../backend/convex/_generated/server";
@@ -8,12 +7,20 @@ import modules from "../../backend/generated/platforms";
 import openapi from "../../backend/generated/openapi.json";
 import config from "../../../disposabl.json";
 import { validatePlatforms } from "../platforms";
-import { createPlatforms } from "./lib/platform-spec";
+import { createOpenApi, createPlatforms } from "./lib/platform-spec";
+import { registerPageRoutes } from "./lib/static";
 
 export { tool } from "@convex-dev/mcp";
 export type { McpServerOptions, McpUser, ToolCtx } from "@convex-dev/mcp";
 
 const platforms = createPlatforms(modules);
+if (
+  JSON.stringify(createOpenApi(platforms.spec).paths) !==
+  JSON.stringify(openapi.paths)
+)
+  throw new Error(
+    "Generated API contract is stale. Run bun run generate; review incompatible changes before using --accept-breaking.",
+  );
 export const platformSpec = platforms.spec;
 
 const enabled = validatePlatforms(config.platforms);
@@ -86,6 +93,6 @@ export default function createHttpRouter() {
         }),
       });
   }
-  registerStaticRoutes(http, components.staticHosting);
+  registerPageRoutes(http);
   return http;
 }

@@ -1,0 +1,70 @@
+import { httpActionGeneric, type HttpRouter } from "convex/server";
+import { components } from "../../../backend/convex/_generated/api";
+import pages from "../../../backend/generated/pages.json";
+
+const routes = pages.map((page) => ({
+  ...page,
+  pattern: new RegExp(
+    "^" +
+      page.path
+        .replace(/\/$/, "")
+        .split("/")
+        .map((part) =>
+          part === "$"
+            ? ".+"
+            : part.startsWith("$")
+              ? "[^/]+"
+              : part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+        )
+        .join("/") +
+      "/?$",
+  ),
+}));
+
+/** Serve prerendered public pages and the app shell only for known protected routes. */
+export function registerPageRoutes(http: HttpRouter) {
+  http.route({
+    pathPrefix: "/",
+    method: "GET",
+    handler: httpActionGeneric(async (ctx, request) => {
+      let path: string;
+      try {
+        path = decodeURIComponent(new URL(request.url).pathname);
+      } catch {
+        return new Response("Bad Request", { status: 400 });
+      }
+      const page = routes.find(({ pattern }) => pattern.test(path));
+      const file =
+        page && !path.split("/").at(-1)?.includes(".")
+          ? page.authenticated
+            ? "/_shell.html"
+            : `${path.replace(/\/$/, "")}/index.html`
+          : path === "/"
+            ? "/index.html"
+            : path;
+      const asset = await ctx.runQuery(
+        components.staticHosting.lib.resolveAssetForHttp,
+        { path: file, spaFallback: false },
+      );
+      if (!asset) return new Response("Not Found", { status: 404 });
+      const contentType = asset.contentType;
+      const headers = {
+        "Content-Type": contentType,
+        "Cache-Control": contentType.includes("text/html")
+          ? "no-cache"
+          : "public, max-age=3600",
+        "X-Content-Type-Options": "nosniff",
+        ...(page?.authenticated || path === "/_shell.html"
+          ? { "X-Robots-Tag": "noindex" }
+          : {}),
+      };
+      if (asset.storageUrl) {
+        const response = await fetch(asset.storageUrl);
+        return response.ok
+          ? new Response(response.body, { headers })
+          : new Response("Asset unavailable", { status: 502 });
+      }
+      return new Response("Asset unavailable", { status: 502 });
+    }),
+  });
+}
