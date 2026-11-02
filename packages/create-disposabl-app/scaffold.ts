@@ -62,13 +62,23 @@ export async function createApp(
       for (const path of [
         "packages/disposabl-kit/client/routes/_auth-pages",
         "packages/disposabl-kit/client/routes/consent.tsx",
-        "apps/web/src/router/_authenticated",
+        "apps/web/src/router/_authenticated/todos",
+        "apps/web/src/router/_authenticated/dashboard.api-keys.tsx",
         "apps/web/tests/auth-branches.test.tsx",
         "apps/mobile/src/app/(auth)",
         "apps/mobile/src/app/(authenticated)/account.tsx",
       ]) {
         await rm(join(destination, path), { recursive: true, force: true });
       }
+      await writeFile(
+        join(destination, "apps/web/src/router/_authenticated/dashboard.tsx"),
+        `import { createFileRoute } from "@tanstack/react-router";
+
+export const Route = createFileRoute("/_providers/_authenticated/dashboard")({
+  component: () => <h1>Dashboard</h1>,
+});
+`,
+      );
       if (folders.includes("apps/mobile")) {
         await writeFile(
           join(destination, "apps/mobile/src/app/index.tsx"),
