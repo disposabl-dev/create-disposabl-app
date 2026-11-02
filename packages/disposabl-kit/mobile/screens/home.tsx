@@ -1,5 +1,5 @@
 import { useConvexAuth } from "convex/react";
-import { router } from "expo-router";
+import { router, Stack } from "expo-router";
 import { Text } from "react-native";
 import { AuthButton, AuthScreen, styles } from "../components/auth-ui";
 
@@ -42,6 +42,7 @@ function AccountLinks() {
 export function PublicHomeScreen() {
   return (
     <AuthScreen>
+      <Stack.Screen options={{ title: "Disposabl" }} />
       <Text style={styles.title}>Welcome to Disposabl</Text>
       <Text style={styles.body}>This home screen is public.</Text>
     </AuthScreen>
