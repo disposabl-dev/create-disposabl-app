@@ -3,9 +3,7 @@
 pathIgnorePatterns = ["**/dist/**", "**/out/**", "**/.output/**"]
 
 [fmt]
-# Keep the compact workflow readable; actionlint validates its YAML.
 ignorePatterns = [
-  ".github/workflows/pipeline.yml",
   "**/routeTree.gen.ts",
   "**/convex/_generated/**",
   "**/.agents/**",
