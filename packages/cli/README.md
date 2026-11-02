@@ -1,17 +1,23 @@
 # Disposabl CLI
 
-The CLI reads your app's `/openapi.json` and calls its API directly. It does not depend on the SDK.
+The CLI connects to `https://disposabl.dev`.
 
 ```sh
-export DISPOSABL_API_URL=https://your-deployment.convex.site
-npx @disposabl/cli login
-npx @disposabl/cli todos create --title 'Ship the app'
-npx @disposabl/cli todos list
-npx @disposabl/cli logout
+disposabl login status
+disposabl login
+disposabl apps create --name my-app --platforms '["web","android","api","mcp","cli","typescript-sdk"]'
+disposabl apps list --paginationOpts '{"numItems":20,"cursor":null}'
+disposabl apps get --appId <uuid>
+disposabl previews token create --reference main --configure .
+disposabl previews get
+disposabl apps delete --appId <uuid>
+disposabl logout
 ```
 
-`--url` overrides the environment. `login --no-browser` prints the authorization URL for manual opening. OAuth uses the app's existing MCP authorization server, PKCE S256, a random loopback callback port and state, rotating refresh tokens, and server-side revocation. Login requires the API platform; MCP tool exposure is optional.
+Save the returned app UUID as `appId` in `disposabl.json`. Preview commands read it automatically. `previews get` also reads the current Git branch; use `--reference` for a detached checkout or a custom worktree name. Token creation requires an explicit reference, reuses that preview, and issues a fresh development key. `--configure .` writes ignored local environment files without printing the key.
 
-Credentials are stored per API origin under `~/.config/disposabl` (directory mode 0700, files 0600). `DISPOSABL_CONFIG_DIR` overrides that directory. Credentials are not encrypted at rest; keep the account and disk protected. A lock serializes refreshes across processes. `DISPOSABL_API_KEY` supplies a dashboard-created key for automation and bypasses OAuth. Logout revokes stored OAuth credentials; revoke API keys from the dashboard.
+`login status` returns `currentUser`. `login --no-browser` prints the OAuth URL. The CLI owns PKCE, the loopback callback, refresh, and logout. The generator only invokes these commands.
 
-Strings are plain option values. Other argument types use JSON, for example `--limit 10` or `--filters '{"done":false}'`. Use `todos --help` for commands exposed by your app.
+Credentials live under `~/.config/disposabl` with restricted file permissions. `DISPOSABL_CONFIG_DIR` changes the local credential directory. `DISPOSABL_API_KEY` provides an automation credential. The service origin has no public override.
+
+Use `--json` for machine-readable preview output. Other commands return JSON; `--help` lists their arguments.

@@ -1,4 +1,3 @@
-import { githubConnection } from "../schema";
 import {
   identityFields,
   internalQuery,
@@ -23,16 +22,6 @@ export const current = internalQuery({
         userId: id,
       }),
     };
-  },
-});
-
-/** The authenticated installation callback supplies this verified binding, not client input. */
-export const connectGithub = internalMutation({
-  args: { userId: v.id("users"), github: githubConnection },
-  returns: v.null(),
-  handler: async (ctx, { userId, github }) => {
-    await ctx.db.patch("users", userId, { github });
-    return null;
   },
 });
 

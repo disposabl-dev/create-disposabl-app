@@ -17,7 +17,7 @@ import {
   previewResult,
   releaseDetails,
   run,
-} from "../schema";
+} from "../validator";
 import type { Doc } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 
@@ -48,7 +48,8 @@ export function presentPlatforms(
   };
   return Object.fromEntries(
     platformNames.map((name) => {
-      const { url: releasedUrl, ...latest } = releases[platformKey(name)] ?? {};
+      const release = releases[platformKey(name)];
+      const { url: releasedUrl, ...latest } = release ?? {};
       const url =
         releasedUrl ??
         (site && Object.hasOwn(routes, name) ? site + routes[name] : undefined);
@@ -58,7 +59,11 @@ export function presentPlatforms(
         {
           enabled,
           ...(enabled && url ? { url } : {}),
-          ...(releases[platformKey(name)] ? { latest } : {}),
+          ...(release
+            ? {
+                latest: { ...latest, status: release.status, run: release.run },
+              }
+            : {}),
         },
       ];
     }),
@@ -129,15 +134,11 @@ export const list = internalQuery({
     };
   },
 });
-export const acquire = internalMutation({
-  args: { ...identityFields, ...previewIdentity, lease: v.string() },
+export const create = internalMutation({
+  args: { ...identityFields, ...previewIdentity },
   returns: v.union(v.number(), v.null()),
   handler: async (ctx, args) => {
     const app = await ownedApp(ctx, args.userId, args.appId);
-    if ((app.provisioning?.expiresAt ?? 0) > Date.now())
-      throw new ConvexError(
-        "Another token request is in progress. Retry shortly.",
-      );
     const preview = await findPreview(ctx, args);
     if (preview)
       await ctx.db.patch("previews", preview._id, {
@@ -152,9 +153,6 @@ export const acquire = internalMutation({
         releases: {},
         updatedAt: Date.now(),
       });
-    await ctx.db.patch("apps", app._id, {
-      provisioning: { id: args.lease, expiresAt: Date.now() + 180_000 },
-    });
     return app.convexProjectId ?? null;
   },
 });
@@ -163,41 +161,25 @@ export const saveProject = internalMutation({
     ...identityFields,
     appId: v.string(),
     projectId: v.number(),
-    lease: v.string(),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
     const app = await ownedApp(ctx, args.userId, args.appId);
-    if (app.provisioning?.id !== args.lease)
-      throw new ConvexError("Provisioning lease expired. Retry.");
     await ctx.db.patch("apps", app._id, { convexProjectId: args.projectId });
     return null;
   },
 });
 export const finish = internalMutation({
-  args: {
-    ...identityFields,
-    ...previewIdentity,
-    lease: v.string(),
-    deployment: v.optional(deployment),
-  },
+  args: { ...identityFields, ...previewIdentity, deployment },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const app = await ownedApp(ctx, args.userId, args.appId);
-    if (app.provisioning?.id !== args.lease) {
-      if (args.deployment)
-        throw new ConvexError("Provisioning lease expired. Retry.");
-      return null;
-    }
-    if (args.deployment) {
-      const preview = await findPreview(ctx, args);
-      if (!preview) throw new ConvexError("Preview not found.");
-      await ctx.db.patch("previews", preview._id, {
-        deployment: args.deployment,
-        updatedAt: Date.now(),
-      });
-    }
-    await ctx.db.patch("apps", app._id, { provisioning: undefined });
+    await ownedApp(ctx, args.userId, args.appId);
+    const preview = await findPreview(ctx, args);
+    if (!preview) throw new ConvexError("Preview not found.");
+    await ctx.db.patch("previews", preview._id, {
+      deployment: args.deployment,
+      updatedAt: Date.now(),
+    });
     return null;
   },
 });
@@ -205,7 +187,8 @@ export const finish = internalMutation({
 export const report = internalMutation({
   args: {
     appId: v.string(),
-    repositoryId: v.number(),
+    githubOwner: v.string(),
+    githubRepo: v.string(),
     reference: v.string(),
     production: v.boolean(),
     run,
@@ -218,7 +201,11 @@ export const report = internalMutation({
       .query("apps")
       .withIndex("by_appId", (q) => q.eq("appId", args.appId))
       .unique();
-    if (!app || app.deletedAt || app.github?.repositoryId !== args.repositoryId)
+    if (
+      !app ||
+      app.githubOwner !== args.githubOwner ||
+      app.githubRepo !== args.githubRepo
+    )
       throw new ConvexError("Repository is not linked to this app.");
     if (!app.platforms.includes(args.platform)) return null;
     validateReference(args.reference);
@@ -248,7 +235,8 @@ export const report = internalMutation({
     }
     const {
       appId: _app,
-      repositoryId: _repo,
+      githubOwner: _owner,
+      githubRepo: _repo,
       reference: _ref,
       production: _prod,
       platform: _platform,

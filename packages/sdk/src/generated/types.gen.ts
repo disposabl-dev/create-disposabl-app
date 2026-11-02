@@ -19,7 +19,6 @@ export type AppsCreateData = {
       | "typescript-sdk"
       | "cli"
     >;
-    appId?: string;
   };
   path?: never;
   query?: never;
@@ -64,12 +63,8 @@ export type AppsCreateResponses = {
       | "typescript-sdk"
       | "cli"
     >;
-    github?: {
-      repositoryId: number;
-      owner: string;
-      repo: string;
-      installationId: string;
-    };
+    githubOwner?: string;
+    githubRepo?: string;
     createdAt: number;
   };
 };
@@ -160,12 +155,8 @@ export type AppsGetResponses = {
       | "typescript-sdk"
       | "cli"
     >;
-    github?: {
-      repositoryId: number;
-      owner: string;
-      repo: string;
-      installationId: string;
-    };
+    githubOwner?: string;
+    githubRepo?: string;
     createdAt: number;
   };
 };
@@ -227,12 +218,8 @@ export type AppsListResponses = {
         | "typescript-sdk"
         | "cli"
       >;
-      github?: {
-        repositoryId: number;
-        owner: string;
-        repo: string;
-        installationId: string;
-      };
+      githubOwner?: string;
+      githubRepo?: string;
       createdAt: number;
     }>;
     continueCursor: string;
@@ -287,7 +274,6 @@ export type PreviewsGetResponses = {
       convexUrl: string;
       convexSiteUrl: string;
     };
-    updatedAt: number;
     platforms: {
       [key: string]: {
         enabled: boolean;
@@ -309,6 +295,7 @@ export type PreviewsGetResponses = {
         };
       };
     };
+    updatedAt: number;
   } | null;
 };
 
@@ -366,7 +353,6 @@ export type PreviewsListResponses = {
         convexUrl: string;
         convexSiteUrl: string;
       };
-      updatedAt: number;
       platforms: {
         [key: string]: {
           enabled: boolean;
@@ -388,6 +374,7 @@ export type PreviewsListResponses = {
           };
         };
       };
+      updatedAt: number;
     }>;
     continueCursor: string;
     isDone: boolean;
@@ -479,7 +466,6 @@ export type ReleasesGetResponses = {
    */
   200: {
     appId: string;
-    updatedAt: number;
     platforms: {
       [key: string]: {
         enabled: boolean;
@@ -501,6 +487,7 @@ export type ReleasesGetResponses = {
         };
       };
     };
+    updatedAt: number;
   } | null;
 };
 

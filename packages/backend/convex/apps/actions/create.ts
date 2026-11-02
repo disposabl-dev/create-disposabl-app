@@ -3,7 +3,7 @@ import {
   internalAction,
 } from "@disposabl/disposabl-kit/server/lib/functions";
 import { internal } from "../../_generated/api";
-import { appArgs, appResult } from "../../schema";
+import { appArgs, appResult } from "../../validator";
 import type { Infer } from "convex/values";
 type AppResult = Infer<typeof appResult>;
 
@@ -14,6 +14,6 @@ export const create = internalAction({
   handler: async (ctx, args): Promise<AppResult> =>
     ctx.runMutation(internal.apps.internal.insert, {
       ...args,
-      appId: args.appId ?? crypto.randomUUID(),
+      appId: crypto.randomUUID(),
     }),
 });

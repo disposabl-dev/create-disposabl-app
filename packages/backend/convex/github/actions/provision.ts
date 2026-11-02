@@ -24,7 +24,7 @@ export const run = internalAction({
       internal.apps.internal.githubSetup,
       args,
     );
-    if (app.github) return null;
+    if (app.githubOwner && app.githubRepo) return null;
     const owner = connection?.owner ?? env.GITHUB_OWNER;
     const installationId =
       connection?.installationId ?? env.GITHUB_INSTALLATION_ID;
@@ -72,12 +72,8 @@ export const run = internalAction({
       throw new Error("Repository does not match this app.");
     await ctx.runMutation(internal.apps.internal.connectGithub, {
       ...args,
-      github: {
-        repositoryId: repo.id,
-        owner: repo.owner.login,
-        repo: repo.name,
-        installationId,
-      },
+      githubOwner: repo.owner.login,
+      githubRepo: repo.name,
     });
     return null;
   },

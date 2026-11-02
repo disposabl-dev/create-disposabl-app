@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Application API",
-    "version": "6.0.0"
+    "version": "1.0.0"
   },
   "security": [
     {
@@ -48,9 +48,6 @@
                         "cli"
                       ]
                     }
-                  },
-                  "appId": {
-                    "type": "string"
                   }
                 },
                 "required": ["name", "platforms"],
@@ -90,29 +87,11 @@
                         ]
                       }
                     },
-                    "github": {
-                      "type": "object",
-                      "properties": {
-                        "repositoryId": {
-                          "type": "number"
-                        },
-                        "owner": {
-                          "type": "string"
-                        },
-                        "repo": {
-                          "type": "string"
-                        },
-                        "installationId": {
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "repositoryId",
-                        "owner",
-                        "repo",
-                        "installationId"
-                      ],
-                      "additionalProperties": false
+                    "githubOwner": {
+                      "type": "string"
+                    },
+                    "githubRepo": {
+                      "type": "string"
                     },
                     "createdAt": {
                       "type": "number"
@@ -235,29 +214,11 @@
                         ]
                       }
                     },
-                    "github": {
-                      "type": "object",
-                      "properties": {
-                        "repositoryId": {
-                          "type": "number"
-                        },
-                        "owner": {
-                          "type": "string"
-                        },
-                        "repo": {
-                          "type": "string"
-                        },
-                        "installationId": {
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "repositoryId",
-                        "owner",
-                        "repo",
-                        "installationId"
-                      ],
-                      "additionalProperties": false
+                    "githubOwner": {
+                      "type": "string"
+                    },
+                    "githubRepo": {
+                      "type": "string"
                     },
                     "createdAt": {
                       "type": "number"
@@ -374,29 +335,11 @@
                               ]
                             }
                           },
-                          "github": {
-                            "type": "object",
-                            "properties": {
-                              "repositoryId": {
-                                "type": "number"
-                              },
-                              "owner": {
-                                "type": "string"
-                              },
-                              "repo": {
-                                "type": "string"
-                              },
-                              "installationId": {
-                                "type": "string"
-                              }
-                            },
-                            "required": [
-                              "repositoryId",
-                              "owner",
-                              "repo",
-                              "installationId"
-                            ],
-                            "additionalProperties": false
+                          "githubOwner": {
+                            "type": "string"
+                          },
+                          "githubRepo": {
+                            "type": "string"
                           },
                           "createdAt": {
                             "type": "number"
@@ -530,9 +473,6 @@
                           ],
                           "additionalProperties": false
                         },
-                        "updatedAt": {
-                          "type": "number"
-                        },
                         "platforms": {
                           "type": "object",
                           "additionalProperties": {
@@ -606,14 +546,17 @@
                             "required": ["enabled"],
                             "additionalProperties": false
                           }
+                        },
+                        "updatedAt": {
+                          "type": "number"
                         }
                       },
                       "required": [
                         "appId",
                         "reference",
                         "stage",
-                        "updatedAt",
-                        "platforms"
+                        "platforms",
+                        "updatedAt"
                       ],
                       "additionalProperties": false
                     },
@@ -752,9 +695,6 @@
                             ],
                             "additionalProperties": false
                           },
-                          "updatedAt": {
-                            "type": "number"
-                          },
                           "platforms": {
                             "type": "object",
                             "additionalProperties": {
@@ -828,14 +768,17 @@
                               "required": ["enabled"],
                               "additionalProperties": false
                             }
+                          },
+                          "updatedAt": {
+                            "type": "number"
                           }
                         },
                         "required": [
                           "appId",
                           "reference",
                           "stage",
-                          "updatedAt",
-                          "platforms"
+                          "platforms",
+                          "updatedAt"
                         ],
                         "additionalProperties": false
                       }
@@ -1001,9 +944,6 @@
                         "appId": {
                           "type": "string"
                         },
-                        "updatedAt": {
-                          "type": "number"
-                        },
                         "platforms": {
                           "type": "object",
                           "additionalProperties": {
@@ -1077,9 +1017,12 @@
                             "required": ["enabled"],
                             "additionalProperties": false
                           }
+                        },
+                        "updatedAt": {
+                          "type": "number"
                         }
                       },
-                      "required": ["appId", "updatedAt", "platforms"],
+                      "required": ["appId", "platforms", "updatedAt"],
                       "additionalProperties": false
                     },
                     {

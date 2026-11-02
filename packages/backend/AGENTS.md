@@ -1,6 +1,7 @@
 # Backend code
 
 - Read `convex/_generated/ai/guidelines.md` before changing Convex code.
+- `schema.ts` contains tables only. Put argument and return validators in `validator.ts`.
 - Keep the schema small. Store each fact once; derive what you can.
 
 ## Modules

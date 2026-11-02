@@ -54,8 +54,17 @@ export function AuthProvider({
 function SiteHeader() {
   return (
     <header className="border-b border-neutral-200">
-      <nav className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4" aria-label="Main navigation">
-        <a href="/" aria-label="Disposabl home"><img src="/disposabl-logo.svg" alt="Disposabl" className="h-9 w-auto" /></a>
+      <nav
+        className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4"
+        aria-label="Main navigation"
+      >
+        <a href="/" aria-label="Disposabl home">
+          <img
+            src="/disposabl-logo.svg"
+            alt="Disposabl"
+            className="h-9 w-auto"
+          />
+        </a>
         {authenticationEnabled && <AuthLinks />}
       </nav>
     </header>
@@ -68,6 +77,9 @@ function AuthLinks() {
   return isAuthenticated ? (
     <a href="/dashboard">Dashboard</a>
   ) : (
-    <div className="flex items-center gap-5"><a href="/login">Login</a><a href="/signup">Sign up</a></div>
+    <div className="flex items-center gap-5">
+      <a href="/login">Login</a>
+      <a href="/signup">Sign up</a>
+    </div>
   );
 }

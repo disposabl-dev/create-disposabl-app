@@ -1,6 +1,11 @@
 "use node";
 
-import { createPublicKey, verify, type JsonWebKey } from "node:crypto";
+const decode = (value: string) =>
+  Uint8Array.from(atob(value.replace(/-/g, "+").replace(/_/g, "/")), (char) =>
+    char.charCodeAt(0),
+  );
+const json = (value: string) =>
+  JSON.parse(new TextDecoder().decode(decode(value)));
 
 /** GitHub alone signs the repository, workflow and run identity. */
 export async function verifyGitHubToken(token: string) {
@@ -8,7 +13,7 @@ export async function verifyGitHubToken(token: string) {
   const parts = token.split(".");
   if (parts.length !== 3) throw new Error("Invalid Actions token.");
   const [headerPart, bodyPart, signature] = parts as [string, string, string];
-  const header = JSON.parse(Buffer.from(headerPart, "base64url").toString());
+  const header = json(headerPart);
   if (header.alg !== "RS256" || typeof header.kid !== "string")
     throw new Error("Invalid Actions signature.");
   const response = await fetch(
@@ -20,19 +25,27 @@ export async function verifyGitHubToken(token: string) {
     keys: (JsonWebKey & { kid: string })[];
   };
   const key = keys.find((key) => key.kid === header.kid);
+  if (!key) throw new Error("Invalid Actions signature.");
+  const publicKey = await crypto.subtle.importKey(
+    "jwk",
+    key,
+    {
+      name: "RSASSA-PKCS1-v1_5",
+      hash: "SHA-256",
+    },
+    false,
+    ["verify"],
+  );
   if (
-    !key ||
-    !verify(
-      "RSA-SHA256",
-      Buffer.from(`${headerPart}.${bodyPart}`),
-      createPublicKey({ key, format: "jwk" }),
-      Buffer.from(signature, "base64url"),
-    )
+    !(await crypto.subtle.verify(
+      "RSASSA-PKCS1-v1_5",
+      publicKey,
+      decode(signature),
+      new TextEncoder().encode(`${headerPart}.${bodyPart}`),
+    ))
   )
     throw new Error("Invalid Actions signature.");
-  const claims = JSON.parse(
-    Buffer.from(bodyPart, "base64url").toString(),
-  ) as Record<string, unknown>;
+  const claims = json(bodyPart) as Record<string, unknown>;
   const now = Date.now() / 1000;
   if (
     claims.iss !== "https://token.actions.githubusercontent.com" ||

@@ -9,9 +9,6 @@ export const token = httpAction(async (ctx, request) => {
     const result = await ctx.runAction(internal.github.actions.internal.token, {
       appId: body.appId,
       token,
-      ...(body.sourceRunId !== undefined
-        ? { sourceRunId: body.sourceRunId }
-        : {}),
     });
     return Response.json(result, { headers: { "Cache-Control": "no-store" } });
   } catch {

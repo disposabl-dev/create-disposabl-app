@@ -1,33 +1,11 @@
-# Convex + TypeScript + ESLint
+# Backend
 
-This template provides a minimal setup to get Convex working, with TypeScript
-and ESLint.
+Run `bun run dev` at the workspace root, or `bun run dev` here for Convex alone.
 
-Start by editing `convex/myFunctions.ts` and interact with your backend from the
-dashboard or via the CLI:
+`apps`, `previews`, `appReleases`, and `githubConnections` hold application data. `users` provides authentication identities. App IDs are UUID v4 values; preview references are branch/worktree names, including `main`. Deletion permanently removes app, preview, and release records.
 
-```sh
-npx convex run myFunctions:myQuery '{"first": 1, "second": "Hello"}'
-```
+`index.ts` resolves the authenticated user for web/mobile. `internal.ts` implements operations; `platforms: true` exposes them through enabled API, MCP, SDK, and CLI platforms. Actions live under `actions/`. Put argument/return validators in `validator.ts`, and table definitions in `schema.ts`.
 
-See Convex docs at https://docs.convex.dev/home
+Managed setup needs `CONVEX_TEAM_ID` and `CONVEX_TEAM_TOKEN` on the service backend. GitHub repository creation uses Vercel Connect installation tokens, with `VERCEL_TOKEN`, `VERCEL_PROJECT_ID`, `VERCEL_TEAM_ID`, and `GITHUB_CONNECTOR`. `GITHUB_OWNER` and `GITHUB_INSTALLATION_ID` provide the default organization when the user has no connection.
 
-## Setting up
-
-```
-npm create convex@latest -t bare
-```
-
-# App drafts and sandbox setup
-
-App drafts require `website`; `cli`, `typescript`, and `python` require `api`, and `openai` and `claude` require `mcp`. App lists currently return at most 100 records. Existing records without platforms read as `website`.
-
-Boat requires `BOAT_API_KEY` in the Convex deployment. Set `SANDBOX_OPENAI_API_KEY` to a separately scoped, budget-limited OpenAI API key before sending a message; it is exposed to code inside the sandbox. Creation and resume use `noEnv: true`. Codex credentials are written to protected files in its sandbox home, and healthy running sandboxes are reused without stopping them. The user-scoped MCP key is revoked on completion or after one hour, so long-running prompts can lose MCP access. An uncertain prompt submission stays locked for review instead of being retried automatically. Live sandbox provisioning, Codex credential loading, and dispatch have not been verified.
-
-# MCP tools
-
-Run `bun run dev` at the workspace root to start Turbo, or in this directory to start only the backend with `convex dev`.
-
-The function builders still accept `platforms: true`, per-platform flags, and the legacy `mcp` flag. MCP server creation is still controlled by `disposabl.json`.
-
-Tool discovery and platform generation are removed for now. The MCP server receives `createMcpTools({})`, so its tool list stays empty even when MCP is enabled and internal functions have `platforms: true`. The tool adapter remains available for future use.
+Preview token creation reuses a named development deployment and returns a fresh development key. Keys are never stored in application tables. GitHub Actions reports the latest build results through verified OIDC identity. Enabled platforms without a published artifact have no download link.

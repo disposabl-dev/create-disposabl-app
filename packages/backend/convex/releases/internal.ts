@@ -3,13 +3,13 @@ import {
   internalQuery,
 } from "@disposabl/disposabl-kit/server/lib/functions";
 import { v } from "convex/values";
-import { appIdentity, releasesResult } from "../schema";
+import { releasesResult } from "../validator";
 import { ownedApp } from "../apps/internal";
 import { presentPlatforms } from "../previews/internal";
 
 export const get = internalQuery({
   platforms: true,
-  args: { ...identityFields, ...appIdentity },
+  args: { ...identityFields, appId: v.string() },
   returns: v.union(releasesResult, v.null()),
   handler: async (ctx, { userId, appId }) => {
     const app = await ownedApp(ctx, userId, appId);

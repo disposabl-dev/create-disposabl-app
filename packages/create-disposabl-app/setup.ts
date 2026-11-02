@@ -1,5 +1,4 @@
 import { spawn } from "node:child_process";
-import { randomUUID } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -71,21 +70,20 @@ export async function setupApp(
   }
   const path = join(directory, "disposabl.json");
   const config = JSON.parse(await readFile(path, "utf8"));
-  // Persist the request UUID before the network call so a retry cannot duplicate the app.
-  config.appId ??= randomUUID();
-  await writeFile(path, JSON.stringify(config, null, 2) + "\n");
-  const app = (await run([
-    "apps",
-    "create",
-    "--name",
-    name,
-    "--appId",
-    config.appId,
-    "--platforms",
-    JSON.stringify(config.platforms),
-  ])) as { appId: string };
-  if (app.appId !== config.appId)
-    throw new Error("Created app UUID does not match disposabl.json.");
+  if (config.appId) {
+    await run(["apps", "get", "--appId", config.appId]);
+  } else {
+    const app = (await run([
+      "apps",
+      "create",
+      "--name",
+      name,
+      "--platforms",
+      JSON.stringify(config.platforms),
+    ])) as { appId: string };
+    config.appId = app.appId;
+    await writeFile(path, JSON.stringify(config, null, 2) + "\n");
+  }
   await run([
     "previews",
     "token",

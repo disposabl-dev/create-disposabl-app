@@ -49,8 +49,9 @@ start the backend, website, and Metro. Restart Metro after changing these URLs.
 The cloud URL connects the mobile client; the site URL is available for HTTP
 endpoints and is not needed for the native password flow.
 
-Use a development build containing `expo-secure-store`, or an SDK 58-compatible
-Expo Go installation. No browser redirect or custom token exchange is needed
+Use a development build containing `expo-dev-client` and `expo-secure-store`.
+Run `bun run android` or `bun run ios` once to install it, then use `bun run dev`.
+Expo Go is not supported. No browser redirect or custom token exchange is needed
 for username/password login. OAuth would require a separate browser flow.
 
 Checked npm and the Convex Auth `reboot` branch on 2026-11-02. The latest v2 beta

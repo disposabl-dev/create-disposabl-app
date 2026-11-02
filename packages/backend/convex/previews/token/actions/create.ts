@@ -5,7 +5,7 @@ import {
 import { ConvexError, v } from "convex/values";
 import { internal } from "../../../_generated/api";
 import { env } from "../../../_generated/server";
-import { previewIdentity, deployment } from "../../../schema";
+import { previewIdentity, deployment } from "../../../validator";
 import { validateReference } from "../../internal";
 import { ensureDevelopment, ensureProject } from "./management";
 
@@ -40,41 +40,30 @@ export const create = internalAction({
       throw new ConvexError(
         "Managed setup requires CONVEX_TEAM_ID and CONVEX_TEAM_TOKEN on the service backend.",
       );
-    const lease = crypto.randomUUID();
-    const saved = await ctx.runMutation(internal.previews.internal.acquire, {
-      ...args,
-      lease,
+    const saved = await ctx.runMutation(
+      internal.previews.internal.create,
+      args,
+    );
+    await ctx.runAction(internal.github.actions.provision.run, {
+      userId: args.userId,
+      appId: args.appId,
     });
-    try {
-      await ctx.runAction(internal.github.actions.provision.run, {
+    const projectId = saved ?? (await ensureProject(token, teamId, args.appId));
+    if (saved === null)
+      await ctx.runMutation(internal.previews.internal.saveProject, {
         userId: args.userId,
         appId: args.appId,
-      });
-      const projectId =
-        saved ?? (await ensureProject(token, teamId, args.appId));
-      if (saved === null)
-        await ctx.runMutation(internal.previews.internal.saveProject, {
-          userId: args.userId,
-          appId: args.appId,
-          projectId,
-          lease,
-        });
-      const { deployKey, ...deployment } = await ensureDevelopment(
-        token,
         projectId,
-        args.reference,
-      );
-      await ctx.runMutation(internal.previews.internal.finish, {
-        ...args,
-        lease,
-        deployment,
       });
-      return { appId: args.appId, ...deployment, deployKey };
-    } catch (error) {
-      await ctx
-        .runMutation(internal.previews.internal.finish, { ...args, lease })
-        .catch(() => {});
-      throw error;
-    }
+    const { deployKey, ...deployment } = await ensureDevelopment(
+      token,
+      projectId,
+      args.reference,
+    );
+    await ctx.runMutation(internal.previews.internal.finish, {
+      ...args,
+      deployment,
+    });
+    return { appId: args.appId, ...deployment, deployKey };
   },
 });

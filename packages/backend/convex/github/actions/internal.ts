@@ -4,7 +4,7 @@ import { internalAction } from "@disposabl/disposabl-kit/server/lib/functions";
 import { v } from "convex/values";
 import { internal } from "../../_generated/api";
 import type { ActionCtx } from "../../_generated/server";
-import { platform, releaseDetails } from "../../schema";
+import { platform, releaseDetails } from "../../validator";
 import { githubRequest, githubToken } from "./tokens";
 import { verifyGitHubToken } from "./oidc";
 
@@ -20,22 +20,13 @@ type WorkflowRun = {
   repository: { id: number };
   head_repository: { id: number };
 };
-async function authorize(
-  ctx: ActionCtx,
-  appId: string,
-  token: string,
-  sourceRunId?: number,
-) {
+async function authorize(ctx: ActionCtx, appId: string, token: string) {
   const claims = await verifyGitHubToken(token);
   const app = await ctx.runQuery(internal.apps.internal.githubApp, { appId });
-  if (!app || String(app.github.repositoryId) !== claims.repository_id)
-    throw new Error("Repository is not linked to this app.");
-  const repository = `${app.github.owner}/${app.github.repo}`;
-  const publisher =
-    claims.event_name === "workflow_run" && claims.ref === "refs/heads/main";
-  const workflowPath = publisher
-    ? ".github/workflows/releases.yml"
-    : ".github/workflows/pipeline.yml";
+  if (!app) throw new Error("Repository is not linked to this app.");
+  const repository = `${app.githubOwner}/${app.githubRepo}`;
+  const publisher = claims.environment === "publishing";
+  const workflowPath = ".github/workflows/pipeline.yml";
   const workflow = `${repository}/${workflowPath}@${claims.ref}`;
   if (
     claims.repository !== repository ||
@@ -45,13 +36,11 @@ async function authorize(
     throw new Error("Unexpected workflow.");
   const productionEvent =
     claims.event_name === "push" && claims.ref === "refs/heads/main";
-  if (!publisher && claims.event_name !== "pull_request" && !productionEvent)
+  if (claims.event_name !== "pull_request" && !productionEvent)
     throw new Error("Unexpected workflow event.");
-  if (publisher !== (sourceRunId !== undefined))
-    throw new Error("Unexpected source run.");
   // PR build code only receives read access. Write tokens go to main or its trusted artifact publisher.
   const installationToken = await githubToken(
-    app.github.installationId,
+    app.installationId,
     [
       publisher || productionEvent ? "contents:write" : "contents:read",
       "actions:read",
@@ -59,43 +48,50 @@ async function authorize(
     ],
     repository,
   );
-  let workflowRun = await githubRequest<WorkflowRun>(
+  const { id: repositoryId } = await githubRequest<{ id: number }>(
+    installationToken,
+    `/repos/${repository}`,
+  );
+  if (String(repositoryId) !== claims.repository_id)
+    throw new Error("Repository does not match Actions identity.");
+  const workflowRun = await githubRequest<WorkflowRun>(
     installationToken,
     `/repos/${repository}/actions/runs/${claims.run_id}`,
   );
   if (
     workflowRun.id !== Number(claims.run_id) ||
     workflowRun.run_attempt !== Number(claims.run_attempt) ||
-    workflowRun.repository.id !== app.github.repositoryId ||
-    workflowRun.head_repository.id !== app.github.repositoryId ||
+    workflowRun.repository.id !== repositoryId ||
+    workflowRun.head_repository.id !== repositoryId ||
     workflowRun.event !== claims.event_name ||
     workflowRun.path.split("@")[0] !== workflowPath
   )
     throw new Error("Workflow run does not match Actions identity.");
-  if (publisher) {
-    if (!Number.isSafeInteger(sourceRunId) || sourceRunId! <= 0)
-      throw new Error("Invalid source run.");
-    workflowRun = await githubRequest<WorkflowRun>(
-      installationToken,
-      `/repos/${repository}/actions/runs/${sourceRunId}`,
-    );
-    if (
-      workflowRun.repository.id !== app.github.repositoryId ||
-      workflowRun.head_repository.id !== app.github.repositoryId ||
-      !(
-        workflowRun.event === "pull_request" ||
-        (workflowRun.event === "push" && workflowRun.head_branch === "main")
-      ) ||
-      workflowRun.path.split("@")[0] !== ".github/workflows/pipeline.yml"
-    )
-      throw new Error("Unexpected artifact source.");
+  if (publisher && !productionEvent) {
+    // PR changes cannot grant themselves a publishing environment or execute different publisher steps.
+    if (!/^[a-f0-9]{40}$/.test(claims.workflow_sha ?? ""))
+      throw new Error("Missing workflow source identity.");
+    const workflowFile = `/repos/${repository}/contents/${workflowPath}`;
+    const [source, trusted] = await Promise.all([
+      githubRequest<{ sha: string }>(
+        installationToken,
+        `${workflowFile}?ref=${claims.workflow_sha}`,
+      ),
+      githubRequest<{ sha: string }>(
+        installationToken,
+        `${workflowFile}?ref=main`,
+      ),
+    ]);
+    if (source.sha !== trusted.sha)
+      throw new Error(
+        "Merge workflow changes before publishing preview artifacts.",
+      );
   }
   const production = workflowRun.event === "push";
   if (production && workflowRun.head_branch !== "main")
     throw new Error("Production requires main.");
   if (
     !production &&
-    !publisher &&
     claims.head_ref &&
     claims.head_ref !== workflowRun.head_branch
   )
@@ -119,30 +115,22 @@ export const token = internalAction({
   args: {
     appId: v.string(),
     token: v.string(),
-    sourceRunId: v.optional(v.number()),
   },
   returns: v.object({ token: v.string() }),
   handler: async (ctx, args): Promise<{ token: string }> => ({
-    token: (await authorize(ctx, args.appId, args.token, args.sourceRunId))
-      .installationToken,
+    token: (await authorize(ctx, args.appId, args.token)).installationToken,
   }),
 });
 export const report = internalAction({
   args: {
     appId: v.string(),
     token: v.string(),
-    sourceRunId: v.optional(v.number()),
     platform,
     ...releaseDetails,
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const verified = await authorize(
-      ctx,
-      args.appId,
-      args.token,
-      args.sourceRunId,
-    );
+    const verified = await authorize(ctx, args.appId, args.token);
     for (const field of [
       "url",
       "githubReleaseUrl",
@@ -187,10 +175,11 @@ export const report = internalAction({
       )
         throw new Error("Release or download is not published.");
     }
-    const { token: _token, sourceRunId: _source, ...result } = args;
+    const { token: _token, ...result } = args;
     await ctx.runMutation(internal.previews.internal.report, {
       ...result,
-      repositoryId: verified.app.github.repositoryId,
+      githubOwner: verified.app.githubOwner,
+      githubRepo: verified.app.githubRepo,
       reference: verified.reference,
       production: verified.production,
       run: verified.run,

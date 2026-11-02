@@ -16,6 +16,7 @@ import type * as github_actions_internal from "../github/actions/internal.js";
 import type * as github_actions_oidc from "../github/actions/oidc.js";
 import type * as github_actions_provision from "../github/actions/provision.js";
 import type * as github_actions_tokens from "../github/actions/tokens.js";
+import type * as github_internal from "../github/internal.js";
 import type * as http from "../http.js";
 import type * as mcp from "../mcp.js";
 import type * as previews_internal from "../previews/internal.js";
@@ -25,6 +26,7 @@ import type * as previews_token_internal from "../previews/token/internal.js";
 import type * as releases_internal from "../releases/internal.js";
 import type * as users_index from "../users/index.js";
 import type * as users_internal from "../users/internal.js";
+import type * as validator from "../validator.js";
 
 import type {
   ApiFromModules,
@@ -41,6 +43,7 @@ declare const fullApi: ApiFromModules<{
   "github/actions/oidc": typeof github_actions_oidc;
   "github/actions/provision": typeof github_actions_provision;
   "github/actions/tokens": typeof github_actions_tokens;
+  "github/internal": typeof github_internal;
   http: typeof http;
   mcp: typeof mcp;
   "previews/internal": typeof previews_internal;
@@ -50,6 +53,7 @@ declare const fullApi: ApiFromModules<{
   "releases/internal": typeof releases_internal;
   "users/index": typeof users_index;
   "users/internal": typeof users_internal;
+  validator: typeof validator;
 }>;
 
 /**
