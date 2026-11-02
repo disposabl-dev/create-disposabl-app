@@ -8,6 +8,6 @@ Each client uses semantic-release, like create-disposabl-app, with a separate `<
 
 Configure npm trusted publishing for each app-specific package name, GitHub repository, and `pipeline.yml` workflow. Activate the bundled `.github/workflows/pipeline.yml.example` as `pipeline.yml` when setting up the app's CI. No npm token is used by the workflow. If npm-side package or publisher setup is missing, the package job reports the authentication failure; configure it and rerun.
 
-This starter repository uses the existing `publish.yml` workflow for create-disposabl-app and its own `@disposabl/cli` and `@disposabl/sdk` packages. Their trusted publisher must therefore name `publish.yml`. Generated apps receive their own package and binary names and their repository metadata is set at release time.
+`publish.yml` belongs exclusively to create-disposabl-app and does not publish app clients. CLI and SDK publishing belongs only to the app's `pipeline.yml`. Generated apps receive their own package and binary names and their repository metadata is set at release time.
 
 After a partial publication, check npm and Git tags before rerunning. If a tag exists but an artifact is missing, recover the missing artifact from that exact commit and version.
