@@ -47,7 +47,7 @@ jobs:
       convex_site_url: ${{ steps.deploy.outputs.CONVEX_SITE_URL }}
     env:
       PLATFORM: android
-      ANDROID_SIGNING_READY: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' && secrets.ANDROID_KEYSTORE_PASSWORD != '' && secrets.ANDROID_KEY_ALIAS != '' && secrets.ANDROID_KEY_PASSWORD != '' }}
+      ANDROID_SIGNING_READY: ${{ secrets.DISPOSABL_ANDROID_SIGNING != '' || (secrets.ANDROID_KEYSTORE_BASE64 != '' && secrets.ANDROID_KEYSTORE_PASSWORD != '' && secrets.ANDROID_KEY_ALIAS != '' && secrets.ANDROID_KEY_PASSWORD != '') }}
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
       EXPO_PROJECT_ID: ${{ secrets.EXPO_PROJECT_ID || vars.EXPO_PROJECT_ID }}
       EXPO_OWNER: ${{ secrets.EXPO_OWNER || vars.EXPO_OWNER }}
@@ -193,6 +193,7 @@ jobs:
           RUNTIME: ${{ needs.web.outputs.android_runtime }}
           DISPOSABL_ANDROID_CHANNEL: *channel
           MANIFEST: ${{ needs.web.outputs.android_manifest }}
+          DISPOSABL_ANDROID_SIGNING: ${{ github.event_name == 'push' && secrets.DISPOSABL_ANDROID_SIGNING || '' }}
           ANDROID_KEYSTORE_BASE64: ${{ github.event_name == 'push' && secrets.ANDROID_KEYSTORE_BASE64 || '' }}
           ANDROID_KEYSTORE_PASSWORD: ${{ github.event_name == 'push' && secrets.ANDROID_KEYSTORE_PASSWORD || '' }}
           ANDROID_KEY_ALIAS: ${{ github.event_name == 'push' && secrets.ANDROID_KEY_ALIAS || '' }}

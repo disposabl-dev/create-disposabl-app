@@ -93,6 +93,13 @@ jq --arg sha "$SHA" '. + {sha256: $sha, action: "update"}' <<< "$MANIFEST" > ../
   android-build)
 test "$(gh api "repos/$GH_REPO/$SOURCE_PATH" --jq 'if has("head") then (if .state == "open" then .head.sha else "closed" end) else .object.sha end')" = "$SOURCE"
 if [[ "$CHANNEL" == production ]]; then
+  if [[ -n "${DISPOSABL_ANDROID_SIGNING:-}" ]]; then
+    signing_values=$(jq -er '[.keystoreBase64, .storePassword, .keyAlias, .keyPassword] | if all(.[]; type == "string" and length > 0 and (contains("\n") | not) and (contains("\r") | not)) then .[] else error("Invalid Android signing bundle") end' <<< "$DISPOSABL_ANDROID_SIGNING")
+    mapfile -t signing <<< "$signing_values"
+    for value in "${signing[@]}"; do printf '::add-mask::%s\n' "${value//%/%25}"; done
+    export ANDROID_KEYSTORE_BASE64="${signing[0]}" ANDROID_KEYSTORE_PASSWORD="${signing[1]}" ANDROID_KEY_ALIAS="${signing[2]}" ANDROID_KEY_PASSWORD="${signing[3]}"
+    unset signing_values signing value DISPOSABL_ANDROID_SIGNING
+  fi
   : "${ANDROID_KEYSTORE_BASE64:?}" "${ANDROID_KEYSTORE_PASSWORD:?}" "${ANDROID_KEY_ALIAS:?}" "${ANDROID_KEY_PASSWORD:?}"
   export ANDROID_KEYSTORE_PATH="$RUNNER_TEMP/android-release.jks"
   trap 'rm -f "$ANDROID_KEYSTORE_PATH"' EXIT
