@@ -214,6 +214,7 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 90
     env:
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
       CONVEX_URL: ${{ needs.web.outputs.convex_url }}
       CONVEX_SITE_URL: ${{ needs.web.outputs.convex_site_url }}
       EXPO_PUBLIC_CONVEX_URL: ${{ needs.web.outputs.convex_url }}
@@ -231,6 +232,10 @@ jobs:
       - *install
       - name: Report build
         run: node .github/scripts/disposabl.mjs report ios building
+      - name: Xcode toolchain
+        run: |
+          xcodebuild -version
+          xcrun swift --version
       - name: Build simulator archive
         working-directory: apps/mobile
         run: bash "$GITHUB_WORKSPACE/.github/scripts/apple.sh" simulator
