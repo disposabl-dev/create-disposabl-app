@@ -8,7 +8,6 @@ import {
   internalMutation as nativeMutation,
   internalQuery as nativeQuery,
 } from "../../../backend/convex/_generated/server";
-import type { Platforms } from "./platforms";
 
 // Trusted server entrypoints must supply the user ID after authentication.
 export const identityFields = {
@@ -22,19 +21,11 @@ const withPlatforms = <TDefinition, TResult extends object>(
     definition: TDefinition & {
       args: PropertyValidators;
       returns: GenericValidator;
-      platforms?: Platforms;
-      mcp?: boolean;
+      platforms?: true;
     },
   ): TResult => {
-    const mcpEnabled =
-      definition.platforms === undefined
-        ? definition.mcp === true
-        : definition.platforms === true ||
-          (typeof definition.platforms === "object" &&
-            definition.platforms.mcp === true);
     return Object.assign(builder(definition), {
       platforms: definition.platforms,
-      mcp: mcpEnabled ? (definition.mcp ?? true) : false,
       args: definition.args,
       returns: definition.returns,
     });

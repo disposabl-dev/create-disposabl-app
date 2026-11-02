@@ -1,19 +1,49 @@
 import type { ForgeConfig } from '@electron-forge/shared-types';
 import { MakerSquirrel } from '@electron-forge/maker-squirrel';
-import { MakerZIP } from '@electron-forge/maker-zip';
+import { MakerDMG } from '@electron-forge/maker-dmg';
 import { MakerDeb } from '@electron-forge/maker-deb';
 import { MakerRpm } from '@electron-forge/maker-rpm';
 import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
-import { PublisherGitHub } from '@electron-forge/publisher-github';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
+
+const signedRelease =
+  process.platform === 'darwin' && process.env.MACOS_NOTARIZE === 'true';
+if (
+  signedRelease &&
+  (!process.env.APPLE_API_KEY ||
+    !process.env.APPLE_API_KEY_ID ||
+    !process.env.APPLE_API_ISSUER)
+)
+  throw new Error('macOS releases require Apple notarization credentials');
 
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
-    // Native bundle metadata needs a numeric version; package.json retains the PR suffix.
-    appVersion: process.env.DESKTOP_VERSION?.split('-')[0],
-    buildVersion: process.env.DESKTOP_VERSION?.split('-')[0],
+    appBundleId: process.env.MACOS_BUNDLE_ID || 'dev.disposabl.starter.desktop',
+    ...(process.platform === 'darwin'
+      ? {
+          osxSign: signedRelease
+            ? {}
+            : {
+                identity: '-',
+                identityValidation: false,
+                optionsForFile: () => ({
+                  hardenedRuntime: false,
+                  timestamp: 'none',
+                }),
+              },
+        }
+      : {}),
+    ...(signedRelease
+      ? {
+          osxNotarize: {
+            appleApiKey: process.env.APPLE_API_KEY!,
+            appleApiKeyId: process.env.APPLE_API_KEY_ID!,
+            appleApiIssuer: process.env.APPLE_API_ISSUER!,
+          },
+        }
+      : {}),
     download: {
       cacheRoot: process.env.electron_config_cache,
     },
@@ -34,20 +64,9 @@ const config: ForgeConfig = {
   },
   makers: [
     new MakerSquirrel({}),
-    new MakerZIP({}, ['darwin']),
+    new MakerDMG({ format: 'ULFO' }),
     new MakerRpm({}),
     new MakerDeb({}),
-  ],
-  publishers: [
-    new PublisherGitHub({
-      repository: {
-        owner: 'disposabl-dev',
-        name: 'create-disposabl-app',
-      },
-      tagPrefix: 'desktop-v',
-      draft: true,
-      prerelease: false,
-    }),
   ],
   plugins: [
     new VitePlugin({

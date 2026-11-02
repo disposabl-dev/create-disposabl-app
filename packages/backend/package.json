@@ -3,15 +3,14 @@
   "private": true,
   "version": "0.0.0",
   "scripts": {
-    "dev:setup": "bun --no-env-file ../disposabl-kit/server/dev-setup.mjs",
+    "predev": "bun x --no-install --package @convex-dev/auth auth --keys-only",
     "dev": "convex dev",
     "logs": "convex logs",
     "typecheck": "tsc -p convex",
-    "lint": "bun run typecheck && eslint . --report-unused-disable-directives --max-warnings 0",
+    "lint": "eslint . --report-unused-disable-directives --max-warnings 0",
     "format": "prettier --write 'convex/**/*.ts'"
   },
   "dependencies": {
-    "@boatdev/convex": "^0.1.0",
     "@convex-dev/auth": "catalog:",
     "@convex-dev/mcp": "catalog:",
     "@convex-dev/static-hosting": "catalog:",

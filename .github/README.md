@@ -1,57 +1,99 @@
-# CI and deployment
+# Preview pipeline
 
-The app runs GitHub Actions on Boat's 4-CPU runner. Install the
-[Boat CI GitHub App](https://docs.boat.dev/ci) for the repository with
-`boat ci connect` before pushing. This connects the installation to the current
-Boat billing account. It does not require a personal GitHub token or a Boat API
-key in the workflow.
+`pipeline.yml` runs directly in this repository and is included in generated apps.
+All preview decisions are visible in the workflow. There are no `preview.mjs`
+helpers or local development setup hooks. Backend development uses `convex dev`.
 
-Boat CI requires a paid Boat plan. Public repositories also require explicit
-enablement in Boat and an allowlist of GitHub users. Fork pull requests use
-`ubuntu-latest` and build without deployment secrets.
+## Order
 
-Keep these repository or organization secrets in GitHub Actions:
+1. **Web**, **Linux** and **Windows** start in parallel on 4-vCPU Blacksmith runners.
+   **macOS** joins them on a 6-vCPU Blacksmith Apple Silicon runner.
+   Platform selection runs inline, with no separate Plan job. Each desktop runner
+   checks whether it is enabled and affected before installing dependencies.
+2. Web checks the source and deploys backend and web, then checks each affected
+   mobile platform's fingerprint on the same runner.
+3. A matching project, application ID, channel and fingerprint uses EAS Update.
+   A different fingerprint or missing compatible binary starts that platform's
+   native job after Web. Android and iOS build in parallel on 4-vCPU Linux and
+   6-vCPU macOS Blacksmith runners respectively.
+4. Each platform publishes from its existing build runner as soon as its own
+   build and verification succeed. Compatible updates publish from Web; native
+   jobs publish independently. There is no final Release job or artifact transfer.
 
-- `CONVEX_DEPLOY_KEY`: production deploy key.
-- `CONVEX_DEPLOY_KEY_PREVIEW`: project preview deploy key.
+Each PR has one published prerelease per affected platform at
+`<RELEASE_PREFIX>-<CHANNEL>-<PLATFORM>`, for example `app-pr-2-macos`.
+Successful updates replace its assets and notes, remove obsolete assets and move
+that platform's preview tag to the tested commit. A failed platform build leaves
+its previous preview available and does not block other platforms.
+New releases are drafts only during their initial upload, then become public.
+Production publishes regular releases with separate tags per platform and run.
+Platform releases do not compete for GitHub's single Latest label with the CLI's
+semantic-release publication. Desktop package versions remain `1.0.<run number>`.
 
-Do not move them to Boat environments. Boat CI deliberately does not inherit
-those environments. GitHub supplies the workflow's secrets and job token.
-`actions/cache` continues to store the Turbo cache through GitHub Actions.
+iOS uses EAS local builds with remote ad hoc signing credentials and publishes
+release IPAs. A matching, unexpired IPA receives EAS Update. Missing credentials
+fail the native build; no additional enable flag is required. The macOS desktop
+runner is separate from iOS. See [iOS setup](../apps/mobile/README.md#ios).
 
-Same-repository pull requests deploy branch previews. Pushing to `main` deploys
-production. Set the GitHub Actions repository variable `DISPOSABL_CI_RUNNER` to
-`boat-small` for 2 CPUs, `boat` for 4 CPUs, or `ubuntu-latest` for GitHub's runner.
-Without the variable, normal jobs use `boat`.
+`CHANNEL` at the top is the single preview-name expression. Convex preview names,
+EAS channels, EAS branches and mobile builds all use it. The default is `pr-N` for
+PRs and `production` for main. Runner labels and tool versions are also at the top.
 
-## Compare runners
+## Selection
 
-Run **CI and deploy** manually on the same branch and commit for each of
-`ubuntu-latest`, `boat-small`, and `boat`. The workflow must first exist on the
-default branch. Keep the lockfile and inputs identical.
+Mobile changes select Android and iOS; desktop changes select Linux, Windows and macOS. Shared
+packages, lockfiles and platform configuration select all enabled supported
+native targets. Web, backend-only and documentation changes skip native installs
+and builds. Desktop runners still start briefly to make that decision; forks skip
+the desktop jobs entirely.
+Each PR platform compares against its last successfully published release's
+source commit. Later web-only commits therefore skip desktop and mobile, while
+failed or cancelled builds remain pending. Without a published baseline, selection
+uses the whole PR diff. Truncated or diverged comparisons conservatively rebuild.
+Main uses the complete pushed commit range. Fork PRs only
+validate on Blacksmith Linux; they never deploy or publish.
 
-Use a new `cache_scope`, such as `comparison-20261101-a`, for the first round.
-Each runner has a separate Turbo cache namespace. Repeat with the same scope
-and commit to measure a warm cache. The scope controls Turbo caching, not any
-provider's preinstalled tools or package download caches. Check cache restore
-logs and Turbo's hit counts before labeling a result warm.
+## Runners and caches
 
-The default manual run installs, checks, tests, and builds without deployment
-credentials. Enable `preview` to measure the full deployment path using the
-preview key. Manual runs never deploy production. Each runner gets a separate
-`ci-benchmark-<runner>` preview. Manual runs on the same runner serialize across
-branches, so two branches cannot deploy to the same benchmark preview at once.
+Every job uses Blacksmith. GitHub Actions schedules the jobs and displays their
+graph; there are no GitHub-hosted or Boat runners.
 
-Record the workflow/run URL, commit, attempt, actual CPU/RAM details from
-**Record machine**, cache state, and step timings. For each job, compute queue
-time as `started_at - created_at` and runtime as `completed_at - started_at`
-from GitHub's jobs API. Also record time from workflow creation to job creation
-and workflow creation to job completion, so workflow scheduling delay is not
-hidden. For reruns, use that attempt's start and jobs instead of the original
-workflow creation time.
+A full native preview can use four 4-vCPU runners and two 6-vCPU macOS runners.
+Android and iOS allocate runners only when a native build is needed. Publishing
+reuses those machines; there is no separate Plan or Release runner.
+Install the Blacksmith GitHub App for the repository.
 
-The deployment log prints `Web build seconds` separately from the combined
-backend deployment, web build, and upload step. `boat ci job <job-id> --json`
-provides Boat's own provisioning/wait/runtime measurements. Do not add its wait
-time to GitHub's queue time: the intervals can overlap. Compare multiple cold
-and warm rounds before choosing a default based on speed.
+Bun cache keys include OS, architecture, Bun version and lockfile. Each fresh
+runner installs from that cache; `node_modules` is not transferred between OSes.
+Blacksmith's native Turbo remote cache stores checks and web builds. Gradle caches dependencies and cacheable build
+outputs; Electron downloads have their own cache. Build outputs upload directly
+to GitHub Releases without an intermediate Actions artifact. Superseded PR runs
+cancel; production runs serialize.
+
+Default branch dependency caches can seed previews. Blacksmith's Turbo cache
+shares eligible tasks across branches; Actions dependency caches retain their
+branch access rules. No cache access policy is changed here.
+Thirty to forty seconds is a warm update-only target, not a measured guarantee.
+Native compilation and external deployment can take longer than one minute.
+Compare the same commit with warm caches before increasing runner size; use a
+larger runner only when it saves close to half the end-to-end time or more.
+The 4-vCPU configuration is a candidate until comparable cold/warm runs verify it.
+
+## Configuration
+
+Web requires `CONVEX_DEPLOY_KEY_PREVIEW` for PRs and `CONVEX_DEPLOY_KEY` for main.
+Mobile previews require `EXPO_TOKEN` plus `EXPO_PROJECT_ID`, `EXPO_OWNER` and `EXPO_SLUG`
+repository variables. See [mobile setup](../apps/mobile/README.md) for signing.
+macOS signing and notarization use the five optional
+[desktop signing secrets](../apps/desktop/README.md#macos-signing). With all five
+present, both previews and production are Developer ID signed and notarized.
+Otherwise, both publish an ad hoc signed, unnotarized Apple Silicon DMG with its
+status and installation guidance in the release notes. Configured signing or
+notarization failures still fail the job. Apple notarization adds external
+processing time. `MACOS_BUNDLE_ID` configures the app identifier.
+The Web/Android and desktop jobs have contents-write permission for their own
+releases. Forks never deploy or publish; checkout does not persist credentials.
+Each platform verifies its expected files and source commit before publication.
+
+Benchmark branches are separate from this product workflow. Build-only benchmark
+URLs and cache timings do not prove a live backend deployment or device behavior.

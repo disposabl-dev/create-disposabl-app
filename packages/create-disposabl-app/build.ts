@@ -37,6 +37,9 @@ await cp(join(root, "LICENSE"), join(dir, "LICENSE"));
           ".DS_Store",
         ].includes(basename(path)) &&
         path !== dir &&
+        path !== join(root, "apps/mobile/android") &&
+        path !== join(root, "apps/mobile/ios") &&
+        path !== join(root, "apps/desktop/out") &&
         !basename(path).endsWith(".tgz") &&
         !basename(path).endsWith(".tsbuildinfo") &&
         (basename(path) === ".env.example" ||
@@ -54,10 +57,6 @@ await cp(join(root, "LICENSE"), join(dir, "LICENSE"));
         recursive: true,
         filter: (path) => path !== join(root, ".github/workflows/publish.yml"),
       });
-      await rename(
-        join(templateDir, ".github/workflows/pipeline.yml.template"),
-        join(templateDir, ".github/workflows/pipeline.yml"),
-      );
     } else if (entry === "packages") {
       for (const pkg of await readdir(join(root, entry))) {
         if (pkg !== "create-disposabl-app") {
