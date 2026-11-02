@@ -1,5 +1,14 @@
 {
   "version": "0.1.0",
-  "platforms": ["web", "android", "ios", "windows", "macos", "linux"],
+  "platforms": [
+    "web",
+    "android",
+    "ios",
+    "windows",
+    "macos",
+    "linux",
+    "api",
+    "mcp"
+  ],
   "features": ["authentication"]
 }

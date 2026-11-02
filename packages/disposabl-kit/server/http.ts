@@ -1,16 +1,22 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { McpServer } from "@convex-dev/mcp";
 import { registerStaticRoutes } from "@convex-dev/static-hosting";
-import { httpRouter } from "convex/server";
+import { httpActionGeneric, httpRouter } from "convex/server";
 import { components } from "../../backend/convex/_generated/api";
 import { env } from "../../backend/convex/_generated/server";
-import { createMcpTools } from "./lib/mcp-tools";
-import { getPlatforms } from "./lib/platforms";
+import * as todos from "../../backend/convex/todos/internal";
+import config from "../../../disposabl.json";
+import { validatePlatforms } from "../platforms";
+import { createPlatforms } from "./lib/platform-spec";
 
 export { tool } from "@convex-dev/mcp";
 export type { McpServerOptions, McpUser, ToolCtx } from "@convex-dev/mcp";
 
-const mcp = getPlatforms().isMcpEnabled
+const platforms = createPlatforms({ "todos/internal": todos });
+export const platformSpec = platforms.spec;
+
+const enabled = validatePlatforms(config.platforms);
+const mcp = enabled.some((platform) => platform === "mcp" || platform === "api")
   ? new McpServer(components.mcp, {
       name: "disposabl",
       title: "Disposabl",
@@ -18,8 +24,7 @@ const mcp = getPlatforms().isMcpEnabled
       siteUrl: env.CONVEX_SITE_URL,
       consentUrl: `${env.CONVEX_SITE_URL}/consent`,
       scopes: {},
-      // Discovery is disabled; platform flags do not register tools yet.
-      tools: createMcpTools({}),
+      tools: platforms.tools,
     })
   : undefined;
 
@@ -36,7 +41,15 @@ export const {
 
 export default function createHttpRouter() {
   const http = httpRouter();
-  mcp?.registerRoutes(http);
+  if (mcp && enabled.includes("mcp")) mcp.registerRoutes(http);
+  if (mcp && enabled.includes("api"))
+    http.route({
+      pathPrefix: "/api/",
+      method: "POST",
+      handler: httpActionGeneric((ctx, request) =>
+        platforms.handleApi(ctx, request, mcp.authenticate.bind(mcp)),
+      ),
+    });
   registerStaticRoutes(http, components.staticHosting);
   return http;
 }

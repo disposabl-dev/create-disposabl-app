@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "scripts": {
+    "predev": "bun x --no-install --package @convex-dev/auth auth --keys-only",
     "dev": "convex dev",
     "logs": "convex logs",
     "typecheck": "tsc -p convex",
@@ -10,7 +11,6 @@
     "format": "prettier --write 'convex/**/*.ts'"
   },
   "dependencies": {
-    "@boatdev/convex": "^0.1.0",
     "@convex-dev/auth": "catalog:",
     "@convex-dev/mcp": "catalog:",
     "@convex-dev/static-hosting": "catalog:",

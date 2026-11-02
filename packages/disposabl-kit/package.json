@@ -54,6 +54,7 @@
     "./client/hooks/*": "./client/hooks/*.ts",
     "./server/http": "./server/http.ts",
     "./server/lib/functions": "./server/lib/functions.ts",
-    "./client/vite.config": "./client/vite.config.ts"
+    "./client/vite.config": "./client/vite.config.ts",
+    "./platforms": "./platforms.ts"
   }
 }

@@ -7,7 +7,7 @@ import { ConvexError, v } from "convex/values";
 import schema from "../schema";
 
 export const create = internalMutation({
-  platforms: { mcp: true },
+  platforms: true,
   args: { ...identityFields, title: v.string() },
   returns: v.id("todos"),
   handler: async (ctx, { userId, title }) => {
@@ -20,7 +20,7 @@ export const create = internalMutation({
 });
 
 export const list = internalQuery({
-  platforms: { mcp: true },
+  platforms: true,
   args: { ...identityFields },
   returns: v.array(schema.doc("todos")),
   handler: async (ctx, { userId }) => {
@@ -33,7 +33,7 @@ export const list = internalQuery({
 });
 
 export const get = internalQuery({
-  platforms: { mcp: true },
+  platforms: true,
   args: { ...identityFields, id: v.id("todos") },
   returns: v.union(schema.doc("todos"), v.null()),
   handler: async (ctx, { userId, id }) => {

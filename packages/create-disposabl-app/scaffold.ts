@@ -12,6 +12,7 @@ import { join } from "node:path";
 import {
   selectedFolders,
   selectFeatures,
+  selectPlatforms,
   type DisposablConfig,
 } from "./options";
 
@@ -24,6 +25,7 @@ export async function createApp(
 ) {
   config = {
     ...config,
+    platforms: selectPlatforms(config.platforms.join(",")),
     features: selectFeatures(config.features.join(",") || "none"),
   };
   const folders = selectedFolders(config);

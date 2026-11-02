@@ -1,51 +1,13 @@
-export const platforms = [
-  { id: "web", label: "Web", group: "Required", status: "required" },
-  { id: "android", label: "Android", group: "Mobile", status: "available" },
-  { id: "ios", label: "iOS", group: "Mobile", status: "available" },
-  { id: "windows", label: "Windows", group: "Desktop", status: "available" },
-  { id: "linux", label: "Linux", group: "Desktop", status: "available" },
-  { id: "macos", label: "macOS", group: "Desktop", status: "available" },
-  {
-    id: "mcp",
-    label: "MCP",
-    group: "MCP & plugins",
-    status: "available",
-    description: "Tools for AI assistants",
-  },
-  {
-    id: "openai-plugin",
-    label: "OpenAI Plugin",
-    description: "Tools and skills for OpenAI",
-    group: "MCP & plugins",
-    status: "available",
-  },
-  {
-    id: "claude-code-plugin",
-    label: "Claude Code Plugin",
-    description: "Tools and skills for Claude Code",
-    group: "MCP & plugins",
-    status: "available",
-  },
-  { id: "api", label: "API", group: "Coming soon", status: "disabled" },
-  { id: "cli", label: "CLI", group: "Coming soon", status: "disabled" },
-  {
-    id: "python-sdk",
-    label: "Python SDK",
-    group: "Coming soon",
-    status: "disabled",
-  },
-  {
-    id: "typescript-sdk",
-    label: "TypeScript SDK",
-    group: "Coming soon",
-    status: "disabled",
-  },
-] as const;
-
-export const platformDependencies = {
-  "openai-plugin": ["mcp"],
-  "claude-code-plugin": ["mcp"],
-} as const;
+import {
+  platforms,
+  resolvePlatforms,
+  type Platform,
+} from "../disposabl-kit/platforms";
+export {
+  platforms,
+  platformDependencies,
+  type Platform,
+} from "../disposabl-kit/platforms";
 
 export const features = [
   { id: "docs", label: "Docs", hint: "apps/docs" },
@@ -58,7 +20,6 @@ export const features = [
   },
 ] as const;
 
-export type Platform = (typeof platforms)[number]["id"];
 export type Feature = (typeof features)[number]["id"];
 export const requiredFeatures: readonly Feature[] = ["authentication"];
 export type DisposablConfig = {
@@ -85,12 +46,7 @@ export function selectPlatforms(input = "web"): Platform[] {
         option.label + " is not available yet and cannot be selected.",
       );
   }
-  for (const [plugin, dependencies] of Object.entries(platformDependencies)) {
-    if (requested.includes(plugin)) requested.push(...dependencies);
-  }
-  return platforms
-    .filter((option) => option.id === "web" || requested.includes(option.id))
-    .map((option) => option.id);
+  return resolvePlatforms(requested);
 }
 
 export function selectFeatures(input = "none"): Feature[] {

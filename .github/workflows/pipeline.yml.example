@@ -18,7 +18,8 @@ env:
   BUN_VERSION: &bun-version '1.4.4'
   NODE_VERSION: &node-version '24'
   LINUX_RUNNER: &linux-runner blacksmith-4vcpu-ubuntu-2404
-  WINDOWS_RUNNER: &windows-runner blacksmith-4vcpu-windows-2025
+  WEB_RUNNER: &web-runner blacksmith-2vcpu-ubuntu-2404
+  WINDOWS_RUNNER: &windows-runner blacksmith-2vcpu-windows-2025
   MACOS_RUNNER: &macos-runner blacksmith-6vcpu-macos-26
   MACOS_BUNDLE_ID: dev.disposabl.starter.desktop
   RELEASE_PREFIX: app
@@ -37,7 +38,7 @@ jobs:
       contents: write
       pull-requests: read
     timeout-minutes: 45
-    runs-on: *linux-runner
+    runs-on: *web-runner
     outputs:
       android_build: ${{ steps.fingerprint.outputs.build }}
       android_runtime: ${{ steps.fingerprint.outputs.runtime }}
