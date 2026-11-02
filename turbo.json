@@ -43,6 +43,15 @@
       "cache": false,
       "persistent": true,
       "passThroughEnv": ["VITE_*"]
+    },
+    "@disposabl/backend#dev": {
+      "cache": false,
+      "persistent": true,
+      "with": ["@disposabl/backend#generate:watch"]
+    },
+    "generate:watch": {
+      "cache": false,
+      "persistent": true
     }
   },
   "globalDependencies": ["disposabl.json"]

@@ -4,7 +4,8 @@ import { registerStaticRoutes } from "@convex-dev/static-hosting";
 import { httpActionGeneric, httpRouter } from "convex/server";
 import { components } from "../../backend/convex/_generated/api";
 import { env } from "../../backend/convex/_generated/server";
-import * as todos from "../../backend/convex/todos/internal";
+import modules from "../../backend/generated/platforms";
+import openapi from "../../backend/generated/openapi.json";
 import config from "../../../disposabl.json";
 import { validatePlatforms } from "../platforms";
 import { createPlatforms } from "./lib/platform-spec";
@@ -12,7 +13,7 @@ import { createPlatforms } from "./lib/platform-spec";
 export { tool } from "@convex-dev/mcp";
 export type { McpServerOptions, McpUser, ToolCtx } from "@convex-dev/mcp";
 
-const platforms = createPlatforms({ "todos/internal": todos });
+const platforms = createPlatforms(modules);
 export const platformSpec = platforms.spec;
 
 const enabled = validatePlatforms(config.platforms);
@@ -41,15 +42,31 @@ export const {
 
 export default function createHttpRouter() {
   const http = httpRouter();
-  if (mcp && enabled.includes("mcp")) mcp.registerRoutes(http);
-  if (mcp && enabled.includes("api"))
+  if (mcp) {
+    const authRoutes = httpRouter();
+    mcp.registerRoutes(authRoutes);
+    for (const [path, method, handler] of authRoutes.getRoutes()) {
+      if (path !== "/mcp" || enabled.includes("mcp"))
+        http.route({ path, method, handler });
+    }
+  }
+  if (mcp && enabled.includes("api")) {
     http.route({
-      pathPrefix: "/api/",
-      method: "POST",
-      handler: httpActionGeneric((ctx, request) =>
-        platforms.handleApi(ctx, request, mcp.authenticate.bind(mcp)),
+      path: "/openapi.json",
+      method: "GET",
+      handler: httpActionGeneric(async () =>
+        Response.json({ ...openapi, servers: [{ url: env.CONVEX_SITE_URL }] }),
       ),
     });
+    for (const method of ["GET", "POST"] as const)
+      http.route({
+        pathPrefix: "/api/",
+        method,
+        handler: httpActionGeneric((ctx, request) =>
+          platforms.handleApi(ctx, request, mcp.authenticate.bind(mcp)),
+        ),
+      });
+  }
   registerStaticRoutes(http, components.staticHosting);
   return http;
 }
