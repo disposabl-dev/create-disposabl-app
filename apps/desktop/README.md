@@ -86,3 +86,5 @@ may disallow this. Local `make:macos` builds also use ad hoc signing by default.
 
 Change `MACOS_BUNDLE_ID` at the top of the workflow to set your desktop bundle
 identifier. CI builds only Apple Silicon (`arm64`), never Intel macOS packages.
+
+The desktop window uses the web app at `http://localhost:3000` during development. Packaged builds use the `CONVEX_SITE_URL` supplied at build time. This shares the same home, login/signup, and authentication-disabled behavior. If the website is unavailable, a bundled Disposabl starter home is shown.

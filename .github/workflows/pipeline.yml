@@ -15,22 +15,18 @@ env:
   DISPOSABL_MOBILE_CHANNEL: *channel
   EAS_ENVIRONMENT: ${{ github.event_name == 'push' && 'production' || 'preview' }}
   EAS_CLI: eas-cli@27.2.0
-  BUN_VERSION: &bun-version '1.4.4'
-  NODE_VERSION: &node-version '24'
+  BUN_VERSION: &bun-version "1.4.4"
+  NODE_VERSION: &node-version "24"
   LINUX_RUNNER: &linux-runner blacksmith-4vcpu-ubuntu-2404
   WEB_RUNNER: &web-runner blacksmith-2vcpu-ubuntu-2404
-  WINDOWS_RUNNER: &windows-runner blacksmith-2vcpu-windows-2025
-  MACOS_RUNNER: &macos-runner blacksmith-6vcpu-macos-26
-  MACOS_BUNDLE_ID: dev.disposabl.starter.desktop
+  WINDOWS_RUNNER: blacksmith-2vcpu-windows-2025
   RELEASE_PREFIX: app
   DISPOSABL_ANDROID_VERSION_CODE: ${{ github.run_number }}
-  DISPOSABL_IOS_BUILD_NUMBER: ${{ github.run_number }}
   GH_TOKEN: ${{ github.token }}
   GH_REPO: ${{ github.repository }}
   SOURCE: ${{ github.event.pull_request.head.sha || github.sha }}
   SOURCE_PATH: ${{ github.event_name == 'pull_request' && format('pulls/{0}', github.event.number) || 'git/ref/heads/main' }}
   DISPOSABL_RELEASE_VERSION: 1.0.${{ github.run_number }}
-
 jobs:
   web:
     name: Web
@@ -43,11 +39,10 @@ jobs:
     timeout-minutes: 45
     runs-on: *web-runner
     outputs:
+      desktop: ${{ steps.platforms.outputs.desktop }}
       android_build: ${{ steps.fingerprint.outputs.build }}
       android_runtime: ${{ steps.fingerprint.outputs.runtime }}
       android_manifest: ${{ steps.fingerprint.outputs.manifest }}
-      ios_build: ${{ steps.ios.outputs.build }}
-      ios_manifest: ${{ steps.ios.outputs.manifest }}
       convex_url: ${{ steps.deploy.outputs.CONVEX_URL }}
       convex_site_url: ${{ steps.deploy.outputs.CONVEX_SITE_URL }}
     env:
@@ -56,12 +51,11 @@ jobs:
       EXPO_PROJECT_ID: ${{ vars.EXPO_PROJECT_ID }}
       EXPO_OWNER: ${{ vars.EXPO_OWNER }}
       EXPO_SLUG: ${{ vars.EXPO_SLUG }}
-      EXPO_NO_DOTENV: '1'
+      EXPO_NO_DOTENV: "1"
     steps:
       - &checkout
-        name: Checkout
         uses: actions/checkout@v6
-        with: {ref: "${{ env.SOURCE }}", persist-credentials: false}
+        with: { ref: "${{ env.SOURCE }}", persist-credentials: false }
       - &platforms
         name: Platforms
         shell: bash
@@ -72,31 +66,22 @@ jobs:
           TRUSTED: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
         run: bash "$GITHUB_WORKSPACE/.github/scripts/platforms.sh"
       - &node
-        name: Node
-        if: github.job != 'desktop' || steps.platforms.outputs.selected == 'true'
         uses: actions/setup-node@v6
-        with: {node-version: *node-version, package-manager-cache: false}
+        with: { node-version: *node-version, package-manager-cache: false }
       - &app-token
         name: Disposabl GitHub App token
-        if: github.job != 'desktop' || steps.platforms.outputs.selected == 'true'
         run: node .github/scripts/disposabl.mjs token
       - &bun
-        name: Bun
-        if: github.job != 'desktop' || steps.platforms.outputs.selected == 'true'
         uses: oven-sh/setup-bun@v2
-        with: {bun-version: *bun-version}
+        with: { bun-version: *bun-version }
       - &cache
-        name: Cache
-        if: github.job != 'desktop' || steps.platforms.outputs.selected == 'true'
         uses: actions/cache@v4
         with:
           path: ~/.bun/install/cache
           key: bun-${{ github.job == 'desktop' && 'desktop-' || '' }}${{ runner.os }}-${{ runner.arch }}-${{ env.BUN_VERSION }}-${{ hashFiles('bun.lock') }}
           restore-keys: bun-${{ github.job == 'desktop' && 'desktop-' || '' }}${{ runner.os }}-${{ runner.arch }}-${{ env.BUN_VERSION }}-
       - &install
-        name: Install
-        if: github.job != 'desktop' || steps.platforms.outputs.selected == 'true'
-        run: bun install --frozen-lockfile ${{ github.job == 'desktop' && '--filter desktop' || (github.job == 'ios' || github.job == 'android') && '--filter @disposabl/mobile' || '' }}
+        run: bun install --frozen-lockfile ${{ github.job == 'desktop' && '--filter desktop' || (github.job == 'android') && '--filter @disposabl/mobile' || '' }}
       - name: Report build start
         run: |
           node .github/scripts/disposabl.mjs report web,api,mcp building
@@ -121,11 +106,11 @@ jobs:
         run: node .github/scripts/disposabl.mjs report web,api,mcp ${{ steps.deploy.outcome == 'success' && 'ready' || 'failed' }}
       - &expo
         name: Expo
-        if: github.job == 'ios' || github.job == 'android' || steps.platforms.outputs.android == 'true' || steps.platforms.outputs.ios == 'true'
+        if: github.job == 'android' || steps.platforms.outputs.android == 'true'
         working-directory: apps/mobile
         run: bash "$GITHUB_WORKSPACE/.github/scripts/expo-env.sh"
       - name: Channel
-        if: steps.platforms.outputs.android == 'true' || steps.platforms.outputs.ios == 'true'
+        if: steps.platforms.outputs.android == 'true'
         working-directory: apps/mobile
         run: bash "$GITHUB_WORKSPACE/.github/scripts/expo-channel.sh"
       - name: Fingerprint
@@ -141,41 +126,9 @@ jobs:
           RUNTIME: ${{ steps.fingerprint.outputs.runtime }}
           MANIFEST: ${{ steps.fingerprint.outputs.manifest }}
         run: bash "$GITHUB_WORKSPACE/.github/scripts/expo-update.sh"
-      - name: iOS
-        id: ios
-        if: steps.platforms.outputs.ios == 'true'
-        working-directory: apps/mobile
-        run: |
-          runtime() { bun x --no-install expo-updates runtimeversion:resolve --platform ios --workflow managed | jq -er '.runtimeVersion | select(test("^[a-f0-9]{40,64}$"))'; }
-          fingerprint=$(runtime)
-          bun x --no-install expo config --json > "$RUNNER_TEMP/ios-config.json"
-          gh api "repos/$GH_REPO/releases?per_page=100" --paginate --slurp | jq --arg tag "$RELEASE_PREFIX-$CHANNEL-ios" 'add | map(select(.draft | not) | select(.tag_name == $tag or (.tag_name | startswith($tag + "-")))) | .[0] // {}' > "$RUNNER_TEMP/ios-release.json"
-          RUNTIME="$fingerprint" bun -e '
-            const config = await Bun.file(`${process.env.RUNNER_TEMP}/ios-config.json`).json();
-            const wanted = {channel: process.env.CHANNEL, projectId: config.extra.eas.projectId, applicationId: config.ios.bundleIdentifier, runtimeVersion: process.env.RUNTIME};
-            const release = await Bun.file(`${process.env.RUNNER_TEMP}/ios-release.json`).json();
-            const prior = JSON.parse(/<!-- ios (\{[^\n]+\}) -->/.exec(release.body || "")?.[1] || "null");
-            const reusable = prior && Object.keys(wanted).every(k => prior[k] === wanted[k]) && Date.parse(prior.expiresAt) > Date.now() && /^[a-f0-9]{64}$/.test(prior.sha256 || "") && release.assets.some(a => a.name === "ios.ipa" && a.state === "uploaded" && a.size > 0 && a.digest === `sha256:${prior.sha256}`);
-            await Bun.write(`${process.env.RUNNER_TEMP}/ios-build`, String(!reusable));
-            console.log(`build=${!reusable}\nmanifest=${JSON.stringify(wanted)}`);
-          ' >> "$GITHUB_OUTPUT"
-          if [[ $(cat "$RUNNER_TEMP/ios-build") == true ]]; then echo "iOS needs a new signed IPA; the iOS job will build it." >> "$GITHUB_STEP_SUMMARY"; exit 0; fi
-          bun x --no-install expo export --platform ios --output-dir dist/update-ios
-          test "$(runtime)" = "$fingerprint"
-          test "$(gh api "repos/$GH_REPO/$SOURCE_PATH" --jq 'if has("head") then (if .state == "open" then .head.sha else "closed" end) else .object.sha end')" = "$SOURCE"
-          bun x "$EAS_CLI" update --platform ios --channel "$CHANNEL" --environment "$EAS_ENVIRONMENT" --skip-bundler --input-dir dist/update-ios --message "$SOURCE" --non-interactive
-          if [[ "$CHANNEL" != production ]]; then
-            test "$(gh api "repos/$GH_REPO/$SOURCE_PATH" --jq .head.sha)" = "$SOURCE"
-            tag=$(jq -r .tag_name "$RUNNER_TEMP/ios-release.json")
-            jq -r --arg source "$SOURCE" '.body | sub("(?m)^Source: [a-f0-9]+"; "Source: " + $source)' "$RUNNER_TEMP/ios-release.json" > "$RUNNER_TEMP/ios-notes.md"
-            gh api --method PATCH "repos/$GH_REPO/git/refs/tags/$tag" -f sha="$SOURCE" -F force=true > /dev/null
-            gh release edit "$tag" --notes-file "$RUNNER_TEMP/ios-notes.md"
-          fi
-          (cd ../.. && node .github/scripts/disposabl.mjs report ios ready)
-          echo "iOS update published to $CHANNEL." >> "$GITHUB_STEP_SUMMARY"
       - &publish
         name: Publish
-        if: github.job == 'ios' || github.job == 'android' || (github.job == 'web' && hashFiles('dist/release/android.json') != '') || steps.platforms.outputs.selected == 'true'
+        if: github.job == 'android' || (github.job == 'web' && hashFiles('dist/release/android.json') != '') || github.job == 'desktop'
         shell: bash
         run: bash "$GITHUB_WORKSPACE/.github/scripts/verify-artifacts.sh"
       - &artifacts
@@ -187,7 +140,6 @@ jobs:
           path: dist/release/
           retention-days: 3
           if-no-files-found: error
-
   android:
     name: Android
     needs: web
@@ -201,7 +153,7 @@ jobs:
       EXPO_PROJECT_ID: ${{ vars.EXPO_PROJECT_ID }}
       EXPO_OWNER: ${{ vars.EXPO_OWNER }}
       EXPO_SLUG: ${{ vars.EXPO_SLUG }}
-      EXPO_NO_DOTENV: '1'
+      EXPO_NO_DOTENV: "1"
       CONVEX_URL: ${{ needs.web.outputs.convex_url }}
       CONVEX_SITE_URL: ${{ needs.web.outputs.convex_site_url }}
       EXPO_PUBLIC_CONVEX_URL: ${{ needs.web.outputs.convex_url }}
@@ -219,13 +171,13 @@ jobs:
       - *expo
       - name: Java
         uses: actions/setup-java@v5
-        with: {distribution: temurin, java-version: '17'}
+        with: { distribution: temurin, java-version: "17" }
       - name: SDK
         uses: android-actions/setup-android@v3
-        with: {packages: platform-tools}
+        with: { packages: platform-tools }
       - name: Gradle
         uses: gradle/actions/setup-gradle@v4
-        with: {cache-read-only: false}
+        with: { cache-read-only: false }
       - name: Build
         working-directory: apps/mobile
         env:
@@ -236,119 +188,53 @@ jobs:
           ANDROID_KEYSTORE_PASSWORD: ${{ github.event_name == 'push' && secrets.ANDROID_KEYSTORE_PASSWORD || '' }}
           ANDROID_KEY_ALIAS: ${{ github.event_name == 'push' && secrets.ANDROID_KEY_ALIAS || '' }}
           ANDROID_KEY_PASSWORD: ${{ github.event_name == 'push' && secrets.ANDROID_KEY_PASSWORD || '' }}
-        run: |
-          test "$(gh api "repos/$GH_REPO/$SOURCE_PATH" --jq 'if has("head") then (if .state == "open" then .head.sha else "closed" end) else .object.sha end')" = "$SOURCE"
-          if [[ "$CHANNEL" == production ]]; then
-            : "${ANDROID_KEYSTORE_BASE64:?}" "${ANDROID_KEYSTORE_PASSWORD:?}" "${ANDROID_KEY_ALIAS:?}" "${ANDROID_KEY_PASSWORD:?}"
-            export ANDROID_KEYSTORE_PATH="$RUNNER_TEMP/android-release.jks"
-            trap 'rm -f "$ANDROID_KEYSTORE_PATH"' EXIT
-            (umask 077; printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$ANDROID_KEYSTORE_PATH")
-          fi
-          bun x --no-install expo prebuild --platform android --no-install
-          test "$(bun x --no-install expo-updates runtimeversion:resolve --platform android --workflow managed | jq -er .runtimeVersion)" = "$RUNTIME"
-          (cd android && ./gradlew :app:assembleRelease --no-daemon --build-cache)
-          apk=android/app/build/outputs/apk/release/app-release.apk
-          test "$(unzip -p "$apk" assets/fingerprint)" = "$RUNTIME"
-          test "$(bun x --no-install expo-updates runtimeversion:resolve --platform android --workflow managed | jq -er .runtimeVersion)" = "$RUNTIME"
-          mkdir -p ../../dist/release
-          cp "$apk" ../../dist/release/android.apk
-          jq --arg sha "$(sha256sum "$apk" | cut -d' ' -f1)" '. + {sha256: $sha, action: "build"}' <<< "$MANIFEST" > ../../dist/release/android.json
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/android-build.sh"
       - *publish
       - *artifacts
       - name: Report Android failure
         if: failure() || cancelled()
         run: node .github/scripts/disposabl.mjs report android failed
-
-  # iOS builds are temporarily disabled.
-
+  # iOS and macOS builds remain disabled to avoid paid Apple runners.
   desktop:
+    needs: web
     permissions: *release-permissions
     name: ${{ matrix.platform }}
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    if: needs.web.outputs.desktop != '[]' && needs.web.outputs.desktop != ''
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - {platform: linux, runner: *linux-runner}
-          - {platform: windows, runner: *windows-runner}
-          # Restore this matrix entry when macOS builds resume.
-          # - {platform: macos, runner: *macos-runner}
+        include: ${{ fromJSON(needs.web.outputs.desktop) }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
     env:
       PLATFORM: ${{ matrix.platform }}
       DISPOSABL_DESKTOP_PLATFORM: ${{ matrix.platform }}
-      MACOS_NOTARIZE: ${{ secrets.MACOS_CERTIFICATES_P12_PRODUCTION != '' && secrets.MACOS_CERTIFICATES_PASSWORD_PRODUCTION != '' && secrets.MACOS_APPLE_API_KEY_P8_PRODUCTION != '' && secrets.MACOS_APPLE_API_KEY_ID_PRODUCTION != '' && secrets.MACOS_APPLE_API_ISSUER_PRODUCTION != '' }}
+      CONVEX_SITE_URL: ${{ needs.web.outputs.convex_site_url }}
       electron_config_cache: ${{ github.workspace }}/.cache/electron
     steps:
       - *checkout
-      - *platforms
       - *node
       - *app-token
       - *bun
       - *cache
       - *install
       - name: Report desktop build
-        if: steps.platforms.outputs.selected == 'true'
         run: node .github/scripts/disposabl.mjs report "$PLATFORM" building
       - name: Electron
-        if: steps.platforms.outputs.selected == 'true'
         uses: actions/cache@v4
         with:
           path: .cache/electron
           key: electron-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}
       - name: Packages
-        if: steps.platforms.outputs.selected == 'true' && matrix.platform == 'linux'
+        if: matrix.platform == 'linux'
         run: command -v fakeroot && command -v rpmbuild && command -v dpkg-deb || { sudo apt-get update && sudo apt-get install -y fakeroot dpkg rpm; }
-      # Apple credentials are optional for both previews and production.
-      - name: Sign
-        if: steps.platforms.outputs.selected == 'true' && matrix.platform == 'macos' && env.MACOS_NOTARIZE == 'true'
-        uses: apple-actions/import-codesign-certs@v7.2.0
-        with:
-          p12-file-base64: ${{ secrets.MACOS_CERTIFICATES_P12_PRODUCTION }}
-          p12-password: ${{ secrets.MACOS_CERTIFICATES_PASSWORD_PRODUCTION }}
-      - name: Notary
-        if: steps.platforms.outputs.selected == 'true' && matrix.platform == 'macos' && env.MACOS_NOTARIZE == 'true'
-        env:
-          API_KEY_P8: ${{ secrets.MACOS_APPLE_API_KEY_P8_PRODUCTION }}
-          API_KEY_ID: ${{ secrets.MACOS_APPLE_API_KEY_ID_PRODUCTION }}
-          API_ISSUER: ${{ secrets.MACOS_APPLE_API_ISSUER_PRODUCTION }}
-        run: |
-          : "${API_KEY_P8:?Configure MACOS_APPLE_API_KEY_P8_PRODUCTION}" "${API_KEY_ID:?Configure MACOS_APPLE_API_KEY_ID_PRODUCTION}" "${API_ISSUER:?Configure MACOS_APPLE_API_ISSUER_PRODUCTION}"
-          umask 077
-          printf '%s' "$API_KEY_P8" > "$RUNNER_TEMP/notary.p8"
-          printf 'APPLE_API_KEY=%s\nAPPLE_API_KEY_ID=%s\nAPPLE_API_ISSUER=%s\n' "$RUNNER_TEMP/notary.p8" "$API_KEY_ID" "$API_ISSUER" >> "$GITHUB_ENV"
       - name: Build
-        if: steps.platforms.outputs.selected == 'true'
         run: bun run --cwd apps/desktop preview
-      - name: Verify
-        if: steps.platforms.outputs.selected == 'true' && matrix.platform == 'macos'
-        run: |
-          images=(dist/release/*.dmg)
-          test "${#images[@]}" -eq 1 && test -s "${images[0]}"
-          mkdir -p "$RUNNER_TEMP/macos-verify"
-          hdiutil attach "${images[0]}" -readonly -nobrowse -mountpoint "$RUNNER_TEMP/macos-verify"
-          trap 'hdiutil detach "$RUNNER_TEMP/macos-verify"' EXIT
-          apps=("$RUNNER_TEMP/macos-verify/"*.app)
-          test "${#apps[@]}" -eq 1 && test -d "${apps[0]}"
-          codesign --verify --deep --strict "${apps[0]}"
-          if [[ "$MACOS_NOTARIZE" == true ]]; then
-            spctl --assess --type execute --verbose "${apps[0]}"
-            xcrun stapler validate "${apps[0]}"
-            echo 'macOS: Apple Silicon, Developer ID signed and notarized.' > dist/release/macos.txt
-          else
-            echo 'macOS: Apple Silicon, ad hoc signed and NOT notarized. If blocked, use System Settings > Privacy & Security > Open Anyway. https://support.apple.com/102445' > dist/release/macos.txt
-          fi
-          cat dist/release/macos.txt >> "$GITHUB_STEP_SUMMARY"
       - *publish
       - *artifacts
       - name: Report desktop failure
-        if: (failure() || cancelled()) && steps.platforms.outputs.selected == 'true'
+        if: failure() || cancelled()
         run: node .github/scripts/disposabl.mjs report "$PLATFORM" failed
-      - name: Clean
-        if: always() && matrix.platform == 'macos'
-        run: rm -f "$RUNNER_TEMP/notary.p8"
-
   packages:
     name: Package / ${{ matrix.package }}
     needs: web
@@ -365,70 +251,18 @@ jobs:
       fail-fast: false
       matrix:
         package: [cli, sdk]
+    env:
+      PACKAGE: ${{ matrix.package }}
     steps:
       - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-      - name: Selected package
-        id: selected
-        run: echo "exists=$(test -f packages/${{ matrix.package }}/package.json && echo true || echo false)" >> "$GITHUB_OUTPUT"
-      - uses: actions/setup-node@v6
-        if: steps.selected.outputs.exists == 'true'
-        with:
-          node-version: '24'
-          package-manager-cache: false
-      - uses: oven-sh/setup-bun@v2
-        if: steps.selected.outputs.exists == 'true'
-        with:
-          bun-version: '1.4.4'
-      - name: Install and generate
-        if: steps.selected.outputs.exists == 'true'
-        run: |
-          bun install --frozen-lockfile
-          bun run generate
-      - name: Disposabl GitHub App token
-        if: steps.selected.outputs.exists == 'true'
-        run: node .github/scripts/disposabl.mjs token
-      - name: Package publication prerequisites
-        id: publishable
-        if: steps.selected.outputs.exists == 'true'
-        run: |
-          platform='${{ matrix.package }}'
-          if [[ "$platform" == sdk ]]; then platform=typescript-sdk; fi
-          name=$(node -p "require('./packages/${{ matrix.package }}/package.json').name")
-          if npm view "$name" version > "$RUNNER_TEMP/published-version" 2>/dev/null; then
-            echo 'ready=true' >> "$GITHUB_OUTPUT"
-            node .github/scripts/disposabl.mjs report "$platform" building
-          else
-            echo 'ready=false' >> "$GITHUB_OUTPUT"
-            node .github/scripts/disposabl.mjs report "$platform" blocked 'Publish the package once and configure npm trusted publishing.'
-          fi
-      - name: Validate package
-        if: steps.selected.outputs.exists == 'true'
-        run: bun run --cwd packages/${{ matrix.package }} typecheck
-      - name: Publish
-        id: package-release
-        if: steps.publishable.outputs.ready == 'true'
-        working-directory: packages/${{ matrix.package }}
-        run: bun run release
-        env:
-          GITHUB_TOKEN: ${{ env.GH_TOKEN }}
-          npm_config_workspaces_update: 'false'
-      - name: Report package result
-        if: always() && steps.publishable.outputs.ready == 'true'
-        run: |
-          platform='${{ matrix.package }}'
-          if [[ "$platform" == sdk ]]; then platform=typescript-sdk; fi
-          if [[ '${{ steps.package-release.outcome }}' == success ]]; then
-            name=$(node -p "require('./packages/${{ matrix.package }}/package.json').name")
-            version=$(node -p "require('./packages/${{ matrix.package }}/package.json').version")
-            if [[ "$version" == *development* ]]; then version=$(cat "$RUNNER_TEMP/published-version"); fi
-            export PUBLISHED_VERSION=$(npm view "$name@$version" version)
-            node .github/scripts/disposabl.mjs report "$platform" ready
-          else
-            node .github/scripts/disposabl.mjs report "$platform" failed 'Package publication failed; check npm trusted publishing and the workflow log.'
-          fi
+        with: { fetch-depth: 0, persist-credentials: false }
+      - *node
+      - *bun
+      - *cache
+      - *install
+      - *app-token
+      - name: Publish package if configured
+        run: bash .github/scripts/package-release.sh
 
   # The publisher executes scripts from main only; the authorizer verifies workflow_sha.
   publish:
@@ -448,7 +282,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@v6
         with:
-          node-version: '24'
+          node-version: "24"
           package-manager-cache: false
       - name: Disposabl installation token
         run: node .github/scripts/disposabl.mjs token

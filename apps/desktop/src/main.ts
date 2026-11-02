@@ -2,55 +2,53 @@ import { app, BrowserWindow } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 
-// Handle creating/removing shortcuts on Windows when installing/uninstalling.
-if (started) {
-  app.quit();
-}
+if (started) app.quit();
 
-const createWindow = () => {
-  // Create the browser window.
-  const mainWindow = new BrowserWindow({
+async function createWindow() {
+  const window = new BrowserWindow({
     title: 'Disposabl',
-    width: 800,
-    height: 600,
+    width: 1000,
+    height: 720,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.cjs'),
+      sandbox: true,
+      contextIsolation: true,
+      nodeIntegration: false,
     },
   });
-
-  // and load the index.html of the app.
-  if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
-    mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
-  } else {
-    mainWindow.loadFile(
+  window.webContents.session.setPermissionRequestHandler(
+    (_contents, _permission, callback) => callback(false),
+  );
+  window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  // Reuse the website's home, authentication and feature selection in the desktop app.
+  const website = app.isPackaged ? DISPOSABL_WEB_URL : 'http://localhost:3000';
+  if (website) {
+    const origin = new URL(website).origin;
+    if (app.isPackaged && !website.startsWith('https://'))
+      throw new Error('Desktop requires an HTTPS website.');
+    window.webContents.on('will-navigate', (event, url) => {
+      if (new URL(url).origin !== origin) event.preventDefault();
+    });
+    try {
+      await window.loadURL(website);
+      return;
+    } catch {
+      /* Show the starter home if the website is unavailable. */
+    }
+  }
+  if (MAIN_WINDOW_VITE_DEV_SERVER_URL)
+    await window.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
+  else
+    await window.loadFile(
       path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`),
     );
-  }
-};
+}
 
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
 app.whenReady().then(() => {
-  createWindow();
-
-  // On OS X it's common to re-create a window in the app when the
-  // dock icon is clicked and there are no other windows open.
+  void createWindow();
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
-    }
+    if (BrowserWindow.getAllWindows().length === 0) void createWindow();
   });
 });
-
-// Quit when all windows are closed, except on macOS. There, it's common
-// for applications and their menu bar to stay active until the user quits
-// explicitly with Cmd + Q.
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
+  if (process.platform !== 'darwin') app.quit();
 });
-
-// In this file you can include the rest of your app's specific main process
-// code. You can also put them in separate files and import them here.

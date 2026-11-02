@@ -3,16 +3,20 @@
 Generated with the pinned Hey API generator from `packages/backend/generated/openapi.json`.
 
 ```ts
-import { client, todosCreate, todosList, todosGet } from "@disposabl/sdk";
+import { client, appsCreate, appsList, appsGet } from "@disposabl/sdk";
 
 client.setConfig({
   baseUrl: "https://your-deployment.convex.site",
   auth: process.env.DISPOSABL_API_KEY,
   throwOnError: true,
 });
-const { data: id } = await todosCreate({ body: { title: "Ship the app" } });
-const { data: todos } = await todosList();
-const { data: todo } = await todosGet({ query: { id: id! } });
+const { data: created } = await appsCreate({
+  body: { name: "My app", platforms: ["web", "api"] },
+});
+const { data: page } = await appsList({
+  query: { paginationOpts: { numItems: 20, cursor: null } },
+});
+const { data: app } = await appsGet({ query: { appId: created!.appId } });
 ```
 
 Create API keys at `/dashboard/api-keys`. Keep server integration keys on the server. The API also accepts OAuth tokens issued through its MCP authorization server.
