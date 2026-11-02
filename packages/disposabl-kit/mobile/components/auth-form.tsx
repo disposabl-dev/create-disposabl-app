@@ -2,7 +2,7 @@ import {
   useSignInWithUsernamePassword,
   useSignUpWithUsernamePassword,
 } from "@convex-dev/auth/methods/username-password/react";
-import { Link } from "expo-router";
+import { Link, router } from "expo-router";
 import { useRef, useState } from "react";
 import {
   Keyboard,
@@ -11,8 +11,8 @@ import {
   View,
   type TextInputInstance,
 } from "react-native";
-import { api } from "@/lib/convex";
-import { authErrorMessage } from "@/lib/auth-errors";
+import { api } from "../lib/convex";
+import { authErrorMessage } from "../lib/auth-errors";
 import { AuthButton, AuthScreen, styles } from "./auth-ui";
 
 export function AuthForm({ mode }: { mode: "login" | "signup" }) {
@@ -41,7 +41,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
         setError(authErrorMessage(result.userError));
       } else {
         setPassword("");
-        // The auth layout redirects only after Convex confirms authentication.
+        router.replace("/(authenticated)/account");
       }
     } finally {
       submitting.current = false;

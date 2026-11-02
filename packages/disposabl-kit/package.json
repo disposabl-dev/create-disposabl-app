@@ -57,6 +57,28 @@
     "./server/http": "./server/http.ts",
     "./server/lib/functions": "./server/lib/functions.ts",
     "./client/vite.config": "./client/vite.config.ts",
-    "./platforms": "./platforms.ts"
+    "./platforms": "./platforms.ts",
+    "./mobile": "./mobile/index.ts",
+    "./features": "./features.ts"
+  },
+  "peerDependencies": {
+    "expo": "~58.0.19",
+    "expo-router": "~58.0.26",
+    "expo-secure-store": "~58.0.2",
+    "react-native": "0.88.0"
+  },
+  "peerDependenciesMeta": {
+    "expo": {
+      "optional": true
+    },
+    "expo-router": {
+      "optional": true
+    },
+    "expo-secure-store": {
+      "optional": true
+    },
+    "react-native": {
+      "optional": true
+    }
   }
 }

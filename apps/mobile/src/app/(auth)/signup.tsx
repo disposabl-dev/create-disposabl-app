@@ -1,5 +1,1 @@
-import { AuthForm } from "@/components/auth-form";
-
-export default function Signup() {
-  return <AuthForm mode="signup" />;
-}
+export { SignupScreen as default } from "@disposabl/disposabl-kit/mobile";

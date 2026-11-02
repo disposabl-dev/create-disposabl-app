@@ -3,11 +3,26 @@
 ## Local development and authentication
 
 Mobile uses the same Convex Auth v2 username/password accounts as the website.
-The home screen opens native login and signup forms in `src/app/(auth)/`.
-After login, `users.current` returns the caller's username and user ID from
-Convex. Logout clears the saved session through Convex Auth. Session tokens are
-stored with Expo SecureStore and namespaced by deployment, so they survive app
-restarts without mixing accounts between backends.
+`@disposabl/disposabl-kit/mobile` owns the provider, signup/login forms, session
+storage, route guards, and account screen. Files in `src/app/` only re-export
+these reusable screens and layouts. Add custom app screens alongside them.
+
+Routes outside `(authenticated)` are public. Put screens that require login
+under `src/app/(authenticated)/`; its shared layout guards every descendant,
+including direct links. The `(auth)` group contains login and signup. Successful
+login opens the account screen, where `users.current` returns the caller's
+username and user ID from Convex. Logout clears the session and returns home.
+Expo SecureStore persists tokens per deployment across app restarts.
+
+Include `"authentication"` in root `disposabl.json` features to enable frontend
+auth. Without it, web and mobile use a plain Convex provider, hide authentication
+UI, and allow routes without a sign-in check. The example account screen shows
+public content instead of querying private user data. Backend authentication
+and its access checks remain installed and enforced in both modes. Rebuild
+preview/release apps after changing the feature list.
+
+Expo autolinking deduplicates React, Convex, and Convex Auth between the app and
+kit so native screens use the app's React version and a single auth context.
 
 For a new worktree, install dependencies with `bun install`, then select an
 isolated Convex dev deployment. Substitute your own team, project, and branch:
