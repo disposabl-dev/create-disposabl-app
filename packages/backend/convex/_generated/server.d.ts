@@ -34,6 +34,7 @@ type Env = {
   readonly AUTH_PRIVATE_KEY: string;
   readonly CONVEX_TEAM_ID: string | undefined;
   readonly CONVEX_TEAM_TOKEN: string | undefined;
+  readonly EXPO_TOKEN: string | undefined;
   readonly GITHUB_CONNECTOR: string | undefined;
   readonly GITHUB_INSTALLATION_ID: string | undefined;
   readonly GITHUB_OWNER: string | undefined;

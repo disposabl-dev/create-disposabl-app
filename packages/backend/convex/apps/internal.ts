@@ -195,3 +195,23 @@ export const githubSetup = internalQuery({
     };
   },
 });
+
+export const project = internalQuery({
+  args: { ...identityFields, appId: v.string() },
+  returns: v.union(v.number(), v.null()),
+  handler: async (ctx, { userId, appId }) =>
+    (await ownedApp(ctx, userId, appId)).convexProjectId ?? null,
+});
+export const saveProject = internalMutation({
+  args: {
+    ...identityFields,
+    appId: v.string(),
+    projectId: v.number(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const app = await ownedApp(ctx, args.userId, args.appId);
+    await ctx.db.patch("apps", app._id, { convexProjectId: args.projectId });
+    return null;
+  },
+});

@@ -2,12 +2,12 @@ import {
   identityFields,
   internalAction,
 } from "@disposabl/disposabl-kit/server/lib/functions";
-import { ConvexError, v } from "convex/values";
+import { v } from "convex/values";
 import { internal } from "../../../_generated/api";
 import { env } from "../../../_generated/server";
 import { previewIdentity, deployment } from "../../../validator";
 import { validateReference } from "../../internal";
-import { ensureDevelopment, ensureProject } from "./management";
+import { ensureDevelopment } from "./management";
 
 export const create = internalAction({
   platforms: true,
@@ -34,29 +34,13 @@ export const create = internalAction({
       userId: args.userId,
       appId: args.appId,
     });
-    const token = env.CONVEX_TEAM_TOKEN;
-    const teamId = env.CONVEX_TEAM_ID;
-    if (!token || !teamId || !/^\d+$/.test(teamId))
-      throw new ConvexError(
-        "Managed setup requires CONVEX_TEAM_ID and CONVEX_TEAM_TOKEN on the service backend.",
-      );
-    const saved = await ctx.runMutation(
-      internal.previews.internal.create,
-      args,
-    );
-    await ctx.runAction(internal.github.actions.provision.run, {
+    await ctx.runMutation(internal.previews.internal.create, args);
+    const projectId = await ctx.runAction(internal.apps.actions.setup.setup, {
       userId: args.userId,
       appId: args.appId,
     });
-    const projectId = saved ?? (await ensureProject(token, teamId, args.appId));
-    if (saved === null)
-      await ctx.runMutation(internal.previews.internal.saveProject, {
-        userId: args.userId,
-        appId: args.appId,
-        projectId,
-      });
     const { deployKey, ...deployment } = await ensureDevelopment(
-      token,
+      env.CONVEX_TEAM_TOKEN!,
       projectId,
       args.reference,
     );

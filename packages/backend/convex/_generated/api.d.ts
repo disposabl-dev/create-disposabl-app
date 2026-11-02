@@ -9,12 +9,14 @@
  */
 
 import type * as apps_actions_create from "../apps/actions/create.js";
+import type * as apps_actions_setup from "../apps/actions/setup.js";
 import type * as apps_internal from "../apps/internal.js";
 import type * as auth from "../auth.js";
 import type * as github_actions_http from "../github/actions/http.js";
 import type * as github_actions_internal from "../github/actions/internal.js";
 import type * as github_actions_oidc from "../github/actions/oidc.js";
 import type * as github_actions_provision from "../github/actions/provision.js";
+import type * as github_actions_secrets from "../github/actions/secrets.js";
 import type * as github_actions_tokens from "../github/actions/tokens.js";
 import type * as github_internal from "../github/internal.js";
 import type * as http from "../http.js";
@@ -36,12 +38,14 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   "apps/actions/create": typeof apps_actions_create;
+  "apps/actions/setup": typeof apps_actions_setup;
   "apps/internal": typeof apps_internal;
   auth: typeof auth;
   "github/actions/http": typeof github_actions_http;
   "github/actions/internal": typeof github_actions_internal;
   "github/actions/oidc": typeof github_actions_oidc;
   "github/actions/provision": typeof github_actions_provision;
+  "github/actions/secrets": typeof github_actions_secrets;
   "github/actions/tokens": typeof github_actions_tokens;
   "github/internal": typeof github_internal;
   http: typeof http;

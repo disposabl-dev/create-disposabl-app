@@ -18,6 +18,7 @@ const app = defineApp({
     VERCEL_TEAM_ID: v.optional(v.string()),
     GITHUB_CONNECTOR: v.optional(v.string()),
     GITHUB_OWNER: v.optional(v.string()),
+    EXPO_TOKEN: v.optional(v.string()),
     GITHUB_INSTALLATION_ID: v.optional(v.string()),
   },
 });

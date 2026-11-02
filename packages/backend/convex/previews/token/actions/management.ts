@@ -131,3 +131,36 @@ export async function ensureDevelopment(
     deployKey,
   };
 }
+
+export async function ensureProduction(token: string, projectId: number) {
+  const path = `/projects/${projectId}`;
+  const lookup = () =>
+    management<Deployment>(token, `${path}/deployment?defaultProd=true`);
+  let deployment: Deployment;
+  try {
+    deployment = await lookup();
+  } catch (error) {
+    if (!(error instanceof ManagementError) || error.status !== 404)
+      throw error;
+    try {
+      deployment = await management<Deployment>(
+        token,
+        `${path}/create_deployment`,
+        { type: "prod" },
+      );
+    } catch (error) {
+      try {
+        deployment = await lookup();
+      } catch {
+        throw error;
+      }
+    }
+  }
+  if (
+    deployment.kind !== "cloud" ||
+    deployment.deploymentType !== "prod" ||
+    deployment.projectId !== projectId
+  )
+    throw new Error("Expected this app's production deployment.");
+  return deployment.name;
+}

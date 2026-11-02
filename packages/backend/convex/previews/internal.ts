@@ -156,19 +156,6 @@ export const create = internalMutation({
     return app.convexProjectId ?? null;
   },
 });
-export const saveProject = internalMutation({
-  args: {
-    ...identityFields,
-    appId: v.string(),
-    projectId: v.number(),
-  },
-  returns: v.null(),
-  handler: async (ctx, args) => {
-    const app = await ownedApp(ctx, args.userId, args.appId);
-    await ctx.db.patch("apps", app._id, { convexProjectId: args.projectId });
-    return null;
-  },
-});
 export const finish = internalMutation({
   args: { ...identityFields, ...previewIdentity, deployment },
   returns: v.null(),

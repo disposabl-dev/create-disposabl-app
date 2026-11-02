@@ -47,9 +47,10 @@ export async function githubRequest<T>(
   token: string,
   path: string,
   body?: unknown,
+  method = body === undefined ? "GET" : "POST",
 ): Promise<T> {
   const response = await fetch(`https://api.github.com${path}`, {
-    method: body === undefined ? "GET" : "POST",
+    method,
     redirect: "error",
     signal: AbortSignal.timeout(30_000),
     headers: {
@@ -62,5 +63,9 @@ export async function githubRequest<T>(
   });
   if (!response.ok)
     throw new Error(`GitHub request failed (${response.status}).`);
-  return response.json() as Promise<T>;
+  return (
+    response.status === 204 || response.headers.get("content-length") === "0"
+      ? undefined
+      : await response.json()
+  ) as T;
 }
