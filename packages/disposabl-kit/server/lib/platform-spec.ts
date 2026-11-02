@@ -92,19 +92,37 @@ export function createPlatforms(
       request: Request,
       authenticate: McpServer["authenticate"],
     ) {
-      const definition = routes.get(new URL(request.url).pathname);
+      const url = new URL(request.url);
+      const definition = routes.get(url.pathname);
       if (!definition)
         return Response.json({ error: "not_found" }, { status: 404 });
+      const method =
+        spec.find((operation) => operation.path === url.pathname)?.type ===
+        "query"
+          ? "GET"
+          : "POST";
+      if (request.method !== method)
+        return Response.json(
+          { error: "method_not_allowed" },
+          { status: 405, headers: { Allow: method } },
+        );
       try {
         const user = await authenticate(ctx, request);
         if (!user)
           return Response.json({ error: "unauthenticated" }, { status: 401 });
         if (definition.scope && !user.scopes.includes(definition.scope))
           return Response.json({ error: "forbidden" }, { status: 403 });
-        const input = checkValue(
-          v.object(definition.args ?? {}),
-          await request.json(),
-        );
+        const raw =
+          request.method === "GET"
+            ? Object.fromEntries(
+                [...url.searchParams].map(([key, value]) => {
+                  if (url.searchParams.getAll(key).length !== 1)
+                    throw new SyntaxError("Duplicate argument");
+                  return [key, JSON.parse(value)];
+                }),
+              )
+            : await request.json();
+        const input = checkValue(v.object(definition.args ?? {}), raw);
         if (!input.ok)
           return Response.json({ error: input.error }, { status: 400 });
         const result = await definition.handler(
@@ -133,5 +151,76 @@ export function createPlatforms(
         return Response.json({ error: "internal_error" }, { status: 500 });
       }
     },
+  };
+}
+
+/** The same validator schemas describe the HTTP transport and generated clients. */
+export function createOpenApi(spec: Operation[], version = "0.1.0") {
+  const ids = new Set<string>();
+  return {
+    openapi: "3.1.0",
+    info: { title: "Application API", version },
+    security: [{ bearerAuth: [] }],
+    components: {
+      securitySchemes: { bearerAuth: { type: "http", scheme: "bearer" } },
+    },
+    paths: Object.fromEntries(
+      spec.map((operation) => {
+        const parts = operation.path.slice(5).split("/");
+        const operationId = parts
+          .map((part, i) =>
+            i ? part.charAt(0).toUpperCase() + part.slice(1) : part,
+          )
+          .join("");
+        if (ids.has(operationId))
+          throw new Error(`Duplicate operation ID: ${operationId}`);
+        ids.add(operationId);
+        const query = operation.type === "query";
+        const args = operation.args as {
+          properties?: Record<string, unknown>;
+          required?: string[];
+        };
+        return [
+          operation.path,
+          {
+            [query ? "get" : "post"]: {
+              operationId,
+              "x-convex-function": operation.name,
+              ...(query
+                ? {
+                    parameters: Object.entries(args.properties ?? {}).map(
+                      ([name, schema]) => ({
+                        name,
+                        in: "query",
+                        required: args.required?.includes(name) ?? false,
+                        content: { "application/json": { schema } },
+                      }),
+                    ),
+                  }
+                : {
+                    requestBody: {
+                      required: true,
+                      content: {
+                        "application/json": { schema: operation.args },
+                      },
+                    },
+                  }),
+              responses: {
+                "200": {
+                  description: "Success",
+                  content: {
+                    "application/json": { schema: operation.returns },
+                  },
+                },
+                "400": { description: "Invalid arguments" },
+                "401": { description: "Authentication required" },
+                "403": { description: "Insufficient scope" },
+                "500": { description: "Internal error" },
+              },
+            },
+          },
+        ];
+      }),
+    ),
   };
 }
