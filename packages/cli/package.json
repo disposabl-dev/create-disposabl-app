@@ -1,0 +1,35 @@
+{
+  "name": "@disposabl/cli",
+  "version": "0.0.0-development",
+  "type": "module",
+  "description": "Command-line access to your Disposabl app",
+  "license": "MIT",
+  "bin": {
+    "disposabl": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "bun build.ts",
+    "typecheck": "bun check",
+    "lint": "bun check"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "commander": "15.0.0",
+    "proper-lockfile": "4.1.2"
+  },
+  "devDependencies": {
+    "@types/bun": "1.4.4",
+    "typescript": "6.0.3",
+    "@types/proper-lockfile": "4.1.4"
+  }
+}

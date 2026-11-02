@@ -16,6 +16,7 @@ import { Route as DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesConsen
 import { Route as DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesLoginRouteImport } from './../../../packages/disposabl-kit/client/routes/_auth-pages/login'
 import { Route as DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesSignUpRouteImport } from './../../../packages/disposabl-kit/client/routes/_auth-pages/signUp'
 import { Route as AuthenticatedDashboardRouteImport } from './router/_authenticated/dashboard'
+import { Route as AuthenticatedDashboardDotapiKeysRouteImport } from './router/_authenticated/dashboard.api-keys'
 import { Route as AuthenticatedTodosIndexRouteImport } from './router/_authenticated/todos/index'
 import { Route as AuthenticatedTodosIdRouteImport } from './router/_authenticated/todos/$id'
 
@@ -73,6 +74,12 @@ const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   getParentRoute: () =>
     DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthenticatedRouteRoute,
 } as any)
+const AuthenticatedDashboardDotapiKeysRoute =
+  AuthenticatedDashboardDotapiKeysRouteImport.update({
+    id: '/api-keys',
+    path: '/api-keys',
+    getParentRoute: () => AuthenticatedDashboardRoute,
+  } as any)
 const AuthenticatedTodosIndexRoute = AuthenticatedTodosIndexRouteImport.update({
   id: '/todos/',
   path: '/todos/',
@@ -91,7 +98,8 @@ export interface FileRoutesByFullPath {
   '/consent': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesConsentRoute
   '/login': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesLoginRoute
   '/signup': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesSignUpRoute
-  '/dashboard': typeof AuthenticatedDashboardRoute
+  '/dashboard': typeof AuthenticatedDashboardRouteWithChildren
+  '/dashboard/api-keys': typeof AuthenticatedDashboardDotapiKeysRoute
   '/todos/$id': typeof AuthenticatedTodosIdRoute
   '/todos/': typeof AuthenticatedTodosIndexRoute
 }
@@ -100,7 +108,8 @@ export interface FileRoutesByTo {
   '/consent': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesConsentRoute
   '/login': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesLoginRoute
   '/signup': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesSignUpRoute
-  '/dashboard': typeof AuthenticatedDashboardRoute
+  '/dashboard': typeof AuthenticatedDashboardRouteWithChildren
+  '/dashboard/api-keys': typeof AuthenticatedDashboardDotapiKeysRoute
   '/todos/$id': typeof AuthenticatedTodosIdRoute
   '/todos': typeof AuthenticatedTodosIndexRoute
 }
@@ -112,7 +121,8 @@ export interface FileRoutesById {
   '/_providers/login': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesLoginRoute
   '/_providers/signup': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesSignUpRoute
   '/_providers/': typeof IndexRoute
-  '/_providers/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_providers/_authenticated/dashboard': typeof AuthenticatedDashboardRouteWithChildren
+  '/_providers/_authenticated/dashboard/api-keys': typeof AuthenticatedDashboardDotapiKeysRoute
   '/_providers/_authenticated/todos/$id': typeof AuthenticatedTodosIdRoute
   '/_providers/_authenticated/todos/': typeof AuthenticatedTodosIndexRoute
 }
@@ -124,6 +134,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/signup'
     | '/dashboard'
+    | '/dashboard/api-keys'
     | '/todos/$id'
     | '/todos/'
   fileRoutesByTo: FileRoutesByTo
@@ -133,6 +144,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/signup'
     | '/dashboard'
+    | '/dashboard/api-keys'
     | '/todos/$id'
     | '/todos'
   id:
@@ -144,6 +156,7 @@ export interface FileRouteTypes {
     | '/_providers/signup'
     | '/_providers/'
     | '/_providers/_authenticated/dashboard'
+    | '/_providers/_authenticated/dashboard/api-keys'
     | '/_providers/_authenticated/todos/$id'
     | '/_providers/_authenticated/todos/'
   fileRoutesById: FileRoutesById
@@ -203,6 +216,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
       parentRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthenticatedRouteRoute
     }
+    '/_providers/_authenticated/dashboard/api-keys': {
+      id: '/_providers/_authenticated/dashboard/api-keys'
+      path: '/api-keys'
+      fullPath: '/dashboard/api-keys'
+      preLoaderRoute: typeof AuthenticatedDashboardDotapiKeysRouteImport
+      parentRoute: typeof AuthenticatedDashboardRoute
+    }
     '/_providers/_authenticated/todos/': {
       id: '/_providers/_authenticated/todos/'
       path: '/todos'
@@ -220,15 +240,30 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AuthenticatedDashboardRouteChildren {
+  AuthenticatedDashboardDotapiKeysRoute: typeof AuthenticatedDashboardDotapiKeysRoute
+}
+
+const AuthenticatedDashboardRouteChildren: AuthenticatedDashboardRouteChildren =
+  {
+    AuthenticatedDashboardDotapiKeysRoute:
+      AuthenticatedDashboardDotapiKeysRoute,
+  }
+
+const AuthenticatedDashboardRouteWithChildren =
+  AuthenticatedDashboardRoute._addFileChildren(
+    AuthenticatedDashboardRouteChildren,
+  )
+
 interface DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthenticatedRouteRouteChildren {
-  AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRouteWithChildren
   AuthenticatedTodosIdRoute: typeof AuthenticatedTodosIdRoute
   AuthenticatedTodosIndexRoute: typeof AuthenticatedTodosIndexRoute
 }
 
 const DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthenticatedRouteRouteChildren: DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthenticatedRouteRouteChildren =
   {
-    AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+    AuthenticatedDashboardRoute: AuthenticatedDashboardRouteWithChildren,
     AuthenticatedTodosIdRoute: AuthenticatedTodosIdRoute,
     AuthenticatedTodosIndexRoute: AuthenticatedTodosIndexRoute,
   }
@@ -271,3 +306,12 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
+}

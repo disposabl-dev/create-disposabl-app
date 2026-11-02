@@ -1,0 +1,31 @@
+{
+  "name": "@disposabl/sdk",
+  "version": "0.0.0-development",
+  "type": "module",
+  "description": "Generated TypeScript SDK for your Disposabl API",
+  "license": "MIT",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "generate": "openapi-ts && bun fmt src/generated",
+    "build": "bun run generate && tsc -p tsconfig.build.json",
+    "typecheck": "bun run generate && tsc --noEmit",
+    "lint": "bun check"
+  },
+  "devDependencies": {
+    "@hey-api/openapi-ts": "0.99.0",
+    "typescript": "6.0.3",
+    "@types/bun": "1.4.4"
+  }
+}

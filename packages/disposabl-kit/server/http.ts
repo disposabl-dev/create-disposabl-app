@@ -51,20 +51,39 @@ export default function createHttpRouter() {
     }
   }
   if (mcp && enabled.includes("api")) {
+    const cors = {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Authorization, Content-Type",
+      "Cache-Control": "no-store",
+    };
     http.route({
       path: "/openapi.json",
       method: "GET",
       handler: httpActionGeneric(async () =>
-        Response.json({ ...openapi, servers: [{ url: env.CONVEX_SITE_URL }] }),
+        Response.json(
+          { ...openapi, servers: [{ url: env.CONVEX_SITE_URL }] },
+          { headers: cors },
+        ),
       ),
     });
-    for (const method of ["GET", "POST"] as const)
+    for (const method of ["GET", "POST", "OPTIONS"] as const)
       http.route({
         pathPrefix: "/api/",
         method,
-        handler: httpActionGeneric((ctx, request) =>
-          platforms.handleApi(ctx, request, mcp.authenticate.bind(mcp)),
-        ),
+        handler: httpActionGeneric(async (ctx, request) => {
+          const response =
+            method === "OPTIONS"
+              ? new Response(null, { status: 204 })
+              : await platforms.handleApi(
+                  ctx,
+                  request,
+                  mcp.authenticate.bind(mcp),
+                );
+          for (const [key, value] of Object.entries(cors))
+            response.headers.set(key, value);
+          return response;
+        }),
       });
   }
   registerStaticRoutes(http, components.staticHosting);

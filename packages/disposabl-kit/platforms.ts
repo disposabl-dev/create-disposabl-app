@@ -26,8 +26,8 @@ export const platforms = [
     group: "MCP & plugins",
     status: "available",
   },
-  { id: "api", label: "API", group: "Coming soon", status: "disabled" },
-  { id: "cli", label: "CLI", group: "Coming soon", status: "disabled" },
+  { id: "api", label: "API", group: "Developer tools", status: "available" },
+  { id: "cli", label: "CLI", group: "Developer tools", status: "available" },
   {
     id: "python-sdk",
     label: "Python SDK",
@@ -37,8 +37,8 @@ export const platforms = [
   {
     id: "typescript-sdk",
     label: "TypeScript SDK",
-    group: "Coming soon",
-    status: "disabled",
+    group: "Developer tools",
+    status: "available",
   },
 ] as const;
 

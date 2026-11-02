@@ -57,6 +57,31 @@ export async function createApp(
           force: true,
         });
     }
+    for (const kind of ["cli", "sdk"]) {
+      const folder = join(destination, "packages", kind);
+      if (!folders.includes(`packages/${kind}`)) {
+        await rm(folder, { recursive: true, force: true });
+        continue;
+      }
+      const packagePath = join(folder, "package.json");
+      const client = JSON.parse(await readFile(packagePath, "utf8"));
+      client.name = `${name}-${kind}`;
+      if (client.name.length > 214)
+        throw new Error(
+          "Project name is too long for generated package names.",
+        );
+      if (kind === "cli") client.bin = { [name]: "dist/index.js" };
+      await writeFile(packagePath, JSON.stringify(client, null, 2) + "\n");
+      const readme = join(folder, "README.md");
+      if (existsSync(readme))
+        await writeFile(
+          readme,
+          (await readFile(readme, "utf8")).replaceAll(
+            `@disposabl/${kind}`,
+            client.name,
+          ),
+        );
+    }
     if (existsSync(join(destination, "gitignore"))) {
       await rename(
         join(destination, "gitignore"),

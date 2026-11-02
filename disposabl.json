@@ -8,7 +8,9 @@
     "macos",
     "linux",
     "api",
-    "mcp"
+    "mcp",
+    "cli",
+    "typescript-sdk"
   ],
   "features": ["authentication"]
 }

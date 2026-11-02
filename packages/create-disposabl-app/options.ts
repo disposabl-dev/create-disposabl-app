@@ -70,6 +70,8 @@ export function selectFeatures(input = "none"): Feature[] {
 
 export function selectedFolders(config: DisposablConfig): string[] {
   const result = ["apps/web"];
+  if (config.platforms.includes("cli")) result.push("packages/cli");
+  if (config.platforms.includes("typescript-sdk")) result.push("packages/sdk");
   if (
     config.platforms.some(
       (platform) => platform === "android" || platform === "ios",
