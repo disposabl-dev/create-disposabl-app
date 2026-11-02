@@ -70,41 +70,7 @@ jobs:
           BEFORE: ${{ github.event.before }}
           PR: ${{ github.event.number }}
           TRUSTED: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
-        run: |
-          if [[ "$GITHUB_JOB" == android || "$GITHUB_JOB" == ios ]]; then exit; fi
-          if [[ "$TRUSTED" != true ]]; then printf 'android=false\nios=false\ndesktop=[]\nselected=false\n' >> "$GITHUB_OUTPUT"; exit; fi
-          if [[ -n "$PR" ]]; then
-            gh api "repos/$GH_REPO/pulls/$PR/files?per_page=100" --paginate --jq '.[] | .filename, (.previous_filename // empty)' > "$RUNNER_TEMP/changes"
-          elif [[ -z "$BEFORE" || "$BEFORE" =~ ^0+$ ]]; then echo disposabl.json > "$RUNNER_TEMP/changes"
-          else
-            git -c credential.helper= -c 'credential.helper=!gh auth git-credential' fetch --depth=1 origin "$BEFORE"
-            git diff --name-only --no-renames "$BEFORE" "$SOURCE" > "$RUNNER_TEMP/changes"
-          fi
-          node --input-type=module -e '
-            import {readFileSync} from "node:fs";
-            import {execFileSync} from "node:child_process";
-            const relevant = p => p && !/(^|\/)\.agents\/|\.(md|mdx)$/.test(p);
-            const paths = readFileSync(`${process.env.RUNNER_TEMP}/changes`, "utf8").split(/\r?\n/).filter(relevant);
-            const enabled = JSON.parse(readFileSync("disposabl.json", "utf8")).platforms;
-            const api = path => JSON.parse(execFileSync("gh", ["api", `repos/${process.env.GH_REPO}/${path}`], {encoding: "utf8", stdio: ["ignore", "pipe", "ignore"]}));
-            const changes = platform => {
-              if (!process.env.PR) return paths;
-              try {
-                const release = api(`releases/tags/${process.env.RELEASE_PREFIX}-${process.env.CHANNEL}-${platform}`);
-                const base = /^Source: ([a-f0-9]{40})$/m.exec(release.body || "")?.[1];
-                if (release.draft || !base) return paths;
-                if (base === process.env.SOURCE) return [];
-                const diff = api(`compare/${base}...${process.env.SOURCE}`);
-                // GitHub caps comparison files at 300; never skip on a truncated result.
-                return !["ahead", "identical"].includes(diff.status) || !Array.isArray(diff.files) || diff.files.length >= 300 ? ["disposabl.json"] : diff.files.flatMap(f => [f.filename, f.previous_filename]).filter(relevant);
-              } catch { return paths; }
-            };
-            const affected = (platform, directory) => enabled.includes(platform) && changes(platform).some(p => p.startsWith(directory) || /^(bun.lock$|package.json$|disposabl.json$|turbo.json$|bunfig.toml$|patches\/|\.github\/workflows\/pipeline.yml$|packages\/(?!backend\/|create-disposabl-app\/))/.test(p));
-            const target = process.env.DISPOSABL_DESKTOP_PLATFORM;
-            for (const platform of ["android", "ios"]) console.log(`${platform}=${platform === "android" && Boolean(process.env.EXPO_TOKEN) && !target && affected(platform, "apps/mobile/")}`); // Restore iOS selection when builds resume.
-            const desktop = ["linux", "windows", "macos"].filter(platform => target === platform && affected(platform, "apps/desktop/"));
-            console.log(`desktop=${JSON.stringify(desktop)}\nselected=${desktop.includes(process.env.DISPOSABL_DESKTOP_PLATFORM)}`);
-          ' >> "$GITHUB_OUTPUT"
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/platforms.sh"
       - &node
         name: Node
         if: github.job != 'desktop' || steps.platforms.outputs.selected == 'true'
@@ -149,15 +115,7 @@ jobs:
         env:
           TRUSTED: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
           CONVEX_DEPLOY_KEY: ${{ secrets[github.event_name == 'push' && 'CONVEX_DEPLOY_KEY' || 'CONVEX_DEPLOY_KEY_PREVIEW'] }}
-        run: |
-          if [[ "$TRUSTED" != true ]]; then VITE_CONVEX_URL=https://ci.invalid VITE_CONVEX_SITE_URL=https://ci.invalid bun run build --filter=@disposabl/web; exit; fi
-          : "${CONVEX_DEPLOY_KEY:?Configure the Convex deployment secret for this repository}"
-          cd packages/backend
-          export AUTH_TARGET=--prod
-          target=()
-          if [[ "$CHANNEL" != production ]]; then export AUTH_TARGET="--preview-name $CHANNEL"; target=(--preview-name "$CHANNEL"); fi
-          bun x --no-install convex deploy --yes "${target[@]}" --cmd-url-env-var-name CONVEX_URL --cmd 'for name in CONVEX_URL CONVEX_SITE_URL; do value=$(printenv "$name"); test -n "$value" || exit 1; for prefix in "" VITE_ EXPO_PUBLIC_; do export "$prefix$name=$value"; printf "%s=%s\n" "$prefix$name" "$value" | tee -a "$GITHUB_ENV" >> "$GITHUB_OUTPUT"; done; done; bun x --no-install --package @convex-dev/auth auth --keys-only $AUTH_TARGET && bun run --cwd ../.. build --filter=@disposabl/web'
-          bun x --no-install static-hosting upload $AUTH_TARGET --no-spa --dist ../../apps/web/dist/client
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/web-deploy.sh"
       - name: Report web result
         if: always()
         run: node .github/scripts/disposabl.mjs report web,api,mcp ${{ steps.deploy.outcome == 'success' && 'ready' || 'failed' }}
@@ -165,56 +123,16 @@ jobs:
         name: Expo
         if: github.job == 'ios' || github.job == 'android' || steps.platforms.outputs.android == 'true' || steps.platforms.outputs.ios == 'true'
         working-directory: apps/mobile
-        run: |
-          jq --arg channel "$CHANNEL" '.build["ios-" + env.EAS_ENVIRONMENT].channel = $channel' eas.json > "$RUNNER_TEMP/eas.json"
-          mv "$RUNNER_TEMP/eas.json" eas.json
-          bun x "$EAS_CLI" env:pull --environment "$EAS_ENVIRONMENT" --path "$RUNNER_TEMP/expo.env" --non-interactive
-          bun -e '
-            import {parseEnv} from "node:util";
-            import {appendFileSync, readFileSync} from "node:fs";
-            for (const [key, value] of Object.entries(parseEnv(readFileSync(`${process.env.RUNNER_TEMP}/expo.env`, "utf8")))) {
-              // Web and mobile use the same backend from this deployment.
-              if (/^CONVEX_(URL|SITE_URL)$/.test(key) && value !== process.env[key]) throw new Error(`EAS overrides the deployed backend: ${key}`);
-              if (/^(EXPO_PUBLIC_|VITE_)?CONVEX_(URL|SITE_URL)$/.test(key)) continue;
-              if (/^(GITHUB_|RUNNER_|GH_|DISPOSABL_|BUN_|CI$|NODE_OPTIONS$|PATH$|HOME$|SOURCE(_PATH)?$|CHANNEL$|PLATFORM$|RELEASE_PREFIX$|MACOS_|EAS_(ENVIRONMENT|CLI)$|EXPO_(TOKEN|PROJECT_ID|OWNER|SLUG|NO_DOTENV)$)/.test(key)) throw new Error(`Reserved EAS variable: ${key}`);
-              const delimiter = crypto.randomUUID();
-              appendFileSync(process.env.GITHUB_ENV, `${key}<<${delimiter}\n${value}\n${delimiter}\n`);
-            }
-          '
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/expo-env.sh"
       - name: Channel
         if: steps.platforms.outputs.android == 'true' || steps.platforms.outputs.ios == 'true'
         working-directory: apps/mobile
-        run: |
-          for ((offset=0; ; offset+=25)); do
-            bun x "$EAS_CLI" channel:list --json --limit 25 --offset "$offset" > "$RUNNER_TEMP/channels.json"
-            if jq -e --arg channel "$CHANNEL" 'any(.currentPage[]; .name == $channel)' "$RUNNER_TEMP/channels.json" > /dev/null; then
-              jq -e --arg channel "$CHANNEL" '.currentPage[] | select(.name == $channel) | (.isPaused == false) and (.updateBranches | length == 1) and (.updateBranches[0].name == $channel) and ((.branchMapping | fromjson).data == [{branchId: .updateBranches[0].id, branchMappingLogic: "true"}])' "$RUNNER_TEMP/channels.json" > /dev/null || { echo 'Preview channel must point only to its same-named branch'; exit 1; }
-              break
-            fi
-            if [[ $(jq '.currentPage | length' "$RUNNER_TEMP/channels.json") -lt 25 ]]; then bun x "$EAS_CLI" channel:create "$CHANNEL" --non-interactive; break; fi
-          done
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/expo-channel.sh"
       - name: Fingerprint
         id: fingerprint
         if: steps.platforms.outputs.android == 'true'
         working-directory: apps/mobile
-        run: |
-          for ((page=1; ; page++)); do
-            gh api "repos/$GH_REPO/releases?per_page=100&page=$page" > "$RUNNER_TEMP/releases.json"
-            jq --arg tag "$RELEASE_PREFIX-$CHANNEL-android" --arg legacy "$RELEASE_PREFIX-$CHANNEL" '[.[] | select(.draft | not) | select(.tag_name == $tag or .tag_name == $legacy or (.tag_name | startswith($legacy + "-"))) | select(any(.assets[]; .name == "android.apk"))] | sort_by(.tag_name != $tag, .tag_name != $legacy) | .[0] // {}' "$RUNNER_TEMP/releases.json" > "$RUNNER_TEMP/release.json"
-            if jq -e '.id' "$RUNNER_TEMP/release.json" > /dev/null || [[ $(jq length "$RUNNER_TEMP/releases.json") -lt 100 ]]; then break; fi
-          done
-          bun x --no-install expo config --json > "$RUNNER_TEMP/mobile.json"
-          RUNTIME=$(bun x --no-install expo-updates runtimeversion:resolve --platform android --workflow managed | jq -er 'select(.fingerprintSources != null) | .runtimeVersion | select(test("^[a-f0-9]{40,64}$"))')
-          export RUNTIME
-          bun -e '
-            const config = await Bun.file(`${process.env.RUNNER_TEMP}/mobile.json`).json();
-            if (!config.extra?.eas?.projectId) throw new Error("Link an Expo project first");
-            const wanted = {channel: process.env.CHANNEL, projectId: config.extra.eas.projectId, applicationId: config.android.package, runtimeVersion: process.env.RUNTIME};
-            const release = await Bun.file(`${process.env.RUNNER_TEMP}/release.json`).json();
-            const prior = JSON.parse(/<!-- android (\{[^\n]+\}) -->/.exec(release.body || "")?.[1] || "null");
-            const reusable = prior && Object.keys(wanted).every(k => prior[k] === wanted[k]) && /^[a-f0-9]{64}$/.test(prior.sha256 || "") && release.assets.some(a => a.name === "android.apk" && a.state === "uploaded" && a.size > 0 && a.digest === `sha256:${prior.sha256}`);
-            console.log(`build=${!reusable}\nruntime=${wanted.runtimeVersion}\nmanifest=${JSON.stringify(wanted)}\ntag=${reusable ? release.tag_name : ""}\nsha=${reusable ? prior.sha256 : ""}`);
-          ' >> "$GITHUB_OUTPUT"
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/expo-fingerprint.sh"
       - name: Update
         if: steps.fingerprint.outputs.build == 'false'
         env:
@@ -222,16 +140,7 @@ jobs:
           SHA: ${{ steps.fingerprint.outputs.sha }}
           RUNTIME: ${{ steps.fingerprint.outputs.runtime }}
           MANIFEST: ${{ steps.fingerprint.outputs.manifest }}
-        run: |
-          mkdir -p dist/release
-          gh release download "$TAG" --pattern android.apk --dir dist/release
-          echo "$SHA  dist/release/android.apk" | sha256sum --check
-          cd apps/mobile
-          bun x --no-install expo export --platform android --output-dir dist/update
-          test "$(bun x --no-install expo-updates runtimeversion:resolve --platform android --workflow managed | jq -er .runtimeVersion)" = "$RUNTIME"
-          test "$(gh api "repos/$GH_REPO/$SOURCE_PATH" --jq 'if has("head") then (if .state == "open" then .head.sha else "closed" end) else .object.sha end')" = "$SOURCE"
-          bun x "$EAS_CLI" update --platform android --channel "$CHANNEL" --environment "$EAS_ENVIRONMENT" --skip-bundler --input-dir dist/update --message "$SOURCE" --non-interactive
-          jq --arg sha "$SHA" '. + {sha256: $sha, action: "update"}' <<< "$MANIFEST" > ../../dist/release/android.json
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/expo-update.sh"
       - name: iOS
         id: ios
         if: steps.platforms.outputs.ios == 'true'
@@ -268,18 +177,7 @@ jobs:
         name: Publish
         if: github.job == 'ios' || github.job == 'android' || (github.job == 'web' && hashFiles('dist/release/android.json') != '') || steps.platforms.outputs.selected == 'true'
         shell: bash
-        run: |
-          check_source() { test "$(gh api "repos/$GH_REPO/$SOURCE_PATH" --jq 'if has("head") then (if .state == "open" then .head.sha else "closed" end) else .object.sha end')" = "$SOURCE"; }
-          check_source
-          for file in dist/release/*; do test -f "$file"; test -s "$file"; done
-          case "$PLATFORM" in
-            android) test -s dist/release/android.apk; test -s dist/release/android.json ;;
-            ios) test -s dist/release/ios.ipa; test -s dist/release/ios.json ;;
-            linux) compgen -G 'dist/release/*.deb' > /dev/null; compgen -G 'dist/release/*.rpm' > /dev/null ;;
-            windows) compgen -G 'dist/release/*.exe' > /dev/null; compgen -G 'dist/release/*.nupkg' > /dev/null; test -s dist/release/RELEASES ;;
-            macos) compgen -G 'dist/release/*.dmg' > /dev/null ;;
-            *) exit 1 ;;
-          esac
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/verify-artifacts.sh"
       - &artifacts
         name: Upload release artifacts
         if: hashFiles('dist/release/*') != ''
@@ -361,78 +259,7 @@ jobs:
         if: failure() || cancelled()
         run: node .github/scripts/disposabl.mjs report android failed
 
-  ios:
-    name: iOS
-    needs: web
-    # Temporarily disabled to avoid macOS and iOS build costs; remove false && to restore.
-    if: false && needs.web.outputs.ios_build == 'true'
-    permissions: *release-permissions
-    runs-on: *macos-runner
-    timeout-minutes: 60
-    env:
-      PLATFORM: ios
-      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-      EXPO_PROJECT_ID: ${{ vars.EXPO_PROJECT_ID }}
-      EXPO_OWNER: ${{ vars.EXPO_OWNER }}
-      EXPO_SLUG: ${{ vars.EXPO_SLUG }}
-      EXPO_NO_DOTENV: '1'
-      CONVEX_URL: ${{ needs.web.outputs.convex_url }}
-      CONVEX_SITE_URL: ${{ needs.web.outputs.convex_site_url }}
-      EXPO_PUBLIC_CONVEX_URL: ${{ needs.web.outputs.convex_url }}
-      EXPO_PUBLIC_CONVEX_SITE_URL: ${{ needs.web.outputs.convex_site_url }}
-      MANIFEST: ${{ needs.web.outputs.ios_manifest }}
-    steps:
-      - *checkout
-      - *platforms
-      - *node
-      - *app-token
-      - *bun
-      - *cache
-      - *install
-      - name: Report mobile build
-        run: node .github/scripts/disposabl.mjs report "$PLATFORM" building
-      - *expo
-      - name: Pods
-        uses: actions/cache@v4
-        with:
-          path: ~/Library/Caches/CocoaPods
-          key: pods-${{ runner.arch }}-${{ hashFiles('bun.lock') }}
-          restore-keys: pods-${{ runner.arch }}-
-      - name: Build
-        working-directory: apps/mobile
-        run: |
-          test "$(gh api "repos/$GH_REPO/$SOURCE_PATH" --jq 'if has("head") then (if .state == "open" then .head.sha else "closed" end) else .object.sha end')" = "$SOURCE"
-          mkdir -p ../../dist/release
-          bun x "$EAS_CLI" build --platform ios --profile "ios-$EAS_ENVIRONMENT" --local --non-interactive --output ../../dist/release/ios.ipa
-      - name: Verify
-        run: |
-          unzip -q dist/release/ios.ipa -d "$RUNNER_TEMP/ipa"
-          apps=("$RUNNER_TEMP/ipa/Payload/"*.app)
-          test "${#apps[@]}" -eq 1
-          app=${apps[0]}
-          codesign --verify --deep --strict "$app"
-          test "$(plutil -extract CFBundleIdentifier raw -o - "$app/Info.plist")" = "$(jq -r .applicationId <<< "$MANIFEST")"
-          runtime=$(plutil -extract EXUpdatesRuntimeVersion raw -o - "$app/Expo.plist")
-          if [[ "$runtime" == "file:fingerprint" ]]; then
-            fingerprints=()
-            while IFS= read -r path; do fingerprints+=("$path"); done < <(find "$app" -path '*/EXUpdates.bundle/fingerprint' -type f)
-            if [[ ${#fingerprints[@]} -ne 1 ]]; then
-              echo "Expected one EXUpdates.bundle/fingerprint, found ${#fingerprints[@]}" >&2
-              exit 1
-            fi
-            runtime=$(cat "${fingerprints[0]}")
-          fi
-          expected_runtime=$(jq -r .runtimeVersion <<< "$MANIFEST")
-          if [[ "$runtime" != "$expected_runtime" ]]; then
-            echo "iOS runtime version mismatch: expected $expected_runtime, found $runtime" >&2
-            exit 1
-          fi
-          test "$(plutil -extract EXUpdatesRequestHeaders.expo-channel-name raw -o - "$app/Expo.plist")" = "$CHANNEL"
-          security cms -D -i "$app/embedded.mobileprovision" > "$RUNNER_TEMP/profile.plist"
-          expires=$(python3 -c 'import datetime,plistlib,sys; p=plistlib.load(open(sys.argv[1],"rb")); expiry=p["ExpirationDate"].replace(tzinfo=datetime.timezone.utc); assert p.get("ProvisionedDevices") and not p["Entitlements"].get("get-task-allow",False) and expiry>datetime.datetime.now(datetime.timezone.utc); print(expiry.isoformat())' "$RUNNER_TEMP/profile.plist")
-          jq --arg sha "$(shasum -a 256 dist/release/ios.ipa | cut -d' ' -f1)" --arg expires "$expires" '. + {sha256: $sha, expiresAt: $expires}' <<< "$MANIFEST" > dist/release/ios.json
-      - *publish
-      - *artifacts
+  # iOS builds are temporarily disabled.
 
   desktop:
     permissions: *release-permissions
@@ -602,3 +429,37 @@ jobs:
           else
             node .github/scripts/disposabl.mjs report "$platform" failed 'Package publication failed; check npm trusted publishing and the workflow log.'
           fi
+
+  # The publisher executes scripts from main only; the authorizer verifies workflow_sha.
+  publish:
+    needs: [web, android, desktop]
+    if: always() && !cancelled() && !contains(needs.*.result, 'failure') && (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository)
+    environment: publishing
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      actions: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Disposabl installation token
+        run: node .github/scripts/disposabl.mjs token
+      - name: Select release source
+        id: source
+        run: bash .github/scripts/release-source.sh
+      - uses: actions/download-artifact@v4
+        if: steps.source.outputs.current == 'true'
+        with:
+          pattern: release-*
+          path: artifacts
+      - name: Publish verified build artifacts
+        if: steps.source.outputs.current == 'true'
+        run: bash .github/scripts/release-publish.sh
