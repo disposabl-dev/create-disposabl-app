@@ -66,6 +66,7 @@ export async function createApp(
       const packagePath = join(folder, "package.json");
       const client = JSON.parse(await readFile(packagePath, "utf8"));
       client.name = `${name}-${kind}`;
+      delete client.repository;
       if (client.name.length > 214)
         throw new Error(
           "Project name is too long for generated package names.",

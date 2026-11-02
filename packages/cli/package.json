@@ -20,7 +20,8 @@
   "scripts": {
     "build": "bun build.ts",
     "typecheck": "bun check",
-    "lint": "bun check"
+    "lint": "bun check",
+    "release": "semantic-release"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",
@@ -30,6 +31,14 @@
   "devDependencies": {
     "@types/bun": "1.4.4",
     "typescript": "6.0.3",
-    "@types/proper-lockfile": "4.1.4"
+    "@types/proper-lockfile": "4.1.4",
+    "semantic-release": "25.0.9",
+    "@semantic-release/exec": "7.1.0",
+    "conventional-changelog-conventionalcommits": "9.3.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/disposabl-dev/create-disposabl-app.git",
+    "directory": "packages/cli"
   }
 }
