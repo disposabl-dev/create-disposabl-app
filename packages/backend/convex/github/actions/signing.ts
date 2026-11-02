@@ -1,3 +1,5 @@
+"use node";
+
 import { generateKeyPair, randomBytes } from "node:crypto";
 import { promisify } from "node:util";
 import forge from "node-forge";

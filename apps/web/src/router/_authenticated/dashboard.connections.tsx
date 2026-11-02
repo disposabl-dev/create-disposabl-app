@@ -108,7 +108,7 @@ function Connections() {
             );
           await selectGithub({
             proof: result.proof,
-            installationId: result.installations[0]!.installationId,
+            installationId: result.installations[0].installationId,
           });
         } else {
           setInstallations(result.installations);
