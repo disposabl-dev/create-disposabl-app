@@ -40,6 +40,7 @@ async function authorize(ctx: ActionCtx, appId: string, token: string) {
     throw new Error("Unexpected workflow event.");
   // PR build code only receives read access. Write tokens go to main or its trusted artifact publisher.
   const installationToken = await githubToken(
+    ctx,
     app.installationId,
     [
       publisher || productionEvent ? "contents:write" : "contents:read",

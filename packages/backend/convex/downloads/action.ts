@@ -72,6 +72,7 @@ export const resolve = internalAction({
     )
       return null;
     const token = await githubToken(
+      ctx,
       candidate.installationId,
       ["contents:read"],
       repository,

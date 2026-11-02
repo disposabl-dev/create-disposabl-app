@@ -16,19 +16,36 @@ if (config.appId) {
     throw new Error(`GitHub identity failed (${identity.status}).`);
   const { value: token } = await identity.json();
   const call = async (path, body) => {
-    const response = await fetch(origin + path, {
-      method: "POST",
-      redirect: "error",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ appId: config.appId, ...body }),
-      signal: AbortSignal.timeout(90_000),
-    });
-    if (!response.ok)
-      throw new Error(`Disposabl ${path} failed (${response.status}).`);
-    return response.json();
+    for (let attempt = 0; ; attempt++) {
+      const response = await fetch(origin + path, {
+        method: "POST",
+        redirect: "error",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ appId: config.appId, ...body }),
+        signal: AbortSignal.timeout(90_000),
+      });
+      if (response.ok) return response.json();
+      const delay = Number(response.headers.get("retry-after") || 5);
+      if (
+        ![429, 502, 503, 504].includes(response.status) ||
+        attempt >= 5 ||
+        !Number.isFinite(delay) ||
+        delay > 60
+      )
+        throw new Error(
+          `Disposabl ${path} failed (${response.status}).${response.headers.has("retry-after") ? ` Retry after ${delay}s.` : ""}`,
+        );
+      console.log(
+        `Disposabl connection is busy; retrying in ${Math.max(1, delay)}s.`,
+      );
+      await response.body?.cancel();
+      await new Promise((resolve) =>
+        setTimeout(resolve, Math.max(1, delay) * 1000),
+      );
+    }
   };
   if (command === "token") {
     const result = await call("/github/token", {});

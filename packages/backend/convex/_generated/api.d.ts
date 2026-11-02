@@ -34,6 +34,7 @@ import type * as github_actions_provision from "../github/actions/provision.js";
 import type * as github_actions_secrets from "../github/actions/secrets.js";
 import type * as github_actions_signing from "../github/actions/signing.js";
 import type * as github_actions_tokens from "../github/actions/tokens.js";
+import type * as github_identityCache from "../github/identityCache.js";
 import type * as github_internal from "../github/internal.js";
 import type * as http from "../http.js";
 import type * as mcp from "../mcp.js";
@@ -79,6 +80,7 @@ declare const fullApi: ApiFromModules<{
   "github/actions/secrets": typeof github_actions_secrets;
   "github/actions/signing": typeof github_actions_signing;
   "github/actions/tokens": typeof github_actions_tokens;
+  "github/identityCache": typeof github_identityCache;
   "github/internal": typeof github_internal;
   http: typeof http;
   mcp: typeof mcp;

@@ -42,7 +42,7 @@ export const start = internalAction({
         env.GITHUB_CONNECTOR!,
         { subject: { type: "user", id: userId } },
         {
-          vercelToken: await vercelIdentity(),
+          vercelToken: await vercelIdentity(ctx),
           callbackUrl: `${callback}&code=connected&state=${state}`,
           expiresInMs: 10 * 60_000,
         },
@@ -79,7 +79,7 @@ export const complete = internalAction({
       internal.connections.internal.consume,
       { userId, provider, hash: hash(state) },
     );
-    if (provider === "github") return userInstallations(userId);
+    if (provider === "github") return userInstallations(ctx, userId);
     const response = await fetch("https://api.convex.dev/oauth/token", {
       method: "POST",
       redirect: "error",

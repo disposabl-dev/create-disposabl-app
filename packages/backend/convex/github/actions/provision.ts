@@ -28,7 +28,7 @@ export const run = internalAction({
     const installationId = connection?.installationId;
     if (!owner || !installationId || !/^[a-zA-Z0-9-]+$/.test(owner))
       throw new Error("Configure a verified GitHub installation.");
-    const token = await githubToken(installationId, [
+    const token = await githubToken(ctx, installationId, [
       "administration:write",
       "contents:read",
     ]);

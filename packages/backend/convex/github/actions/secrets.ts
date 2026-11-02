@@ -34,6 +34,7 @@ export const configure = internalAction({
       );
     const repository = `${app.githubOwner}/${app.githubRepo}`;
     const token = await githubToken(
+      ctx,
       app.installationId,
       ["secrets:write"],
       repository,
