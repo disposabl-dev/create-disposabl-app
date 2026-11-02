@@ -1,47 +1,37 @@
 # Documentation
 
-Enable `docs` in the root `disposabl.json` features array. Generated apps include
-this folder when created with `--features docs`.
+Choose `--features docs` when creating an app. The generator includes Fumapress,
+the web build dependency and copy step, and the `/docs` HTTP routes. Without
+docs, it removes this workspace and all of those hooks.
 
-Run the usual web development command, `bun run --cwd apps/web dev`, and open
-`/docs`. The kit builds Fumapress and serves its static output at `/docs/`.
-Changes to `content`, `src`, or the docs configuration rebuild the docs; refresh
-the browser after the terminal reports completion. Restart the web dev server
-after changing the feature flag or dependencies.
+Add Markdown or MDX files in `apps/docs/content` and commit them with your PR.
+`content/index.mdx` is the docs home. `content/guides/writing.mdx` becomes
+`/docs/guides/writing`. Fumapress builds the sidebar and static search index from
+these files. Use `/guides/writing` for internal docs links; Fumapress adds `/docs`.
+Use an ordinary `<a href="/docs/">` link from the web app to enter docs.
 
-Write pages in `content` using Markdown or MDX. `content/index.mdx` is the docs
-home, and `content/guides/writing.mdx` is `/docs/guides/writing`. Fumapress adds the
-`/docs` base path to internal links, so use `/guides/writing` within docs content.
-Use ordinary `<a href="/docs/">` links from the TanStack app to enter docs.
-
-## One build and deployment
-
-Run `bun run build`, or `bun run --cwd apps/web build` for just the website.
-The web build owns the docs build so it runs once, then copies the output:
+Run `bun run build`, or `bun run build --filter=@disposabl/web` for the website
+and its dependencies. Turbo builds docs first, then web copies the rendered site
+into its output. Both build tasks run without caching so deleted pages cannot
+survive a cache restore:
 
 ```text
 apps/web/dist/client/
-  index.html                 Web app
-  assets/                    Web assets
+  index.html
+  assets/
   docs/
-    index.html               Fumapress home
+    index.html
     guides/writing/index.html
-    assets/                  Docs assets
-    RSC/                     Static navigation payloads
-    api/search               Static search index
+    assets/
+    RSC/
+    api/search
 ```
 
-Deploy the existing `apps/web/dist/client` directory through Convex static
-hosting. Web and docs ship in the same upload. The kit's small `/docs` HTTP
-handler maps clean URLs to directory indexes, redirects `/docs` to `/docs/`, and
-returns 404 for missing pages. Fumapress runs at build time; production needs no
-Waku server. Deploy backend changes when enabling or disabling the docs feature.
+The PR and production pipeline template uses that same web build command and
+uploads `apps/web/dist/client` once to Convex static hosting. Docs changes ship
+with the web app. There is no docs dev server or runtime build process.
 
-Run `bun run --cwd apps/docs build` to build docs on their own. The root build
-excludes the standalone docs task because the web build already builds and copies
-docs when enabled.
-
-With `docs` disabled, the web build skips Fumapress and emits no docs directory.
-The generator also omits this workspace and its dependencies. Search runs in the
-browser using a static index. Server-only Fumapress plugins require a different
-hosting setup and are outside this static integration.
+Run `bun run --cwd apps/docs build` to build only the documentation. Local web
+development does not serve docs; rendered docs are included in the combined
+build and deployment. Adding docs to an app generated without them requires
+restoring the workspace and build hooks, not just changing `disposabl.json`.

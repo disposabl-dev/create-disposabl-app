@@ -1,4 +1,6 @@
-import { docsPlugin } from "@disposabl/disposabl-kit/client/lib/docs";
+// docs:start
+import { cp } from "node:fs/promises";
+// docs:end
 import kitRouter from "@disposabl/disposabl-kit/client/vite.config";
 import {
   createPrerenderFilter,
@@ -38,7 +40,18 @@ const config = defineConfig(({ mode }) => {
     define: { "import.meta.env.VITE_CONVEX_SITE_URL": JSON.stringify(siteUrl) },
     resolve: { tsconfigPaths: true },
     plugins: [
-      docsPlugin(),
+      // docs:start
+      {
+        name: "copy-docs",
+        apply: "build",
+        async closeBundle() {
+          if (this.environment.name === "client")
+            await cp("../docs/dist/public", "dist/client/docs", {
+              recursive: true,
+            });
+        },
+      },
+      // docs:end
       devtools({ consolePiping: { enabled: false } }),
       tailwindcss(),
       tanstackStart({

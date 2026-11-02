@@ -57,6 +57,34 @@ export async function createApp(
           force: true,
         });
     }
+    if (!config.features.includes("docs")) {
+      const webPackage = join(destination, "apps/web/package.json");
+      const web = JSON.parse(await readFile(webPackage, "utf8"));
+      delete web.devDependencies["@disposabl/docs"];
+      await writeFile(webPackage, JSON.stringify(web, null, 2) + "\n");
+      for (const file of [
+        "apps/web/vite.config.ts",
+        "packages/disposabl-kit/client/lib/prerender.ts",
+        "packages/disposabl-kit/server/http.ts",
+      ]) {
+        const path = join(destination, file);
+        const source = await readFile(path, "utf8");
+        await writeFile(
+          path,
+          source.replace(
+            /^[ \t]*\/\/ docs:start\r?\n[\s\S]*?^[ \t]*\/\/ docs:end\r?\n/gm,
+            "",
+          ),
+        );
+      }
+      const turboPath = join(destination, "turbo.json");
+      const turbo = JSON.parse(await readFile(turboPath, "utf8"));
+      delete turbo.tasks["@disposabl/docs#build"];
+      delete turbo.tasks["@disposabl/web#build"];
+      await writeFile(turboPath, JSON.stringify(turbo, null, 2) + "\n");
+      for (const file of ["docs.ts", "docs.test.ts"])
+        await rm(join(destination, "packages/disposabl-kit/server/lib", file));
+    }
     for (const kind of ["cli", "sdk"]) {
       const folder = join(destination, "packages", kind);
       if (!folders.includes(`packages/${kind}`)) {
