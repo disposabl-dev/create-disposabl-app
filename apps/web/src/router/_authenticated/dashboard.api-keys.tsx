@@ -5,11 +5,26 @@ import { api } from "../../../../../packages/backend/convex/_generated/api";
 import { Button } from "@disposabl/disposabl-kit/client/components/ui/button";
 import { Input } from "@disposabl/disposabl-kit/client/components/ui/input";
 import config from "../../../../../disposabl.json";
+import { authenticationEnabled } from "@disposabl/disposabl-kit/features";
 
 export const Route = createFileRoute(
   "/_providers/_authenticated/dashboard/api-keys",
 )({ component: ApiKeys });
-function ApiKeys() {
+export function ApiKeys({
+  enabled = authenticationEnabled,
+}: { enabled?: boolean } = {}) {
+  if (!enabled) {
+    return (
+      <main className="mx-auto max-w-xl p-6">
+        <h1 className="text-2xl font-semibold">API keys</h1>
+        <p>API key management requires authentication.</p>
+      </main>
+    );
+  }
+  return <AuthenticatedApiKeys />;
+}
+
+function AuthenticatedApiKeys() {
   const enabled = config.platforms.includes("api");
   const connections = useQuery(api.mcp.listConnections, enabled ? {} : "skip");
   const create = useAction(api.mcp.createApiKey);

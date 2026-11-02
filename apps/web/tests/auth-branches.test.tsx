@@ -6,6 +6,7 @@ import { AuthenticatedLayout } from "../../../packages/disposabl-kit/client/rout
 import { ConsentPage } from "../../../packages/disposabl-kit/client/routes/consent";
 import { Todos } from "../src/router/_authenticated/todos/index";
 import { Todo } from "../src/router/_authenticated/todos/$id";
+import { ApiKeys } from "../src/router/_authenticated/dashboard.api-keys";
 import { renderToStaticMarkup } from "react-dom/server";
 
 describe("frontend authentication branches", () => {
@@ -30,6 +31,7 @@ describe("frontend authentication branches", () => {
       ConsentPage({ enabled: false }),
       Todos({ enabled: false }),
       Todo({ enabled: false }),
+      ApiKeys({ enabled: false }),
     ]) {
       expect(renderToStaticMarkup(element)).toContain("authentication");
     }

@@ -5,6 +5,7 @@ import {
   useLocation,
 } from "@tanstack/react-router";
 import config from "../../../../../disposabl.json";
+import { authenticationEnabled } from "@disposabl/disposabl-kit/features";
 
 export const Route = createFileRoute("/_providers/_authenticated/dashboard")({
   component: Dashboard,
@@ -18,7 +19,7 @@ function Dashboard() {
       <h1 className="text-2xl font-semibold">Dashboard</h1>
       <nav className="flex gap-4">
         <Link to="/todos">Todos</Link>
-        {config.platforms.includes("api") && (
+        {authenticationEnabled && config.platforms.includes("api") && (
           <Link to="/dashboard/api-keys">API keys</Link>
         )}
       </nav>
