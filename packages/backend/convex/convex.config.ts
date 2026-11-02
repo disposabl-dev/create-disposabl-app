@@ -11,15 +11,15 @@ const app = defineApp({
   env: {
     AUTH_PRIVATE_KEY: v.string(),
     AUTH_JWKS: v.string(),
-    CONVEX_TEAM_ID: v.optional(v.string()),
-    CONVEX_TEAM_TOKEN: v.optional(v.string()),
+    CONVEX_OAUTH_CLIENT_ID: v.optional(v.string()),
+    CONVEX_OAUTH_CLIENT_SECRET: v.optional(v.string()),
+    GITHUB_APP_SLUG: v.optional(v.string()),
+    CONNECTIONS_ENCRYPTION_KEY: v.optional(v.string()),
+    CONNECTIONS_ORIGIN: v.optional(v.string()),
     VERCEL_TOKEN: v.optional(v.string()),
     VERCEL_PROJECT_ID: v.optional(v.string()),
     VERCEL_TEAM_ID: v.optional(v.string()),
     GITHUB_CONNECTOR: v.optional(v.string()),
-    GITHUB_OWNER: v.optional(v.string()),
-    EXPO_TOKEN: v.optional(v.string()),
-    GITHUB_INSTALLATION_ID: v.optional(v.string()),
   },
 });
 

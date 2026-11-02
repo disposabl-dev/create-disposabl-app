@@ -8,6 +8,24 @@ export async function githubToken(
   permissions: string[],
   repository?: string,
 ) {
+  const token = await vercelIdentity();
+  return getToken(
+    env.GITHUB_CONNECTOR!,
+    {
+      subject: { type: "app" },
+      installationId,
+      authorizationDetails: [
+        {
+          type: "github_app_installation",
+          permissions,
+          ...(repository ? { repositories: [repository] } : {}),
+        },
+      ],
+    },
+    { vercelToken: token },
+  );
+}
+export async function vercelIdentity() {
   if (
     !env.VERCEL_TOKEN ||
     !env.VERCEL_PROJECT_ID ||
@@ -27,21 +45,7 @@ export async function githubToken(
   if (!response.ok)
     throw new Error(`GitHub connection failed (${response.status}).`);
   const { token } = (await response.json()) as { token: string };
-  return getToken(
-    env.GITHUB_CONNECTOR,
-    {
-      subject: { type: "app" },
-      installationId,
-      authorizationDetails: [
-        {
-          type: "github_app_installation",
-          permissions,
-          ...(repository ? { repositories: [repository] } : {}),
-        },
-      ],
-    },
-    { vercelToken: token },
-  );
+  return token;
 }
 export async function githubRequest<T>(
   token: string,

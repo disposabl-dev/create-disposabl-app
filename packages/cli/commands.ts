@@ -7,6 +7,7 @@ import {
   hasCredentials,
   login,
   logout,
+  openUrl,
 } from "./auth";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -118,6 +119,12 @@ export async function runCli(
               parent.commands.find((command) => command.name() === part) ??
               parent.command(part);
           const command = parent.command(parts.at(-1)!);
+          const connectionStatus = path === "/api/connections/status";
+          if (connectionStatus)
+            command.option(
+              "--wait",
+              "Open Connections and continue when GitHub and Convex are connected",
+            );
           const previewGet = path === "/api/previews/get";
           const tokenCreate = path === "/api/previews/token/create";
           if (previewGet)
@@ -208,7 +215,30 @@ export async function runCli(
               throw new Error(
                 `API request failed (${result.status}): ${await result.text()}`,
               );
-            const value = await result.json();
+            let value = await result.json();
+            if (connectionStatus && options.wait && !value.ready) {
+              const url = `${base}/dashboard/connections`;
+              console.error(
+                `Connect your GitHub and Convex accounts:\n${url}\nWaiting for connections. Press Ctrl+C to keep your files and finish later.`,
+              );
+              openUrl(url);
+              const deadline = Date.now() + 15 * 60_000;
+              while (!value.ready && Date.now() < deadline) {
+                await new Promise((resolve) => setTimeout(resolve, 3000));
+                result = await send();
+                if (result.status === 401 && !process.env.DISPOSABL_API_KEY)
+                  result = await send(true);
+                if (!result.ok)
+                  throw new Error(
+                    `Connection status failed (${result.status}). Your login and app files are saved.`,
+                  );
+                value = await result.json();
+              }
+              if (!value.ready)
+                throw new Error(
+                  `Connections are still incomplete. Finish at ${url}, then retry setup.`,
+                );
+            }
             if (tokenCreate && options.configure) {
               await configureDevelopment(options.configure, value);
               const { deployKey: _secret, ...details } = value;

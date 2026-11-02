@@ -15,6 +15,7 @@
 
 ## Keep it simple
 
-- Keep every source file at 300 lines or fewer; regenerate generated files instead of editing them.
+- Aim for roughly 300 lines per source file, not a hard limit. Keep related logic together rather than splitting files to meet a line count.
+- Regenerate generated files instead of editing them.
 - Prefer clear, concise code over extra layers, fields, or abstractions.
 - With each change, review it from a fresh perspective: simplify related code, remove duplication, and address nearby debt without expanding scope.

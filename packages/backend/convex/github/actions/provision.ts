@@ -6,7 +6,6 @@ import {
 } from "@disposabl/disposabl-kit/server/lib/functions";
 import { v } from "convex/values";
 import { internal } from "../../_generated/api";
-import { env } from "../../_generated/server";
 import { githubRequest, githubToken } from "./tokens";
 
 type Repository = {
@@ -25,11 +24,8 @@ export const run = internalAction({
       args,
     );
     if (app.githubOwner && app.githubRepo) return null;
-    const owner = connection?.owner ?? env.GITHUB_OWNER;
-    const installationId =
-      connection?.installationId ?? env.GITHUB_INSTALLATION_ID;
-    // Standalone apps do not require a GitHub connection.
-    if (!owner && !installationId) return null;
+    const owner = connection?.owner;
+    const installationId = connection?.installationId;
     if (!owner || !installationId || !/^[a-zA-Z0-9-]+$/.test(owner))
       throw new Error("Configure a verified GitHub installation.");
     const token = await githubToken(installationId, [

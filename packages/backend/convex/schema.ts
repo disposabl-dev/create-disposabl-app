@@ -3,7 +3,23 @@ import { v } from "convex/values";
 import { deployment, platform, releases } from "./validator";
 
 export default defineSchema({
-  users: defineTable({}),
+  users: defineTable({
+    connectionState: v.optional(
+      v.object({
+        provider: v.union(v.literal("github"), v.literal("convex")),
+        hash: v.string(),
+        verifier: v.string(),
+        expiresAt: v.number(),
+      }),
+    ),
+  }),
+  connections: defineTable({
+    userId: v.string(),
+    provider: v.union(v.literal("convex"), v.literal("expo")),
+    accountId: v.string(),
+    name: v.string(),
+    token: v.string(),
+  }).index("by_userId_provider", ["userId", "provider"]),
   apps: defineTable({
     appId: v.string(),
     userId: v.string(),

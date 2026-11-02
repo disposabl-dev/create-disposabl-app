@@ -1,16 +1,17 @@
+"use node";
+
 import {
   identityFields,
   internalAction,
 } from "@disposabl/disposabl-kit/server/lib/functions";
 import { v } from "convex/values";
 import { internal } from "../../../_generated/api";
-import { env } from "../../../_generated/server";
+import { credential } from "../../../connections/actions/credentials";
 import { previewIdentity, deployment } from "../../../validator";
 import { validateReference } from "../../internal";
 import { ensureDevelopment } from "./management";
 
 export const create = internalAction({
-  platforms: true,
   args: { ...identityFields, ...previewIdentity },
   returns: v.object({
     appId: v.string(),
@@ -40,7 +41,7 @@ export const create = internalAction({
       appId: args.appId,
     });
     const { deployKey, ...deployment } = await ensureDevelopment(
-      env.CONVEX_TEAM_TOKEN!,
+      (await credential(ctx, args.userId, "convex")).token,
       projectId,
       args.reference,
     );

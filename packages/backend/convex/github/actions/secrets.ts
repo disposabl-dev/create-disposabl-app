@@ -7,7 +7,8 @@ import {
 } from "@disposabl/disposabl-kit/server/lib/functions";
 import { v } from "convex/values";
 import { internal } from "../../_generated/api";
-import { env } from "../../_generated/server";
+import { credential, unseal } from "../../connections/actions/credentials";
+import { validateExpo } from "../../connections/actions/expo";
 import {
   management,
   ensureProduction,
@@ -25,7 +26,10 @@ export const configure = internalAction({
     const app = await ctx.runQuery(internal.apps.internal.githubApp, {
       appId: args.appId,
     });
-    if (!app) return null;
+    if (!app)
+      throw new Error(
+        "Reconnect the GitHub account that owns this app before continuing setup.",
+      );
     const repository = `${app.githubOwner}/${app.githubRepo}`;
     const token = await githubToken(
       app.installationId,
@@ -61,9 +65,11 @@ export const configure = internalAction({
         "PUT",
       );
     };
-    const managementToken = env.CONVEX_TEAM_TOKEN;
-    if (!managementToken)
-      throw new Error("Convex team access is not configured.");
+    const { token: managementToken } = await credential(
+      ctx,
+      args.userId,
+      "convex",
+    );
     if (!names.has("CONVEX_DEPLOY_KEY")) {
       const deployment = await ensureProduction(
         managementToken,
@@ -90,12 +96,20 @@ export const configure = internalAction({
         throw new Error("Expected a preview deploy key.");
       await save("CONVEX_DEPLOY_KEY_PREVIEW", previewDeployKey);
     }
-    if (
-      app.githubOwner === env.GITHUB_OWNER?.toLowerCase() &&
-      env.EXPO_TOKEN &&
-      !names.has("EXPO_TOKEN")
-    )
-      await save("EXPO_TOKEN", env.EXPO_TOKEN);
+    const expo = await ctx.runQuery(internal.connections.internal.get, {
+      userId: args.userId,
+      provider: "expo",
+    });
+    if (expo) {
+      const token = unseal(expo.token, `${args.userId}:expo`);
+      const accounts = await validateExpo(token);
+      if (!accounts.some((account) => account.id === expo.accountId))
+        throw new Error(
+          "Reconnect your Expo account before setting up mobile builds.",
+        );
+      await save("EXPO_TOKEN", token);
+      await save("EXPO_OWNER", expo.name);
+    }
     return null;
   },
 });

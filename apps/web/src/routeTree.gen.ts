@@ -17,6 +17,7 @@ import { Route as DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPa
 import { Route as DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesSignUpRouteImport } from './../../../packages/disposabl-kit/client/routes/_auth-pages/signUp'
 import { Route as AuthenticatedDashboardRouteImport } from './router/_authenticated/dashboard'
 import { Route as AuthenticatedDashboardDotapiKeysRouteImport } from './router/_authenticated/dashboard.api-keys'
+import { Route as AuthenticatedDashboardDotconnectionsRouteImport } from './router/_authenticated/dashboard.connections'
 
 const DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRoute =
   DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRouteImport.update(
@@ -78,6 +79,12 @@ const AuthenticatedDashboardDotapiKeysRoute =
     path: '/api-keys',
     getParentRoute: () => AuthenticatedDashboardRoute,
   } as any)
+const AuthenticatedDashboardDotconnectionsRoute =
+  AuthenticatedDashboardDotconnectionsRouteImport.update({
+    id: '/connections',
+    path: '/connections',
+    getParentRoute: () => AuthenticatedDashboardRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -86,6 +93,7 @@ export interface FileRoutesByFullPath {
   '/signup': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesSignUpRoute
   '/dashboard': typeof AuthenticatedDashboardRouteWithChildren
   '/dashboard/api-keys': typeof AuthenticatedDashboardDotapiKeysRoute
+  '/dashboard/connections': typeof AuthenticatedDashboardDotconnectionsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -94,6 +102,7 @@ export interface FileRoutesByTo {
   '/signup': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesSignUpRoute
   '/dashboard': typeof AuthenticatedDashboardRouteWithChildren
   '/dashboard/api-keys': typeof AuthenticatedDashboardDotapiKeysRoute
+  '/dashboard/connections': typeof AuthenticatedDashboardDotconnectionsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -105,6 +114,7 @@ export interface FileRoutesById {
   '/_providers/': typeof IndexRoute
   '/_providers/_authenticated/dashboard': typeof AuthenticatedDashboardRouteWithChildren
   '/_providers/_authenticated/dashboard/api-keys': typeof AuthenticatedDashboardDotapiKeysRoute
+  '/_providers/_authenticated/dashboard/connections': typeof AuthenticatedDashboardDotconnectionsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -115,6 +125,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/dashboard'
     | '/dashboard/api-keys'
+    | '/dashboard/connections'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -123,6 +134,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/dashboard'
     | '/dashboard/api-keys'
+    | '/dashboard/connections'
   id:
     | '__root__'
     | '/_providers'
@@ -133,6 +145,7 @@ export interface FileRouteTypes {
     | '/_providers/'
     | '/_providers/_authenticated/dashboard'
     | '/_providers/_authenticated/dashboard/api-keys'
+    | '/_providers/_authenticated/dashboard/connections'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -197,17 +210,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardDotapiKeysRouteImport
       parentRoute: typeof AuthenticatedDashboardRoute
     }
+    '/_providers/_authenticated/dashboard/connections': {
+      id: '/_providers/_authenticated/dashboard/connections'
+      path: '/connections'
+      fullPath: '/dashboard/connections'
+      preLoaderRoute: typeof AuthenticatedDashboardDotconnectionsRouteImport
+      parentRoute: typeof AuthenticatedDashboardRoute
+    }
   }
 }
 
 interface AuthenticatedDashboardRouteChildren {
   AuthenticatedDashboardDotapiKeysRoute: typeof AuthenticatedDashboardDotapiKeysRoute
+  AuthenticatedDashboardDotconnectionsRoute: typeof AuthenticatedDashboardDotconnectionsRoute
 }
 
 const AuthenticatedDashboardRouteChildren: AuthenticatedDashboardRouteChildren =
   {
     AuthenticatedDashboardDotapiKeysRoute:
       AuthenticatedDashboardDotapiKeysRoute,
+    AuthenticatedDashboardDotconnectionsRoute:
+      AuthenticatedDashboardDotconnectionsRoute,
   }
 
 const AuthenticatedDashboardRouteWithChildren =

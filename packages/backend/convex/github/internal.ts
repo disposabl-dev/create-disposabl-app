@@ -21,14 +21,12 @@ export const connect = internalMutation({
         q.eq("userId", userId).eq("owner", owner),
       )
       .unique();
-    if (existing)
-      await ctx.db.patch("githubConnections", existing._id, { installationId });
-    else
-      await ctx.db.insert("githubConnections", {
-        userId,
-        owner,
-        installationId,
-      });
+    if (existing) await ctx.db.delete("githubConnections", existing._id);
+    await ctx.db.insert("githubConnections", {
+      userId,
+      owner,
+      installationId,
+    });
     return null;
   },
 });

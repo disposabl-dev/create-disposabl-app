@@ -10,7 +10,6 @@ import {
 import { ConvexError, v, type Infer } from "convex/values";
 import { appArgs, appResult } from "../validator";
 import { githubConnection } from "../validator";
-import { env } from "../_generated/server";
 import type { Doc } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 type AppResult = Infer<typeof appResult>;
@@ -136,11 +135,7 @@ export const githubApp = internalQuery({
         q.eq("userId", app.userId).eq("owner", app.githubOwner!),
       )
       .unique();
-    const installationId =
-      connection?.installationId ??
-      (app.githubOwner === env.GITHUB_OWNER?.toLowerCase()
-        ? env.GITHUB_INSTALLATION_ID
-        : undefined);
+    const installationId = connection?.installationId;
     return installationId
       ? {
           githubOwner: app.githubOwner,

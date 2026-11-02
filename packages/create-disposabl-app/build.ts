@@ -54,8 +54,7 @@ await cp(join(root, "LICENSE"), join(dir, "LICENSE"));
         !/\.test\.[^.]+$/.test(basename(path)) &&
         !basename(path).endsWith(".tgz") &&
         !basename(path).endsWith(".tsbuildinfo") &&
-        (basename(path) === ".env.example" ||
-          !/^\.env(?:\.|$)/.test(basename(path))),
+        !/^\.env(?:\.|$)/.test(basename(path)),
     });
   for (const item of await readdir(root, { withFileTypes: true })) {
     const entry = item.name;
@@ -95,16 +94,13 @@ await cp(join(root, "LICENSE"), join(dir, "LICENSE"));
     }
   }
   // npm omits .gitignore files from packed templates.
-  if (await Bun.file(join(templateDir, ".gitignore")).exists()) {
-    await rename(
-      join(templateDir, ".gitignore"),
-      join(templateDir, "gitignore"),
-    );
-  } else {
-    await Bun.write(
-      join(templateDir, "gitignore"),
-      "node_modules/\n.env\n.env.*\n!.env.example\n**/dist/\n.turbo/\n",
-    );
+  for (const path of await readdir(templateDir, { recursive: true })) {
+    if (basename(path) === ".gitignore") {
+      await rename(
+        join(templateDir, path),
+        join(templateDir, path.replace(/\.gitignore$/, "gitignore")),
+      );
+    }
   }
   console.log("Built CLI and bundled app source.");
 }

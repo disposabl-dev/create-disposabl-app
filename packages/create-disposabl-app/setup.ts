@@ -58,6 +58,15 @@ export async function setupApp(
     if (!verified.currentUser)
       throw new Error("Login completed without a verified user.");
   }
+  const connections = (await run(["connections", "status", "--wait"])) as {
+    ready: boolean;
+  };
+  if (!connections.ready)
+    throw new Error(
+      "Connect GitHub and Convex at https://www.disposabl.dev/dashboard/connections, then retry: bun create disposabl-app@latest " +
+        directory +
+        " --setup. Your app files and login are saved.",
+    );
   const path = join(directory, "disposabl.json");
   const config = JSON.parse(await readFile(path, "utf8"));
   if (config.appId) {
@@ -73,6 +82,10 @@ export async function setupApp(
     ])) as { appId: string };
     config.appId = app.appId;
     await writeFile(path, JSON.stringify(config, null, 2) + "\n");
+    execFileSync("bun", ["fmt", "disposabl.json"], {
+      cwd: directory,
+      stdio: "pipe",
+    });
   }
   await run([
     "previews",

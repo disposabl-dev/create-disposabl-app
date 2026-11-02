@@ -21,6 +21,9 @@ import type {
   AppsListData,
   AppsListErrors,
   AppsListResponses,
+  ConnectionsStatusData,
+  ConnectionsStatusErrors,
+  ConnectionsStatusResponses,
   PreviewsGetData,
   PreviewsGetErrors,
   PreviewsGetResponses,
@@ -114,6 +117,23 @@ export const appsList = <ThrowOnError extends boolean = false>(
     },
     security: [{ scheme: "bearer", type: "http" }],
     url: "/api/apps/list",
+    ...options,
+  });
+
+export const connectionsStatus = <ThrowOnError extends boolean = false>(
+  options?: Options<ConnectionsStatusData, ThrowOnError>,
+): RequestResult<
+  ConnectionsStatusResponses,
+  ConnectionsStatusErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    ConnectionsStatusResponses,
+    ConnectionsStatusErrors,
+    ThrowOnError
+  >({
+    security: [{ scheme: "bearer", type: "http" }],
+    url: "/api/connections/status",
     ...options,
   });
 

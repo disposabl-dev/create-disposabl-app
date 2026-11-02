@@ -8,7 +8,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import {
   selectedFolders,
   selectFeatures,
@@ -63,6 +63,7 @@ export async function createApp(
         "packages/disposabl-kit/client/routes/_auth-pages",
         "packages/disposabl-kit/client/routes/consent.tsx",
         "apps/web/src/router/_authenticated/dashboard.api-keys.tsx",
+        "apps/web/src/router/_authenticated/dashboard.connections.tsx",
         "apps/mobile/src/app/(auth)",
         "apps/mobile/src/app/(authenticated)/account.tsx",
       ]) {
@@ -141,11 +142,13 @@ export const Route = createFileRoute("/_providers/_authenticated/dashboard")({
           ),
         );
     }
-    if (existsSync(join(destination, "gitignore"))) {
-      await rename(
-        join(destination, "gitignore"),
-        join(destination, ".gitignore"),
-      );
+    for (const path of await readdir(destination, { recursive: true })) {
+      if (basename(path) === "gitignore") {
+        await rename(
+          join(destination, path),
+          join(destination, path.replace(/gitignore$/, ".gitignore")),
+        );
+      }
     }
     const manifestPath = join(destination, "package.json");
     const manifest = JSON.parse(await readFile(manifestPath, "utf8"));

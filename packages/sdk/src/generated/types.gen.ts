@@ -231,6 +231,59 @@ export type AppsListResponses = {
 
 export type AppsListResponse = AppsListResponses[keyof AppsListResponses];
 
+export type ConnectionsStatusData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: "/api/connections/status";
+};
+
+export type ConnectionsStatusErrors = {
+  /**
+   * Invalid arguments
+   */
+  400: unknown;
+  /**
+   * Authentication required
+   */
+  401: unknown;
+  /**
+   * Insufficient scope
+   */
+  403: unknown;
+  /**
+   * Internal error
+   */
+  500: unknown;
+};
+
+export type ConnectionsStatusResponses = {
+  /**
+   * Success
+   */
+  200: {
+    github: {
+      owner: string;
+    } | null;
+    convex: {
+      name: string;
+    } | null;
+    expo: {
+      name: string;
+    } | null;
+    ready: boolean;
+    available: {
+      github: boolean;
+      convex: boolean;
+      expo: boolean;
+    };
+    githubInstallUrl: string | null;
+  };
+};
+
+export type ConnectionsStatusResponse =
+  ConnectionsStatusResponses[keyof ConnectionsStatusResponses];
+
 export type PreviewsGetData = {
   body?: never;
   path?: never;

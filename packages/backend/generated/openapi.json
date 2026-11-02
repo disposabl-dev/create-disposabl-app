@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Application API",
-    "version": "1.0.0"
+    "version": "1.1.0"
   },
   "security": [
     {
@@ -380,6 +380,128 @@
                     }
                   },
                   "required": ["page", "continueCursor", "isDone"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid arguments"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient scope"
+          },
+          "500": {
+            "description": "Internal error"
+          }
+        }
+      }
+    },
+    "/api/connections/status": {
+      "get": {
+        "operationId": "connectionsStatus",
+        "x-convex-function": "connections/internal:status",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "github": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "owner": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["owner"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "convex": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["name"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "expo": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["name"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "ready": {
+                      "type": "boolean"
+                    },
+                    "available": {
+                      "type": "object",
+                      "properties": {
+                        "github": {
+                          "type": "boolean"
+                        },
+                        "convex": {
+                          "type": "boolean"
+                        },
+                        "expo": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": ["github", "convex", "expo"],
+                      "additionalProperties": false
+                    },
+                    "githubInstallUrl": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "github",
+                    "convex",
+                    "expo",
+                    "ready",
+                    "available",
+                    "githubInstallUrl"
+                  ],
                   "additionalProperties": false
                 }
               }

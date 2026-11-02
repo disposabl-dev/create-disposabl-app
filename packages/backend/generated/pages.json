@@ -22,5 +22,9 @@
   {
     "path": "/dashboard/api-keys",
     "authenticated": true
+  },
+  {
+    "path": "/dashboard/connections",
+    "authenticated": true
   }
 ]

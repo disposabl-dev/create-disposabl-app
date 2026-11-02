@@ -21,6 +21,20 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
 
+export function openUrl(url: string) {
+  const command =
+    process.platform === "darwin"
+      ? "open"
+      : process.platform === "win32"
+        ? "rundll32"
+        : "xdg-open";
+  const args =
+    process.platform === "win32" ? ["url.dll,FileProtocolHandler", url] : [url];
+  const child = spawn(command, args, { stdio: "ignore" });
+  child.on("error", () => console.error("Open the URL manually."));
+  child.unref();
+}
+
 export class NotAuthenticated extends Error {}
 
 type Session = {
@@ -159,23 +173,7 @@ async function unlockedLogin(url: string, openBrowser = true) {
       if (authorizationUrl.origin !== url)
         throw new Error("Unexpected authorization server.");
       console.error(`Open this URL to sign in:\n${authorizationUrl.href}`);
-      if (openBrowser) {
-        const command =
-          process.platform === "darwin"
-            ? "open"
-            : process.platform === "win32"
-              ? "rundll32"
-              : "xdg-open";
-        const args =
-          process.platform === "win32"
-            ? ["url.dll,FileProtocolHandler", authorizationUrl.href]
-            : [authorizationUrl.href];
-        const child = spawn(command, args, { stdio: "ignore" });
-        child.on("error", () =>
-          console.error("Open the sign-in URL manually."),
-        );
-        child.unref();
-      }
+      if (openBrowser) openUrl(authorizationUrl.href);
     },
     state,
   );

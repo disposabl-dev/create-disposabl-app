@@ -32,12 +32,12 @@ type Env = {
   readonly CONVEX_SITE_URL: string;
   readonly AUTH_JWKS: string;
   readonly AUTH_PRIVATE_KEY: string;
-  readonly CONVEX_TEAM_ID: string | undefined;
-  readonly CONVEX_TEAM_TOKEN: string | undefined;
-  readonly EXPO_TOKEN: string | undefined;
+  readonly CONNECTIONS_ENCRYPTION_KEY: string | undefined;
+  readonly CONNECTIONS_ORIGIN: string | undefined;
+  readonly CONVEX_OAUTH_CLIENT_ID: string | undefined;
+  readonly CONVEX_OAUTH_CLIENT_SECRET: string | undefined;
+  readonly GITHUB_APP_SLUG: string | undefined;
   readonly GITHUB_CONNECTOR: string | undefined;
-  readonly GITHUB_INSTALLATION_ID: string | undefined;
-  readonly GITHUB_OWNER: string | undefined;
   readonly VERCEL_PROJECT_ID: string | undefined;
   readonly VERCEL_TEAM_ID: string | undefined;
   readonly VERCEL_TOKEN: string | undefined;
