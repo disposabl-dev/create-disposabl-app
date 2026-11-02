@@ -1,5 +1,5 @@
 import { readFile, writeFile, access } from "node:fs/promises";
-import { join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { parseEnv } from "node:util";
 
 const root = import.meta.dir;
@@ -7,21 +7,37 @@ const backend = join(root, "packages/backend");
 const read = (path: string) => readFile(path, "utf8").catch(() => "");
 const backendEnv = () => read(join(backend, ".env.local")).then(parseEnv);
 let env = await backendEnv();
-if (!env.CONVEX_DEPLOYMENT && !env.CONVEX_DEPLOY_KEY) {
+const config = JSON.parse(await read(join(root, "disposabl.json")));
+if (!env.CONVEX_DEPLOY_KEY && (!env.CONVEX_DEPLOYMENT || config.appId)) {
+  console.log("Setting up this app through your Disposabl connections…");
   const configure = Bun.spawn(
-    // Configure the deployment first; backend predev installs auth keys before pushing.
-    ["bun", "x", "--no-install", "convex", "dev", "--once", "--skip-push"],
+    [
+      "bun",
+      "create",
+      "disposabl-app@latest",
+      basename(root),
+      "--setup",
+      "--yes",
+    ],
     {
-      cwd: backend,
+      cwd: dirname(root),
       stdin: "inherit",
       stdout: "inherit",
       stderr: "inherit",
     },
   );
   if (await configure.exited)
-    throw new Error("Complete Convex setup before starting development.");
+    throw new Error(
+      "Disposabl setup did not finish. Your files are saved; run bun run dev to resume.",
+    );
   env = await backendEnv();
+  if (!env.CONVEX_DEPLOY_KEY?.startsWith("dev:"))
+    throw new Error("Disposabl setup must provide a scoped development token.");
 }
+if (env.CONVEX_DEPLOY_KEY && !env.CONVEX_DEPLOY_KEY.startsWith("dev:"))
+  throw new Error(
+    "Local development requires a development token, not production or CI credentials.",
+  );
 const url = env.CONVEX_URL;
 const site =
   env.CONVEX_SITE_URL || url?.replace(/\.convex\.cloud$/, ".convex.site");
