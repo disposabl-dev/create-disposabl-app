@@ -1,3 +1,4 @@
+import manifest from './package.json' with { type: 'json' };
 import type { ForgeConfig } from '@electron-forge/shared-types';
 import { MakerSquirrel } from '@electron-forge/maker-squirrel';
 import { MakerDMG } from '@electron-forge/maker-dmg';
@@ -6,6 +7,10 @@ import { MakerRpm } from '@electron-forge/maker-rpm';
 import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
+
+const executableName = manifest.productName
+  .toLowerCase()
+  .replace(/[^a-z0-9-]/g, '-');
 
 const signedRelease =
   process.platform === 'darwin' && process.env.MACOS_NOTARIZE === 'true';
@@ -20,6 +25,7 @@ if (
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
+    executableName,
     icon: 'src/assets/icon',
     appBundleId: process.env.MACOS_BUNDLE_ID || 'dev.disposabl.starter.desktop',
     ...(process.platform === 'darwin'
@@ -66,8 +72,8 @@ const config: ForgeConfig = {
   makers: [
     new MakerSquirrel({ setupIcon: 'src/assets/icon.ico' }),
     new MakerDMG({ format: 'ULFO' }),
-    new MakerRpm({}),
-    new MakerDeb({}),
+    new MakerRpm({ options: { name: executableName, bin: executableName } }),
+    new MakerDeb({ options: { name: executableName, bin: executableName } }),
   ],
   plugins: [
     new VitePlugin({
