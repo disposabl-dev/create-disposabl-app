@@ -6,6 +6,7 @@ import {
 } from "@tanstack/react-router";
 import config from "../../../../../disposabl.json";
 import { authenticationEnabled } from "@disposabl/disposabl-kit/features";
+import { LogOut } from "@disposabl/disposabl-kit/client/components/ui/log-out";
 
 export const Route = createFileRoute("/_providers/_authenticated/dashboard")({
   component: Dashboard,
@@ -23,6 +24,7 @@ function Dashboard() {
           <Link to="/dashboard/api-keys">API keys</Link>
         )}
       </nav>
+      {authenticationEnabled && <LogOut />}
     </main>
   );
 }
