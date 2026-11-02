@@ -9,7 +9,8 @@
     "format": "turbo format",
     "typecheck": "turbo typecheck",
     "generate": "bun run --cwd packages/backend generate",
-    "prebuild": "bun run generate"
+    "prebuild": "bun run generate",
+    "predev": "bun dev.ts"
   },
   "devDependencies": {
     "prettier": "^3.9.10",

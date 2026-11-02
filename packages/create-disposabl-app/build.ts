@@ -44,12 +44,14 @@ await cp(join(root, "LICENSE"), join(dir, "LICENSE"));
           ".vinxi",
           ".convex",
           ".DS_Store",
+          "tests",
         ].includes(basename(path)) &&
         path !== dir &&
         path !== join(root, "apps/desktop") &&
         path !== join(root, "apps/mobile/android") &&
         path !== join(root, "apps/mobile/ios") &&
         path !== join(root, "apps/desktop/out") &&
+        !/\.test\.[^.]+$/.test(basename(path)) &&
         !basename(path).endsWith(".tgz") &&
         !basename(path).endsWith(".tsbuildinfo") &&
         (basename(path) === ".env.example" ||
@@ -62,6 +64,8 @@ await cp(join(root, "LICENSE"), join(dir, "LICENSE"));
         ? ![".github", "apps", "packages", "patches"].includes(entry)
         : ![
             "LICENSE",
+            "AGENTS.md",
+            "dev.ts",
             "package.json",
             "bun.lock",
             "bunfig.toml",
