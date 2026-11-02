@@ -59,7 +59,8 @@
     "./client/vite.config": "./client/vite.config.ts",
     "./platforms": "./platforms.ts",
     "./mobile": "./mobile/index.ts",
-    "./features": "./features.ts"
+    "./features": "./features.ts",
+    "./mobile/expo-plugin": "./mobile/expo-plugin.cjs"
   },
   "peerDependencies": {
     "expo": "~58.0.19",

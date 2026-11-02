@@ -26,6 +26,9 @@ new apps. Rebuild preview/release apps after changing routes or features.
 
 Expo autolinking deduplicates React, Convex, and Convex Auth between the app and
 kit so native screens use the app's React version and a single auth context.
+The kit's Expo config plugin adds workspace sources, the feature list, and public
+backend URL inputs to Android release bundling, so Gradle rebuilds the embedded
+JavaScript after shared kit or configuration changes.
 
 For a new worktree, install dependencies with `bun install`, then select an
 isolated Convex dev deployment. Substitute your own team, project, and branch:
