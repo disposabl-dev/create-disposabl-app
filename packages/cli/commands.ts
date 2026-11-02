@@ -9,11 +9,14 @@ import {
   logout,
 } from "./auth";
 import { readFile } from "node:fs/promises";
-import { execFileSync } from "node:child_process";
 import { join } from "node:path";
-import { configureDevelopment, formatPreview } from "./preview";
+import {
+  configureDevelopment,
+  detectReference,
+  formatPreview,
+} from "./preview";
 
-export const SERVICE_ORIGIN = "https://disposabl.dev";
+export const SERVICE_ORIGIN = "https://www.disposabl.dev";
 export async function runCli(
   argv = process.argv,
   serviceOrigin = SERVICE_ORIGIN,
@@ -145,7 +148,7 @@ export async function runCli(
             if (
               field.required &&
               !(field.name === "appId" && (previewGet || tokenCreate)) &&
-              !(field.name === "reference" && previewGet)
+              !(field.name === "reference" && (previewGet || tokenCreate))
             )
               command.requiredOption(
                 flag,
@@ -169,19 +172,8 @@ export async function runCli(
                 );
               options.appId = config.appId;
             }
-            if (previewGet && !options.reference) {
-              try {
-                options.reference = execFileSync(
-                  "git",
-                  ["symbolic-ref", "--short", "HEAD"],
-                  { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
-                ).trim();
-              } catch {
-                throw new Error(
-                  "Cannot determine the Git branch. Supply --reference with the worktree or preview name.",
-                );
-              }
-            }
+            if ((previewGet || tokenCreate) && !options.reference)
+              options.reference = detectReference(options.configure);
             const input = Object.fromEntries(
               fields
                 .filter((field) => options[field.name] !== undefined)

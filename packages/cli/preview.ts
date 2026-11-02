@@ -6,9 +6,23 @@ import {
   writeFile,
   rm,
 } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 import { spawnSync } from "node:child_process";
+
+export function detectReference(directory = process.cwd()) {
+  const git = (...args: string[]) =>
+    spawnSync("git", args, { cwd: directory, encoding: "utf8" }).stdout?.trim();
+  const branch = git("symbolic-ref", "--quiet", "--short", "HEAD");
+  if (branch) return branch;
+  const root = git("rev-parse", "--show-toplevel");
+  const common = git("rev-parse", "--path-format=absolute", "--git-common-dir");
+  const local = git("rev-parse", "--absolute-git-dir");
+  if (root && common && local && common !== local) return basename(root);
+  throw new Error(
+    "Cannot detect a branch or worktree. Run inside the app's Git checkout or supply --reference.",
+  );
+}
 
 type Development = {
   appId: string;
@@ -129,7 +143,7 @@ type Preview = {
 };
 export function formatPreview(preview: Preview | null) {
   if (!preview)
-    return "Preview not found. Create it with disposabl previews token create --reference <branch-or-worktree>.";
+    return "Preview not found. Create it with disposabl previews token create --configure .";
   const lines = [
     `Preview: ${preview.reference}`,
     `App: ${preview.appId}`,

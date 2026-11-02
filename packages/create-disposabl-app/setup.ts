@@ -1,7 +1,8 @@
-import { spawn } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { detectReference } from "../cli/preview";
 
 export type CliRunner = (
   args: string[],
@@ -28,7 +29,7 @@ export const runDisposabl: CliRunner = (args, interactive = false) =>
       if (code !== 0) {
         reject(
           new Error(
-            `disposabl ${args.slice(0, 3).join(" ")} failed. The project remains available; retry setup from its directory.`,
+            `disposabl ${args.slice(0, 3).join(" ")} failed. Your files are saved. Retry from the parent directory: bun create disposabl-app@latest <app-directory> --setup`,
           ),
         );
         return;
@@ -45,20 +46,9 @@ export const runDisposabl: CliRunner = (args, interactive = false) =>
 export async function setupApp(
   directory: string,
   name: string,
-  reference: string,
   run: CliRunner = runDisposabl,
 ) {
-  if (
-    !reference ||
-    reference.trim() !== reference ||
-    reference.length > 200 ||
-    [...reference].some(
-      (char) => char.charCodeAt(0) <= 32 || char.charCodeAt(0) === 127,
-    )
-  )
-    throw new Error(
-      "Supply --reference with a branch, worktree name, or main.",
-    );
+  const reference = detectReference(directory);
   const status = (await run(["login", "status"])) as { currentUser: unknown };
   if (!status.currentUser) {
     await run(["login"], true);
@@ -96,4 +86,60 @@ export async function setupApp(
     directory,
   ]);
   return config.appId as string;
+}
+
+export async function install(directory: string, interactive: boolean) {
+  await new Promise<void>((done, reject) => {
+    const child = spawn("bun", ["install"], {
+      cwd: directory,
+      stdio: ["ignore", "pipe", "pipe"],
+      env: { ...process.env, NODE_ENV: "development" },
+    });
+    let detail = "";
+    const onData = (chunk: Buffer) => {
+      detail = (detail + chunk.toString()).slice(-4000);
+      if (!interactive) process.stderr.write(chunk);
+    };
+    child.stdout.on("data", onData);
+    child.stderr.on("data", onData);
+    child.once("error", reject);
+    child.once("close", (code) =>
+      code === 0
+        ? done()
+        : reject(
+            new Error(
+              "bun install failed. The project was created at " +
+                directory +
+                ". Run bun install there to retry.\n" +
+                detail.trim(),
+            ),
+          ),
+    );
+  });
+}
+
+export function commitApp(directory: string) {
+  const git = (...args: string[]) =>
+    execFileSync("git", args, { cwd: directory, stdio: "pipe" });
+  git("add", "--all");
+  const hasIdentity =
+    spawnSync("git", ["var", "GIT_AUTHOR_IDENT"], {
+      cwd: directory,
+      stdio: "ignore",
+    }).status === 0;
+  git(
+    ...(hasIdentity
+      ? []
+      : [
+          "-c",
+          "user.name=create-disposabl-app",
+          "-c",
+          "user.email=create-disposabl-app@users.noreply.github.com",
+        ]),
+    "-c",
+    "commit.gpgsign=false",
+    "commit",
+    "-m",
+    "Initial commit",
+  );
 }

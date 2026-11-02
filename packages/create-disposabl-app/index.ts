@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-import { execFileSync, spawn, spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { lstatSync } from "node:fs";
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Command, CommanderError } from "commander";
 import * as p from "@clack/prompts";
@@ -20,11 +20,10 @@ import {
 import { createPlatformPrompt } from "./platform-prompt";
 import { projectSetup } from "./project-setup";
 import { createApp } from "./scaffold";
-import { setupApp } from "./setup";
+import { commitApp, install, setupApp } from "./setup";
 
 type Options = {
   setup?: boolean;
-  reference?: string;
   yes?: boolean;
   platforms?: string;
   features?: string;
@@ -50,10 +49,6 @@ const program = new Command("create-disposabl-app")
     "Skip prompts; include Web and authentication by default",
   )
   .option("--setup", "Sign in to Disposabl and configure a development preview")
-  .option(
-    "--reference <name>",
-    "Branch or worktree name for setup (including main)",
-  )
   .option("--skip-install", "Create files without running bun install")
   .option(
     "--list-options",
@@ -66,7 +61,7 @@ const program = new Command("create-disposabl-app")
   .helpOption("-h, --help")
   .addHelpText(
     "after",
-    "\nPlatforms:\n  web (required), android, ios, api, mcp, cli, typescript-sdk\n  CLI and TypeScript SDK automatically include API.\n\nOptional features:\n  authentication, docs\n  Authentication is enabled by default. Use --features none to disable frontend authentication.\n\nExamples:\n  bun create disposabl-app@latest\n  bun create disposabl-app@latest my-app --yes\n  bun create disposabl-app@latest my-app --platforms web,android,ios,mcp --features docs --yes\n  bun create disposabl-app@latest my-app --platforms web --features none --skip-install --json\n  bun create disposabl-app@latest --list-options --json\n\nWithout a TTY, the CLI never prompts. Supply an app name.\nPlatform and feature choices are saved in disposabl.json.\nBackend authentication code is always included. Use --setup --reference main to create an app UUID and development environment through https://disposabl.dev.\n",
+    "\nPlatforms:\n  web (required), android, ios, api, mcp, cli, typescript-sdk\n  CLI and TypeScript SDK automatically include API.\n\nOptional features:\n  authentication, docs\n  Authentication is enabled by default. Use --features none to disable frontend authentication.\n\nExamples:\n  bun create disposabl-app@latest\n  bun create disposabl-app@latest my-app --yes\n  bun create disposabl-app@latest my-app --platforms web,android,ios,mcp --features docs --yes\n  bun create disposabl-app@latest my-app --platforms web --features none --skip-install --json\n  bun create disposabl-app@latest --list-options --json\n\nWithout a TTY, the CLI never prompts. Supply an app name.\nPlatform and feature choices are saved in disposabl.json.\nBackend authentication code is always included. Use --setup to create an app UUID and development environment through https://www.disposabl.dev.\n",
   )
   .configureOutput({ writeErr: () => {} })
   .exitOverride();
@@ -123,36 +118,6 @@ function showOptions(json: boolean) {
   );
 }
 
-async function install(directory: string, interactive: boolean) {
-  await new Promise<void>((done, reject) => {
-    const child = spawn("bun", ["install"], {
-      cwd: directory,
-      stdio: ["ignore", "pipe", "pipe"],
-      env: { ...process.env, NODE_ENV: "development" },
-    });
-    let detail = "";
-    const onData = (chunk: Buffer) => {
-      detail = (detail + chunk.toString()).slice(-4000);
-      if (!interactive) process.stderr.write(chunk);
-    };
-    child.stdout.on("data", onData);
-    child.stderr.on("data", onData);
-    child.once("error", reject);
-    child.once("close", (code) =>
-      code === 0
-        ? done()
-        : reject(
-            new Error(
-              "bun install failed. The project was created at " +
-                directory +
-                ". Run bun install there to retry.\n" +
-                detail.trim(),
-            ),
-          ),
-    );
-  });
-}
-
 async function main() {
   program.parse();
   const options = program.opts<Options>();
@@ -186,6 +151,15 @@ async function main() {
   const invalidName = validateName(name);
   if (invalidName) throw new Error(invalidName);
   let directory = resolve(name);
+  if (options.setup && pathExists(join(directory, "disposabl.json"))) {
+    const appId = await setupApp(directory, name);
+    console.log(
+      options.json
+        ? JSON.stringify({ status: "configured", directory, appId })
+        : `\nSetup complete.\n\n  cd ${name}\n  bun run dev\n`,
+    );
+    return;
+  }
   let overwrite = false;
   if (pathExists(directory)) {
     overwrite =
@@ -239,31 +213,6 @@ async function main() {
           initialValue: false,
         }),
       ));
-  let reference = options.reference;
-  if (managedSetup && interactive && !reference)
-    reference = answer(
-      await p.text({
-        message: "Branch or worktree name",
-        defaultValue: "main",
-        placeholder: "main",
-        validate: (value) =>
-          !value?.trim()
-            ? "Enter a branch, worktree name, or main."
-            : undefined,
-      }),
-    );
-  if (
-    managedSetup &&
-    (!reference ||
-      reference !== reference.trim() ||
-      reference.length > 200 ||
-      [...reference].some(
-        (char) => char.charCodeAt(0) <= 32 || char.charCodeAt(0) === 127,
-      ))
-  )
-    throw new Error(
-      "Setup requires --reference with a branch, worktree name, or main.",
-    );
   const config: DisposablConfig = {
     version: version,
     platforms: chosenPlatforms,
@@ -299,31 +248,12 @@ async function main() {
     });
     throw error;
   }
-  const git = (...args: string[]) =>
-    execFileSync("git", args, { cwd: directory, stdio: "pipe" });
-  git("init", "--initial-branch=main");
-  if (managedSetup) config.appId = await setupApp(directory, name, reference!);
-  git("add", "--all");
-  const hasIdentity =
-    spawnSync("git", ["var", "GIT_AUTHOR_IDENT"], {
-      cwd: directory,
-      stdio: "ignore",
-    }).status === 0;
-  git(
-    ...(hasIdentity
-      ? []
-      : [
-          "-c",
-          "user.name=create-disposabl-app",
-          "-c",
-          "user.email=create-disposabl-app@users.noreply.github.com",
-        ]),
-    "-c",
-    "commit.gpgsign=false",
-    "commit",
-    "-m",
-    "Initial commit",
-  );
+  execFileSync("git", ["init", "--initial-branch=main"], {
+    cwd: directory,
+    stdio: "pipe",
+  });
+  if (managedSetup) config.appId = await setupApp(directory, name);
+  commitApp(directory);
   const folders = selectedFolders(config);
   if (options.json) {
     console.log(

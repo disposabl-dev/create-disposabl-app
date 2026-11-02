@@ -15,14 +15,18 @@ its access checks remain installed.
 Releases publish automatically after changes reach `main`. Commit messages
 determine the next version; no manual version edit is needed.
 
-Choose managed setup to sign in through `disposabl login`, create an app, save its UUID in `disposabl.json`, and configure a named development preview. The service is `https://disposabl.dev`.
+Choose managed setup to sign in through `disposabl login`, create an app, save its UUID in `disposabl.json`, and configure a named development preview. The service is `https://www.disposabl.dev`.
 
 ```sh
-bun create disposabl-app@latest my-app --setup --reference main
+bun create disposabl-app@latest my-app --setup
 cd my-app
 bun run dev
 ```
 
+New apps start on `main`, which is also their initial preview name. No branch prompt is needed.
+
 The website opens automatically and Metro starts with development-client support. Install a development build once with `bun run --cwd apps/mobile android` or `bun run --cwd apps/mobile ios`. Expo Go is not used.
 
-To get another development key in a worktree, run `disposabl previews token create --reference your-branch --configure .`. The reference is required; repeated requests reuse the preview and issue a new key.
+To get another development key in a worktree, run `disposabl previews token create --configure .`. The branch is detected automatically, or the worktree name when detached. Repeated requests reuse the preview and issue a new key.
+
+If managed setup fails, rerun `bun create disposabl-app@latest my-app --setup` from the parent directory. It resumes setup using the existing files and app UUID.
