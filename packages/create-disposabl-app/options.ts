@@ -70,6 +70,12 @@ export function selectedFolders(config: DisposablConfig): string[] {
     )
   )
     result.push("apps/mobile");
+  if (
+    config.platforms.some((platform) =>
+      ["macos", "windows", "linux"].includes(platform),
+    )
+  )
+    result.push("apps/desktop");
   for (const feature of config.features) {
     if (feature !== "authentication") result.push("apps/" + feature);
   }

@@ -65,7 +65,6 @@ await cp(join(root, "LICENSE"), join(dir, "LICENSE"));
           "tests",
         ].includes(basename(path)) &&
         path !== dir &&
-        path !== join(root, "apps/desktop") &&
         path !== join(root, "apps/mobile/android") &&
         path !== join(root, "apps/mobile/ios") &&
         path !== join(root, "apps/desktop/out") &&

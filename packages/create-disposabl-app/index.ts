@@ -61,7 +61,7 @@ const program = new Command("create-disposabl-app")
   .helpOption("-h, --help")
   .addHelpText(
     "after",
-    "\nPlatforms:\n  web (required), android, ios, api, mcp, cli, typescript-sdk\n  CLI and TypeScript SDK automatically include API.\n\nOptional features:\n  authentication, docs\n  Authentication is enabled by default. Use --features none to disable frontend authentication.\n\nExamples:\n  bun create disposabl-app@latest\n  bun create disposabl-app@latest my-app --yes\n  bun create disposabl-app@latest my-app --platforms web,android,ios,mcp --features docs --yes\n  bun create disposabl-app@latest my-app --platforms web --features none --skip-install --json\n  bun create disposabl-app@latest --list-options --json\n\nWithout a TTY, the CLI never prompts. Supply an app name.\nPlatform and feature choices are saved in disposabl.json.\nBackend authentication code is always included. Use --setup to create an app UUID and development environment through https://www.disposabl.dev.\n",
+    "\nPlatforms:\n  web (required), android, ios, macos, windows, linux, api, mcp, cli, typescript-sdk\n  CLI and TypeScript SDK automatically include API.\n\nOptional features:\n  authentication, docs\n  Authentication is enabled by default. Use --features none to disable frontend authentication.\n\nExamples:\n  bun create disposabl-app@latest\n  bun create disposabl-app@latest my-app --yes\n  bun create disposabl-app@latest my-app --platforms web,android,ios,mcp --features docs --yes\n  bun create disposabl-app@latest my-app --platforms web --features none --skip-install --json\n  bun create disposabl-app@latest --list-options --json\n\nWithout a TTY, the CLI never prompts. Supply an app name.\nPlatform and feature choices are saved in disposabl.json.\nBackend authentication code is always included. Use --setup to create an app UUID and development environment through https://www.disposabl.dev.\n",
   )
   .configureOutput({ writeErr: () => {} })
   .exitOverride();
@@ -92,6 +92,9 @@ function showOptions(json: boolean) {
             "typescript-sdk": "packages/sdk",
             android: "apps/mobile",
             ios: "apps/mobile",
+            macos: "apps/desktop",
+            windows: "apps/desktop",
+            linux: "apps/desktop",
             docs: "apps/docs",
           },
           configOnly: ["api", "mcp"],

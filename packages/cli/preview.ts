@@ -133,6 +133,8 @@ type Preview = {
       latest?: {
         version?: string;
         status: string;
+        reason?: string;
+        run?: { url: string };
         githubReleaseUrl?: string | null;
         artifactUrl?: string | null;
         updateUrl?: string | null;
@@ -164,6 +166,8 @@ export function formatPreview(preview: Preview | null) {
       Release: latest?.githubReleaseUrl,
       Download: latest?.artifactUrl,
       Update: latest?.updateUrl,
+      "Workflow run": latest?.run?.url,
+      Reason: latest?.reason,
     }))
       if (url) lines.push(`  ${label}: ${url}`);
   }
