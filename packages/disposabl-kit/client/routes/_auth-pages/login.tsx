@@ -22,7 +22,7 @@ export function LogIn() {
           if (result.status === "complete") {
             if (request)
               await navigate({ to: "/consent", search: { request } });
-            else if (returnTo) window.location.assign(returnTo);
+            else window.location.assign(returnTo ?? "/dashboard");
             return;
           }
           setError(() => {

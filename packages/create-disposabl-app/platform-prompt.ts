@@ -21,7 +21,7 @@ export function createPlatformPrompt(
     required: false,
     render() {
       // Keep only explicit choices in the prompt's value. Dependencies are
-      // derived for display and output, so removing a plugin cannot erase intent.
+      // derived for display and output, so deselection cannot erase intent.
       const explicit = this.value ?? [];
       const selected = selectPlatforms(
         explicit.length ? explicit.join(",") : "web",
@@ -46,8 +46,7 @@ export function createPlatformPrompt(
             ? "Required"
             : option.disabled
               ? "Unavailable"
-              : option.description +
-                (option.value.endsWith("-plugin") ? " · Requires MCP" : "");
+              : option.description;
         const checkbox = checked
           ? p.S_CHECKBOX_SELECTED
           : active

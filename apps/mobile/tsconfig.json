@@ -7,5 +7,12 @@
       "@/assets/*": ["./assets/*"]
     }
   },
-  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"]
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts",
+    "../../packages/disposabl-kit/mobile/**/*.ts",
+    "../../packages/disposabl-kit/mobile/**/*.tsx"
+  ]
 }

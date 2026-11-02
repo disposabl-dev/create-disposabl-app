@@ -11,17 +11,15 @@ export {
 
 export const features = [
   { id: "docs", label: "Docs", hint: "apps/docs" },
-  { id: "blog", label: "Blog", hint: "apps/blog" },
-  { id: "changelog", label: "Changelog", hint: "apps/changelog" },
   {
     id: "authentication",
     label: "Authentication",
-    hint: "Always included",
+    hint: "Frontend sign-in and sign-up",
   },
 ] as const;
 
 export type Feature = (typeof features)[number]["id"];
-export const requiredFeatures: readonly Feature[] = ["authentication"];
+export const requiredFeatures: readonly Feature[] = [];
 export type DisposablConfig = {
   version: string;
   platforms: Platform[];
@@ -41,15 +39,11 @@ export function selectPlatforms(input = "web"): Platform[] {
           JSON.stringify(id) +
           ". Use --list-options to see valid IDs.",
       );
-    if (option.status === "disabled")
-      throw new Error(
-        option.label + " is not available yet and cannot be selected.",
-      );
   }
   return resolvePlatforms(requested);
 }
 
-export function selectFeatures(input = "none"): Feature[] {
+export function selectFeatures(input = "authentication"): Feature[] {
   const requested = input === "none" ? [] : parseList(input);
   for (const id of requested) {
     if (!features.some((feature) => feature.id === id)) {
@@ -61,10 +55,7 @@ export function selectFeatures(input = "none"): Feature[] {
     }
   }
   return features
-    .filter(
-      (option) =>
-        requiredFeatures.includes(option.id) || requested.includes(option.id),
-    )
+    .filter((option) => requested.includes(option.id))
     .map((option) => option.id);
 }
 
@@ -78,12 +69,6 @@ export function selectedFolders(config: DisposablConfig): string[] {
     )
   )
     result.push("apps/mobile");
-  if (
-    config.platforms.some((platform) =>
-      ["windows", "linux", "macos"].includes(platform),
-    )
-  )
-    result.push("apps/desktop");
   for (const feature of config.features) {
     if (feature !== "authentication") result.push("apps/" + feature);
   }

@@ -81,15 +81,18 @@ export function createPrerenderFilter(
   let source: string | undefined;
   let isAuthenticated: ReturnType<typeof routeMatcher> | undefined;
   return (page: { path: string; sitemap?: { exclude?: boolean } }) => {
+    const pathname = new URL(page.path, "http://localhost").pathname;
+    // docs:start
+    // Fumapress builds its own pages, including links crawled from the web app.
+    if (/^\/docs(?:\/|$)/.test(pathname)) return false;
+    // docs:end
     // Read lazily: Start generates the route tree after loading the Vite config.
     const nextSource = readFileSync(routeTreeFile, "utf8");
     if (nextSource !== source) {
       isAuthenticated = routeMatcher(nextSource);
       source = nextSource;
     }
-    const authenticated = isAuthenticated!(
-      new URL(page.path, "http://localhost").pathname,
-    );
+    const authenticated = isAuthenticated!(pathname);
     if (authenticated) page.sitemap = { ...page.sitemap, exclude: true };
     return !authenticated;
   };

@@ -8,7 +8,7 @@ export const Route = createFileRoute("/_providers/_authenticated/todos/$id")({
   errorComponent: () => <p role="alert">Unable to load todo.</p>,
 });
 
-function Todo() {
+export function Todo() {
   const { id } = Route.useParams();
   const todo = useQuery(api.todos.index.get, { id: id as Id<"todos"> });
 

@@ -1,1 +1,29 @@
-{}
+{
+  "name": "@disposabl/docs",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "fumapress build",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@base-ui/react": "^1.9.0",
+    "fumadocs-core": "^16.16.2",
+    "fumadocs-mdx": "^15.4.6",
+    "fumadocs-ui": "npm:@fumadocs/base-ui@^16.16.2",
+    "fumapress": "1.6.2",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "waku": "1.0.0-rc.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4",
+    "@types/mdx": "^2",
+    "@types/node": "^22",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "tailwindcss": "^4",
+    "typescript": "^6.0.2",
+    "vite": "^8"
+  }
+}

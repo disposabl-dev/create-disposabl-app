@@ -21,6 +21,8 @@
     },
     "plugins": [
       "expo-router",
+      "expo-secure-store",
+      "@disposabl/disposabl-kit/mobile/expo-plugin",
       [
         "expo-splash-screen",
         {

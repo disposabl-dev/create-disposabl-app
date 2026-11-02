@@ -37,6 +37,7 @@ await cp(join(root, "LICENSE"), join(dir, "LICENSE"));
           ".DS_Store",
         ].includes(basename(path)) &&
         path !== dir &&
+        path !== join(root, "apps/desktop") &&
         path !== join(root, "apps/mobile/android") &&
         path !== join(root, "apps/mobile/ios") &&
         path !== join(root, "apps/desktop/out") &&
@@ -48,8 +49,18 @@ await cp(join(root, "LICENSE"), join(dir, "LICENSE"));
   for (const item of await readdir(root, { withFileTypes: true })) {
     const entry = item.name;
     if (
-      item.isDirectory() &&
-      ![".github", "apps", "packages", "patches"].includes(entry)
+      item.isDirectory()
+        ? ![".github", "apps", "packages", "patches"].includes(entry)
+        : ![
+            "LICENSE",
+            "package.json",
+            "bun.lock",
+            "bunfig.toml",
+            "disposabl.json",
+            "turbo.json",
+            "tsconfig.json",
+            ".gitignore",
+          ].includes(entry)
     )
       continue;
     if (entry === ".github") {

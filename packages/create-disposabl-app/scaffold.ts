@@ -57,6 +57,67 @@ export async function createApp(
           force: true,
         });
     }
+    if (!config.features.includes("authentication")) {
+      // These are auth screens and starter examples, not backend capabilities.
+      for (const path of [
+        "packages/disposabl-kit/client/routes/_auth-pages",
+        "packages/disposabl-kit/client/routes/consent.tsx",
+        "apps/web/src/router/_authenticated/todos",
+        "apps/web/src/router/_authenticated/dashboard.api-keys.tsx",
+        "apps/web/tests/auth-branches.test.tsx",
+        "apps/mobile/src/app/(auth)",
+        "apps/mobile/src/app/(authenticated)/account.tsx",
+      ]) {
+        await rm(join(destination, path), { recursive: true, force: true });
+      }
+      await writeFile(
+        join(destination, "apps/web/src/router/_authenticated/dashboard.tsx"),
+        `import { createFileRoute } from "@tanstack/react-router";
+
+export const Route = createFileRoute("/_providers/_authenticated/dashboard")({
+  component: () => <h1>Dashboard</h1>,
+});
+`,
+      );
+      if (folders.includes("apps/mobile")) {
+        await writeFile(
+          join(destination, "apps/mobile/src/app/index.tsx"),
+          'export { PublicHomeScreen as default } from "@disposabl/disposabl-kit/mobile";\n',
+        );
+        await writeFile(
+          join(destination, "apps/mobile/src/app/(authenticated)/_layout.tsx"),
+          'export { PublicLayout as default } from "@disposabl/disposabl-kit/mobile";\n',
+        );
+      }
+    }
+    if (!config.features.includes("docs")) {
+      const webPackage = join(destination, "apps/web/package.json");
+      const web = JSON.parse(await readFile(webPackage, "utf8"));
+      delete web.devDependencies["@disposabl/docs"];
+      await writeFile(webPackage, JSON.stringify(web, null, 2) + "\n");
+      for (const file of [
+        "apps/web/vite.config.ts",
+        "packages/disposabl-kit/client/lib/prerender.ts",
+        "packages/disposabl-kit/server/http.ts",
+      ]) {
+        const path = join(destination, file);
+        const source = await readFile(path, "utf8");
+        await writeFile(
+          path,
+          source.replace(
+            /^[ \t]*\/\/ docs:start\r?\n[\s\S]*?^[ \t]*\/\/ docs:end\r?\n/gm,
+            "",
+          ),
+        );
+      }
+      const turboPath = join(destination, "turbo.json");
+      const turbo = JSON.parse(await readFile(turboPath, "utf8"));
+      delete turbo.tasks["@disposabl/docs#build"];
+      delete turbo.tasks["@disposabl/web#build"];
+      await writeFile(turboPath, JSON.stringify(turbo, null, 2) + "\n");
+      for (const file of ["docs.ts", "docs.test.ts"])
+        await rm(join(destination, "packages/disposabl-kit/server/lib", file));
+    }
     for (const kind of ["cli", "sdk"]) {
       const folder = join(destination, "packages", kind);
       if (!folders.includes(`packages/${kind}`)) {
