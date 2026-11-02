@@ -11,8 +11,6 @@ export {
 
 export const features = [
   { id: "docs", label: "Docs", hint: "apps/docs" },
-  { id: "blog", label: "Blog", hint: "apps/blog" },
-  { id: "changelog", label: "Changelog", hint: "apps/changelog" },
   {
     id: "authentication",
     label: "Authentication",
