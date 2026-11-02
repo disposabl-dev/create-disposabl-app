@@ -186,4 +186,4 @@ credentials fail the iOS build instead of silently skipping it.
 It does not require TestFlight or an App Store Connect app record. TestFlight is
 a separate distribution option. The pipeline never submits to the App Store.
 
-Android preview builds produce an installable APK. Production builds produce an AAB for Google Play. GitHub Actions builds and publishes these files; Expo hosts compatible EAS Updates.
+Android preview builds produce an installable APK. Production builds produce a signed installable APK. GitHub Actions builds and publishes these files; Expo hosts compatible EAS Updates.

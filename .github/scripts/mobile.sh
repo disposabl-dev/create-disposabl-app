@@ -50,7 +50,6 @@ done
     ;;
   expo-fingerprint)
 artifact=android.apk
-[[ "$CHANNEL" != production ]] || artifact=android.aab
 export artifact
 for ((page=1; ; page++)); do
   gh api "repos/$GH_REPO/releases?per_page=100&page=$page" > "$RUNNER_TEMP/releases.json"
@@ -69,7 +68,7 @@ bun -e '
   const reusable = prior && Object.keys(wanted).every(k => prior[k] === wanted[k]) && /^[a-f0-9]{64}$/.test(prior.sha256 || "") && release.assets.some(a => a.name === process.env.artifact && a.state === "uploaded" && a.size > 0 && a.digest === `sha256:${prior.sha256}`);
   const blocked = !reusable && process.env.CHANNEL === "production" && process.env.ANDROID_SIGNING_READY !== "true";
   if (blocked) {
-    const reason = "Configure Android production signing credentials before building an AAB.";
+    const reason = "Configure Android production signing credentials before building a production APK.";
     console.error(`::notice::${reason}`);
     const report = Bun.spawnSync(["node", ".github/scripts/disposabl.mjs", "report", "android", "blocked", reason], {
       cwd: process.env.GITHUB_WORKSPACE, stdout: "inherit", stderr: "inherit",
@@ -81,7 +80,6 @@ bun -e '
     ;;
   expo-update)
 artifact=android.apk
-[[ "$CHANNEL" != production ]] || artifact=android.aab
 mkdir -p dist/release
 gh release download "$TAG" --pattern "$artifact" --dir dist/release
 echo "$SHA  dist/release/$artifact" | sha256sum --check
@@ -106,12 +104,7 @@ task=assembleRelease
 artifact=android.apk
 binary=android/app/build/outputs/apk/release/app-release.apk
 fingerprint=assets/fingerprint
-if [[ "$CHANNEL" == production ]]; then
-  task=bundleRelease
-  artifact=android.aab
-  binary=android/app/build/outputs/bundle/release/app-release.aab
-  fingerprint=base/assets/fingerprint
-fi
+
 (cd android && ./gradlew ":app:$task" --no-daemon --build-cache)
 test "$(unzip -p "$binary" "$fingerprint")" = "$RUNTIME"
 test "$(bun x --no-install expo-updates runtimeversion:resolve --platform android --workflow managed | jq -er .runtimeVersion)" = "$RUNTIME"
