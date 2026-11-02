@@ -35,12 +35,17 @@ export async function generate(acceptBreaking = false) {
   for (const file of files.sort()) {
     if (
       file.startsWith("_generated/") ||
+      file.includes("/actions/") ||
       !file.endsWith(".ts") ||
       file.endsWith(".d.ts")
     )
       continue;
     const source = await readFile(join(convex, file), "utf8");
-    if (!/\bplatforms\s*:\s*true\b/.test(source)) continue;
+    if (
+      !/\bplatforms\s*:\s*true\b/.test(source) &&
+      !file.endsWith("/internal.ts")
+    )
+      continue;
     if (/^[\s;]*["']use node["']/.test(source))
       throw new Error(
         `${file}: platform validators must be in a default-runtime module; delegate Node work through an internal action.`,

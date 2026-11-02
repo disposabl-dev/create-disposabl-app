@@ -9,9 +9,6 @@ import type {
   TDataShape,
 } from "./client/index.js";
 import type {
-  AccountCurrentData,
-  AccountCurrentErrors,
-  AccountCurrentResponses,
   AppsCreateData,
   AppsCreateErrors,
   AppsCreateResponses,
@@ -33,9 +30,12 @@ import type {
   PreviewsTokenCreateData,
   PreviewsTokenCreateErrors,
   PreviewsTokenCreateResponses,
-  PreviewsUpdateData,
-  PreviewsUpdateErrors,
-  PreviewsUpdateResponses,
+  ReleasesGetData,
+  ReleasesGetErrors,
+  ReleasesGetResponses,
+  UsersCurrentData,
+  UsersCurrentErrors,
+  UsersCurrentResponses,
 } from "./types.gen.js";
 
 export type Options<
@@ -55,19 +55,6 @@ export type Options<
    */
   meta?: keyof ClientMeta extends never ? Record<string, unknown> : ClientMeta;
 };
-
-export const accountCurrent = <ThrowOnError extends boolean = false>(
-  options?: Options<AccountCurrentData, ThrowOnError>,
-): RequestResult<AccountCurrentResponses, AccountCurrentErrors, ThrowOnError> =>
-  (options?.client ?? client).get<
-    AccountCurrentResponses,
-    AccountCurrentErrors,
-    ThrowOnError
-  >({
-    security: [{ scheme: "bearer", type: "http" }],
-    url: "/api/account/current",
-    ...options,
-  });
 
 export const appsCreate = <ThrowOnError extends boolean = false>(
   options: Options<AppsCreateData, ThrowOnError>,
@@ -159,23 +146,6 @@ export const previewsList = <ThrowOnError extends boolean = false>(
     ...options,
   });
 
-export const previewsUpdate = <ThrowOnError extends boolean = false>(
-  options: Options<PreviewsUpdateData, ThrowOnError>,
-): RequestResult<PreviewsUpdateResponses, PreviewsUpdateErrors, ThrowOnError> =>
-  (options.client ?? client).post<
-    PreviewsUpdateResponses,
-    PreviewsUpdateErrors,
-    ThrowOnError
-  >({
-    security: [{ scheme: "bearer", type: "http" }],
-    url: "/api/previews/update",
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
-  });
-
 export const previewsTokenCreate = <ThrowOnError extends boolean = false>(
   options: Options<PreviewsTokenCreateData, ThrowOnError>,
 ): RequestResult<
@@ -195,4 +165,30 @@ export const previewsTokenCreate = <ThrowOnError extends boolean = false>(
       "Content-Type": "application/json",
       ...options.headers,
     },
+  });
+
+export const releasesGet = <ThrowOnError extends boolean = false>(
+  options: Options<ReleasesGetData, ThrowOnError>,
+): RequestResult<ReleasesGetResponses, ReleasesGetErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    ReleasesGetResponses,
+    ReleasesGetErrors,
+    ThrowOnError
+  >({
+    security: [{ scheme: "bearer", type: "http" }],
+    url: "/api/releases/get",
+    ...options,
+  });
+
+export const usersCurrent = <ThrowOnError extends boolean = false>(
+  options?: Options<UsersCurrentData, ThrowOnError>,
+): RequestResult<UsersCurrentResponses, UsersCurrentErrors, ThrowOnError> =>
+  (options?.client ?? client).get<
+    UsersCurrentResponses,
+    UsersCurrentErrors,
+    ThrowOnError
+  >({
+    security: [{ scheme: "bearer", type: "http" }],
+    url: "/api/users/current",
+    ...options,
   });

@@ -4,48 +4,6 @@ export type ClientOptions = {
   baseUrl: `${string}://${string}` | (string & {});
 };
 
-export type AccountCurrentData = {
-  body?: never;
-  path?: never;
-  query?: never;
-  url: "/api/account/current";
-};
-
-export type AccountCurrentErrors = {
-  /**
-   * Invalid arguments
-   */
-  400: unknown;
-  /**
-   * Authentication required
-   */
-  401: unknown;
-  /**
-   * Insufficient scope
-   */
-  403: unknown;
-  /**
-   * Internal error
-   */
-  500: unknown;
-};
-
-export type AccountCurrentResponses = {
-  /**
-   * Success
-   */
-  200: null | {
-    /**
-     * ID of a document in "users"
-     */
-    id: string;
-    username: string | null;
-  };
-};
-
-export type AccountCurrentResponse =
-  AccountCurrentResponses[keyof AccountCurrentResponses];
-
 export type AppsCreateData = {
   body: {
     name: string;
@@ -106,6 +64,12 @@ export type AppsCreateResponses = {
       | "typescript-sdk"
       | "cli"
     >;
+    github?: {
+      repositoryId: number;
+      owner: string;
+      repo: string;
+      installationId: string;
+    };
     createdAt: number;
   };
 };
@@ -196,6 +160,12 @@ export type AppsGetResponses = {
       | "typescript-sdk"
       | "cli"
     >;
+    github?: {
+      repositoryId: number;
+      owner: string;
+      repo: string;
+      installationId: string;
+    };
     createdAt: number;
   };
 };
@@ -257,6 +227,12 @@ export type AppsListResponses = {
         | "typescript-sdk"
         | "cli"
       >;
+      github?: {
+        repositoryId: number;
+        owner: string;
+        repo: string;
+        installationId: string;
+      };
       createdAt: number;
     }>;
     continueCursor: string;
@@ -304,189 +280,7 @@ export type PreviewsGetResponses = {
   200: {
     appId: string;
     reference: string;
-    githubUrl?: string | null;
-    platforms: {
-      web:
-        | {
-            enabled: false;
-          }
-        | {
-            enabled: true;
-            url?: string;
-            latest?: {
-              revision: number;
-              status: "pending" | "building" | "ready" | "failed";
-              version?: string;
-              commitSha?: string;
-              url?: string | null;
-              githubReleaseUrl?: string | null;
-              artifactUrl?: string | null;
-              updateUrl?: string | null;
-            };
-          };
-      android:
-        | {
-            enabled: false;
-          }
-        | {
-            enabled: true;
-            url?: string;
-            latest?: {
-              revision: number;
-              status: "pending" | "building" | "ready" | "failed";
-              version?: string;
-              commitSha?: string;
-              url?: string | null;
-              githubReleaseUrl?: string | null;
-              artifactUrl?: string | null;
-              updateUrl?: string | null;
-            };
-          };
-      ios:
-        | {
-            enabled: false;
-          }
-        | {
-            enabled: true;
-            url?: string;
-            latest?: {
-              revision: number;
-              status: "pending" | "building" | "ready" | "failed";
-              version?: string;
-              commitSha?: string;
-              url?: string | null;
-              githubReleaseUrl?: string | null;
-              artifactUrl?: string | null;
-              updateUrl?: string | null;
-            };
-          };
-      macos:
-        | {
-            enabled: false;
-          }
-        | {
-            enabled: true;
-            url?: string;
-            latest?: {
-              revision: number;
-              status: "pending" | "building" | "ready" | "failed";
-              version?: string;
-              commitSha?: string;
-              url?: string | null;
-              githubReleaseUrl?: string | null;
-              artifactUrl?: string | null;
-              updateUrl?: string | null;
-            };
-          };
-      windows:
-        | {
-            enabled: false;
-          }
-        | {
-            enabled: true;
-            url?: string;
-            latest?: {
-              revision: number;
-              status: "pending" | "building" | "ready" | "failed";
-              version?: string;
-              commitSha?: string;
-              url?: string | null;
-              githubReleaseUrl?: string | null;
-              artifactUrl?: string | null;
-              updateUrl?: string | null;
-            };
-          };
-      linux:
-        | {
-            enabled: false;
-          }
-        | {
-            enabled: true;
-            url?: string;
-            latest?: {
-              revision: number;
-              status: "pending" | "building" | "ready" | "failed";
-              version?: string;
-              commitSha?: string;
-              url?: string | null;
-              githubReleaseUrl?: string | null;
-              artifactUrl?: string | null;
-              updateUrl?: string | null;
-            };
-          };
-      api:
-        | {
-            enabled: false;
-          }
-        | {
-            enabled: true;
-            url?: string;
-            latest?: {
-              revision: number;
-              status: "pending" | "building" | "ready" | "failed";
-              version?: string;
-              commitSha?: string;
-              url?: string | null;
-              githubReleaseUrl?: string | null;
-              artifactUrl?: string | null;
-              updateUrl?: string | null;
-            };
-          };
-      mcp:
-        | {
-            enabled: false;
-          }
-        | {
-            enabled: true;
-            url?: string;
-            latest?: {
-              revision: number;
-              status: "pending" | "building" | "ready" | "failed";
-              version?: string;
-              commitSha?: string;
-              url?: string | null;
-              githubReleaseUrl?: string | null;
-              artifactUrl?: string | null;
-              updateUrl?: string | null;
-            };
-          };
-      sdk:
-        | {
-            enabled: false;
-          }
-        | {
-            enabled: true;
-            url?: string;
-            latest?: {
-              revision: number;
-              status: "pending" | "building" | "ready" | "failed";
-              version?: string;
-              commitSha?: string;
-              url?: string | null;
-              githubReleaseUrl?: string | null;
-              artifactUrl?: string | null;
-              updateUrl?: string | null;
-            };
-          };
-      cli:
-        | {
-            enabled: false;
-          }
-        | {
-            enabled: true;
-            url?: string;
-            latest?: {
-              revision: number;
-              status: "pending" | "building" | "ready" | "failed";
-              version?: string;
-              commitSha?: string;
-              url?: string | null;
-              githubReleaseUrl?: string | null;
-              artifactUrl?: string | null;
-              updateUrl?: string | null;
-            };
-          };
-    };
+    stage: "generating" | "building";
     deployment?: {
       name: string;
       reference: string;
@@ -494,6 +288,27 @@ export type PreviewsGetResponses = {
       convexSiteUrl: string;
     };
     updatedAt: number;
+    platforms: {
+      [key: string]: {
+        enabled: boolean;
+        url?: string;
+        latest?: {
+          status: "building" | "ready" | "failed" | "blocked";
+          reason?: string;
+          version?: string;
+          githubReleaseUrl?: string;
+          artifactUrl?: string;
+          updateUrl?: string;
+          run: {
+            id: number;
+            attempt: number;
+            number: number;
+            commitSha: string;
+            url: string;
+          };
+        };
+      };
+    };
   } | null;
 };
 
@@ -544,189 +359,7 @@ export type PreviewsListResponses = {
     page: Array<{
       appId: string;
       reference: string;
-      githubUrl?: string | null;
-      platforms: {
-        web:
-          | {
-              enabled: false;
-            }
-          | {
-              enabled: true;
-              url?: string;
-              latest?: {
-                revision: number;
-                status: "pending" | "building" | "ready" | "failed";
-                version?: string;
-                commitSha?: string;
-                url?: string | null;
-                githubReleaseUrl?: string | null;
-                artifactUrl?: string | null;
-                updateUrl?: string | null;
-              };
-            };
-        android:
-          | {
-              enabled: false;
-            }
-          | {
-              enabled: true;
-              url?: string;
-              latest?: {
-                revision: number;
-                status: "pending" | "building" | "ready" | "failed";
-                version?: string;
-                commitSha?: string;
-                url?: string | null;
-                githubReleaseUrl?: string | null;
-                artifactUrl?: string | null;
-                updateUrl?: string | null;
-              };
-            };
-        ios:
-          | {
-              enabled: false;
-            }
-          | {
-              enabled: true;
-              url?: string;
-              latest?: {
-                revision: number;
-                status: "pending" | "building" | "ready" | "failed";
-                version?: string;
-                commitSha?: string;
-                url?: string | null;
-                githubReleaseUrl?: string | null;
-                artifactUrl?: string | null;
-                updateUrl?: string | null;
-              };
-            };
-        macos:
-          | {
-              enabled: false;
-            }
-          | {
-              enabled: true;
-              url?: string;
-              latest?: {
-                revision: number;
-                status: "pending" | "building" | "ready" | "failed";
-                version?: string;
-                commitSha?: string;
-                url?: string | null;
-                githubReleaseUrl?: string | null;
-                artifactUrl?: string | null;
-                updateUrl?: string | null;
-              };
-            };
-        windows:
-          | {
-              enabled: false;
-            }
-          | {
-              enabled: true;
-              url?: string;
-              latest?: {
-                revision: number;
-                status: "pending" | "building" | "ready" | "failed";
-                version?: string;
-                commitSha?: string;
-                url?: string | null;
-                githubReleaseUrl?: string | null;
-                artifactUrl?: string | null;
-                updateUrl?: string | null;
-              };
-            };
-        linux:
-          | {
-              enabled: false;
-            }
-          | {
-              enabled: true;
-              url?: string;
-              latest?: {
-                revision: number;
-                status: "pending" | "building" | "ready" | "failed";
-                version?: string;
-                commitSha?: string;
-                url?: string | null;
-                githubReleaseUrl?: string | null;
-                artifactUrl?: string | null;
-                updateUrl?: string | null;
-              };
-            };
-        api:
-          | {
-              enabled: false;
-            }
-          | {
-              enabled: true;
-              url?: string;
-              latest?: {
-                revision: number;
-                status: "pending" | "building" | "ready" | "failed";
-                version?: string;
-                commitSha?: string;
-                url?: string | null;
-                githubReleaseUrl?: string | null;
-                artifactUrl?: string | null;
-                updateUrl?: string | null;
-              };
-            };
-        mcp:
-          | {
-              enabled: false;
-            }
-          | {
-              enabled: true;
-              url?: string;
-              latest?: {
-                revision: number;
-                status: "pending" | "building" | "ready" | "failed";
-                version?: string;
-                commitSha?: string;
-                url?: string | null;
-                githubReleaseUrl?: string | null;
-                artifactUrl?: string | null;
-                updateUrl?: string | null;
-              };
-            };
-        sdk:
-          | {
-              enabled: false;
-            }
-          | {
-              enabled: true;
-              url?: string;
-              latest?: {
-                revision: number;
-                status: "pending" | "building" | "ready" | "failed";
-                version?: string;
-                commitSha?: string;
-                url?: string | null;
-                githubReleaseUrl?: string | null;
-                artifactUrl?: string | null;
-                updateUrl?: string | null;
-              };
-            };
-        cli:
-          | {
-              enabled: false;
-            }
-          | {
-              enabled: true;
-              url?: string;
-              latest?: {
-                revision: number;
-                status: "pending" | "building" | "ready" | "failed";
-                version?: string;
-                commitSha?: string;
-                url?: string | null;
-                githubReleaseUrl?: string | null;
-                artifactUrl?: string | null;
-                updateUrl?: string | null;
-              };
-            };
-      };
+      stage: "generating" | "building";
       deployment?: {
         name: string;
         reference: string;
@@ -734,6 +367,27 @@ export type PreviewsListResponses = {
         convexSiteUrl: string;
       };
       updatedAt: number;
+      platforms: {
+        [key: string]: {
+          enabled: boolean;
+          url?: string;
+          latest?: {
+            status: "building" | "ready" | "failed" | "blocked";
+            reason?: string;
+            version?: string;
+            githubReleaseUrl?: string;
+            artifactUrl?: string;
+            updateUrl?: string;
+            run: {
+              id: number;
+              attempt: number;
+              number: number;
+              commitSha: string;
+              url: string;
+            };
+          };
+        };
+      };
     }>;
     continueCursor: string;
     isDone: boolean;
@@ -744,260 +398,6 @@ export type PreviewsListResponses = {
 
 export type PreviewsListResponse =
   PreviewsListResponses[keyof PreviewsListResponses];
-
-export type PreviewsUpdateData = {
-  body: {
-    appId: string;
-    reference: string;
-    platform:
-      | "web"
-      | "android"
-      | "ios"
-      | "macos"
-      | "windows"
-      | "linux"
-      | "api"
-      | "mcp"
-      | "typescript-sdk"
-      | "cli";
-    latest: {
-      revision: number;
-      status: "pending" | "building" | "ready" | "failed";
-      version?: string;
-      commitSha?: string;
-      url?: string | null;
-      githubReleaseUrl?: string | null;
-      artifactUrl?: string | null;
-      updateUrl?: string | null;
-    };
-    githubUrl?: string;
-  };
-  path?: never;
-  query?: never;
-  url: "/api/previews/update";
-};
-
-export type PreviewsUpdateErrors = {
-  /**
-   * Invalid arguments
-   */
-  400: unknown;
-  /**
-   * Authentication required
-   */
-  401: unknown;
-  /**
-   * Insufficient scope
-   */
-  403: unknown;
-  /**
-   * Internal error
-   */
-  500: unknown;
-};
-
-export type PreviewsUpdateResponses = {
-  /**
-   * Success
-   */
-  200: {
-    appId: string;
-    reference: string;
-    githubUrl?: string | null;
-    platforms: {
-      web:
-        | {
-            enabled: false;
-          }
-        | {
-            enabled: true;
-            url?: string;
-            latest?: {
-              revision: number;
-              status: "pending" | "building" | "ready" | "failed";
-              version?: string;
-              commitSha?: string;
-              url?: string | null;
-              githubReleaseUrl?: string | null;
-              artifactUrl?: string | null;
-              updateUrl?: string | null;
-            };
-          };
-      android:
-        | {
-            enabled: false;
-          }
-        | {
-            enabled: true;
-            url?: string;
-            latest?: {
-              revision: number;
-              status: "pending" | "building" | "ready" | "failed";
-              version?: string;
-              commitSha?: string;
-              url?: string | null;
-              githubReleaseUrl?: string | null;
-              artifactUrl?: string | null;
-              updateUrl?: string | null;
-            };
-          };
-      ios:
-        | {
-            enabled: false;
-          }
-        | {
-            enabled: true;
-            url?: string;
-            latest?: {
-              revision: number;
-              status: "pending" | "building" | "ready" | "failed";
-              version?: string;
-              commitSha?: string;
-              url?: string | null;
-              githubReleaseUrl?: string | null;
-              artifactUrl?: string | null;
-              updateUrl?: string | null;
-            };
-          };
-      macos:
-        | {
-            enabled: false;
-          }
-        | {
-            enabled: true;
-            url?: string;
-            latest?: {
-              revision: number;
-              status: "pending" | "building" | "ready" | "failed";
-              version?: string;
-              commitSha?: string;
-              url?: string | null;
-              githubReleaseUrl?: string | null;
-              artifactUrl?: string | null;
-              updateUrl?: string | null;
-            };
-          };
-      windows:
-        | {
-            enabled: false;
-          }
-        | {
-            enabled: true;
-            url?: string;
-            latest?: {
-              revision: number;
-              status: "pending" | "building" | "ready" | "failed";
-              version?: string;
-              commitSha?: string;
-              url?: string | null;
-              githubReleaseUrl?: string | null;
-              artifactUrl?: string | null;
-              updateUrl?: string | null;
-            };
-          };
-      linux:
-        | {
-            enabled: false;
-          }
-        | {
-            enabled: true;
-            url?: string;
-            latest?: {
-              revision: number;
-              status: "pending" | "building" | "ready" | "failed";
-              version?: string;
-              commitSha?: string;
-              url?: string | null;
-              githubReleaseUrl?: string | null;
-              artifactUrl?: string | null;
-              updateUrl?: string | null;
-            };
-          };
-      api:
-        | {
-            enabled: false;
-          }
-        | {
-            enabled: true;
-            url?: string;
-            latest?: {
-              revision: number;
-              status: "pending" | "building" | "ready" | "failed";
-              version?: string;
-              commitSha?: string;
-              url?: string | null;
-              githubReleaseUrl?: string | null;
-              artifactUrl?: string | null;
-              updateUrl?: string | null;
-            };
-          };
-      mcp:
-        | {
-            enabled: false;
-          }
-        | {
-            enabled: true;
-            url?: string;
-            latest?: {
-              revision: number;
-              status: "pending" | "building" | "ready" | "failed";
-              version?: string;
-              commitSha?: string;
-              url?: string | null;
-              githubReleaseUrl?: string | null;
-              artifactUrl?: string | null;
-              updateUrl?: string | null;
-            };
-          };
-      sdk:
-        | {
-            enabled: false;
-          }
-        | {
-            enabled: true;
-            url?: string;
-            latest?: {
-              revision: number;
-              status: "pending" | "building" | "ready" | "failed";
-              version?: string;
-              commitSha?: string;
-              url?: string | null;
-              githubReleaseUrl?: string | null;
-              artifactUrl?: string | null;
-              updateUrl?: string | null;
-            };
-          };
-      cli:
-        | {
-            enabled: false;
-          }
-        | {
-            enabled: true;
-            url?: string;
-            latest?: {
-              revision: number;
-              status: "pending" | "building" | "ready" | "failed";
-              version?: string;
-              commitSha?: string;
-              url?: string | null;
-              githubReleaseUrl?: string | null;
-              artifactUrl?: string | null;
-              updateUrl?: string | null;
-            };
-          };
-    };
-    deployment?: {
-      name: string;
-      reference: string;
-      convexUrl: string;
-      convexSiteUrl: string;
-    };
-    updatedAt: number;
-  };
-};
-
-export type PreviewsUpdateResponse =
-  PreviewsUpdateResponses[keyof PreviewsUpdateResponses];
 
 export type PreviewsTokenCreateData = {
   body: {
@@ -1044,3 +444,107 @@ export type PreviewsTokenCreateResponses = {
 
 export type PreviewsTokenCreateResponse =
   PreviewsTokenCreateResponses[keyof PreviewsTokenCreateResponses];
+
+export type ReleasesGetData = {
+  body?: never;
+  path?: never;
+  query: {
+    appId: string;
+  };
+  url: "/api/releases/get";
+};
+
+export type ReleasesGetErrors = {
+  /**
+   * Invalid arguments
+   */
+  400: unknown;
+  /**
+   * Authentication required
+   */
+  401: unknown;
+  /**
+   * Insufficient scope
+   */
+  403: unknown;
+  /**
+   * Internal error
+   */
+  500: unknown;
+};
+
+export type ReleasesGetResponses = {
+  /**
+   * Success
+   */
+  200: {
+    appId: string;
+    updatedAt: number;
+    platforms: {
+      [key: string]: {
+        enabled: boolean;
+        url?: string;
+        latest?: {
+          status: "building" | "ready" | "failed" | "blocked";
+          reason?: string;
+          version?: string;
+          githubReleaseUrl?: string;
+          artifactUrl?: string;
+          updateUrl?: string;
+          run: {
+            id: number;
+            attempt: number;
+            number: number;
+            commitSha: string;
+            url: string;
+          };
+        };
+      };
+    };
+  } | null;
+};
+
+export type ReleasesGetResponse =
+  ReleasesGetResponses[keyof ReleasesGetResponses];
+
+export type UsersCurrentData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: "/api/users/current";
+};
+
+export type UsersCurrentErrors = {
+  /**
+   * Invalid arguments
+   */
+  400: unknown;
+  /**
+   * Authentication required
+   */
+  401: unknown;
+  /**
+   * Insufficient scope
+   */
+  403: unknown;
+  /**
+   * Internal error
+   */
+  500: unknown;
+};
+
+export type UsersCurrentResponses = {
+  /**
+   * Success
+   */
+  200: null | {
+    /**
+     * ID of a document in "users"
+     */
+    id: string;
+    username: string | null;
+  };
+};
+
+export type UsersCurrentResponse =
+  UsersCurrentResponses[keyof UsersCurrentResponses];

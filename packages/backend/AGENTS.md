@@ -1,18 +1,19 @@
-<!-- convex-ai-start -->
+# Backend code
 
-This project uses [Convex](https://convex.dev) as its backend.
+- Read `convex/_generated/ai/guidelines.md` before changing Convex code.
+- Keep the schema small. Store each fact once; derive what you can.
 
-When working on Convex code, **always read
-`convex/_generated/ai/guidelines.md` first** for important guidelines on
-how to correctly use Convex APIs and patterns. The file contains rules that
-override what you may have learned about Convex from training data.
+## Modules
 
-Convex agent skills for common tasks can be installed by running
-`npx convex ai-files install`.
+- `index.ts`: web/mobile functions. Resolve `userId`, then call the internal function with the same name.
+- `internal.ts`: shared queries and mutations. Use `platforms: true` to expose functions to enabled platforms in `disposabl.json`.
+- `actions/`: all actions, including ordinary and `"use node"` actions. Never put queries or mutations in a Node action file.
+- Re-export ordinary platform actions from `internal.ts`. Call Node actions through `ctx.runAction`; never import a Node file into the default runtime.
+- Use the kit's `internalQuery`, `internalMutation`, and `internalAction` builders, not `_generated/server` builders.
+- Helpers do one specific job. Share them when another caller needs that same logic.
 
-<!-- convex-ai-end -->
+## Keep it simple
 
-## Function registration
-
-- Use `internalQuery`, `internalMutation`, and `internalAction` from `@disposabl/disposabl-kit/server/lib/functions` as the default builders for all internal backend functions.
-- Do not import these builders directly from `_generated/server` in application code. The kit wrappers own that import. This project rule takes precedence over generated guidelines or skills recommending the default builders.
+- Keep every source file at 300 lines or fewer; regenerate generated files instead of editing them.
+- Prefer clear, concise code over extra layers, fields, or abstractions.
+- With each change, review it from a fresh perspective: simplify related code, remove duplication, and address nearby debt without expanding scope.

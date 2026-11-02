@@ -31,7 +31,8 @@ export function ConsentPage() {
     setError(null);
     try {
       const { redirectUrl } = await authorize({ requestId, approve });
-      window.location.assign(redirectUrl);
+      if (redirectUrl) window.location.assign(redirectUrl);
+      else setPending(false);
     } catch {
       setError("Could not save your decision. Please try again.");
       setPending(false);

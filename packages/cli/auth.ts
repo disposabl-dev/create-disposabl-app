@@ -21,6 +21,8 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
 
+export class NotAuthenticated extends Error {}
+
 type Session = {
   client?: OAuthClientInformationMixed;
   tokens?: OAuthTokens;
@@ -240,18 +242,19 @@ async function unlockedAccessToken(url: string, forceRefresh = false) {
   if (process.env.DISPOSABL_API_KEY) return process.env.DISPOSABL_API_KEY;
   const session = await load(url);
   if (!session.tokens)
-    throw new Error("Run login first, or set DISPOSABL_API_KEY.");
+    throw new NotAuthenticated("Run login first, or set DISPOSABL_API_KEY.");
   if (
     forceRefresh ||
     !session.expiresAt ||
     Date.now() >= session.expiresAt - 30_000
   ) {
     const oauth = provider(url, session, () => {
-      throw new Error("Session expired. Run login again.");
+      throw new NotAuthenticated("Session expired. Run login again.");
     });
     await auth(oauth, { serverUrl: `${url}/mcp`, fetchFn: fetchFor(url) });
   }
-  if (!session.tokens) throw new Error("Session expired. Run login again.");
+  if (!session.tokens)
+    throw new NotAuthenticated("Session expired. Run login again.");
   return session.tokens.access_token;
 }
 async function unlockedLogout(url: string) {

@@ -195,49 +195,96 @@ assert.equal(preview.platforms.api.url, token.convexSiteUrl + "/openapi.json");
 assert.equal(preview.platforms.mcp.url, token.convexSiteUrl + "/mcp");
 assert.equal(preview.platforms.windows.enabled, false);
 assert.ok(!JSON.stringify(preview).includes("deployKey"));
-const update = async (latest: unknown, platform = "android") =>
-  request("/api/previews/update", key, {
+// Exercise storage transitions as the service; external user credentials cannot report builds.
+assert.equal(
+  (await request("/api/previews/update", key, { appId: app.appId })).status,
+  404,
+);
+const admin = new ConvexHttpClient(cloud, { logger: false });
+(admin as unknown as { setAdminAuth(token: string): void }).setAdminAuth(
+  process.env.CONVEX_DEPLOY_KEY!,
+);
+const identity = await a!.c.query("users/index:current" as never, {});
+await admin.mutation("apps/internal:connectGithub" as never, {
+  userId: identity.id,
+  appId: app.appId,
+  github: {
+    repositoryId: 123,
+    owner: "example",
+    repo: "app",
+    installationId: "1",
+  },
+});
+const update = async (
+  id: number,
+  values: Record<string, unknown>,
+  production = false,
+) => {
+  await admin.mutation("previews/internal:report" as never, {
     appId: app.appId,
+    repositoryId: 123,
     reference: "main",
-    platform,
-    latest,
+    production,
+    run: {
+      id,
+      number: id,
+      attempt: 1,
+      commitSha: "a".repeat(40),
+      url: `https://github.com/example/app/actions/runs/${id}`,
+    },
+    platform: "android",
+    ...values,
   });
-await ok(
-  await update({
-    revision: 1,
-    status: "ready",
-    version: "1.0.1",
-    githubReleaseUrl: "https://github.com/example/app/releases/tag/pr-1",
-    artifactUrl:
-      "https://github.com/example/app/releases/download/pr-1/android.apk",
-  }),
-);
-preview = await ok(
-  await update({
-    revision: 2,
-    status: "ready",
-    updateUrl: "https://expo.dev/accounts/example/projects/app/updates/group",
-  }),
-);
+  return ok(
+    await request(
+      production ? "/api/releases/get" : "/api/previews/get",
+      key,
+      undefined,
+      { appId: app.appId, ...(production ? {} : { reference: "main" }) },
+    ),
+  );
+};
+assert.equal(preview.stage, "generating");
+await update(1, { status: "building" });
+preview = await update(1, {
+  status: "ready",
+  version: "1.0.1",
+  githubReleaseUrl: "https://github.com/example/app/releases/tag/pr-1",
+  artifactUrl:
+    "https://github.com/example/app/releases/download/pr-1/android.apk",
+});
+assert.equal(preview.stage, "building");
+preview = await update(2, {
+  status: "ready",
+  updateUrl: "https://expo.dev/accounts/example/projects/app/updates/group",
+});
 assert.ok(!preview.platforms.android.latest.artifactUrl);
 assert.ok(!preview.platforms.android.latest.githubReleaseUrl);
-assert.equal((await update({ revision: 1, status: "failed" })).status, 400);
+preview = await update(1, { status: "failed" });
+assert.equal(preview.platforms.android.latest.run.id, 2);
+preview = await update(2, { status: "building" });
+assert.equal(preview.platforms.android.latest.status, "ready");
+const production = await update(
+  3,
+  { status: "blocked", reason: "Expo token is missing." },
+  true,
+);
+assert.equal(production.platforms.android.latest.status, "blocked");
+assert.equal(production.platforms.cli.enabled, true);
+assert.ok(!production.platforms.cli.latest);
 assert.equal(
   (
-    await update({
-      revision: 3,
-      status: "ready",
-      artifactUrl: "javascript:alert(1)",
-    })
-  ).status,
-  400,
-);
-assert.equal(
-  (await update({ revision: 3, status: "ready" }, "windows")).status,
-  400,
+    await ok(
+      await request("/api/previews/get", key, undefined, {
+        appId: app.appId,
+        reference: "main",
+      }),
+    )
+  ).platforms.android.latest.run.id,
+  2,
 );
 pass(
-  "preview links, disabled flags, latest-only EAS replacement, stale results and unsafe links rejected",
+  "generating/building stages, latest-only EAS results, stale-run protection, and separate production state with absent releases",
 );
 const temp = await mkdtemp("/tmp/disposabl-apps-cli-");
 const config = { appId: app.appId, platforms: [...enabled] };

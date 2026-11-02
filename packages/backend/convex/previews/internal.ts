@@ -7,21 +7,81 @@ import {
   paginationOptsValidator,
   paginationResultValidator,
 } from "convex/server";
-import { ConvexError, v } from "convex/values";
-import { ownedApp, platform } from "../apps/model";
+import { ConvexError, v, type Infer } from "convex/values";
+import { ownedApp } from "../apps/internal";
 import {
-  platformKey,
-  initialPlatforms,
+  deployment,
+  platform,
+  platformNames,
   previewIdentity,
   previewResult,
-  release,
-  validateReference,
-  validateLink,
-} from "./model";
+  releaseDetails,
+  run,
+} from "../schema";
 import type { Doc } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 
-export async function findPreview(
+export function validateReference(reference: string) {
+  if (
+    !reference ||
+    reference !== reference.trim() ||
+    reference.length > 200 ||
+    [...reference].some(
+      (char) => char.charCodeAt(0) <= 32 || char.charCodeAt(0) === 127,
+    )
+  )
+    throw new ConvexError(
+      "Provide a branch, worktree, or PR name (1–200 characters, no whitespace).",
+    );
+}
+const platformKey = (name: string) =>
+  name === "typescript-sdk" ? "sdk" : name;
+export function presentPlatforms(
+  app: Doc<"apps">,
+  releases: Doc<"previews">["releases"],
+  site?: string,
+) {
+  const routes: Record<string, string> = {
+    web: "",
+    api: "/openapi.json",
+    mcp: "/mcp",
+  };
+  return Object.fromEntries(
+    platformNames.map((name) => {
+      const { url: releasedUrl, ...latest } = releases[platformKey(name)] ?? {};
+      const url =
+        releasedUrl ??
+        (site && Object.hasOwn(routes, name) ? site + routes[name] : undefined);
+      const enabled = app.platforms.includes(name);
+      return [
+        platformKey(name),
+        {
+          enabled,
+          ...(enabled && url ? { url } : {}),
+          ...(releases[platformKey(name)] ? { latest } : {}),
+        },
+      ];
+    }),
+  );
+}
+function present(
+  preview: Doc<"previews">,
+  app: Doc<"apps">,
+): Infer<typeof previewResult> {
+  return {
+    appId: preview.appId,
+    reference: preview.reference,
+    stage: preview.stage,
+    ...(preview.deployment ? { deployment: preview.deployment } : {}),
+    updatedAt: preview.updatedAt,
+    platforms: presentPlatforms(
+      app,
+      preview.releases,
+      preview.deployment?.convexSiteUrl,
+    ),
+  };
+}
+async function findPreview(
   ctx: Pick<QueryCtx, "db">,
   args: { appId: string; reference: string },
 ) {
@@ -33,48 +93,14 @@ export async function findPreview(
     )
     .unique();
 }
-function present({
-  _id: _unusedId,
-  _creationTime: _unusedTime,
-  ...preview
-}: Doc<"previews">) {
-  const site = preview.deployment?.convexSiteUrl;
-  if (site)
-    for (const [name, path] of [
-      ["web", ""],
-      ["api", "/openapi.json"],
-      ["mcp", "/mcp"],
-    ] as const) {
-      const state = preview.platforms[name];
-      if (state?.enabled)
-        preview.platforms[name] = { ...state, url: site + path };
-    }
-  return preview;
-}
-export const ensure = internalMutation({
-  args: { ...identityFields, ...previewIdentity },
-  returns: previewResult,
-  handler: async (ctx, args) => {
-    const app = await ownedApp(ctx, args.userId, args.appId);
-    const existing = await findPreview(ctx, args);
-    if (existing) return present(existing);
-    const id = await ctx.db.insert("previews", {
-      appId: args.appId,
-      reference: args.reference,
-      platforms: initialPlatforms(app.platforms),
-      updatedAt: Date.now(),
-    });
-    return present((await ctx.db.get("previews", id))!);
-  },
-});
 export const get = internalQuery({
   platforms: true,
   args: { ...identityFields, ...previewIdentity },
   returns: v.union(previewResult, v.null()),
   handler: async (ctx, args) => {
-    await ownedApp(ctx, args.userId, args.appId);
+    const app = await ownedApp(ctx, args.userId, args.appId);
     const preview = await findPreview(ctx, args);
-    return preview ? present(preview) : null;
+    return preview ? present(preview, app) : null;
   },
 });
 export const list = internalQuery({
@@ -86,7 +112,7 @@ export const list = internalQuery({
   },
   returns: paginationResultValidator(previewResult),
   handler: async (ctx, { userId, appId, paginationOpts }) => {
-    await ownedApp(ctx, userId, appId);
+    const app = await ownedApp(ctx, userId, appId);
     if (
       !Number.isInteger(paginationOpts.numItems) ||
       paginationOpts.numItems < 1 ||
@@ -97,58 +123,160 @@ export const list = internalQuery({
       .query("previews")
       .withIndex("by_appId_reference", (q) => q.eq("appId", appId))
       .paginate(paginationOpts);
-    return { ...result, page: result.page.map(present) };
+    return {
+      ...result,
+      page: result.page.map((preview) => present(preview, app)),
+    };
   },
 });
-export const update = internalMutation({
-  platforms: true,
+export const acquire = internalMutation({
+  args: { ...identityFields, ...previewIdentity, lease: v.string() },
+  returns: v.union(v.number(), v.null()),
+  handler: async (ctx, args) => {
+    const app = await ownedApp(ctx, args.userId, args.appId);
+    if ((app.provisioning?.expiresAt ?? 0) > Date.now())
+      throw new ConvexError(
+        "Another token request is in progress. Retry shortly.",
+      );
+    const preview = await findPreview(ctx, args);
+    if (preview)
+      await ctx.db.patch("previews", preview._id, {
+        stage: "generating",
+        updatedAt: Date.now(),
+      });
+    else
+      await ctx.db.insert("previews", {
+        appId: args.appId,
+        reference: args.reference,
+        stage: "generating",
+        releases: {},
+        updatedAt: Date.now(),
+      });
+    await ctx.db.patch("apps", app._id, {
+      provisioning: { id: args.lease, expiresAt: Date.now() + 180_000 },
+    });
+    return app.convexProjectId ?? null;
+  },
+});
+export const saveProject = internalMutation({
+  args: {
+    ...identityFields,
+    appId: v.string(),
+    projectId: v.number(),
+    lease: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const app = await ownedApp(ctx, args.userId, args.appId);
+    if (app.provisioning?.id !== args.lease)
+      throw new ConvexError("Provisioning lease expired. Retry.");
+    await ctx.db.patch("apps", app._id, { convexProjectId: args.projectId });
+    return null;
+  },
+});
+export const finish = internalMutation({
   args: {
     ...identityFields,
     ...previewIdentity,
-    platform,
-    latest: release,
-    githubUrl: v.optional(v.string()),
+    lease: v.string(),
+    deployment: v.optional(deployment),
   },
-  returns: previewResult,
+  returns: v.null(),
   handler: async (ctx, args) => {
     const app = await ownedApp(ctx, args.userId, args.appId);
-    if (!app.platforms.includes(args.platform))
-      throw new ConvexError("Platform is disabled for this app.");
-    if (!Number.isSafeInteger(args.latest.revision) || args.latest.revision < 0)
-      throw new ConvexError("Revision must be a non-negative safe integer.");
-    validateLink(args.githubUrl, true);
-    for (const key of [
-      "url",
-      "githubReleaseUrl",
-      "artifactUrl",
-      "updateUrl",
-    ] as const)
-      validateLink(args.latest[key], key === "githubReleaseUrl");
-    let preview = await findPreview(ctx, args);
-    if (!preview) {
-      const id = await ctx.db.insert("previews", {
-        appId: args.appId,
-        reference: args.reference,
-        platforms: initialPlatforms(app.platforms),
+    if (app.provisioning?.id !== args.lease) {
+      if (args.deployment)
+        throw new ConvexError("Provisioning lease expired. Retry.");
+      return null;
+    }
+    if (args.deployment) {
+      const preview = await findPreview(ctx, args);
+      if (!preview) throw new ConvexError("Preview not found.");
+      await ctx.db.patch("previews", preview._id, {
+        deployment: args.deployment,
         updatedAt: Date.now(),
       });
-      preview = (await ctx.db.get("previews", id))!;
     }
-    const previous = preview.platforms[platformKey(args.platform)];
-    if (
-      previous?.enabled &&
-      previous.latest &&
-      args.latest.revision < previous.latest.revision
-    )
-      throw new ConvexError("Stale preview update.");
-    await ctx.db.patch("previews", preview._id, {
-      platforms: {
-        ...preview.platforms,
-        [platformKey(args.platform)]: { enabled: true, latest: args.latest },
-      },
-      ...(args.githubUrl !== undefined ? { githubUrl: args.githubUrl } : {}),
+    await ctx.db.patch("apps", app._id, { provisioning: undefined });
+    return null;
+  },
+});
+/** Only the GitHub OIDC HTTP handler can report build outcomes. */
+export const report = internalMutation({
+  args: {
+    appId: v.string(),
+    repositoryId: v.number(),
+    reference: v.string(),
+    production: v.boolean(),
+    run,
+    platform,
+    ...releaseDetails,
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const app = await ctx.db
+      .query("apps")
+      .withIndex("by_appId", (q) => q.eq("appId", args.appId))
+      .unique();
+    if (!app || app.deletedAt || app.github?.repositoryId !== args.repositoryId)
+      throw new ConvexError("Repository is not linked to this app.");
+    if (!app.platforms.includes(args.platform)) return null;
+    validateReference(args.reference);
+    const table = args.production ? "appReleases" : "previews";
+    const existing = args.production
+      ? await ctx.db
+          .query("appReleases")
+          .withIndex("by_appId", (q) => q.eq("appId", args.appId))
+          .unique()
+      : await findPreview(ctx, args);
+    const key = platformKey(args.platform);
+    const previous = existing?.releases[key];
+    if (previous) {
+      if (
+        args.run.id < previous.run.id ||
+        (args.run.id === previous.run.id &&
+          args.run.attempt < previous.run.attempt)
+      )
+        return null;
+      if (
+        args.run.id === previous.run.id &&
+        args.run.attempt === previous.run.attempt &&
+        previous.status !== "building" &&
+        args.status !== "failed"
+      )
+        return null;
+    }
+    const {
+      appId: _app,
+      repositoryId: _repo,
+      reference: _ref,
+      production: _prod,
+      platform: _platform,
+      ...latest
+    } = args;
+    const values = {
+      releases: { ...existing?.releases, [key]: latest },
       updatedAt: Date.now(),
-    });
-    return present((await ctx.db.get("previews", preview._id))!);
+    };
+    if (table === "appReleases") {
+      const record = existing as Doc<"appReleases"> | null;
+      if (record) await ctx.db.patch("appReleases", record._id, values);
+      else await ctx.db.insert("appReleases", { appId: args.appId, ...values });
+    } else {
+      const record = existing as Doc<"previews"> | null;
+      if (record)
+        await ctx.db.patch("previews", record._id, {
+          ...values,
+          stage: "building",
+        });
+      else
+        await ctx.db.insert("previews", {
+          appId: args.appId,
+          reference: args.reference,
+          stage: "building",
+          ...values,
+        });
+    }
+    return null;
   },
 });

@@ -10,7 +10,7 @@ these reusable screens and layouts. Add custom app screens alongside them.
 Routes outside `(authenticated)` are public. Put screens that require login
 under `src/app/(authenticated)/`; its shared layout guards every descendant,
 including direct links. The `(auth)` group contains login and signup. Successful
-login opens the account screen, where `users.current` returns the caller's
+login opens the account screen, where `users.index.current` returns the caller's
 username and user ID from Convex. Logout clears the session and returns home.
 Expo SecureStore persists tokens per deployment across app restarts.
 

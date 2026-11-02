@@ -12,4 +12,4 @@ export const {
 } = setupUsernamePassword(auth, {
   component: components.authPassword,
   usernameComponent: components.authUsername,
-}).attachUserCallbacks({ createUser: internal.users.createUser });
+}).attachUserCallbacks({ createUser: internal.users.internal.createUser });

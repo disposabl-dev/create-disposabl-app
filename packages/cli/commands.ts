@@ -1,6 +1,13 @@
 import { Command } from "commander";
 import manifest from "./package.json";
-import { accessToken, apiUrl, hasCredentials, login, logout } from "./auth";
+import {
+  NotAuthenticated,
+  accessToken,
+  apiUrl,
+  hasCredentials,
+  login,
+  logout,
+} from "./auth";
 import { readFile } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
@@ -46,16 +53,23 @@ export async function runCli(
         return;
       }
       const send = async (refresh = false) =>
-        fetch(`${base}/api/account/current`, {
+        fetch(`${base}/api/users/current`, {
           headers: {
             Authorization: `Bearer ${await accessToken(base, refresh)}`,
           },
           redirect: "error",
           signal: AbortSignal.timeout(30_000),
         });
-      let response = await send();
-      if (response.status === 401 && !process.env.DISPOSABL_API_KEY)
-        response = await send(true);
+      let response: Response;
+      try {
+        response = await send();
+        if (response.status === 401 && !process.env.DISPOSABL_API_KEY)
+          response = await send(true);
+      } catch (error) {
+        if (!(error instanceof NotAuthenticated)) throw error;
+        console.log(JSON.stringify({ currentUser: null }));
+        return;
+      }
       if (response.status === 401) {
         console.log(JSON.stringify({ currentUser: null }));
         return;

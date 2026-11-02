@@ -7,7 +7,7 @@ import { AuthButton, AuthScreen, styles } from "../components/auth-ui";
 import { api } from "../lib/convex";
 
 export function AccountScreen() {
-  const user = useQuery(api.users.current);
+  const user = useQuery(api.users.index.current);
   const { signOut } = useAuthActions();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);

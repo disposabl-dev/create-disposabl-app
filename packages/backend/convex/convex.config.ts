@@ -13,6 +13,12 @@ const app = defineApp({
     AUTH_JWKS: v.string(),
     CONVEX_TEAM_ID: v.optional(v.string()),
     CONVEX_TEAM_TOKEN: v.optional(v.string()),
+    VERCEL_TOKEN: v.optional(v.string()),
+    VERCEL_PROJECT_ID: v.optional(v.string()),
+    VERCEL_TEAM_ID: v.optional(v.string()),
+    GITHUB_CONNECTOR: v.optional(v.string()),
+    GITHUB_OWNER: v.optional(v.string()),
+    GITHUB_INSTALLATION_ID: v.optional(v.string()),
   },
 });
 

@@ -34,6 +34,12 @@ type Env = {
   readonly AUTH_PRIVATE_KEY: string;
   readonly CONVEX_TEAM_ID: string | undefined;
   readonly CONVEX_TEAM_TOKEN: string | undefined;
+  readonly GITHUB_CONNECTOR: string | undefined;
+  readonly GITHUB_INSTALLATION_ID: string | undefined;
+  readonly GITHUB_OWNER: string | undefined;
+  readonly VERCEL_PROJECT_ID: string | undefined;
+  readonly VERCEL_TEAM_ID: string | undefined;
+  readonly VERCEL_TOKEN: string | undefined;
 };
 
 /**

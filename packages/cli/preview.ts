@@ -8,7 +8,7 @@ import {
 } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
-import { execFileSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 
 type Development = {
   appId: string;
@@ -66,50 +66,26 @@ export async function configureDevelopment(
     !value.deployKey.startsWith(`dev:${value.name}|`)
   )
     throw new Error("Development credentials do not match this app.");
-  for (const [url, suffix] of [
-    [value.convexUrl, ".convex.cloud"],
-    [value.convexSiteUrl, ".convex.site"],
-  ]) {
-    const parsed = new URL(url!);
-    if (
-      parsed.protocol !== "https:" ||
-      !parsed.hostname.endsWith(suffix!) ||
-      parsed.origin !== url
-    )
-      throw new Error("Invalid development URL.");
-  }
+  if (
+    !/^[a-z0-9-]+$/.test(value.name) ||
+    value.convexUrl !== `https://${value.name}.convex.cloud` ||
+    value.convexSiteUrl !== `https://${value.name}.convex.site`
+  )
+    throw new Error("Development URLs do not match the deployment.");
   const files = ["packages/backend/.env.local", "apps/web/.env.local"];
   if (config.platforms.some((p: string) => p === "android" || p === "ios"))
     files.push("apps/mobile/.env.local");
   for (const file of files) {
-    // Never place a deploy key in a file Git can accidentally commit.
-    try {
-      execFileSync("git", ["check-ignore", "--quiet", file], {
-        cwd: root,
-        stdio: "ignore",
-      });
-      execFileSync("git", ["ls-files", "--error-unmatch", file], {
-        cwd: root,
-        stdio: "ignore",
-      });
-      throw new Error(`${file} is tracked by Git.`);
-    } catch (error) {
-      if (!(
-        error &&
-        typeof error === "object" &&
-        "status" in error &&
-        error.status === 1
-      ))
-        throw error;
-      // A failing check-ignore also exits 1; check independently before writing.
-      if (
-        execFileSync("git", ["check-ignore", file], {
-          cwd: root,
-          encoding: "utf8",
-        }).trim() !== file
-      )
-        throw new Error(`${file} must be ignored by Git.`);
-    }
+    const ignored = spawnSync("git", ["check-ignore", "--quiet", file], {
+      cwd: root,
+      stdio: "ignore",
+    });
+    const tracked = spawnSync("git", ["ls-files", "--error-unmatch", file], {
+      cwd: root,
+      stdio: "ignore",
+    });
+    if (ignored.status !== 0 || tracked.status !== 1)
+      throw new Error(`${file} must be untracked and ignored by Git.`);
   }
   await updateEnv(
     join(root, files[0]!),
@@ -133,6 +109,7 @@ export async function configureDevelopment(
 
 type Preview = {
   reference: string;
+  stage?: string;
   appId: string;
   platforms: Record<
     string,
@@ -153,7 +130,11 @@ type Preview = {
 export function formatPreview(preview: Preview | null) {
   if (!preview)
     return "Preview not found. Create it with disposabl previews token create --reference <branch-or-worktree>.";
-  const lines = [`Preview: ${preview.reference}`, `App: ${preview.appId}`];
+  const lines = [
+    `Preview: ${preview.reference}`,
+    `App: ${preview.appId}`,
+    `Stage: ${preview.stage ?? "building"}`,
+  ];
   for (const [name, state] of Object.entries(preview.platforms)) {
     if (!state.enabled) {
       lines.push(`${name}: disabled`);
@@ -161,7 +142,7 @@ export function formatPreview(preview: Preview | null) {
     }
     const latest = state.latest;
     lines.push(
-      `${name}: ${latest?.status ?? "pending"}${latest?.version ? ` (${latest.version})` : ["cli", "sdk"].includes(name) ? " (not published)" : ""}`,
+      `${name}: ${latest?.status ?? "not built"}${latest?.version ? ` (${latest.version})` : ["cli", "sdk"].includes(name) ? " (not published)" : ""}`,
     );
     for (const [label, url] of Object.entries({
       URL: state.url,

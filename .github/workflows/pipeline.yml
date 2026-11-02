@@ -37,8 +37,9 @@ jobs:
     # Fork code must not run in a job with deployment credentials.
     if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
     permissions: &release-permissions
-      contents: write
+      contents: read
       pull-requests: read
+      id-token: write
     timeout-minutes: 45
     runs-on: *web-runner
     outputs:
@@ -100,7 +101,7 @@ jobs:
             };
             const affected = (platform, directory) => enabled.includes(platform) && changes(platform).some(p => p.startsWith(directory) || /^(bun.lock$|package.json$|disposabl.json$|turbo.json$|bunfig.toml$|patches\/|\.github\/workflows\/pipeline.yml$|packages\/(?!backend\/|create-disposabl-app\/))/.test(p));
             const target = process.env.DISPOSABL_DESKTOP_PLATFORM;
-            for (const platform of ["android", "ios"]) console.log(`${platform}=${platform === "android" && !target && affected(platform, "apps/mobile/")}`); // Restore iOS selection when builds resume.
+            for (const platform of ["android", "ios"]) console.log(`${platform}=${platform === "android" && Boolean(process.env.EXPO_TOKEN) && !target && affected(platform, "apps/mobile/")}`); // Restore iOS selection when builds resume.
             const desktop = ["linux", "windows", "macos"].filter(platform => target === platform && affected(platform, "apps/desktop/"));
             console.log(`desktop=${JSON.stringify(desktop)}\nselected=${desktop.includes(process.env.DISPOSABL_DESKTOP_PLATFORM)}`);
           ' >> "$GITHUB_OUTPUT"
@@ -109,6 +110,10 @@ jobs:
         if: github.job != 'desktop' || steps.platforms.outputs.selected == 'true'
         uses: actions/setup-node@v6
         with: {node-version: *node-version, package-manager-cache: false}
+      - &app-token
+        name: Disposabl GitHub App token
+        if: github.job != 'desktop' || steps.platforms.outputs.selected == 'true'
+        run: node .github/scripts/disposabl.mjs token
       - &bun
         name: Bun
         if: github.job != 'desktop' || steps.platforms.outputs.selected == 'true'
@@ -126,6 +131,12 @@ jobs:
         name: Install
         if: github.job != 'desktop' || steps.platforms.outputs.selected == 'true'
         run: bun install --frozen-lockfile ${{ github.job == 'desktop' && '--filter desktop' || (github.job == 'ios' || github.job == 'android') && '--filter @disposabl/mobile' || '' }}
+      - name: Report build start
+        run: |
+          node .github/scripts/disposabl.mjs report web,api,mcp building
+          if [[ -z "$EXPO_TOKEN" ]]; then node .github/scripts/disposabl.mjs report android blocked 'Connect Expo before building Android.'; fi
+          node .github/scripts/disposabl.mjs report ios,macos blocked 'Apple builds are temporarily disabled.'
+          if [[ '${{ github.event_name }}' == pull_request ]]; then node .github/scripts/disposabl.mjs report cli,typescript-sdk blocked 'Packages publish after merge to main.'; fi
       - name: Check
         run: bun run check
       - name: Build selected clients
@@ -147,6 +158,9 @@ jobs:
           if [[ "$CHANNEL" != production ]]; then export AUTH_TARGET="--preview-name $CHANNEL"; target=(--preview-name "$CHANNEL"); fi
           bun x --no-install convex deploy --yes "${target[@]}" --cmd-url-env-var-name CONVEX_URL --cmd 'for name in CONVEX_URL CONVEX_SITE_URL; do value=$(printenv "$name"); test -n "$value" || exit 1; for prefix in "" VITE_ EXPO_PUBLIC_; do export "$prefix$name=$value"; printf "%s=%s\n" "$prefix$name" "$value" | tee -a "$GITHUB_ENV" >> "$GITHUB_OUTPUT"; done; done; bun x --no-install --package @convex-dev/auth auth --keys-only $AUTH_TARGET && bun run --cwd ../.. build --filter=@disposabl/web'
           bun x --no-install static-hosting upload $AUTH_TARGET --no-spa --dist ../../apps/web/dist/client
+      - name: Report web result
+        if: always()
+        run: node .github/scripts/disposabl.mjs report web,api,mcp ${{ steps.deploy.outcome == 'success' && 'ready' || 'failed' }}
       - &expo
         name: Expo
         if: github.job == 'ios' || github.job == 'android' || steps.platforms.outputs.android == 'true' || steps.platforms.outputs.ios == 'true'
@@ -248,6 +262,7 @@ jobs:
             gh api --method PATCH "repos/$GH_REPO/git/refs/tags/$tag" -f sha="$SOURCE" -F force=true > /dev/null
             gh release edit "$tag" --notes-file "$RUNNER_TEMP/ios-notes.md"
           fi
+          (cd ../.. && node .github/scripts/disposabl.mjs report ios ready)
           echo "iOS update published to $CHANNEL." >> "$GITHUB_STEP_SUMMARY"
       - &publish
         name: Publish
@@ -265,27 +280,15 @@ jobs:
             macos) compgen -G 'dist/release/*.dmg' > /dev/null ;;
             *) exit 1 ;;
           esac
-          TAG="$RELEASE_PREFIX-$CHANNEL-$PLATFORM"
-          if [[ '${{ github.event_name }}' == push ]]; then TAG+="-${{ github.run_id }}-${{ github.run_attempt }}"; fi
-          printf "Platform: %s\nSource: %s\n" "$PLATFORM" "$SOURCE" > notes.md
-          if [[ -f dist/release/macos.txt ]]; then cat dist/release/macos.txt >> notes.md; fi
-          if [[ -f dist/release/android.json ]]; then echo "<!-- android $(jq -c . dist/release/android.json) -->" >> notes.md; fi
-          if [[ -f dist/release/ios.json ]]; then echo "<!-- ios $(jq -c . dist/release/ios.json) -->" >> notes.md; fi
-          if gh release view "$TAG" --json assets > previous.json; then
-            check_source
-            gh release upload "$TAG" dist/release/* --clobber
-            while IFS= read -r asset; do
-              asset=${asset%$'\r'}
-              if [[ ! -f "dist/release/$asset" ]]; then check_source; gh release delete-asset "$TAG" "$asset" --yes; fi
-            done < <(jq -r '.assets[].name' previous.json)
-            check_source
-            if [[ '${{ github.event_name }}' == pull_request ]]; then gh api --method PATCH "repos/$GH_REPO/git/refs/tags/$TAG" -f sha="$SOURCE" -F force=true > /dev/null; fi
-          else
-            gh release create "$TAG" dist/release/* --draft --target "$SOURCE" --title "$CHANNEL / $PLATFORM" --notes-file notes.md --prerelease=${{ github.event_name == 'pull_request' }}
-          fi
-          check_source
-          gh release edit "$TAG" --title "$CHANNEL / $PLATFORM" --notes-file notes.md --draft=false --prerelease=${{ github.event_name == 'pull_request' }} --latest=false
-          echo "Release: https://github.com/$GH_REPO/releases/tag/$TAG" >> "$GITHUB_STEP_SUMMARY"
+      - &artifacts
+        name: Upload release artifacts
+        if: hashFiles('dist/release/*') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ env.PLATFORM }}
+          path: dist/release/
+          retention-days: 3
+          if-no-files-found: error
 
   android:
     name: Android
@@ -309,9 +312,12 @@ jobs:
       - *checkout
       - *platforms
       - *node
+      - *app-token
       - *bun
       - *cache
       - *install
+      - name: Report mobile build
+        run: node .github/scripts/disposabl.mjs report "$PLATFORM" building
       - *expo
       - name: Java
         uses: actions/setup-java@v5
@@ -350,6 +356,10 @@ jobs:
           cp "$apk" ../../dist/release/android.apk
           jq --arg sha "$(sha256sum "$apk" | cut -d' ' -f1)" '. + {sha256: $sha, action: "build"}' <<< "$MANIFEST" > ../../dist/release/android.json
       - *publish
+      - *artifacts
+      - name: Report Android failure
+        if: failure() || cancelled()
+        run: node .github/scripts/disposabl.mjs report android failed
 
   ios:
     name: iOS
@@ -375,9 +385,12 @@ jobs:
       - *checkout
       - *platforms
       - *node
+      - *app-token
       - *bun
       - *cache
       - *install
+      - name: Report mobile build
+        run: node .github/scripts/disposabl.mjs report "$PLATFORM" building
       - *expo
       - name: Pods
         uses: actions/cache@v4
@@ -419,6 +432,7 @@ jobs:
           expires=$(python3 -c 'import datetime,plistlib,sys; p=plistlib.load(open(sys.argv[1],"rb")); expiry=p["ExpirationDate"].replace(tzinfo=datetime.timezone.utc); assert p.get("ProvisionedDevices") and not p["Entitlements"].get("get-task-allow",False) and expiry>datetime.datetime.now(datetime.timezone.utc); print(expiry.isoformat())' "$RUNNER_TEMP/profile.plist")
           jq --arg sha "$(shasum -a 256 dist/release/ios.ipa | cut -d' ' -f1)" --arg expires "$expires" '. + {sha256: $sha, expiresAt: $expires}' <<< "$MANIFEST" > dist/release/ios.json
       - *publish
+      - *artifacts
 
   desktop:
     permissions: *release-permissions
@@ -443,9 +457,13 @@ jobs:
       - *checkout
       - *platforms
       - *node
+      - *app-token
       - *bun
       - *cache
       - *install
+      - name: Report desktop build
+        if: steps.platforms.outputs.selected == 'true'
+        run: node .github/scripts/disposabl.mjs report "$PLATFORM" building
       - name: Electron
         if: steps.platforms.outputs.selected == 'true'
         uses: actions/cache@v4
@@ -496,6 +514,10 @@ jobs:
           fi
           cat dist/release/macos.txt >> "$GITHUB_STEP_SUMMARY"
       - *publish
+      - *artifacts
+      - name: Report desktop failure
+        if: (failure() || cancelled()) && steps.platforms.outputs.selected == 'true'
+        run: node .github/scripts/disposabl.mjs report "$PLATFORM" failed
       - name: Clean
         if: always() && matrix.platform == 'macos'
         run: rm -f "$RUNNER_TEMP/notary.p8"
@@ -538,13 +560,45 @@ jobs:
         run: |
           bun install --frozen-lockfile
           bun run generate
+      - name: Disposabl GitHub App token
+        if: steps.selected.outputs.exists == 'true'
+        run: node .github/scripts/disposabl.mjs token
+      - name: Package publication prerequisites
+        id: publishable
+        if: steps.selected.outputs.exists == 'true'
+        run: |
+          platform='${{ matrix.package }}'
+          if [[ "$platform" == sdk ]]; then platform=typescript-sdk; fi
+          name=$(node -p "require('./packages/${{ matrix.package }}/package.json').name")
+          if npm view "$name" version > "$RUNNER_TEMP/published-version" 2>/dev/null; then
+            echo 'ready=true' >> "$GITHUB_OUTPUT"
+            node .github/scripts/disposabl.mjs report "$platform" building
+          else
+            echo 'ready=false' >> "$GITHUB_OUTPUT"
+            node .github/scripts/disposabl.mjs report "$platform" blocked 'Publish the package once and configure npm trusted publishing.'
+          fi
       - name: Validate package
         if: steps.selected.outputs.exists == 'true'
         run: bun run --cwd packages/${{ matrix.package }} typecheck
       - name: Publish
-        if: steps.selected.outputs.exists == 'true'
+        id: package-release
+        if: steps.publishable.outputs.ready == 'true'
         working-directory: packages/${{ matrix.package }}
         run: bun run release
         env:
-          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ env.GH_TOKEN }}
           npm_config_workspaces_update: 'false'
+      - name: Report package result
+        if: always() && steps.publishable.outputs.ready == 'true'
+        run: |
+          platform='${{ matrix.package }}'
+          if [[ "$platform" == sdk ]]; then platform=typescript-sdk; fi
+          if [[ '${{ steps.package-release.outcome }}' == success ]]; then
+            name=$(node -p "require('./packages/${{ matrix.package }}/package.json').name")
+            version=$(node -p "require('./packages/${{ matrix.package }}/package.json').version")
+            if [[ "$version" == *development* ]]; then version=$(cat "$RUNNER_TEMP/published-version"); fi
+            export PUBLISHED_VERSION=$(npm view "$name@$version" version)
+            node .github/scripts/disposabl.mjs report "$platform" ready
+          else
+            node .github/scripts/disposabl.mjs report "$platform" failed 'Package publication failed; check npm trusted publishing and the workflow log.'
+          fi
