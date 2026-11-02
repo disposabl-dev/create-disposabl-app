@@ -29,6 +29,7 @@ import type * as github_actions_internal from "../github/actions/internal.js";
 import type * as github_actions_oidc from "../github/actions/oidc.js";
 import type * as github_actions_provision from "../github/actions/provision.js";
 import type * as github_actions_secrets from "../github/actions/secrets.js";
+import type * as github_actions_signing from "../github/actions/signing.js";
 import type * as github_actions_tokens from "../github/actions/tokens.js";
 import type * as github_internal from "../github/internal.js";
 import type * as http from "../http.js";
@@ -70,6 +71,7 @@ declare const fullApi: ApiFromModules<{
   "github/actions/oidc": typeof github_actions_oidc;
   "github/actions/provision": typeof github_actions_provision;
   "github/actions/secrets": typeof github_actions_secrets;
+  "github/actions/signing": typeof github_actions_signing;
   "github/actions/tokens": typeof github_actions_tokens;
   "github/internal": typeof github_internal;
   http: typeof http;

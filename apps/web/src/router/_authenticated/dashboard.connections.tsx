@@ -101,14 +101,15 @@ function Connections() {
     void complete({ provider, code, state })
       .then(async (result) => {
         if (provider !== "github") return;
-        if (result.installations.length === 1) {
+        const installation = result.installations.at(0);
+        if (result.installations.length === 1 && installation) {
           if (!result.proof)
             throw new Error(
               "GitHub did not return an account selection proof. Please connect again.",
             );
           await selectGithub({
             proof: result.proof,
-            installationId: result.installations[0].installationId,
+            installationId: installation.installationId,
           });
         } else {
           setInstallations(result.installations);

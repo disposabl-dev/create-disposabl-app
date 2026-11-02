@@ -480,6 +480,8 @@ export type PreviewsTokenCreateResponses = {
     convexUrl: string;
     convexSiteUrl: string;
     deployKey: string;
+    productionConvexSiteUrl?: string;
+    repositoryUrl?: string;
   };
 };
 
