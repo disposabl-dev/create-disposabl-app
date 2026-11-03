@@ -1,51 +1,83 @@
 # create-disposabl-app
 
-Create a Disposabl app with Bun:
+Create a Disposabl app for web, mobile, desktop, and developer tools.
+
+## Get started
+
+Install [Bun](https://bun.sh) and [Git](https://git-scm.com), then run:
 
 ```sh
-bun create disposabl-app@latest my-app
+bunx create-disposabl-app@latest
 ```
 
-Web is always included. Frontend authentication is enabled by default; pass
-`--features none` to disable it, or include `authentication` in a comma-separated
-feature list. Auth-disabled projects omit login/signup routes and auth-dependent
-example screens, so missing routes return 404. Backend authentication code and
-its access checks remain installed.
+Choose your app's name and platforms. Web is always included, and app sign-in is enabled by default.
 
-Releases publish automatically after changes reach `main`. Commit messages
-determine the next version; no manual version edit is needed.
+Setup asks you to sign in to [Disposabl](https://www.disposabl.dev) and connect GitHub and Convex. Mobile apps also need an Expo account. It creates your project and configures its development environment.
 
-Every creation checks your Disposabl login and asks you to sign in through `disposabl login` if needed. It then creates the app, saves its UUID in `disposabl.json`, and configures a named development preview. There is no setup option. `--yes`, `--json`, and `--skip-install` still require login and app creation. The service is `https://www.disposabl.dev`.
+When setup finishes:
 
 ```sh
-bun create disposabl-app@latest my-app
 cd my-app
 bun run dev
 ```
 
-New apps start on `main`, which is also their initial preview name. No branch prompt is needed.
+Use the app name you chose instead of `my-app`. Your website opens automatically. Mobile apps need a development build before you can open them on a device; they do not use Expo Go. See the generated `apps/mobile/README.md` for the next steps.
 
-The website opens automatically and Metro starts with development-client support. Install a development build once with `bun run --cwd apps/mobile android` or `bun run --cwd apps/mobile ios`. Expo Go is not used.
+You can also launch setup with npm, pnpm, or Yarn 2+. The generated project still requires Bun. These launchers also need Node.js 22.12 or newer.
 
-To get another development key in a worktree, run `disposabl previews token create --configure .`. The branch is detected automatically, or the worktree name when detached. Repeated requests reuse the preview and issue a new key. This configures local development; it does not deploy or require a git push. Push the scaffold Initial commit to `main` first, then open a same-repository feature PR to `main` for a CI preview. A feature branch push alone does not deploy.
+| Tool | Command                                |
+| ---- | -------------------------------------- |
+| npm  | `npx create-disposabl-app@latest`      |
+| pnpm | `pnpm dlx create-disposabl-app@latest` |
+| Yarn | `yarn dlx create-disposabl-app@latest` |
 
-If app creation is interrupted, rerun `bun create disposabl-app@latest my-app` from the parent directory. It resumes setup using the existing files and app UUID.
+## Prefer a coding agent?
 
-Generated apps do not include the `create-disposabl-app` package, its workspace lockfile entry, or its Turbo build task. The generator and bundled Disposabl CLI run externally.
+Paste this into Codex, Claude Code, Cursor, or another coding agent:
 
-Each new app installs the bundled `disposabl-app` skill and its references into
-`.agents/skills/disposabl-app` for Codex and `.claude/skills/disposabl-app` for
-Claude Code. `AGENTS.md` links to the skill. No separate skill installation or
-global configuration is needed; the source copy remains in `packages/skill`.
+```text
+Help me build an app with Disposabl. Read https://github.com/disposabl-dev/create-disposabl-app, then ask me what I want to make and where it should run.
+```
 
-Generated backends start with only `users: defineTable({})`. The starter keeps
-authentication, static hosting, and API/MCP support, with `users/current` as its
-only application operation. Disposabl's apps, previews, releases, provider
-connections, GitHub handlers, and service credentials stay in the Disposabl
-backend. Product-generated API bindings, contracts, and SDK operations are not
-copied into new apps.
+## Choose options in the command
 
-The root `reset.ts` script owns the product-to-starter cleanup. The generator
-runs it only inside its disposable staging copy before packaging. Replacement
-backend files live in `starter/backend`; platform and feature selection still
-happens when the user creates an app.
+For example, create a web and mobile app with sign-in:
+
+```sh
+bunx create-disposabl-app@latest my-app --platforms web,ios,android --yes
+```
+
+| Option              | What it does                                                                                                                                                          |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--platforms <ids>` | Choose `web`, `ios`, `android`, `macos`, `windows`, `linux`, `mcp`, `api`, `cli`, or `typescript-sdk`. Separate multiple choices with commas. Web is always included. |
+| `--features <ids>`  | Choose features from `--list-options`, such as `authentication` and `docs`. The default is `authentication`. Use `--features none` to omit optional features.         |
+| `--yes`             | Skip the name, platform, and feature questions. Supply an app name in the command.                                                                                    |
+| `--list-options`    | Show available platforms and features without creating an app.                                                                                                        |
+| `--skip-install`    | Create files without installing dependencies. Account setup still runs.                                                                                               |
+| `--json`            | Return a result coding agents can read. Supply an app name. Account setup still runs.                                                                                 |
+
+CLI and TypeScript SDK include API support automatically. Backend authentication and access checks remain installed even with `--features none`.
+
+## If setup stops
+
+Your files are saved. Follow the error's instructions, then run the same command from the parent folder:
+
+```sh
+bunx create-disposabl-app@latest my-app
+```
+
+Setup resumes using the existing project and app ID. If dependency installation failed, run `bun install` inside the app folder before retrying.
+
+## Development and publishing
+
+New apps start on the `main` branch with a configured local development environment. Use `bun run dev` for local work.
+
+For a separate Git worktree, run this inside that worktree to configure its development environment:
+
+```sh
+bunx --package create-disposabl-app disposabl previews token create --configure .
+```
+
+Push the generated initial commit to `main` before opening feature pull requests. A same-repository pull request to `main` starts a CI preview; changes pushed to `main` start the production workflow. A feature branch push by itself does not deploy. Build and delivery requirements depend on the selected platforms.
+
+See the [coding-agent guide](https://github.com/disposabl-dev/create-disposabl-app/blob/main/packages/skill/SKILL.md) for the full delivery workflow, or [report a problem](https://github.com/disposabl-dev/create-disposabl-app/issues).
