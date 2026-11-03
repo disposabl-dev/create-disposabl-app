@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Navigate } from "@tanstack/react-router";
 import { useAction, useConvexAuth, useQuery } from "convex/react";
 import { api } from "../../../backend/convex/_generated/api";
 import { Button } from "../components/ui/button";
@@ -117,13 +117,7 @@ export function ConsentPage() {
             )}
           </div>
         ) : (
-          <Link
-            to="/login"
-            search={{ request: requestId }}
-            className="font-medium underline underline-offset-4"
-          >
-            Log in to review this request
-          </Link>
+          <Navigate to="/signup" search={{ request: requestId }} replace />
         )}
       </>
     );
