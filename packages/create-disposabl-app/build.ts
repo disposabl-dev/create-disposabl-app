@@ -1,6 +1,6 @@
 import { cp, mkdtemp, readdir, rename, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { basename, join, resolve } from "node:path";
+import { basename, join, resolve, sep } from "node:path";
 import manifest from "./package.json";
 
 const dir = import.meta.dir;
@@ -69,7 +69,8 @@ try {
         path !== join(root, "apps/mobile/ios") &&
         path !== join(root, "apps/desktop/out") &&
         !/\.test\.[^.]+$/.test(basename(path)) &&
-        !basename(path).endsWith(".tgz") &&
+        (!basename(path).endsWith(".tgz") ||
+          path.startsWith(join(root, "vendor") + sep)) &&
         !basename(path).endsWith(".tsbuildinfo") &&
         !/^\.env(?:\.|$)/.test(basename(path)),
     });
@@ -77,7 +78,14 @@ try {
     const entry = item.name;
     if (
       item.isDirectory()
-        ? ![".github", "apps", "packages", "patches", "starter"].includes(entry)
+        ? ![
+            ".github",
+            "apps",
+            "packages",
+            "patches",
+            "starter",
+            "vendor",
+          ].includes(entry)
         : ![
             "LICENSE",
             "AGENTS.md",

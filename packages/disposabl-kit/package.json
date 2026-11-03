@@ -32,7 +32,8 @@
     "@convex-dev/auth": "catalog:",
     "@convex-dev/mcp": "catalog:",
     "@convex-dev/static-hosting": "catalog:",
-    "@tanstack/react-router": "latest"
+    "@tanstack/react-router": "latest",
+    "jose": "^6.2.15"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4",
@@ -60,7 +61,8 @@
     "./platforms": "./platforms.ts",
     "./mobile": "./mobile/index.ts",
     "./features": "./features.ts",
-    "./mobile/expo-plugin": "./mobile/expo-plugin.cjs"
+    "./mobile/expo-plugin": "./mobile/expo-plugin.cjs",
+    "./server/mcp/identity": "./server/mcp/identity.ts"
   },
   "peerDependencies": {
     "expo": "~58.0.19",

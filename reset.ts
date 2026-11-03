@@ -81,6 +81,7 @@ const keep = new Set([
   "auth.ts",
   "auth.config.ts",
   "mcp.ts",
+  "mcpEnterprise",
   "tsconfig.json",
   "users",
 ]);
@@ -157,4 +158,4 @@ for (const [path, value] of [
   ["turbo.json", turbo],
 ] as const)
   await Bun.write(join(root, path), JSON.stringify(value, null, 2) + "\n");
-console.log("Reset staging copy to a users-only starter.");
+console.log("Reset staging copy to the starter.");

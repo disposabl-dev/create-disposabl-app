@@ -1,4 +1,4 @@
-import { getAuthUserId } from "@convex-dev/auth/server";
+import { getSessionUserId } from "@disposabl/disposabl-kit/server/lib/functions";
 import { ConvexError, v, type Infer } from "convex/values";
 import type { ActionCtx, MutationCtx, QueryCtx } from "../_generated/server";
 import { action, mutation, query } from "../_generated/server";
@@ -12,7 +12,7 @@ import {
 } from "./validator";
 
 async function requireUser(ctx: QueryCtx | MutationCtx | ActionCtx) {
-  const id = await getAuthUserId(ctx);
+  const id = await getSessionUserId(ctx);
   if (!id) throw new ConvexError("Sign in to manage your connections.");
   return id;
 }

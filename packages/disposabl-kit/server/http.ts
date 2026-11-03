@@ -1,5 +1,6 @@
-import { getAuthUserId } from "@convex-dev/auth/server";
+import { getSessionUserId } from "./lib/functions";
 import { McpServer } from "@convex-dev/mcp";
+import { EnterpriseMcpServer } from "./mcp/enterprise";
 import { httpActionGeneric, httpRouter } from "convex/server";
 import { components } from "../../backend/convex/_generated/api";
 import { env } from "../../backend/convex/_generated/server";
@@ -27,16 +28,22 @@ if (
 export const platformSpec = platforms.spec;
 
 const enabled = validatePlatforms(config.platforms);
-const mcp = enabled.some((platform) => platform === "mcp" || platform === "api")
-  ? new McpServer(components.mcp, {
-      name: "disposabl",
-      title: "Disposabl",
-      version: "1.0.0",
-      siteUrl: env.CONVEX_SITE_URL,
-      consentUrl: `${env.CONVEX_SITE_URL}/consent`,
-      scopes: {},
-      tools: platforms.tools,
-    })
+const mcp: McpServer | undefined = enabled.some(
+  (platform) => platform === "mcp" || platform === "api",
+)
+  ? new (enabled.includes("mcp") ? EnterpriseMcpServer : McpServer)(
+      components.mcp,
+      {
+        name: "disposabl",
+        title: "Disposabl",
+        version: "1.0.0",
+        siteUrl: env.CONVEX_SITE_URL,
+        consentUrl: `${env.CONVEX_SITE_URL}/consent`,
+        scopes: {},
+        clientMetadataDocumentHosts: ["claude.ai"],
+        tools: platforms.tools,
+      },
+    )
   : undefined;
 
 // Keep the enabled API types for consumers; disabled exports are absent at runtime.
@@ -47,7 +54,7 @@ export const {
   revokeConnection,
   createApiKey,
 } =
-  mcp?.api({ getUserId: getAuthUserId }) ??
+  mcp?.api({ getUserId: getSessionUserId }) ??
   ({} as ReturnType<McpServer["api"]>);
 
 export default function createHttpRouter() {
