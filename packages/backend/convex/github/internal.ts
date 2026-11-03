@@ -10,9 +10,10 @@ export const connect = internalMutation({
     ...identityFields,
     owner: v.string(),
     installationId: v.string(),
+    organization: v.optional(v.boolean()),
   },
   returns: v.null(),
-  handler: async (ctx, { userId, owner, installationId }) => {
+  handler: async (ctx, { userId, owner, installationId, organization }) => {
     if (!/^[a-zA-Z0-9-]+$/.test(owner) || !/^\d+$/.test(installationId))
       throw new ConvexError("Invalid GitHub installation.");
     owner = owner.toLowerCase();
@@ -27,6 +28,7 @@ export const connect = internalMutation({
       userId,
       owner,
       installationId,
+      organization,
     });
     return null;
   },

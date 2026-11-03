@@ -25,7 +25,7 @@ export const status = query({
     }),
 });
 export const start = action({
-  args: { provider: oauthProvider },
+  args: { provider: oauthProvider, install: v.optional(v.boolean()) },
   returns: v.string(),
   handler: async (ctx, args): Promise<string> =>
     ctx.runAction(internal.connections.actions.oauth.start, {
@@ -74,6 +74,25 @@ export const disconnect = mutation({
   returns: v.null(),
   handler: async (ctx, args): Promise<null> =>
     ctx.runMutation(internal.connections.internal.disconnect, {
+      ...args,
+      userId: await requireUser(ctx),
+    }),
+});
+
+export const resumeGithubInstall = action({
+  args: { state: v.string() },
+  returns: v.string(),
+  handler: async (ctx, args): Promise<string> =>
+    ctx.runAction(internal.connections.actions.oauth.resumeGithubInstall, {
+      ...args,
+      userId: await requireUser(ctx),
+    }),
+});
+export const confirmBlacksmith = mutation({
+  args: { owner: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args): Promise<null> =>
+    ctx.runMutation(internal.connections.internal.confirmBlacksmith, {
       ...args,
       userId: await requireUser(ctx),
     }),

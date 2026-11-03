@@ -124,7 +124,12 @@ export async function runCli(
           if (connectionStatus)
             command.option(
               "--wait",
-              "Open Connections and continue when GitHub and Convex are connected",
+              "Open setup and continue when GitHub, Blacksmith and Convex are ready",
+            );
+          if (connectionStatus)
+            command.option(
+              "--mobile",
+              "Also wait for Expo when creating a mobile app",
             );
           const deleteApp = path === "/api/apps/delete";
           if (deleteApp)
@@ -244,14 +249,16 @@ export async function runCli(
                 `API request failed (${result.status}): ${await result.text()}`,
               );
             let value = await result.json();
-            if (connectionStatus && options.wait && !value.ready) {
-              const url = `${base}/dashboard/connections`;
+            const ready = () =>
+              value.ready && (!options.mobile || Boolean(value.expo));
+            if (connectionStatus && options.wait && !ready()) {
+              const url = `${base}/dashboard/connections?mobile=${options.mobile ? "1" : "0"}`;
               console.error(
-                `Connect your GitHub and Convex accounts:\n${url}\nWaiting for connections. Press Ctrl+C to keep your files and finish later.`,
+                `Set up your free GitHub organization, Blacksmith and Convex accounts (plus Expo for mobile):\n${url}\nWaiting for connections. Press Ctrl+C to keep your files and finish later.`,
               );
               openUrl(url);
               const deadline = Date.now() + 15 * 60_000;
-              while (!value.ready && Date.now() < deadline) {
+              while (!ready() && Date.now() < deadline) {
                 await new Promise((resolve) => setTimeout(resolve, 3000));
                 result = await send();
                 if (result.status === 401 && !process.env.DISPOSABL_API_KEY)
@@ -262,7 +269,7 @@ export async function runCli(
                   );
                 value = await result.json();
               }
-              if (!value.ready)
+              if (!ready())
                 throw new Error(
                   `Connections are still incomplete. Finish at ${url}, then retry setup.`,
                 );

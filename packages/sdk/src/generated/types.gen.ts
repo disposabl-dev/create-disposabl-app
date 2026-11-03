@@ -332,6 +332,10 @@ export type ConnectionsStatusResponses = {
   200: {
     github: {
       owner: string;
+      organization: boolean;
+    } | null;
+    blacksmith: {
+      owner: string;
     } | null;
     convex: {
       name: string;
@@ -344,7 +348,9 @@ export type ConnectionsStatusResponses = {
       github: boolean;
       convex: boolean;
       expo: boolean;
+      blacksmith: boolean;
     };
+    blacksmithInstallUrl: string;
     githubInstallUrl: string | null;
   };
 };

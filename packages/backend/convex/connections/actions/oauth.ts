@@ -18,9 +18,13 @@ import { userInstallations } from "./github";
 const hash = (value: string) =>
   createHash("sha256").update(value).digest("base64url");
 export const start = internalAction({
-  args: { ...identityFields, provider: oauthProvider },
+  args: {
+    ...identityFields,
+    provider: oauthProvider,
+    install: v.optional(v.boolean()),
+  },
   returns: v.string(),
-  handler: async (ctx, { userId, provider }) => {
+  handler: async (ctx, { userId, provider, install }): Promise<string> => {
     const status = await ctx.runQuery(internal.connections.internal.status, {
       userId,
     });
@@ -34,8 +38,13 @@ export const start = internalAction({
       userId,
       provider,
       hash: hash(state),
-      verifier,
+      verifier: provider === "github" && install ? "installation" : verifier,
     });
+    if (provider === "github" && install) {
+      const url = new URL(status.githubInstallUrl!);
+      url.searchParams.set("state", state);
+      return url.href;
+    }
     const callback = `${connectionsUrl()}?provider=${provider}`;
     if (provider === "github") {
       const result = await startAuthorization(
@@ -79,6 +88,10 @@ export const complete = internalAction({
       internal.connections.internal.consume,
       { userId, provider, hash: hash(state) },
     );
+    if (verifier === "installation")
+      throw new ConvexError(
+        "Complete GitHub authorization after installing Disposabl.",
+      );
     if (provider === "github") return userInstallations(ctx, userId);
     const response = await fetch("https://api.convex.dev/oauth/token", {
       method: "POST",
@@ -124,5 +137,27 @@ export const complete = internalAction({
       token: seal(result.access_token, `${userId}:convex`),
     });
     return { installations: [] };
+  },
+});
+
+export const resumeGithubInstall = internalAction({
+  args: { ...identityFields, state: v.string() },
+  returns: v.string(),
+  handler: async (ctx, { userId, state }): Promise<string> => {
+    if (!state || state.length > 128)
+      throw new ConvexError("Invalid GitHub installation callback.");
+    const step = await ctx.runMutation(internal.connections.internal.consume, {
+      userId,
+      provider: "github",
+      hash: hash(state),
+    });
+    if (step !== "installation")
+      throw new ConvexError("Restart GitHub setup to continue.");
+    // Installation and user authorization form one setup step. The OAuth callback
+    // still verifies account ownership before binding any installation.
+    return ctx.runAction(internal.connections.actions.oauth.start, {
+      userId,
+      provider: "github",
+    });
   },
 });

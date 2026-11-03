@@ -58,17 +58,25 @@ export async function setupApp(
     if (!verified.currentUser)
       throw new Error("Login completed without a verified user.");
   }
-  const connections = (await run(["connections", "status", "--wait"])) as {
+  const path = join(directory, "disposabl.json");
+  const config = JSON.parse(await readFile(path, "utf8"));
+  const mobile = config.platforms.some(
+    (p: string) => p === "ios" || p === "android",
+  );
+  const connections = (await run([
+    "connections",
+    "status",
+    "--wait",
+    ...(mobile ? ["--mobile"] : []),
+  ])) as {
     ready: boolean;
   };
   if (!connections.ready)
     throw new Error(
-      "Connect GitHub and Convex at https://www.disposabl.dev/dashboard/connections, then retry from the parent directory: bun create disposabl-app@latest " +
+      "Install Disposabl and Blacksmith in a GitHub organization, then connect Convex at https://www.disposabl.dev/dashboard/connections, then retry from the parent directory: bun create disposabl-app@latest " +
         basename(directory) +
         ". Your app files and login are saved.",
     );
-  const path = join(directory, "disposabl.json");
-  const config = JSON.parse(await readFile(path, "utf8"));
   if (config.appId) {
     const app = (await run(["apps", "get", "--appId", config.appId])) as {
       platforms: string[];

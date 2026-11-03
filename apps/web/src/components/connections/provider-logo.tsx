@@ -1,8 +1,14 @@
 export function ProviderLogo({
   provider,
 }: {
-  provider: "github" | "convex" | "expo";
+  provider: "github" | "convex" | "expo" | "blacksmith";
 }) {
+  if (provider === "blacksmith")
+    return (
+      <span aria-hidden="true" className="font-mono text-xl font-bold">
+        B
+      </span>
+    );
   if (provider === "github")
     return (
       <svg

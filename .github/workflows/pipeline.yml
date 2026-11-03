@@ -17,10 +17,10 @@ env:
   EAS_CLI: eas-cli@27.2.0
   BUN_VERSION: &bun-version "1.4.4"
   NODE_VERSION: &node-version "24"
-  LINUX_RUNNER: &linux-runner ubuntu-latest
-  WEB_RUNNER: &web-runner ubuntu-latest
-  WINDOWS_RUNNER: windows-2025
-  MACOS_RUNNER: macos-15
+  LINUX_RUNNER: &linux-runner blacksmith-4vcpu-ubuntu-2404
+  WEB_RUNNER: &web-runner blacksmith-4vcpu-ubuntu-2404
+  WINDOWS_RUNNER: blacksmith-2vcpu-windows-2025
+  MACOS_RUNNER: blacksmith-6vcpu-macos-27
   RELEASE_PREFIX: app
   DISPOSABL_ANDROID_VERSION_CODE: ${{ github.run_number }}
   DISPOSABL_IOS_BUILD_NUMBER: ${{ github.run_number }}
@@ -205,10 +205,9 @@ jobs:
     needs: web
     if: github.event_name == 'pull_request' && needs.web.outputs.ios == 'true'
     permissions: *release-permissions
-    runs-on: xcode-27
+    runs-on: blacksmith-6vcpu-macos-27
     timeout-minutes: 90
     env:
-      DEVELOPER_DIR: /Applications/Xcode_27.2.0.app/Contents/Developer
       CONVEX_URL: ${{ needs.web.outputs.convex_url }}
       CONVEX_SITE_URL: ${{ needs.web.outputs.convex_site_url }}
       EXPO_PUBLIC_CONVEX_URL: ${{ needs.web.outputs.convex_url }}

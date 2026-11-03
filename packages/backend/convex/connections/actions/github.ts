@@ -33,7 +33,6 @@ const permissions = [
 
 export async function userInstallations(ctx: ActionCtx, userId: string) {
   const token = await githubUserToken(ctx, userId);
-  const user = await githubRequest<{ login: string }>(token, "/user");
   const organizations = new Set<string>();
   for (let page = 1; ; page++) {
     const memberships = await githubRequest<
@@ -53,10 +52,11 @@ export async function userInstallations(ctx: ActionCtx, userId: string) {
     for (const item of result.installations) {
       if (item.app_slug !== env.GITHUB_APP_SLUG || item.suspended_at) continue;
       if (!permissions.every((p) => item.permissions[p] === "write")) continue;
-      if (item.account.type === "Organization") {
-        // Only an organization admin can authorize account-wide repository creation.
-        if (!organizations.has(item.account.login.toLowerCase())) continue;
-      } else if (item.account.login.toLowerCase() !== user.login.toLowerCase())
+      // Blacksmith supports organization repositories. Require an organization admin.
+      if (
+        item.account.type !== "Organization" ||
+        !organizations.has(item.account.login.toLowerCase())
+      )
         continue;
       installations.push({
         installationId: String(item.id),
@@ -106,6 +106,7 @@ export const selectGithub = internalAction({
     await ctx.runMutation(internal.github.internal.connect, {
       userId,
       ...chosen,
+      organization: true,
     });
     return null;
   },

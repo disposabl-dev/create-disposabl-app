@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Application API",
-    "version": "3.1.0"
+    "version": "4.0.0"
   },
   "security": [
     {
@@ -523,6 +523,26 @@
                           "properties": {
                             "owner": {
                               "type": "string"
+                            },
+                            "organization": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": ["owner", "organization"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "blacksmith": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "owner": {
+                              "type": "string"
                             }
                           },
                           "required": ["owner"],
@@ -581,10 +601,16 @@
                         },
                         "expo": {
                           "type": "boolean"
+                        },
+                        "blacksmith": {
+                          "type": "boolean"
                         }
                       },
-                      "required": ["github", "convex", "expo"],
+                      "required": ["github", "convex", "expo", "blacksmith"],
                       "additionalProperties": false
+                    },
+                    "blacksmithInstallUrl": {
+                      "type": "string"
                     },
                     "githubInstallUrl": {
                       "anyOf": [
@@ -599,10 +625,12 @@
                   },
                   "required": [
                     "github",
+                    "blacksmith",
                     "convex",
                     "expo",
                     "ready",
                     "available",
+                    "blacksmithInstallUrl",
                     "githubInstallUrl"
                   ],
                   "additionalProperties": false
