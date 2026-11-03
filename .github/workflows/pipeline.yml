@@ -24,6 +24,7 @@ env:
   RELEASE_PREFIX: app
   DISPOSABL_ANDROID_VERSION_CODE: ${{ github.run_number }}
   DISPOSABL_IOS_BUILD_NUMBER: ${{ github.run_number }}
+  # Build jobs only read this repository. Keep installation tokens in publishing jobs.
   GH_TOKEN: ${{ github.token }}
   GH_REPO: ${{ github.repository }}
   SOURCE: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -72,9 +73,6 @@ jobs:
       - &node
         uses: actions/setup-node@v6
         with: { node-version: *node-version, package-manager-cache: false }
-      - &app-token
-        name: Disposabl GitHub App token
-        run: node .github/scripts/disposabl.mjs token
       - &bun
         uses: oven-sh/setup-bun@v2
         with: { bun-version: *bun-version }
@@ -173,7 +171,6 @@ jobs:
       - *checkout
       - *platforms
       - *node
-      - *app-token
       - *bun
       - *cache
       - *install
@@ -226,7 +223,6 @@ jobs:
     steps:
       - *checkout
       - *node
-      - *app-token
       - *bun
       - *cache
       - *install
@@ -272,7 +268,6 @@ jobs:
     steps:
       - *checkout
       - *node
-      - *app-token
       - *bun
       - *cache
       - *install
@@ -312,7 +307,6 @@ jobs:
     steps:
       - *checkout
       - *node
-      - *app-token
       - *bun
       - *cache
       - *install
@@ -378,7 +372,8 @@ jobs:
       - *bun
       - *cache
       - *install
-      - *app-token
+      - name: Disposabl GitHub App token
+        run: node .github/scripts/disposabl.mjs token
       - name: Publish package if configured
         run: bash .github/scripts/release.sh package-release
 
