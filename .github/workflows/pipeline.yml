@@ -97,6 +97,7 @@ jobs:
           done
       - name: Deploy
         id: deploy
+        timeout-minutes: 1
         env:
           TRUSTED: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
           CONVEX_DEPLOY_KEY: ${{ secrets[github.event_name == 'push' && 'CONVEX_DEPLOY_KEY' || 'CONVEX_DEPLOY_KEY_PREVIEW'] }}
