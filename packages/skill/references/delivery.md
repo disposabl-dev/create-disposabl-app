@@ -23,18 +23,18 @@ If compilation succeeds but verification or publication fails, preserve the comp
 
 ## Diagnose the failing stage
 
-| Symptom | What to inspect first |
-| --- | --- |
-| Connect remains visible after OAuth | Callback state, stored provider, selected GitHub installation/Convex team, persistence after reload. |
-| Convex asks to create a project during managed development | Missing app configuration or scoped development credentials. Resume managed setup. |
-| Reports fail with upstream 429 | Identity/token issuance frequency and retry headers. Reuse valid identities and use bounded retries; changing app features will not repair rate limiting. |
-| Convex deployment fails loading modules | Server module initialization and dependency side effects. In the rollout, moving eager libsodium initialization into the action preceded a successful deployment; do not assume every module-load error has that cause. |
-| Linux installer cannot find the executable | Align the packaged executable name with Debian/RPM maker `name` and `bin`. Packaging the app alone does not validate installer creation. |
-| RPM cannot copy `usr/*` | Installer staging path versus rpmbuild's working directory. Use the maintained custom spec and build/inspect a real RPM. |
-| Swift package tools version or actor-isolation compilation error | Exact Swift/Xcode version, dependency source and runner inventory. Validate the selected replacement with a real archive build. |
-| `BUILD SUCCESSFUL`, followed by GitHub 401 | The next API operation and its credential source. Expiration is only one possible cause; do not claim it without evidence. |
-| An old commit's failure arrives after a fix | Match job ID and SHA to the already-diagnosed failure. Avoid another edit or rerun for the same stale notification. |
-| Repeated dependency bot comment | Compare the actual findings. An informational dependency inventory is not a new security finding. |
+| Symptom                                                          | What to inspect first                                                                                                                                                                                                   |
+| ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Connect remains visible after OAuth                              | Callback state, stored provider, selected GitHub installation/Convex team, persistence after reload.                                                                                                                    |
+| Convex asks to create a project during managed development       | Missing app configuration or scoped development credentials. Resume managed setup.                                                                                                                                      |
+| Reports fail with upstream 429                                   | Identity/token issuance frequency and retry headers. Reuse valid identities and use bounded retries; changing app features will not repair rate limiting.                                                               |
+| Convex deployment fails loading modules                          | Server module initialization and dependency side effects. In the rollout, moving eager libsodium initialization into the action preceded a successful deployment; do not assume every module-load error has that cause. |
+| Linux installer cannot find the executable                       | Align the packaged executable name with Debian/RPM maker `name` and `bin`. Packaging the app alone does not validate installer creation.                                                                                |
+| RPM cannot copy `usr/*`                                          | Installer staging path versus rpmbuild's working directory. Use the maintained custom spec and build/inspect a real RPM.                                                                                                |
+| Swift package tools version or actor-isolation compilation error | Exact Swift/Xcode version, dependency source and runner inventory. Validate the selected replacement with a real archive build.                                                                                         |
+| `BUILD SUCCESSFUL`, followed by GitHub 401                       | The next API operation and its credential source. Expiration is only one possible cause; do not claim it without evidence.                                                                                              |
+| An old commit's failure arrives after a fix                      | Match job ID and SHA to the already-diagnosed failure. Avoid another edit or rerun for the same stale notification.                                                                                                     |
+| Repeated dependency bot comment                                  | Compare the actual findings. An informational dependency inventory is not a new security finding.                                                                                                                       |
 
 ## Evidence and timing
 
