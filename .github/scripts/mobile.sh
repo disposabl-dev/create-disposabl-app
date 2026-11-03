@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
+manifest() {
+  bun x --no-install expo config --json | jq -ce --arg channel "${CHANNEL:-}" --arg runtime "${RUNTIME:-}" '
+    def required($name): if type == "string" and (test("[^[:space:]]")) then . else error("Missing or invalid " + $name) end;
+    {channel: ($channel | required("channel")), projectId: (.extra.eas.projectId | required("projectId")), applicationId: (.android.package | required("applicationId")), runtimeVersion: ($runtime | required("runtimeVersion") | if test("^[a-f0-9]{40,64}$") then . else error("Invalid runtimeVersion") end)}
+  '
+}
 case "${1:?operation required}" in
   expo-env)
 if [[ -z "$EXPO_PROJECT_ID" ]]; then
@@ -56,13 +62,12 @@ for ((page=1; ; page++)); do
   jq --arg artifact "$artifact" --arg tag "$RELEASE_PREFIX-$CHANNEL-android" --arg legacy "$RELEASE_PREFIX-$CHANNEL" '[.[] | select(.draft | not) | select(.tag_name == $tag or .tag_name == $legacy or (.tag_name | startswith($legacy + "-"))) | select(any(.assets[]; .name == $artifact))] | sort_by(.tag_name != $tag, .tag_name != $legacy) | .[0] // {}' "$RUNNER_TEMP/releases.json" > "$RUNNER_TEMP/release.json"
   if jq -e '.id' "$RUNNER_TEMP/release.json" > /dev/null || [[ $(jq length "$RUNNER_TEMP/releases.json") -lt 100 ]]; then break; fi
 done
-bun x --no-install expo config --json > "$RUNNER_TEMP/mobile.json"
 RUNTIME=$(bun x --no-install expo-updates runtimeversion:resolve --platform android --workflow managed | jq -er 'select(.fingerprintSources != null) | .runtimeVersion | select(test("^[a-f0-9]{40,64}$"))')
 export RUNTIME
+MANIFEST=$(manifest)
+export MANIFEST
 bun -e '
-  const config = await Bun.file(`${process.env.RUNNER_TEMP}/mobile.json`).json();
-  if (!config.extra?.eas?.projectId) throw new Error("Link an Expo project first");
-  const wanted = {channel: process.env.CHANNEL, projectId: config.extra.eas.projectId, applicationId: config.android.package, runtimeVersion: process.env.RUNTIME};
+  const wanted = JSON.parse(process.env.MANIFEST);
   const release = await Bun.file(`${process.env.RUNNER_TEMP}/release.json`).json();
   const prior = JSON.parse(/<!-- android (\{[^\n]+\}) -->/.exec(release.body || "")?.[1] || "null");
   const reusable = prior && Object.keys(wanted).every(k => prior[k] === wanted[k]) && /^[a-f0-9]{64}$/.test(prior.sha256 || "") && release.assets.some(a => a.name === process.env.artifact && a.state === "uploaded" && a.size > 0 && a.digest === `sha256:${prior.sha256}`);
@@ -75,7 +80,7 @@ bun -e '
     });
     if (report.exitCode) throw new Error("Cannot report Android prerequisites.");
   }
-  console.log(`build=${blocked ? "blocked" : !reusable}\nruntime=${wanted.runtimeVersion}\nmanifest=${JSON.stringify(wanted)}\ntag=${reusable ? release.tag_name : ""}\nsha=${reusable ? prior.sha256 : ""}`);
+  console.log(`build=${blocked ? "blocked" : !reusable}\nruntime=${wanted.runtimeVersion}\ntag=${reusable ? release.tag_name : ""}\nsha=${reusable ? prior.sha256 : ""}`);
 ' >> "$GITHUB_OUTPUT"
     ;;
   expo-update)
@@ -84,6 +89,7 @@ mkdir -p dist/release
 gh release download "$TAG" --pattern "$artifact" --dir dist/release
 echo "$SHA  dist/release/$artifact" | sha256sum --check
 cd apps/mobile
+MANIFEST=$(manifest)
 bun x --no-install expo export --platform android --output-dir dist/update
 test "$(bun x --no-install expo-updates runtimeversion:resolve --platform android --workflow managed | jq -er .runtimeVersion)" = "$RUNTIME"
 test "$(gh api "repos/$GH_REPO/$SOURCE_PATH" --jq 'if has("head") then (if .state == "open" then .head.sha else "closed" end) else .object.sha end')" = "$SOURCE"
@@ -91,6 +97,7 @@ bun x "$EAS_CLI" update --platform android --channel "$CHANNEL" --environment "$
 jq --arg sha "$SHA" '. + {sha256: $sha, action: "update"}' <<< "$MANIFEST" > ../../dist/release/android.json
     ;;
   android-build)
+MANIFEST=$(manifest)
 test "$(gh api "repos/$GH_REPO/$SOURCE_PATH" --jq 'if has("head") then (if .state == "open" then .head.sha else "closed" end) else .object.sha end')" = "$SOURCE"
 if [[ "$CHANNEL" == production ]]; then
   if [[ -n "${DISPOSABL_ANDROID_SIGNING:-}" ]]; then
