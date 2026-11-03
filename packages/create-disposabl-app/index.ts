@@ -23,7 +23,6 @@ import { createApp } from "./scaffold";
 import { commitApp, install, setupApp } from "./setup";
 
 type Options = {
-  setup?: boolean;
   yes?: boolean;
   platforms?: string;
   features?: string;
@@ -46,9 +45,8 @@ const program = new Command("create-disposabl-app")
   )
   .option(
     "-y, --yes",
-    "Skip prompts; include Web and authentication by default",
+    "Skip app options prompts; include Web and authentication by default",
   )
-  .option("--setup", "Sign in to Disposabl and configure a development preview")
   .option("--skip-install", "Create files without running bun install")
   .option(
     "--list-options",
@@ -56,12 +54,12 @@ const program = new Command("create-disposabl-app")
   )
   .option(
     "--json",
-    "Skip prompts and emit a JSON result or error; install logs go to stderr",
+    "Skip app options prompts and emit JSON; login and install logs go to stderr",
   )
   .helpOption("-h, --help")
   .addHelpText(
     "after",
-    "\nPlatforms:\n  web (required), android, ios, macos, windows, linux, api, mcp, cli, typescript-sdk\n  CLI and TypeScript SDK automatically include API.\n\nOptional features:\n  authentication, docs\n  Authentication is enabled by default. Use --features none to disable frontend authentication.\n\nExamples:\n  bun create disposabl-app@latest\n  bun create disposabl-app@latest my-app --yes\n  bun create disposabl-app@latest my-app --platforms web,android,ios,mcp --features docs --yes\n  bun create disposabl-app@latest my-app --platforms web --features none --skip-install --json\n  bun create disposabl-app@latest --list-options --json\n\nWithout a TTY, the CLI never prompts. Supply an app name.\nPlatform and feature choices are saved in disposabl.json.\nBackend authentication code is always included. Use --setup to create an app UUID and development environment through https://www.disposabl.dev.\n",
+    "\nPlatforms:\n  web (required), android, ios, macos, windows, linux, api, mcp, cli, typescript-sdk\n  CLI and TypeScript SDK automatically include API.\n\nOptional features:\n  authentication, docs\n  Authentication is enabled by default. Use --features none to disable frontend authentication.\n\nExamples:\n  bun create disposabl-app@latest\n  bun create disposabl-app@latest my-app --yes\n  bun create disposabl-app@latest my-app --platforms web,android,ios,mcp --features docs --yes\n  bun create disposabl-app@latest my-app --platforms web --features none --skip-install --json\n  bun create disposabl-app@latest --list-options --json\n\nWithout a TTY, supply an app name. App options are not prompted, but login is still required.\nPlatform and feature choices are saved in disposabl.json.\nBackend authentication code is always included. Every app checks your Disposabl login, asks you to sign in if needed, and creates an app UUID and development environment through https://www.disposabl.dev. Rerun the same command to resume an existing app.\n",
   )
   .configureOutput({ writeErr: () => {} })
   .exitOverride();
@@ -154,8 +152,15 @@ async function main() {
   const invalidName = validateName(name);
   if (invalidName) throw new Error(invalidName);
   let directory = resolve(name);
-  if (options.setup && pathExists(join(directory, "disposabl.json"))) {
+  if (pathExists(join(directory, "disposabl.json"))) {
     const appId = await setupApp(directory, name);
+    if (
+      spawnSync("git", ["rev-parse", "--verify", "HEAD"], {
+        cwd: directory,
+        stdio: "ignore",
+      }).status !== 0
+    )
+      commitApp(directory);
     console.log(
       options.json
         ? JSON.stringify({ status: "configured", directory, appId })
@@ -207,15 +212,6 @@ async function main() {
       selected.length ? selected.join(",") : "none",
     );
   }
-  const managedSetup =
-    options.setup ??
-    (interactive &&
-      answer(
-        await p.confirm({
-          message: "Set up this app with Disposabl?",
-          initialValue: false,
-        }),
-      ));
   const config: DisposablConfig = {
     version: version,
     platforms: chosenPlatforms,
@@ -255,7 +251,7 @@ async function main() {
     cwd: directory,
     stdio: "pipe",
   });
-  if (managedSetup) config.appId = await setupApp(directory, name);
+  config.appId = await setupApp(directory, name);
   commitApp(directory);
   const folders = selectedFolders(config);
   if (options.json) {

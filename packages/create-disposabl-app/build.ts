@@ -110,6 +110,19 @@ await cp(join(root, "LICENSE"), join(dir, "LICENSE"));
       await copySource(join(root, entry), join(templateDir, entry));
     }
   }
+  // The generator runs outside the app and must not remain in its workspace.
+  const lockPath = join(templateDir, "bun.lock");
+  const lock = Bun.JSONC.parse(await Bun.file(lockPath).text()) as {
+    workspaces: Record<string, unknown>;
+    packages: Record<string, unknown>;
+  };
+  delete lock.workspaces["packages/create-disposabl-app"];
+  delete lock.packages["create-disposabl-app"];
+  await Bun.write(lockPath, JSON.stringify(lock, null, 2) + "\n");
+  const turboPath = join(templateDir, "turbo.json");
+  const turbo = await Bun.file(turboPath).json();
+  delete turbo.tasks["create-disposabl-app#build"];
+  await Bun.write(turboPath, JSON.stringify(turbo, null, 2) + "\n");
   // npm omits .gitignore files from packed templates.
   for (const path of await readdir(templateDir, { recursive: true })) {
     if (basename(path) === ".gitignore") {

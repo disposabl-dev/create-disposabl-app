@@ -15,10 +15,10 @@ its access checks remain installed.
 Releases publish automatically after changes reach `main`. Commit messages
 determine the next version; no manual version edit is needed.
 
-Choose managed setup to sign in through `disposabl login`, create an app, save its UUID in `disposabl.json`, and configure a named development preview. The service is `https://www.disposabl.dev`.
+Every creation checks your Disposabl login and asks you to sign in through `disposabl login` if needed. It then creates the app, saves its UUID in `disposabl.json`, and configures a named development preview. There is no setup option. `--yes`, `--json`, and `--skip-install` still require login and app creation. The service is `https://www.disposabl.dev`.
 
 ```sh
-bun create disposabl-app@latest my-app --setup
+bun create disposabl-app@latest my-app
 cd my-app
 bun run dev
 ```
@@ -29,4 +29,6 @@ The website opens automatically and Metro starts with development-client support
 
 To get another development key in a worktree, run `disposabl previews token create --configure .`. The branch is detected automatically, or the worktree name when detached. Repeated requests reuse the preview and issue a new key.
 
-If managed setup fails, rerun `bun create disposabl-app@latest my-app --setup` from the parent directory. It resumes setup using the existing files and app UUID.
+If app creation is interrupted, rerun `bun create disposabl-app@latest my-app` from the parent directory. It resumes setup using the existing files and app UUID.
+
+Generated apps do not include the `create-disposabl-app` package, its workspace lockfile entry, or its Turbo build task. The generator and bundled Disposabl CLI run externally.

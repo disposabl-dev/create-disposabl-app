@@ -1,6 +1,6 @@
 import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { detectReference } from "../cli/preview";
 
@@ -29,7 +29,7 @@ export const runDisposabl: CliRunner = (args, interactive = false) =>
       if (code !== 0) {
         reject(
           new Error(
-            `disposabl ${args.slice(0, 3).join(" ")} failed. Your files are saved. Retry from the parent directory: bun create disposabl-app@latest <app-directory> --setup`,
+            `disposabl ${args.slice(0, 3).join(" ")} failed. Your files are saved. Retry from the parent directory: bun create disposabl-app@latest <app-directory>`,
           ),
         );
         return;
@@ -63,9 +63,9 @@ export async function setupApp(
   };
   if (!connections.ready)
     throw new Error(
-      "Connect GitHub and Convex at https://www.disposabl.dev/dashboard/connections, then retry: bun create disposabl-app@latest " +
-        directory +
-        " --setup. Your app files and login are saved.",
+      "Connect GitHub and Convex at https://www.disposabl.dev/dashboard/connections, then retry from the parent directory: bun create disposabl-app@latest " +
+        basename(directory) +
+        ". Your app files and login are saved.",
     );
   const path = join(directory, "disposabl.json");
   const config = JSON.parse(await readFile(path, "utf8"));

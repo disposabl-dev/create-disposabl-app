@@ -11,14 +11,7 @@ const config = JSON.parse(await read(join(root, "disposabl.json")));
 if (!env.CONVEX_DEPLOY_KEY && (!env.CONVEX_DEPLOYMENT || config.appId)) {
   console.log("Setting up this app through your Disposabl connections…");
   const configure = Bun.spawn(
-    [
-      "bun",
-      "create",
-      "disposabl-app@latest",
-      basename(root),
-      "--setup",
-      "--yes",
-    ],
+    ["bun", "create", "disposabl-app@latest", basename(root), "--yes"],
     {
       cwd: dirname(root),
       stdin: "inherit",

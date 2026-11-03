@@ -8,10 +8,10 @@ description: Build and deliver a Disposabl app from a request, including develop
 Aim for a first usable preview in five minutes when practical, without promising a deadline. Treat that as a web-preview target, not a first native-build deadline. In the meal-planner validation, one Android build took about 41 minutes and an iOS simulator job took about 10 minutes; later timings depend on cache and native changes. Select platform and feature IDs with `bun create disposabl-app@latest --list-options` and pass them explicitly. For example:
 
 ```sh
-bun create disposabl-app@latest my-app --platforms web,android --features authentication --setup --yes
+bun create disposabl-app@latest my-app --platforms web,android --features authentication --yes
 ```
 
-Use the requested platforms and features. Setup creates the app and its scoped development environment through Disposabl; do not create a project with the Convex CLI. If setup stops, preserve the generated files and follow its continuation instructions. Never print credentials.
+Use the requested platforms and features. Creation checks login, asks you to sign in if needed, and creates the app and its scoped development environment through Disposabl; do not create a project with the Convex CLI. If setup stops, preserve the generated files and follow its continuation instructions. Never print credentials.
 
 Use the installed `disposabl` bin, or invoke it as `bunx --package create-disposabl-app disposabl`. Check `disposabl login status`; if needed, run `disposabl login` and use the existing authenticated browser session for signup or login when possible. Complete the required GitHub and Convex connections. Respect authorization already given for the task.
 
