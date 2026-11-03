@@ -29,6 +29,11 @@ export async function createApp(
     features: selectFeatures(config.features.join(",") || "none"),
   };
   const folders = selectedFolders(config);
+  const skill = join(template, "packages/skill");
+  if (!existsSync(join(skill, "SKILL.md")))
+    throw new Error(
+      "The bundled starter is missing the Disposabl skill. Rebuild the CLI.",
+    );
   for (const folder of folders) {
     if (!existsSync(join(template, folder, "package.json"))) {
       throw new Error(
@@ -50,6 +55,19 @@ export async function createApp(
         errorOnExist: true,
       });
     }
+    // Install from the bundled source without a network call or global changes.
+    // Copies work on Windows too, where creating symlinks may require privileges.
+    for (const agent of [".agents", ".claude"]) {
+      const skills = join(destination, agent, "skills");
+      await mkdir(skills, { recursive: true });
+      await cp(skill, join(skills, "disposabl-app"), { recursive: true });
+    }
+    const instructions = join(destination, "AGENTS.md");
+    await writeFile(
+      instructions,
+      (await readFile(instructions, "utf8")) +
+        "\n## Disposabl\n\nFor Disposabl development and delivery, read [.agents/skills/disposabl-app/SKILL.md](.agents/skills/disposabl-app/SKILL.md). Work in this generated app; create another app only when requested.\n",
+    );
     for (const entry of await readdir(join(destination, "apps"))) {
       if (!folders.includes("apps/" + entry))
         await rm(join(destination, "apps", entry), {

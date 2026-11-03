@@ -33,6 +33,11 @@ If app creation is interrupted, rerun `bun create disposabl-app@latest my-app` f
 
 Generated apps do not include the `create-disposabl-app` package, its workspace lockfile entry, or its Turbo build task. The generator and bundled Disposabl CLI run externally.
 
+Each new app installs the bundled `disposabl-app` skill and its references into
+`.agents/skills/disposabl-app` for Codex and `.claude/skills/disposabl-app` for
+Claude Code. `AGENTS.md` links to the skill. No separate skill installation or
+global configuration is needed; the source copy remains in `packages/skill`.
+
 Generated backends start with only `users: defineTable({})`. The starter keeps
 authentication, static hosting, and API/MCP support, with `users/current` as its
 only application operation. Disposabl's apps, previews, releases, provider
