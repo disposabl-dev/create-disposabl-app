@@ -1,52 +1,72 @@
 ---
 name: disposabl-app
-description: Build and deliver a Disposabl app from a request, including development and preview verification.
+description: Create, develop, and deliver Disposabl apps, with preview status updates and verification on the requested platforms.
 ---
 
 # Build a Disposabl app
 
-Aim for a first usable preview in five minutes when practical, without promising a deadline. Treat that as a web-preview target, not a first native-build deadline. In the meal-planner validation, one Android build took about 41 minutes and an iOS simulator job took about 10 minutes; later timings depend on cache and native changes. Select platform and feature IDs with `bun create disposabl-app@latest --list-options` and pass them explicitly. For example:
+Build the user's requested app and keep its preview visible. Preserve their chosen name and platforms. Use the generated app's `disposabl.json` to identify the app; do not substitute another project's preview.
+
+## Create and configure
+
+On a fresh machine, check Bun, Git, and Node.js 22.12 or newer. Report a missing prerequisite and follow its official installation instructions; do not assume another machine's tools, login, or credentials exist here.
+
+Discover platform and feature IDs, then create the app with explicit selections:
 
 ```sh
-bun create disposabl-app@latest my-app --platforms web,android --features authentication --yes
+bun create disposabl-app@latest --list-options
+bun create disposabl-app@latest my-app --platforms web,android,mcp --features authentication --yes
 ```
 
-Use the requested platforms and features. Creation checks login, asks you to sign in if needed, and creates the app and its scoped development environment through Disposabl; do not create a project with the Convex CLI. If setup stops, preserve the generated files and follow its continuation instructions. Never print credentials.
+Use the requested platforms and features. Creation handles Disposabl login, required GitHub/Convex connections, and the app's scoped development environment. Resume interrupted setup in the same directory. Do not create a replacement Convex project or delete an app unless requested. Never print credentials.
 
-Use the installed `disposabl` bin, or invoke it as `bunx --package create-disposabl-app disposabl`. Check `disposabl login status`; if needed, run `disposabl login` and use the existing authenticated browser session for signup or login when possible. Complete the required GitHub and Convex connections. Respect authorization already given for the task.
+The CLI is bundled with `create-disposabl-app`; do not use the retired `@disposabl/cli` package. Commands below use the published CLI and work without a global install:
 
-Before starting a native build or repairing delivery, read [delivery checks and failure recovery](references/delivery.md). Confirm account connections survive a page reload and managed development starts without a Convex project-selection prompt.
+```sh
+bunx --package create-disposabl-app@latest disposabl login status
+bunx --package create-disposabl-app@latest disposabl previews get --help
+```
 
-Before designing a new app, locate and read the `frontend-design` skill and use it to choose a visual direction suited to the user's product. If it is unavailable, report that explicitly; do not claim to have applied it. Read [app branding and visual design](references/design.md) for the Disposabl-specific requirements.
+Use command help and the current API contract for other operations. If login is required, use the supported login flow and an existing authenticated browser when available. Never request provider passwords or copy another project's environment files.
 
-Create a separate Git branch and worktree for each change. In that worktree run `disposabl previews token create --configure .`, `bun install`, and `bun dev`. Implement the request and verify the actual behavior on the requested platforms. Commit and push the branch and open a pull request when the task authorizes delivery.
+## Implement and deliver
 
-A newly generated app already has an Initial commit. Publish its scaffold to `main` first so GitHub has the trusted publishing workflow. Setup configures `origin` for the provisioned repository. Then work on the requested features in an isolated branch:
+Choose a visual direction suited to the product. Use `frontend-design` when available and read [app branding and visual design](references/design.md). If that skill is unavailable, proceed with the user's brief and report the limitation without blocking development.
+
+Read [delivery checks](references/delivery.md) before native builds or delivery repairs. Aim to show a usable web preview early; first native builds can take longer. Do not promise a build deadline.
+
+A generated app already has an Initial commit and a provisioned Git remote. For authorized delivery, publish that scaffold to `main`, then develop on an isolated feature branch/worktree:
 
 ```sh
 cd my-app
 git push -u origin main
 git worktree add ../my-app-feature -b feat/first-version
 cd ../my-app-feature
-bunx --package create-disposabl-app disposabl previews token create --configure .
+bunx --package create-disposabl-app@latest disposabl previews token create --configure .
 bun install
 bun run dev
 ```
 
-The configured token is scoped to this worktree's development backend. Never copy another worktree's environment files or use a production deploy key for development. Token provisioning or refresh alone does not deploy or require git operations. Keep credentials in ignored environment files. A branch push alone does not trigger deployment: a same-repository PR to `main` triggers the `pr-N` preview, and a push to `main` triggers production. Local development is separate; preview reports are tracked by head branch.
+Use the host's worktree and delegation tools when required. Keep tokens in ignored environment files. Local development, PR previews, and production are separate deployments. Opening a same-repository PR to `main` triggers its preview; a branch push alone does not. Push only the intended reviewed changes and preserve unrelated work.
 
-For background delivery, hand a subagent a fixed, reviewed commit snapshot in an isolated worktree. Its brief must name the repository, branch, SHA, scope, PR base, required checks, push ownership, and expected result evidence. It pushes that snapshot and opens or updates the same-repository PR while the main agent continues separately. Never sweep concurrent edits or the index, or push later commits without a new handoff. Do not block implementation on push or PR creation.
+## Preview updates every two minutes
 
-After opening the PR, run `disposabl previews get` in the worktree and check each requested platform's status and available preview, workflow, release, or download URLs. Report the deployed SHA, checks, and each platform URL and status. Readiness requires successful CI and actual endpoint or device behavior; a provisioned development URL is not a hosted preview. For Android, install the preview APK on the target and verify the requested behavior and authentication. Do not run `eas submit`. After an authorized merge, verify production status and actual URLs. If a platform or URL is missing, inspect the relevant workflow and report the gap.
+Run this in the active app worktree immediately after setup, after opening or updating its PR, and whenever the user asks for a preview:
 
-Use `disposabl previews get --json` when an agent needs structured status. Query again as builds progress, respecting the host's PR watcher rules, and stop waiting when every requested platform has a terminal status. Inspect and repair failures instead of repeatedly polling an unchanged failure. After merging, run `disposabl releases get --appId <appId-from-disposabl.json>`; production results are separate from the worktree's preview. Install the production Android APK alongside its preview and verify login and saved data against the production backend. Store submission is not required for Android APK delivery. TestFlight is available only after Apple signing and App Store Connect submission credentials are configured.
+```sh
+bunx --package create-disposabl-app@latest disposabl previews get --json
+```
 
-When CI fails, compare the notification SHA with the current branch before editing. Diagnose the exact failed step, collect independent platform failures, and batch related fixes before pushing. A push can cancel an expensive preview build. Use available PR watchers instead of polling unchanged checks. Keep separate evidence for compilation, artifact publication, installation, and login/data persistence.
+While delivery is active, check again every **two minutes**. Track the last check time and continue useful work between checks. Use the host's scheduling/watcher rules; do not start an endless polling process or poll a delegated agent's status. If the host requires yielding to a PR watcher, yield and refresh Disposabl status on wake.
+
+After each check, give a short update: the current stage, requested platforms that are ready or still building, any blocker, and the available preview or download links. If unchanged, say so briefly. On a failed status, diagnose the failure rather than repeatedly polling it. Stop periodic checks when all requested platforms are ready, delivery is blocked on a concrete user action, or the user stops the task.
+
+When a preview becomes available, open that app's URL or install/open its APK in the supported device panel promptly, before lengthy verification. Do not replace the requested app preview with a dashboard or landing page. A configured URL, `enabled: true`, successful build, or local APK does not by itself prove the hosted preview is ready. If local and reported cloud states differ, explain the difference.
+
+Verify the requested behavior, authentication, and saved data after relaunch on each requested platform. Report compilation, publication, and visible behavior separately. After an authorized merge, use `disposabl releases get --appId <appId>` for production status and verify its URLs separately. APK delivery does not require store submission; do not run `eas submit` unless requested.
 
 ## Delete an app
 
-When the user requests deletion, run `disposabl apps delete --appId <uuid> --dangerously-delete-app`. The Convex action deletes linked resources and retains the app record until cleanup is verified. Apps with production releases cannot be deleted.
+Only when requested, run `disposabl apps delete --appId <uuid> --dangerously-delete-app`. Apps with production releases cannot be deleted.
 
-If Expo rejects deletion with its access token, GitHub and Convex cleanup still proceeds. The response `expo_manual_delete_required` includes `projectUrl`, pointing to that exact Expo project's `/settings/advanced` page. The CLI opens it automatically; if your environment cannot show that browser, open the returned URL in the user's available browser. Never send the user to a generic dashboard or another project's settings. Expo preserves the project URL through its login flow. Tell the user to sign in directly to Expo if needed and use Delete project. Never request, collect, or pass an Expo password or session cookie.
-
-After the user finishes on Expo, retry the same Disposabl delete command. Report full deletion only after the action verifies Expo removal and deletes the app record. While waiting, report GitHub/Convex cleanup separately from the remaining manual Expo step. `--no-browser` prints the exact URL for headless callers; API and MCP callers should present and open the returned `projectUrl` themselves.
+If the response is `expo_manual_delete_required`, GitHub/Convex cleanup has completed but Expo cleanup remains. Open the exact returned `projectUrl`; never substitute a generic dashboard. The user completes Expo sign-in or reauthentication directly. Do not collect passwords or session cookies. Retry the deletion command afterward and report full deletion only when Disposabl confirms it. `--no-browser` prints the URL for headless callers.

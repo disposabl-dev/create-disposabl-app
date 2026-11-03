@@ -1,6 +1,6 @@
 # App branding and visual design
 
-Use with the `frontend-design` skill whenever creating a new Disposabl app or substantially redesigning one. Preserve a user's existing brand when provided.
+Use when creating or substantially redesigning a Disposabl app. Apply `frontend-design` when available; otherwise use the user's brief and the guidance below. Preserve an existing brand when provided.
 
 Before implementing screens, derive a short brand direction from the app's purpose, audience, main task, and intended tone. Choose a fitting product name or use the supplied one, a typography hierarchy, color palette, spacing and shape rules, and an image/icon approach. Record the choices briefly in the implementation plan and proceed with reasonable assumptions when the brief is sufficient.
 
