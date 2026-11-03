@@ -26,7 +26,9 @@ function Connections() {
     mobile,
   } = useConnectionSetup();
   const [showExpo, setShowExpo] = useState(false);
+  const [githubWorkspaceReady, setGithubWorkspaceReady] = useState(false);
   const [blacksmithOpened, setBlacksmithOpened] = useState(false);
+  const githubCanInstall = githubWorkspaceReady || installations.length > 0;
   const providers = [
     {
       id: "github",
@@ -175,13 +177,24 @@ function Connections() {
                                 );
                                 setBlacksmithOpened(true);
                               })()
-                            : connect(id)
+                            : id === "github" && !githubCanInstall
+                              ? (() => {
+                                  window.open(
+                                    "https://github.com/organizations/plan",
+                                    "_blank",
+                                    "noopener,noreferrer",
+                                  );
+                                  setGithubWorkspaceReady(true);
+                                })()
+                              : connect(id)
                       }
                     >
                       {id === "expo" && showExpo
                         ? "Cancel"
                         : id === "github"
-                          ? "Install Disposabl"
+                          ? githubCanInstall
+                            ? "Install Disposabl"
+                            : "Create a free workspace"
                           : id === "blacksmith"
                             ? "Install Blacksmith"
                             : "Connect"}
@@ -196,27 +209,41 @@ function Connections() {
                   </p>
                 )}
                 {id === "github" && !connected && (
-                  <p className="mt-4 text-sm text-muted-foreground">
-                    A GitHub organization is a workspace for your apps. It’s
-                    free and you can use it on your own.{" "}
-                    <a
-                      href="https://github.com/organizations/plan"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="font-medium underline underline-offset-4"
-                    >
-                      Create a free organization
-                    </a>
-                    .
-                  </p>
+                  <div className="mt-4 space-y-2 text-sm text-muted-foreground">
+                    <p>
+                      Recommended: create one free GitHub organization just for
+                      your Disposabl apps. Use this workspace for future apps
+                      too.
+                    </p>
+                    <p>
+                      Install Disposabl and Blacksmith only there to keep their
+                      repository access separate from your other projects.
+                    </p>
+                    {!githubWorkspaceReady ? (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        className="font-medium text-foreground underline underline-offset-4 disabled:opacity-50"
+                        onClick={() => setGithubWorkspaceReady(true)}
+                      >
+                        Use an existing organization instead
+                      </button>
+                    ) : (
+                      <p>
+                        Once your workspace is ready, click{" "}
+                        <strong>Install Disposabl</strong> and select it on
+                        GitHub.
+                      </p>
+                    )}
+                  </div>
                 )}
                 {id === "github" && !connected && (
                   <details
                     className="mt-3 rounded-lg bg-muted/50 p-4 text-sm"
-                    open={installNeeded || undefined}
+                    open={installNeeded || githubWorkspaceReady || undefined}
                   >
                     <summary className="cursor-pointer font-medium">
-                      New to GitHub? Follow these steps
+                      How to create your free workspace
                     </summary>
                     <ol className="mt-3 list-decimal space-y-2 pl-5 text-muted-foreground">
                       <li>

@@ -75,8 +75,9 @@ If the response is `expo_manual_delete_required`, GitHub/Convex cleanup has comp
 
 All provider accounts are free to create; builds and hosting have usage limits.
 Use one GitHub step to install Disposabl and finish authorization. Blacksmith
-requires an organization, even for a solo user. If the user has none, explain
-that it is a free workspace, open https://github.com/organizations/plan when
+requires an organization, even for a solo user. Recommend one new, dedicated
+organization for all of the user's Disposabl apps, and reuse it for future apps.
+Keep an existing organization as an alternative. Explain that it is a free workspace, open https://github.com/organizations/plan when
 browser setup is requested, and guide them through the Free plan. Do not convert
 their personal account or report a missing organization as a failed connection.
 Then install Blacksmith in that same organization with All repositories access so new app repositories can build,
