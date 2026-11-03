@@ -17,6 +17,8 @@ Use the installed `disposabl` bin, or invoke it as `bunx --package create-dispos
 
 Before starting a native build or repairing delivery, read [delivery checks and failure recovery](references/delivery.md). Confirm account connections survive a page reload and managed development starts without a Convex project-selection prompt.
 
+Before designing a new app, locate and read the `frontend-design` skill and use it to choose a visual direction suited to the user's product. If it is unavailable, report that explicitly; do not claim to have applied it. Read [app branding and visual design](references/design.md) for the Disposabl-specific requirements.
+
 Create a separate Git branch and worktree for each change. In that worktree run `disposabl previews token create --configure .`, `bun install`, and `bun dev`. Implement the request and verify the actual behavior on the requested platforms. Commit and push the branch and open a pull request when the task authorizes delivery.
 
 For a newly generated app, publish its scaffold to `main` first so GitHub has the trusted publishing workflow. Setup configures `origin` for the provisioned repository. Then work on the requested features in an isolated branch:
