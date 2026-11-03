@@ -1,7 +1,9 @@
 import { appendFile, readFile } from "node:fs/promises";
 
 const origin = "https://www.disposabl.dev";
-const config = JSON.parse(await readFile("disposabl.json", "utf8"));
+const config = JSON.parse(
+  await readFile(new URL("../../disposabl.json", import.meta.url), "utf8"),
+);
 const [command, platform, status, detail] = process.argv.slice(2);
 if (config.appId) {
   const audience = new URL(process.env.ACTIONS_ID_TOKEN_REQUEST_URL);
