@@ -10,6 +10,6 @@
     "resolveJsonModule": true,
     "skipLibCheck": true
   },
-  "include": ["*.ts"],
+  "include": ["*.ts", "../../reset.ts"],
   "exclude": ["**/dist", "node_modules"]
 }

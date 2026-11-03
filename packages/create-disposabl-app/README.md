@@ -39,3 +39,8 @@ only application operation. Disposabl's apps, previews, releases, provider
 connections, GitHub handlers, and service credentials stay in the Disposabl
 backend. Product-generated API bindings, contracts, and SDK operations are not
 copied into new apps.
+
+The root `reset.ts` script owns the product-to-starter cleanup. The generator
+runs it only inside its disposable staging copy before packaging. Replacement
+backend files live in `starter/backend`; platform and feature selection still
+happens when the user creates an app.
