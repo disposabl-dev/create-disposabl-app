@@ -9,7 +9,9 @@ case "${1:?operation required}" in
     (cd ios && pod install)
     workspace=$(find ios -maxdepth 1 -name '*.xcworkspace' -print -quit)
     test -n "$workspace"
-    xcodebuild -workspace "$workspace" -scheme "$(basename "$workspace" .xcworkspace)" -configuration Release -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath "$RUNNER_TEMP/ios-build" CODE_SIGNING_ALLOWED=NO build
+    # Simulator signing embeds the entitlements SecureStore needs for Keychain.
+    # The local ad-hoc identity requires no Apple account or provisioning profile.
+    xcodebuild -workspace "$workspace" -scheme "$(basename "$workspace" .xcworkspace)" -configuration Release -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath "$RUNNER_TEMP/ios-build" CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- build
     app=$(find "$RUNNER_TEMP/ios-build/Build/Products/Release-iphonesimulator" -maxdepth 1 -name '*.app' -type d -print -quit)
     test -n "$app"
     check_source
