@@ -30,15 +30,15 @@ export async function expoRequest<T>(
     data?: T;
     errors?: { message?: string; extensions?: { errorCode?: string } }[];
   };
-  if (
-    result.errors?.some(
-      (error) =>
-        error.extensions?.errorCode === "SUDO_MODE_REQUIRED" ||
-        error.message ===
-          "Only regular user and SSO user access to this API is supported",
+  for (const error of result.errors ?? []) {
+    if (error.extensions?.errorCode === "SUDO_MODE_REQUIRED")
+      throw new ExpoTokenDeletionUnsupported("SUDO_MODE_REQUIRED");
+    if (
+      error.message ===
+      "Only regular user and SSO user access to this API is supported"
     )
-  )
-    throw new ExpoLoginRequired();
+      throw new ExpoTokenDeletionUnsupported("USER_SESSION_REQUIRED");
+  }
   if (result.errors?.length) {
     if (
       result.errors.every(
@@ -53,7 +53,13 @@ export async function expoRequest<T>(
   if (!result.data) throw new ConvexError("Expo returned no project details.");
   return result.data;
 }
-export class ExpoLoginRequired extends Error {}
+export class ExpoTokenDeletionUnsupported extends Error {
+  constructor(
+    readonly providerCode: "SUDO_MODE_REQUIRED" | "USER_SESSION_REQUIRED",
+  ) {
+    super("Expo rejected project deletion with an access token.");
+  }
+}
 class ExpoNotFound extends Error {}
 export async function findExpo(
   token: string,

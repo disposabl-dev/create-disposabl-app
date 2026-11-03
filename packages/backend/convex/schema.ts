@@ -43,6 +43,7 @@ export default defineSchema({
         kind: v.union(v.literal("setup"), v.literal("delete")),
         until: v.number(),
         pending: v.optional(pendingDelete),
+        expoManual: v.optional(v.boolean()),
       }),
     ),
   })

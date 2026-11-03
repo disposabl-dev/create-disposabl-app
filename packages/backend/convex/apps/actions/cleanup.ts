@@ -18,14 +18,19 @@ import {
   management,
 } from "../../previews/token/actions/management";
 import { deleteArgs } from "../validator";
-import { ExpoLoginRequired, deleteExpo, findExpo, verifyExpo } from "./expo";
+import {
+  ExpoTokenDeletionUnsupported,
+  deleteExpo,
+  findExpo,
+  verifyExpo,
+} from "./expo";
 
 export const remove = internalAction({
   args: { ...identityFields, ...deleteArgs },
   returns: v.null(),
   handler: async (ctx, { userId, appId }): Promise<null> => {
     const identity = { userId, appId };
-    const { until, resuming, pending } = await ctx.runMutation(
+    const { until, resuming, pending, expoManual } = await ctx.runMutation(
       internal.apps.operations.internal.begin,
       { ...identity, kind: "delete" },
     );
@@ -198,6 +203,7 @@ export const remove = internalAction({
             projectId?: string;
             accountId: string;
             receipt?: string;
+            projectUrl: string;
           }
         | undefined;
       if (linked.expoAccountId || linked.expoProjectId) {
@@ -218,7 +224,7 @@ export const remove = internalAction({
           linked.expoProjectId,
         );
         if (project) verifyExpo(project, connection.accountId, appId);
-        if (!project && linked.expoProjectId && !retry)
+        if (!project && linked.expoProjectId && !retry && !expoManual)
           throw new ConvexError(
             "The linked Expo project is unavailable. Reconnect its owner before deleting this app.",
           );
@@ -227,9 +233,11 @@ export const remove = internalAction({
           projectId: project?.id,
           accountId: connection.accountId,
           receipt: retry?.receipt,
+          projectUrl: `https://expo.dev/accounts/${encodeURIComponent(project?.ownerAccount.name ?? connection.name)}/projects/${encodeURIComponent(project?.slug ?? `app-${appId}`)}/settings/advanced`,
         };
       }
       started = true;
+      let manualExpoDeletion = false;
       if (expo) {
         // Resume the receipt even if Expo has already removed the project from lookup.
         if (expo.projectId || expo.receipt) {
@@ -244,17 +252,19 @@ export const remove = internalAction({
               },
             );
           } catch (error) {
-            if (error instanceof ExpoLoginRequired)
-              throw new ConvexError({
-                code: "expo_delete_requires_login",
+            if (!(error instanceof ExpoTokenDeletionUnsupported)) throw error;
+            await ctx.runMutation(
+              internal.apps.operations.internal.requireExpoDeletion,
+              {
+                ...identity,
+                until,
                 projectId: expo.projectId ?? linked.expoProjectId!,
-                message:
-                  "Expo requires a signed-in user and password confirmation to delete projects. Complete Expo deletion, then retry this command.",
-              });
-            throw error;
+              },
+            );
+            manualExpoDeletion = true;
           }
         }
-        await forget("expo");
+        if (!manualExpoDeletion) await forget("expo");
       }
       if (github) {
         await deleting("github", github.accountId);
@@ -271,6 +281,17 @@ export const remove = internalAction({
             {},
           );
         await forget("convex");
+      }
+      if (manualExpoDeletion && expo) {
+        await deleting("expo", expo.accountId);
+        throw new ConvexError({
+          code: "expo_manual_delete_required",
+          appId,
+          projectId: expo.projectId ?? linked.expoProjectId!,
+          projectUrl: expo.projectUrl,
+          message:
+            "GitHub and Convex cleanup is complete. Open this Expo project's settings, sign in to Expo if needed, and delete the project there. Then retry Disposabl deletion to verify cleanup and remove the app record. Disposabl never asks for your Expo password.",
+        });
       }
       while (
         !(await ctx.runMutation(internal.apps.operations.internal.erase, {

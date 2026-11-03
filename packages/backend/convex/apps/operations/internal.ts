@@ -35,6 +35,7 @@ export const begin = internalMutation({
     until: v.number(),
     resuming: v.boolean(),
     pending: v.optional(pendingDelete),
+    expoManual: v.optional(v.boolean()),
   }),
   handler: async (ctx, { userId, appId, kind }) => {
     const app = await ownedApp(ctx, userId, appId);
@@ -53,6 +54,7 @@ export const begin = internalMutation({
       until,
       resuming: app.operation?.kind === "delete",
       pending: app.operation?.pending,
+      expoManual: app.operation?.expoManual,
     };
   },
 });
@@ -160,6 +162,30 @@ export const deletingResource = internalMutation({
       throw new ConvexError("Deletion must be restarted.");
     await ctx.db.patch("apps", app._id, {
       operation: { ...app.operation, pending },
+    });
+    return null;
+  },
+});
+export const requireExpoDeletion = internalMutation({
+  args: {
+    ...identityFields,
+    appId: v.string(),
+    until: v.number(),
+    projectId: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, { userId, appId, until, projectId }) => {
+    const app = await ownedApp(ctx, userId, appId);
+    if (
+      app.operation?.kind !== "delete" ||
+      app.operation.until !== until ||
+      (app.expoProjectId && app.expoProjectId !== projectId) ||
+      !app.expoAccountId
+    )
+      throw new ConvexError("Expo deletion must be restarted.");
+    await ctx.db.patch("apps", app._id, {
+      expoProjectId: projectId,
+      operation: { ...app.operation, expoManual: true },
     });
     return null;
   },

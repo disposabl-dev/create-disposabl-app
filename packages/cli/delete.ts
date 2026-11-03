@@ -1,39 +1,48 @@
-import { spawn } from "node:child_process";
+import { openUrl } from "./auth";
 
-/** Expo requires a user session in sudo mode; access tokens cannot provide it. */
-export async function completeExpoDeletion(projectId: unknown) {
+/** Only open the verified Expo project returned by the deletion action. */
+export function openExpoDeletion(
+  body: unknown,
+  appId: string,
+  browser: boolean,
+) {
+  if (!body || typeof body !== "object" || !("error" in body)) return;
+  const error = body.error;
   if (
-    typeof projectId !== "string" ||
-    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-      projectId,
-    )
+    !error ||
+    typeof error !== "object" ||
+    !("code" in error) ||
+    error.code !== "expo_manual_delete_required"
   )
-    throw new Error("The service returned an invalid Expo project ID.");
-  const command = `bunx eas-cli@27.2.0 project:delete ${projectId}`;
-  if (!process.stdin.isTTY || !process.stdout.isTTY)
+    return;
+  if (
+    !("appId" in error) ||
+    error.appId !== appId ||
+    !("projectUrl" in error) ||
+    typeof error.projectUrl !== "string"
+  )
     throw new Error(
-      `Expo needs an interactive login and password confirmation. Run ${command}, then retry apps delete. Your app and remaining resources are retained.`,
+      "Invalid Expo deletion response. The app record has been kept.",
     );
+  const url = new URL(error.projectUrl);
+  const parts = url.pathname.split("/");
+  if (
+    url.origin !== "https://expo.dev" ||
+    url.username ||
+    url.password ||
+    url.search ||
+    url.hash ||
+    parts.length !== 7 ||
+    parts[1] !== "accounts" ||
+    !parts[2] ||
+    parts[3] !== "projects" ||
+    parts[4] !== `app-${appId}` ||
+    parts[5] !== "settings" ||
+    parts[6] !== "advanced"
+  )
+    throw new Error("Invalid Expo project URL. The app record has been kept.");
   console.error(
-    "Expo requires you to confirm deletion in your Expo account. Complete the following EAS prompts to continue.",
+    `GitHub and Convex cleanup is complete. Finish deleting the Expo project here:\n${url.href}\nSign in to Expo if needed and choose Delete project. Then rerun this command to verify cleanup. The Disposabl app record is still pending deletion.`,
   );
-  // EAS owns login, password confirmation and MFA. Do not pass the CI robot token.
-  const { EXPO_TOKEN: _token, ...env } = process.env;
-  await new Promise<void>((resolve, reject) => {
-    const child = spawn(
-      "bunx",
-      ["eas-cli@27.2.0", "project:delete", projectId],
-      { stdio: "inherit", env },
-    );
-    child.on("error", reject);
-    child.on("exit", (code) =>
-      code === 0
-        ? resolve()
-        : reject(
-            new Error(
-              "Expo deletion was not completed. Retry apps delete when ready.",
-            ),
-          ),
-    );
-  });
+  if (browser) openUrl(url.href);
 }

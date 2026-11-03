@@ -1,5 +1,5 @@
-import { completeExpoDeletion } from "./delete";
 import { Command } from "commander";
+import { openExpoDeletion } from "./delete";
 import manifest from "./package.json";
 import {
   NotAuthenticated,
@@ -127,6 +127,11 @@ export async function runCli(
               "Open Connections and continue when GitHub and Convex are connected",
             );
           const deleteApp = path === "/api/apps/delete";
+          if (deleteApp)
+            command.option(
+              "--no-browser",
+              "Print the Expo cleanup URL without opening a browser",
+            );
           const previewGet = path === "/api/previews/get";
           const tokenCreate = path === "/api/previews/token/create";
           if (previewGet)
@@ -225,13 +230,15 @@ export async function runCli(
             let result = await send();
             if (result.status === 401 && !process.env.DISPOSABL_API_KEY)
               result = await send(true);
-            if (deleteApp && result.status === 400) {
-              const body = await result.clone().json();
-              if (body.error?.code === "expo_delete_requires_login") {
-                await completeExpoDeletion(body.error.projectId);
-                result = await send();
-              }
-            }
+            if (deleteApp && !result.ok)
+              openExpoDeletion(
+                await result
+                  .clone()
+                  .json()
+                  .catch(() => null),
+                options.appId,
+                options.browser !== false,
+              );
             if (!result.ok)
               throw new Error(
                 `API request failed (${result.status}): ${await result.text()}`,

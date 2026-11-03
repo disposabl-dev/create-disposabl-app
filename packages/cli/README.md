@@ -22,4 +22,8 @@ Credentials live under `~/.config/disposabl` with restricted file permissions. `
 
 Use `--json` for machine-readable preview output. Other commands return JSON; `--help` lists their arguments.
 
-App deletion permanently removes linked GitHub, Convex, and Expo projects, then previews and the app record. Apps with production releases cannot be deleted. Expo requires a signed-in user and password confirmation; the CLI opens the official EAS deletion flow when needed. API/MCP callers receive the project ID and must complete this Expo step before retrying. If cleanup is interrupted, run the same command again; keep the owning accounts connected until it finishes.
+App deletion runs in the Convex action using connected provider credentials. Apps with production releases cannot be deleted. The CLI never launches EAS or asks for an Expo password.
+
+When Expo rejects token-based deletion, the action records that Expo cleanup is pending and continues deleting GitHub and Convex. Once both are removed, it returns `expo_manual_delete_required` with the app ID, Expo project ID, and exact `projectUrl` ending in `/settings/advanced`. The CLI opens that URL in the browser and prints it. Sign in directly to Expo if needed, then use Delete project. Pass `--no-browser` to print the link without opening it.
+
+The command exits unsuccessfully while manual cleanup is pending. Rerun the same Disposabl deletion command after deleting the Expo project. The action verifies the connected Expo account and project removal, then deletes previews and the app record. Interrupted provider cleanup remains resumable. Keep the owning accounts connected until deletion finishes; Disposabl does not accept Expo passwords or session cookies.
