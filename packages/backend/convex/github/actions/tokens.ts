@@ -7,6 +7,14 @@ import { env, type ActionCtx } from "../../_generated/server";
 import { internal } from "../../_generated/api";
 import { seal, unseal } from "../../connections/actions/credentials";
 
+export async function githubUserToken(ctx: ActionCtx, userId: string) {
+  return getToken(
+    env.GITHUB_CONNECTOR!,
+    { subject: { type: "user", id: userId } },
+    { vercelToken: await vercelIdentity(ctx), forceRefresh: true },
+  );
+}
+
 export async function githubToken(
   ctx: ActionCtx,
   installationId: string,
