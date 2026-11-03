@@ -49,6 +49,7 @@ try {
     cp(source, destination, {
       recursive: true,
       filter: (path) =>
+        path !== join(root, "apps/web/src/components/landing") &&
         ![
           ".git",
           "node_modules",
@@ -105,6 +106,10 @@ try {
     stderr: "inherit",
   });
   if ((await reset.exited) !== 0) throw new Error("Starter reset failed.");
+  await cp(
+    join(dir, "starter/web/index.tsx"),
+    join(templateDir, "apps/web/src/router/index.tsx"),
+  );
   for (const file of ["reset.ts", "starter", ".disposabl-staging.json"])
     await rm(join(templateDir, file), { recursive: true, force: true });
   // npm omits .gitignore files from packed templates.
