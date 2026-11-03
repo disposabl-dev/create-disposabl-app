@@ -46,7 +46,6 @@ jobs:
       ios: ${{ steps.platforms.outputs.ios }}
       android_build: ${{ steps.fingerprint.outputs.build }}
       android_runtime: ${{ steps.fingerprint.outputs.runtime }}
-      android_manifest: ${{ steps.fingerprint.outputs.manifest }}
       convex_url: ${{ steps.deploy.outputs.CONVEX_URL }}
       convex_site_url: ${{ steps.deploy.outputs.CONVEX_SITE_URL }}
     env:
@@ -133,7 +132,6 @@ jobs:
           TAG: ${{ steps.fingerprint.outputs.tag }}
           SHA: ${{ steps.fingerprint.outputs.sha }}
           RUNTIME: ${{ steps.fingerprint.outputs.runtime }}
-          MANIFEST: ${{ steps.fingerprint.outputs.manifest }}
         run: bash "$GITHUB_WORKSPACE/.github/scripts/mobile.sh" expo-update
       - &publish
         name: Publish
@@ -191,7 +189,6 @@ jobs:
         env:
           RUNTIME: ${{ needs.web.outputs.android_runtime }}
           DISPOSABL_ANDROID_CHANNEL: *channel
-          MANIFEST: ${{ needs.web.outputs.android_manifest }}
           DISPOSABL_ANDROID_SIGNING: ${{ github.event_name == 'push' && secrets.DISPOSABL_ANDROID_SIGNING || '' }}
           ANDROID_KEYSTORE_BASE64: ${{ github.event_name == 'push' && secrets.ANDROID_KEYSTORE_BASE64 || '' }}
           ANDROID_KEYSTORE_PASSWORD: ${{ github.event_name == 'push' && secrets.ANDROID_KEYSTORE_PASSWORD || '' }}
