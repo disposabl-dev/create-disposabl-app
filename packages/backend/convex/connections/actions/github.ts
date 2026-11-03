@@ -1,6 +1,5 @@
 "use node";
 
-import { getToken } from "@vercel/connect";
 import {
   identityFields,
   internalAction,
@@ -11,7 +10,7 @@ import { env, type ActionCtx } from "../../_generated/server";
 import {
   githubRequest,
   githubToken,
-  vercelIdentity,
+  githubUserToken,
 } from "../../github/actions/tokens";
 import { installation } from "../validator";
 import { seal, unseal } from "./credentials";
@@ -33,13 +32,7 @@ const permissions = [
 ];
 
 export async function userInstallations(ctx: ActionCtx, userId: string) {
-  const token = await getToken(
-    env.GITHUB_CONNECTOR!,
-    {
-      subject: { type: "user", id: userId },
-    },
-    { vercelToken: await vercelIdentity(ctx), forceRefresh: true },
-  );
+  const token = await githubUserToken(ctx, userId);
   const user = await githubRequest<{ login: string }>(token, "/user");
   const organizations = new Set<string>();
   for (let page = 1; ; page++) {

@@ -6,7 +6,7 @@ import {
 } from "@disposabl/disposabl-kit/server/lib/functions";
 import { v } from "convex/values";
 import { internal } from "../../_generated/api";
-import { githubRequest, githubToken } from "./tokens";
+import { githubRequest, githubToken, githubUserToken } from "./tokens";
 
 type Repository = {
   id: number;
@@ -28,7 +28,7 @@ export const run = internalAction({
     const installationId = connection?.installationId;
     if (!owner || !installationId || !/^[a-zA-Z0-9-]+$/.test(owner))
       throw new Error("Configure a verified GitHub installation.");
-    const token = await githubToken(ctx, installationId, [
+    let token = await githubToken(ctx, installationId, [
       "administration:write",
       "contents:read",
     ]);
@@ -41,6 +41,12 @@ export const run = internalAction({
       token,
       `/users/${owner}`,
     );
+    if (account.type !== "Organization") {
+      token = await githubUserToken(ctx, args.userId);
+      const user = await githubRequest<{ login: string }>(token, "/user");
+      if (user.login.toLowerCase() !== owner.toLowerCase())
+        throw new Error("Reconnect the GitHub account that owns this app.");
+    }
     let repo: Repository;
     try {
       repo = await githubRequest<Repository>(
