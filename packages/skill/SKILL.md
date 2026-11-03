@@ -21,12 +21,10 @@ Before designing a new app, locate and read the `frontend-design` skill and use 
 
 Create a separate Git branch and worktree for each change. In that worktree run `disposabl previews token create --configure .`, `bun install`, and `bun dev`. Implement the request and verify the actual behavior on the requested platforms. Commit and push the branch and open a pull request when the task authorizes delivery.
 
-For a newly generated app, publish its scaffold to `main` first so GitHub has the trusted publishing workflow. Setup configures `origin` for the provisioned repository. Then work on the requested features in an isolated branch:
+A newly generated app already has an Initial commit. Publish its scaffold to `main` first so GitHub has the trusted publishing workflow. Setup configures `origin` for the provisioned repository. Then work on the requested features in an isolated branch:
 
 ```sh
 cd my-app
-git add .
-git commit -m "chore: initialize app"
 git push -u origin main
 git worktree add ../my-app-feature -b feat/first-version
 cd ../my-app-feature
@@ -35,9 +33,11 @@ bun install
 bun run dev
 ```
 
-The configured token is scoped to this worktree's development backend. Never copy another worktree's environment files or use a production deploy key for development. Commit implementation changes, push `feat/first-version`, and create the PR with `gh pr create`. Keep credentials in ignored environment files.
+The configured token is scoped to this worktree's development backend. Never copy another worktree's environment files or use a production deploy key for development. Token provisioning or refresh alone does not deploy or require git operations. Keep credentials in ignored environment files. A branch push alone does not trigger deployment: a same-repository PR to `main` triggers the `pr-N` preview, and a push to `main` triggers production. Local development is separate; preview reports are tracked by head branch.
 
-After pushing the PR, run `disposabl previews get` in the worktree and check each requested platform's status and available preview, workflow, release, or download URLs. Wait for relevant builds or report failures; do not claim readiness without evidence. For Android, install the preview APK on the target and verify the requested behavior and authentication. Do not run `eas submit`. After an authorized merge, verify production status and actual URLs. If a platform or URL is missing, inspect the relevant workflow and report the gap.
+For background delivery, hand a subagent a fixed, reviewed commit snapshot in an isolated worktree. Its brief must name the repository, branch, SHA, scope, PR base, required checks, push ownership, and expected result evidence. It pushes that snapshot and opens or updates the same-repository PR while the main agent continues separately. Never sweep concurrent edits or the index, or push later commits without a new handoff. Do not block implementation on push or PR creation.
+
+After opening the PR, run `disposabl previews get` in the worktree and check each requested platform's status and available preview, workflow, release, or download URLs. Report the deployed SHA, checks, and each platform URL and status. Readiness requires successful CI and actual endpoint or device behavior; a provisioned development URL is not a hosted preview. For Android, install the preview APK on the target and verify the requested behavior and authentication. Do not run `eas submit`. After an authorized merge, verify production status and actual URLs. If a platform or URL is missing, inspect the relevant workflow and report the gap.
 
 Use `disposabl previews get --json` when an agent needs structured status. Query again as builds progress, respecting the host's PR watcher rules, and stop waiting when every requested platform has a terminal status. Inspect and repair failures instead of repeatedly polling an unchanged failure. After merging, run `disposabl releases get --appId <appId-from-disposabl.json>`; production results are separate from the worktree's preview. Install the production Android APK alongside its preview and verify login and saved data against the production backend. Store submission is not required for Android APK delivery. TestFlight is available only after Apple signing and App Store Connect submission credentials are configured.
 

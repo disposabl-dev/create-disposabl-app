@@ -15,7 +15,7 @@ Read before a first native build, a toolchain change, or a failed preview/produc
 
 ## Avoid repeating expensive work
 
-Diagnose independent platform failures in parallel when available, with separate owners and checkouts. Keep each device and browser session under one owner. Give a delivery delegate an observable success condition, such as an uploaded artifact or a verified login on its assigned device; a commit and local checks alone do not satisfy that condition. Batch related repairs before pushing, because PR concurrency can cancel running native builds. Keep source-commit validation when publishing so an old build cannot become the current release.
+Diagnose independent platform failures in parallel when available, with separate owners and checkouts. Keep each device and browser session under one owner. Give a delivery delegate an observable success condition, such as an uploaded artifact or a verified login on its assigned device; a commit and local checks alone do not satisfy that condition. Batch related repairs before pushing, because PR concurrency can cancel running native builds. Use host PR watchers where applicable; do not busy poll. Hand off a new reviewed SHA before pushing subsequent changes. Keep source-commit validation when publishing so an old build cannot become the current release.
 
 Separate an application change from a starter/pipeline defect. Repair a reusable defect in the generator and the generated app. For a new repository, establish its trusted publishing workflow on `main` before the feature preview; later workflow changes must follow the repository's review and merge policy. Do not weaken workflow-source identity checks to bypass a mismatch.
 
