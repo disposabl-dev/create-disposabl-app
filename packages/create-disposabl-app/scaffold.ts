@@ -199,10 +199,7 @@ main().catch((error) => {
           (await readFile(readme, "utf8")).replaceAll(
             `@disposabl/${kind}`,
             client.name,
-          ) +
-            (kind === "cli"
-              ? "\nSet `productionConvexSiteUrl` in `disposabl.json` to your production Convex site URL, or supply `DISPOSABL_CLI_ORIGIN` or `--origin <url>` when running the CLI.\n"
-              : ""),
+          ),
         );
     }
     for (const path of await readdir(destination, { recursive: true })) {
