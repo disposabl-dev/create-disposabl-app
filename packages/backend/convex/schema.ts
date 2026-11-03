@@ -12,6 +12,13 @@ export default defineSchema({
     lease: v.optional(v.string()),
   }).index("by_key", ["key"]),
   users: defineTable({
+    blacksmith: v.optional(
+      v.object({
+        owner: v.string(),
+        installationId: v.string(),
+        confirmedAt: v.number(),
+      }),
+    ),
     connectionState: v.optional(
       v.object({
         provider: v.union(v.literal("github"), v.literal("convex")),
@@ -66,6 +73,7 @@ export default defineSchema({
     userId: v.string(),
     owner: v.string(),
     installationId: v.string(),
+    organization: v.optional(v.boolean()),
   })
     // Latest connection uses creation order; owner lookup uses the compound index.
     // eslint-disable-next-line @convex-dev/no-duplicate-indexes

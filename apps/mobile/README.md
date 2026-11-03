@@ -72,7 +72,7 @@ installable APK in a separate 4-vCPU Android job. Later runs with the same finge
 publish EAS Update from Web. Native jobs install only the mobile workspace using
 the shared dependency cache. Android and iOS native builds run in parallel.
 Linux and Windows start alongside Web.
-All CI jobs run on Blacksmith. See [.github/README.md](../../.github/README.md)
+Build jobs use Blacksmith; package publishing keeps GitHub-hosted runners and production iOS uses EAS Build. See [.github/README.md](../../.github/README.md)
 for the job order and cache behavior.
 
 Each PR uses its own `pr-<number>` channel and Android application ID. Production
