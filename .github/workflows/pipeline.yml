@@ -19,9 +19,11 @@ env:
   NODE_VERSION: &node-version "24"
   LINUX_RUNNER: &linux-runner ubuntu-latest
   WEB_RUNNER: &web-runner ubuntu-latest
-  WINDOWS_RUNNER: blacksmith-2vcpu-windows-2025
+  WINDOWS_RUNNER: windows-2025
+  MACOS_RUNNER: macos-15
   RELEASE_PREFIX: app
   DISPOSABL_ANDROID_VERSION_CODE: ${{ github.run_number }}
+  DISPOSABL_IOS_BUILD_NUMBER: ${{ github.run_number }}
   GH_TOKEN: ${{ github.token }}
   GH_REPO: ${{ github.repository }}
   SOURCE: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -40,6 +42,7 @@ jobs:
     runs-on: *web-runner
     outputs:
       desktop: ${{ steps.platforms.outputs.desktop }}
+      ios: ${{ steps.platforms.outputs.ios }}
       android_build: ${{ steps.fingerprint.outputs.build }}
       android_runtime: ${{ steps.fingerprint.outputs.runtime }}
       android_manifest: ${{ steps.fingerprint.outputs.manifest }}
@@ -47,7 +50,7 @@ jobs:
       convex_site_url: ${{ steps.deploy.outputs.CONVEX_SITE_URL }}
     env:
       PLATFORM: android
-      ANDROID_SIGNING_READY: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' && secrets.ANDROID_KEYSTORE_PASSWORD != '' && secrets.ANDROID_KEY_ALIAS != '' && secrets.ANDROID_KEY_PASSWORD != '' }}
+      ANDROID_SIGNING_READY: ${{ secrets.DISPOSABL_ANDROID_SIGNING != '' || (secrets.ANDROID_KEYSTORE_BASE64 != '' && secrets.ANDROID_KEYSTORE_PASSWORD != '' && secrets.ANDROID_KEY_ALIAS != '' && secrets.ANDROID_KEY_PASSWORD != '') }}
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
       EXPO_PROJECT_ID: ${{ secrets.EXPO_PROJECT_ID || vars.EXPO_PROJECT_ID }}
       EXPO_OWNER: ${{ secrets.EXPO_OWNER || vars.EXPO_OWNER }}
@@ -87,7 +90,6 @@ jobs:
         run: |
           node .github/scripts/disposabl.mjs report web,api,mcp building
           if [[ -z "$EXPO_TOKEN" ]]; then node .github/scripts/disposabl.mjs report android blocked 'Connect Expo before building Android.'; fi
-          node .github/scripts/disposabl.mjs report ios,macos blocked 'Apple builds are temporarily disabled.'
           if [[ '${{ github.event_name }}' == pull_request ]]; then node .github/scripts/disposabl.mjs report cli,typescript-sdk blocked 'Packages publish after merge to main.'; fi
       - name: Check
         run: bun run check
@@ -193,6 +195,7 @@ jobs:
           RUNTIME: ${{ needs.web.outputs.android_runtime }}
           DISPOSABL_ANDROID_CHANNEL: *channel
           MANIFEST: ${{ needs.web.outputs.android_manifest }}
+          DISPOSABL_ANDROID_SIGNING: ${{ github.event_name == 'push' && secrets.DISPOSABL_ANDROID_SIGNING || '' }}
           ANDROID_KEYSTORE_BASE64: ${{ github.event_name == 'push' && secrets.ANDROID_KEYSTORE_BASE64 || '' }}
           ANDROID_KEYSTORE_PASSWORD: ${{ github.event_name == 'push' && secrets.ANDROID_KEYSTORE_PASSWORD || '' }}
           ANDROID_KEY_ALIAS: ${{ github.event_name == 'push' && secrets.ANDROID_KEY_ALIAS || '' }}
@@ -203,7 +206,93 @@ jobs:
       - name: Report Android failure
         if: failure() || cancelled()
         run: node .github/scripts/disposabl.mjs report android failed
-  # iOS and macOS builds remain disabled to avoid paid Apple runners.
+  ios-preview:
+    name: iOS simulator preview
+    needs: web
+    if: github.event_name == 'pull_request' && needs.web.outputs.ios == 'true'
+    permissions: *release-permissions
+    runs-on: xcode-27
+    timeout-minutes: 90
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.2.0.app/Contents/Developer
+      CONVEX_URL: ${{ needs.web.outputs.convex_url }}
+      CONVEX_SITE_URL: ${{ needs.web.outputs.convex_site_url }}
+      EXPO_PUBLIC_CONVEX_URL: ${{ needs.web.outputs.convex_url }}
+      EXPO_PUBLIC_CONVEX_SITE_URL: ${{ needs.web.outputs.convex_site_url }}
+      EXPO_PROJECT_ID: ${{ secrets.EXPO_PROJECT_ID || vars.EXPO_PROJECT_ID }}
+      EXPO_OWNER: ${{ secrets.EXPO_OWNER || vars.EXPO_OWNER }}
+      EXPO_SLUG: ${{ secrets.EXPO_SLUG || vars.EXPO_SLUG }}
+      EXPO_NO_DOTENV: "1"
+    steps:
+      - *checkout
+      - *node
+      - *app-token
+      - *bun
+      - *cache
+      - *install
+      - name: Report build
+        run: node .github/scripts/disposabl.mjs report ios building
+      - name: Xcode toolchain
+        run: |
+          xcodebuild -version
+          xcrun swift --version
+      - name: Build simulator archive
+        working-directory: apps/mobile
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/apple.sh" simulator
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios-simulator
+          path: dist/apple/ios-simulator.zip
+          retention-days: 3
+          if-no-files-found: error
+      - name: Report simulator archive
+        run: |
+          echo 'iOS simulator archive is available in this workflow run’s artifacts; it is not a device or TestFlight build.' >> "$GITHUB_STEP_SUMMARY"
+          node .github/scripts/disposabl.mjs report ios ready 'Simulator archive available in workflow artifacts.'
+      - name: Report failure
+        if: failure() || cancelled()
+        run: node .github/scripts/disposabl.mjs report ios failed 'iOS simulator build failed; check the workflow log.'
+  ios-production:
+    name: iOS production and TestFlight
+    needs: web
+    if: github.event_name == 'push' && needs.web.outputs.ios == 'true'
+    permissions: *release-permissions
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      EXPO_PROJECT_ID: ${{ secrets.EXPO_PROJECT_ID || vars.EXPO_PROJECT_ID }}
+      EXPO_OWNER: ${{ secrets.EXPO_OWNER || vars.EXPO_OWNER }}
+      EXPO_SLUG: ${{ secrets.EXPO_SLUG || vars.EXPO_SLUG }}
+      EXPO_NO_DOTENV: "1"
+      CONVEX_URL: ${{ needs.web.outputs.convex_url }}
+      CONVEX_SITE_URL: ${{ needs.web.outputs.convex_site_url }}
+      EXPO_PUBLIC_CONVEX_URL: ${{ needs.web.outputs.convex_url }}
+      EXPO_PUBLIC_CONVEX_SITE_URL: ${{ needs.web.outputs.convex_site_url }}
+    steps:
+      - *checkout
+      - *node
+      - *app-token
+      - *bun
+      - *cache
+      - *install
+      - name: Check Expo connection
+        id: apple-prerequisites
+        working-directory: apps/mobile
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/apple.sh" prerequisites
+      - name: Load Expo environment
+        if: steps.apple-prerequisites.outputs.ready == 'true'
+        working-directory: apps/mobile
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/mobile.sh" expo-env
+      - name: Build and submit to TestFlight
+        if: steps.apple-prerequisites.outputs.ready == 'true'
+        working-directory: apps/mobile
+        env:
+          ASC_APP_ID: ${{ secrets.ASC_APP_ID || vars.ASC_APP_ID }}
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/apple.sh" production
+      - name: Report failure
+        if: failure() || cancelled()
+        run: node .github/scripts/disposabl.mjs report ios failed 'iOS production build or submission failed; check the workflow log.'
   desktop:
     needs: web
     permissions: *release-permissions
@@ -240,7 +329,27 @@ jobs:
       - name: Build
         run: bun run --cwd apps/desktop preview
       - *publish
-      - *artifacts
+      - name: Upload desktop release artifacts
+        if: matrix.platform != 'macos'
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ env.PLATFORM }}
+          path: dist/release/
+          retention-days: 3
+          if-no-files-found: error
+      - name: Upload unsigned macOS artifact
+        if: matrix.platform == 'macos'
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-unsigned
+          path: dist/release/*.dmg
+          retention-days: 3
+          if-no-files-found: error
+      - name: Report macOS artifact
+        if: matrix.platform == 'macos'
+        run: |
+          echo 'macOS DMG is ad-hoc signed, not Developer ID signed or notarized. Download it from this workflow run’s artifacts.' >> "$GITHUB_STEP_SUMMARY"
+          node .github/scripts/disposabl.mjs report macos blocked 'Ad-hoc signed DMG available in workflow artifacts; Developer ID signing and notarization are not configured.'
       - name: Report desktop failure
         if: failure() || cancelled()
         run: node .github/scripts/disposabl.mjs report "$PLATFORM" failed
@@ -276,7 +385,7 @@ jobs:
   # The publisher executes scripts from main only; the authorizer verifies workflow_sha.
   publish:
     needs: [web, android, desktop]
-    if: always() && !cancelled() && !contains(needs.*.result, 'failure') && (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository)
+    if: always() && !cancelled() && needs.web.result == 'success' && (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository)
     environment: publishing
     runs-on: ubuntu-latest
     timeout-minutes: 15

@@ -78,6 +78,7 @@ export const remove = internalAction({
         const retry = resume("github", app.githubOwner);
         // An installation-wide token remains usable after this repository is deleted.
         const token = await githubToken(
+          ctx,
           app.installationId,
           ["administration:write", "contents:read", "actions:read"],
           retry ? undefined : repository,

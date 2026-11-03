@@ -50,7 +50,6 @@ done
     ;;
   expo-fingerprint)
 artifact=android.apk
-[[ "$CHANNEL" != production ]] || artifact=android.aab
 export artifact
 for ((page=1; ; page++)); do
   gh api "repos/$GH_REPO/releases?per_page=100&page=$page" > "$RUNNER_TEMP/releases.json"
@@ -69,7 +68,7 @@ bun -e '
   const reusable = prior && Object.keys(wanted).every(k => prior[k] === wanted[k]) && /^[a-f0-9]{64}$/.test(prior.sha256 || "") && release.assets.some(a => a.name === process.env.artifact && a.state === "uploaded" && a.size > 0 && a.digest === `sha256:${prior.sha256}`);
   const blocked = !reusable && process.env.CHANNEL === "production" && process.env.ANDROID_SIGNING_READY !== "true";
   if (blocked) {
-    const reason = "Configure Android production signing credentials before building an AAB.";
+    const reason = "Configure Android production signing credentials before building a production APK.";
     console.error(`::notice::${reason}`);
     const report = Bun.spawnSync(["node", ".github/scripts/disposabl.mjs", "report", "android", "blocked", reason], {
       cwd: process.env.GITHUB_WORKSPACE, stdout: "inherit", stderr: "inherit",
@@ -81,7 +80,6 @@ bun -e '
     ;;
   expo-update)
 artifact=android.apk
-[[ "$CHANNEL" != production ]] || artifact=android.aab
 mkdir -p dist/release
 gh release download "$TAG" --pattern "$artifact" --dir dist/release
 echo "$SHA  dist/release/$artifact" | sha256sum --check
@@ -95,6 +93,13 @@ jq --arg sha "$SHA" '. + {sha256: $sha, action: "update"}' <<< "$MANIFEST" > ../
   android-build)
 test "$(gh api "repos/$GH_REPO/$SOURCE_PATH" --jq 'if has("head") then (if .state == "open" then .head.sha else "closed" end) else .object.sha end')" = "$SOURCE"
 if [[ "$CHANNEL" == production ]]; then
+  if [[ -n "${DISPOSABL_ANDROID_SIGNING:-}" ]]; then
+    signing_values=$(jq -er '[.keystoreBase64, .storePassword, .keyAlias, .keyPassword] | if all(.[]; type == "string" and length > 0 and (contains("\n") | not) and (contains("\r") | not)) then .[] else error("Invalid Android signing bundle") end' <<< "$DISPOSABL_ANDROID_SIGNING")
+    mapfile -t signing <<< "$signing_values"
+    for value in "${signing[@]}"; do printf '::add-mask::%s\n' "${value//%/%25}"; done
+    export ANDROID_KEYSTORE_BASE64="${signing[0]}" ANDROID_KEYSTORE_PASSWORD="${signing[1]}" ANDROID_KEY_ALIAS="${signing[2]}" ANDROID_KEY_PASSWORD="${signing[3]}"
+    unset signing_values signing value DISPOSABL_ANDROID_SIGNING
+  fi
   : "${ANDROID_KEYSTORE_BASE64:?}" "${ANDROID_KEYSTORE_PASSWORD:?}" "${ANDROID_KEY_ALIAS:?}" "${ANDROID_KEY_PASSWORD:?}"
   export ANDROID_KEYSTORE_PATH="$RUNNER_TEMP/android-release.jks"
   trap 'rm -f "$ANDROID_KEYSTORE_PATH"' EXIT
@@ -106,12 +111,7 @@ task=assembleRelease
 artifact=android.apk
 binary=android/app/build/outputs/apk/release/app-release.apk
 fingerprint=assets/fingerprint
-if [[ "$CHANNEL" == production ]]; then
-  task=bundleRelease
-  artifact=android.aab
-  binary=android/app/build/outputs/bundle/release/app-release.aab
-  fingerprint=base/assets/fingerprint
-fi
+
 (cd android && ./gradlew ":app:$task" --no-daemon --build-cache)
 test "$(unzip -p "$binary" "$fingerprint")" = "$RUNTIME"
 test "$(bun x --no-install expo-updates runtimeversion:resolve --platform android --workflow managed | jq -er .runtimeVersion)" = "$RUNTIME"

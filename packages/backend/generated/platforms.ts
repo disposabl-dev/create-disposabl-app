@@ -2,18 +2,20 @@
 import * as m0 from "../convex/apps/internal";
 import * as m1 from "../convex/apps/operations/internal";
 import * as m2 from "../convex/connections/internal";
-import * as m3 from "../convex/github/internal";
-import * as m4 from "../convex/previews/internal";
-import * as m5 from "../convex/previews/token/internal";
-import * as m6 from "../convex/releases/internal";
-import * as m7 from "../convex/users/internal";
+import * as m3 from "../convex/downloads/internal";
+import * as m4 from "../convex/github/internal";
+import * as m5 from "../convex/previews/internal";
+import * as m6 from "../convex/previews/token/internal";
+import * as m7 from "../convex/releases/internal";
+import * as m8 from "../convex/users/internal";
 export default {
   "apps/internal": m0,
   "apps/operations/internal": m1,
   "connections/internal": m2,
-  "github/internal": m3,
-  "previews/internal": m4,
-  "previews/token/internal": m5,
-  "releases/internal": m6,
-  "users/internal": m7,
+  "downloads/internal": m3,
+  "github/internal": m4,
+  "previews/internal": m5,
+  "previews/token/internal": m6,
+  "releases/internal": m7,
+  "users/internal": m8,
 };

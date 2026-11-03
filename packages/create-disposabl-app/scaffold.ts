@@ -57,6 +57,25 @@ export async function createApp(
           force: true,
         });
     }
+    // Provider connections belong to Disposabl's setup, not the generated app.
+    await rm(
+      join(
+        destination,
+        "apps/web/src/router/_authenticated/dashboard.connections.tsx",
+      ),
+      { force: true },
+    );
+    const dashboard = join(
+      destination,
+      "apps/web/src/router/_authenticated/dashboard.tsx",
+    );
+    await writeFile(
+      dashboard,
+      (await readFile(dashboard, "utf8")).replace(
+        '        <Link to="/dashboard/connections">Connections</Link>\n',
+        "",
+      ),
+    );
     if (!config.features.includes("authentication")) {
       // These are auth screens and starter examples, not backend capabilities.
       for (const path of [
@@ -130,7 +149,50 @@ export const Route = createFileRoute("/_providers/_authenticated/dashboard")({
         throw new Error(
           "Project name is too long for generated package names.",
         );
-      if (kind === "cli") client.bin = { [name]: "dist/index.js" };
+      if (kind === "cli") {
+        client.bin = { [name]: "dist/index.js" };
+        await writeFile(
+          join(folder, "index.ts"),
+          `#!/usr/bin/env node
+import { readFile } from "node:fs/promises";
+import { runCli } from "./commands";
+
+async function main() {
+  const args = process.argv.slice(2);
+  let origin: string | undefined;
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === "--origin") {
+      if (!args[i + 1] || args[i + 1]!.startsWith("--")) throw new Error("--origin requires a URL.");
+      origin = args[i + 1];
+      args.splice(i, 2);
+      i--;
+    } else if (args[i]!.startsWith("--origin=")) {
+      origin = args[i]!.slice("--origin=".length);
+      args.splice(i, 1);
+      i--;
+    }
+  }
+  if (!origin) origin = process.env.DISPOSABL_CLI_ORIGIN;
+  if (!origin) {
+    const config = await readFile("disposabl.json", "utf8").catch((error) => {
+      if (error.code === "ENOENT") return "{}";
+      throw error;
+    });
+    origin = JSON.parse(config).productionConvexSiteUrl;
+  }
+  if (!origin && !args.some((arg) => ["--help", "-h", "--version", "-V", "help"].includes(arg)) && args.length)
+    throw new Error("Set productionConvexSiteUrl in disposabl.json, DISPOSABL_CLI_ORIGIN, or --origin to your app's Convex site URL.");
+  if (args.includes("--help") || args.includes("-h") || !args.length)
+    console.log("App origin: --origin <url>, DISPOSABL_CLI_ORIGIN, or productionConvexSiteUrl in disposabl.json.");
+  await runCli([process.argv[0]!, process.argv[1]!, ...args], origin ?? "");
+}
+main().catch((error) => {
+  console.error(error instanceof Error ? error.message : "Command failed.");
+  process.exitCode = 1;
+});
+`,
+        );
+      }
       await writeFile(packagePath, JSON.stringify(client, null, 2) + "\n");
       const readme = join(folder, "README.md");
       if (existsSync(readme))
@@ -139,7 +201,10 @@ export const Route = createFileRoute("/_providers/_authenticated/dashboard")({
           (await readFile(readme, "utf8")).replaceAll(
             `@disposabl/${kind}`,
             client.name,
-          ),
+          ) +
+            (kind === "cli"
+              ? "\nSet `productionConvexSiteUrl` in `disposabl.json` to your production Convex site URL, or supply `DISPOSABL_CLI_ORIGIN` or `--origin <url>` when running the CLI.\n"
+              : ""),
         );
     }
     for (const path of await readdir(destination, { recursive: true })) {
@@ -154,6 +219,13 @@ export const Route = createFileRoute("/_providers/_authenticated/dashboard")({
     const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
     manifest.name = name;
     await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + "\n");
+    if (folders.includes("apps/desktop")) {
+      const desktopPath = join(destination, "apps/desktop/package.json");
+      const desktop = JSON.parse(await readFile(desktopPath, "utf8"));
+      desktop.productName = name;
+      desktop.description = `${name} desktop app`;
+      await writeFile(desktopPath, JSON.stringify(desktop, null, 2) + "\n");
+    }
     if (folders.includes("apps/mobile")) {
       const appConfigPath = join(destination, "apps/mobile/app.json");
       const appConfig = JSON.parse(await readFile(appConfigPath, "utf8"));

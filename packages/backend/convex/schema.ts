@@ -4,6 +4,13 @@ import { pendingDelete } from "./apps/validator";
 import { deployment, platform, releases } from "./validator";
 
 export default defineSchema({
+  serviceIdentities: defineTable({
+    key: v.string(),
+    token: v.optional(v.string()),
+    expiresAt: v.number(),
+    refreshAfter: v.number(),
+    lease: v.optional(v.string()),
+  }).index("by_key", ["key"]),
   users: defineTable({
     connectionState: v.optional(
       v.object({

@@ -70,7 +70,21 @@ export async function setupApp(
   const path = join(directory, "disposabl.json");
   const config = JSON.parse(await readFile(path, "utf8"));
   if (config.appId) {
-    await run(["apps", "get", "--appId", config.appId]);
+    const app = (await run(["apps", "get", "--appId", config.appId])) as {
+      platforms: string[];
+    };
+    if (
+      JSON.stringify([...app.platforms].sort()) !==
+      JSON.stringify([...config.platforms].sort())
+    )
+      await run([
+        "apps",
+        "update",
+        "--appId",
+        config.appId,
+        "--platforms",
+        JSON.stringify(config.platforms),
+      ]);
   } else {
     const app = (await run([
       "apps",

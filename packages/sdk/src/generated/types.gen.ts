@@ -232,6 +232,73 @@ export type AppsListResponses = {
 
 export type AppsListResponse = AppsListResponses[keyof AppsListResponses];
 
+export type AppsUpdateData = {
+  body: {
+    appId: string;
+    platforms: Array<
+      | "web"
+      | "android"
+      | "ios"
+      | "macos"
+      | "windows"
+      | "linux"
+      | "api"
+      | "mcp"
+      | "typescript-sdk"
+      | "cli"
+    >;
+  };
+  path?: never;
+  query?: never;
+  url: "/api/apps/update";
+};
+
+export type AppsUpdateErrors = {
+  /**
+   * Invalid arguments
+   */
+  400: unknown;
+  /**
+   * Authentication required
+   */
+  401: unknown;
+  /**
+   * Insufficient scope
+   */
+  403: unknown;
+  /**
+   * Internal error
+   */
+  500: unknown;
+};
+
+export type AppsUpdateResponses = {
+  /**
+   * Success
+   */
+  200: {
+    appId: string;
+    name: string;
+    platforms: Array<
+      | "web"
+      | "android"
+      | "ios"
+      | "macos"
+      | "windows"
+      | "linux"
+      | "api"
+      | "mcp"
+      | "typescript-sdk"
+      | "cli"
+    >;
+    githubOwner?: string;
+    githubRepo?: string;
+    createdAt: number;
+  };
+};
+
+export type AppsUpdateResponse = AppsUpdateResponses[keyof AppsUpdateResponses];
+
 export type ConnectionsStatusData = {
   body?: never;
   path?: never;
@@ -480,6 +547,8 @@ export type PreviewsTokenCreateResponses = {
     convexUrl: string;
     convexSiteUrl: string;
     deployKey: string;
+    productionConvexSiteUrl?: string;
+    repositoryUrl?: string;
   };
 };
 

@@ -21,6 +21,9 @@ import type {
   AppsListData,
   AppsListErrors,
   AppsListResponses,
+  AppsUpdateData,
+  AppsUpdateErrors,
+  AppsUpdateResponses,
   ConnectionsStatusData,
   ConnectionsStatusErrors,
   ConnectionsStatusResponses,
@@ -118,6 +121,23 @@ export const appsList = <ThrowOnError extends boolean = false>(
     security: [{ scheme: "bearer", type: "http" }],
     url: "/api/apps/list",
     ...options,
+  });
+
+export const appsUpdate = <ThrowOnError extends boolean = false>(
+  options: Options<AppsUpdateData, ThrowOnError>,
+): RequestResult<AppsUpdateResponses, AppsUpdateErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    AppsUpdateResponses,
+    AppsUpdateErrors,
+    ThrowOnError
+  >({
+    security: [{ scheme: "bearer", type: "http" }],
+    url: "/api/apps/update",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
   });
 
 export const connectionsStatus = <ThrowOnError extends boolean = false>(

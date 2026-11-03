@@ -1,6 +1,5 @@
 "use node";
 
-import sodium from "libsodium-wrappers";
 import {
   identityFields,
   internalAction,
@@ -15,6 +14,7 @@ import {
   ensureProduction,
 } from "../../previews/token/actions/management";
 import { githubRequest, githubToken } from "./tokens";
+import { generateAndroidSigning } from "./signing";
 
 export const configure = internalAction({
   args: { ...identityFields, appId: v.string(), projectId: v.number() },
@@ -33,20 +33,42 @@ export const configure = internalAction({
       );
     const repository = `${app.githubOwner}/${app.githubRepo}`;
     const token = await githubToken(
+      ctx,
       app.installationId,
       ["secrets:write"],
       repository,
     );
     const path = `/repos/${repository}/actions/secrets`;
-    const existing = await githubRequest<{ secrets: { name: string }[] }>(
-      token,
-      `${path}?per_page=100`,
-    );
-    const names = new Set(existing.secrets.map((secret) => secret.name));
+    const names = new Set<string>();
+    for (let page = 1; ; page++) {
+      const existing = await githubRequest<{ secrets: { name: string }[] }>(
+        token,
+        `${path}?per_page=100&page=${page}`,
+      );
+      for (const secret of existing.secrets) names.add(secret.name);
+      if (existing.secrets.length < 100) break;
+    }
+    const legacySigning = [
+      "ANDROID_KEYSTORE_BASE64",
+      "ANDROID_KEYSTORE_PASSWORD",
+      "ANDROID_KEY_ALIAS",
+      "ANDROID_KEY_PASSWORD",
+    ];
+    const legacyCount = legacySigning.filter((name) => names.has(name)).length;
+    if (
+      details.platforms.includes("android") &&
+      !names.has("DISPOSABL_ANDROID_SIGNING") &&
+      legacyCount > 0 &&
+      legacyCount < legacySigning.length
+    )
+      throw new Error(
+        "Android signing secrets are incomplete. Restore all four legacy ANDROID_* signing secrets before retrying setup. If this app has never shipped, remove the partial set to generate a new key.",
+      );
     const publicKey = await githubRequest<{ key_id: string; key: string }>(
       token,
       `${path}/public-key`,
     );
+    const { default: sodium } = await import("libsodium-wrappers");
     await sodium.ready;
     const save = async (name: string, value: string) => {
       const encrypted = sodium.crypto_box_seal(
@@ -66,6 +88,16 @@ export const configure = internalAction({
         "PUT",
       );
     };
+    if (
+      details.platforms.includes("android") &&
+      !names.has("DISPOSABL_ANDROID_SIGNING") &&
+      legacyCount === 0
+    ) {
+      await save(
+        "DISPOSABL_ANDROID_SIGNING",
+        JSON.stringify(await generateAndroidSigning()),
+      );
+    }
     const { token: managementToken } = await credential(
       ctx,
       args.userId,

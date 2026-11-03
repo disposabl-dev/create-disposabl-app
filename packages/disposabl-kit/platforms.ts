@@ -2,6 +2,9 @@ export const platforms = [
   { id: "web", label: "Web", group: "Required", status: "required" },
   { id: "android", label: "Android", group: "Mobile", status: "available" },
   { id: "ios", label: "iOS", group: "Mobile", status: "available" },
+  { id: "macos", label: "macOS", group: "Desktop", status: "available" },
+  { id: "windows", label: "Windows", group: "Desktop", status: "available" },
+  { id: "linux", label: "Linux", group: "Desktop", status: "available" },
   {
     id: "mcp",
     label: "MCP",

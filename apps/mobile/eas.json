@@ -6,14 +6,14 @@
   "build": {
     "ios-preview": {
       "developmentClient": false,
-      "distribution": "internal",
+      "ios": { "simulator": true },
       "environment": "preview",
       "credentialsSource": "remote",
       "channel": "preview"
     },
     "ios-production": {
       "developmentClient": false,
-      "distribution": "internal",
+      "distribution": "store",
       "environment": "production",
       "credentialsSource": "remote",
       "channel": "production"

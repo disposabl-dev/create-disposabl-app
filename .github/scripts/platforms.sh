@@ -28,10 +28,10 @@ node --input-type=module -e '
       return !["ahead", "identical"].includes(diff.status) || !Array.isArray(diff.files) || diff.files.length >= 300 ? ["disposabl.json"] : diff.files.flatMap(f => [f.filename, f.previous_filename]).filter(relevant);
     } catch { return paths; }
   };
-  const affected = (platform, directory) => enabled.includes(platform) && changes(platform).some(p => p.startsWith(directory) || /^(bun.lock$|package.json$|disposabl.json$|turbo.json$|bunfig.toml$|patches\/|\.github\/workflows\/pipeline.yml$|packages\/(?!backend\/|create-disposabl-app\/))/.test(p));
+  const affected = (platform, directory) => enabled.includes(platform) && changes(platform).some(p => p.startsWith(directory) || /^(bun.lock$|package.json$|disposabl.json$|turbo.json$|bunfig.toml$|patches\/|\.github\/(workflows\/pipeline.yml$|scripts\/)|packages\/(?!backend\/|create-disposabl-app\/))/.test(p));
   const target = process.env.DISPOSABL_DESKTOP_PLATFORM;
-  for (const platform of ["android", "ios"]) console.log(`${platform}=${platform === "android" && Boolean(process.env.EXPO_TOKEN) && !target && affected(platform, "apps/mobile/")}`); // Restore iOS selection when builds resume.
-  const desktop = ["linux", "windows"].filter(platform => affected(platform, "apps/desktop/"))
+  for (const platform of ["android", "ios"]) console.log(`${platform}=${(platform === "ios" || Boolean(process.env.EXPO_TOKEN)) && !target && affected(platform, "apps/mobile/")}`);
+  const desktop = ["linux", "windows", "macos"].filter(platform => affected(platform, "apps/desktop/"))
     .map(platform => ({platform, runner: process.env[`${platform.toUpperCase()}_RUNNER`]}));
   console.log(`desktop=${JSON.stringify(desktop)}`);
 ' >> "$GITHUB_OUTPUT"

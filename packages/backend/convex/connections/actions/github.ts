@@ -7,7 +7,7 @@ import {
 } from "@disposabl/disposabl-kit/server/lib/functions";
 import { ConvexError, v, type Infer } from "convex/values";
 import { internal } from "../../_generated/api";
-import { env } from "../../_generated/server";
+import { env, type ActionCtx } from "../../_generated/server";
 import {
   githubRequest,
   githubToken,
@@ -32,13 +32,13 @@ const permissions = [
   "secrets",
 ];
 
-export async function userInstallations(userId: string) {
+export async function userInstallations(ctx: ActionCtx, userId: string) {
   const token = await getToken(
     env.GITHUB_CONNECTOR!,
     {
       subject: { type: "user", id: userId },
     },
-    { vercelToken: await vercelIdentity(), forceRefresh: true },
+    { vercelToken: await vercelIdentity(ctx), forceRefresh: true },
   );
   const user = await githubRequest<{ login: string }>(token, "/user");
   const organizations = new Set<string>();
@@ -96,7 +96,7 @@ export const selectGithub = internalAction({
     if (!chosen || verified.expiresAt < Date.now())
       throw new ConvexError("Connect GitHub again to choose an account.");
     // Re-check membership and the granted permissions before saving the binding.
-    const current = await userInstallations(userId);
+    const current = await userInstallations(ctx, userId);
     if (
       !current.installations.some(
         (i) => i.installationId === installationId && i.owner === chosen.owner,
@@ -106,6 +106,7 @@ export const selectGithub = internalAction({
         "GitHub access changed. Install Disposabl with the requested permissions.",
       );
     await githubToken(
+      ctx,
       installationId,
       permissions.map((p) => `${p}:write`),
     );
