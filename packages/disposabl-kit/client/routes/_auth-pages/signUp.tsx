@@ -22,7 +22,7 @@ import { useEffect, useRef, useState } from "react";
 import { useConvexAuth } from "convex/react";
 import { getReturnTo } from "../../lib/return-to";
 
-export function SignUp() {
+function SignUp() {
   const { request, returnTo } = Route.useSearch();
   const navigate = useNavigate();
   const { isLoading, isAuthenticated } = useConvexAuth();

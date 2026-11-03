@@ -30,10 +30,12 @@ const touched = [
   "packages/backend/package.json",
   "packages/backend/README.md",
   "packages/sdk/src",
+  "packages/cli/README.md",
   "packages/create-disposabl-app",
   "starter",
   ".github/workflows",
   "apps/web/src/router",
+  "apps/web/src/components/connections",
   "bun.lock",
   "turbo.json",
 ];
@@ -99,6 +101,8 @@ for (const path of [
 ])
   await readFile(join(root, "starter/backend", path));
 
+await readFile(join(root, "starter/cli/README.md"));
+
 const dashboardPath = "apps/web/src/router/_authenticated/dashboard.tsx";
 const connectionPath =
   "apps/web/src/router/_authenticated/dashboard.connections.tsx";
@@ -124,11 +128,16 @@ for (const path of [
   "packages/create-disposabl-app",
   ".github/workflows/publish.yml",
   connectionPath,
+  "apps/web/src/components/connections",
 ])
   await rm(join(root, path), { recursive: true, force: true });
 await cp(join(root, "starter/backend"), join(root, "packages/backend"), {
   recursive: true,
 });
+await cp(
+  join(root, "starter/cli/README.md"),
+  join(root, "packages/cli/README.md"),
+);
 await Bun.write(
   join(root, dashboardPath),
   dashboard.replace(connectionLink, ""),

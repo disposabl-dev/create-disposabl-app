@@ -14,7 +14,7 @@ export const Route = createFileRoute("/_providers/consent")({
   component: ConsentPage,
 });
 
-export function ConsentPage() {
+function ConsentPage() {
   const { request: requestId } = Route.useSearch();
   const request = useQuery(
     api.mcp.getAuthRequest,
@@ -24,15 +24,39 @@ export function ConsentPage() {
   const { isAuthenticated, isLoading } = useConvexAuth();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [decision, setDecision] = useState<{
+    requestId: string;
+    approved: boolean;
+  } | null>(null);
+  const [confirmed, setConfirmed] = useState<{
+    requestId: string;
+    code: string;
+  } | null>(null);
+  const deviceConfirmed =
+    request?.kind === "device" &&
+    !!request.userCode &&
+    confirmed?.requestId === requestId &&
+    confirmed?.code === request.userCode;
 
   const decide = async (approve: boolean) => {
-    if (!requestId || pending) return;
+    if (!requestId || pending || !request || request.status !== "pending")
+      return;
+    if (approve && request.kind === "device" && !deviceConfirmed) return;
     setPending(true);
     setError(null);
     try {
-      const { redirectUrl } = await authorize({ requestId, approve });
+      const { redirectUrl } = await authorize({
+        requestId,
+        approve,
+        ...(approve && request.kind === "device" && deviceConfirmed
+          ? { userCode: request.userCode }
+          : {}),
+      });
       if (redirectUrl) window.location.assign(redirectUrl);
-      else setPending(false);
+      else {
+        setDecision({ requestId, approved: approve });
+        setPending(false);
+      }
     } catch {
       setError("Could not save your decision. Please try again.");
       setPending(false);
@@ -40,7 +64,15 @@ export function ConsentPage() {
   };
 
   let content;
-  if (!requestId) {
+  if (decision && decision.requestId === requestId) {
+    content = (
+      <p role="status">
+        {decision.approved
+          ? "Connected. Return to your agent to continue."
+          : "Connection denied. You can close this page."}
+      </p>
+    );
+  } else if (!requestId) {
     content = (
       <p>
         No connection request was provided. Start the connection from your
@@ -68,7 +100,7 @@ export function ConsentPage() {
       <>
         <p>
           <strong>{request.clientName || request.clientId}</strong> wants to
-          connect to {request.serverName}.
+          connect to {request.serverName}. This name is provided by the agent.
         </p>
         <section className="space-y-2" aria-label="Requested permissions">
           <h2 className="font-medium">Requested access</h2>
@@ -84,12 +116,33 @@ export function ConsentPage() {
             </p>
           )}
         </section>
-        <div className="space-y-1 text-sm">
-          <p className="font-medium">Return address</p>
-          <p className="break-all text-muted-foreground">
-            {request.redirectUri}
-          </p>
-        </div>
+        {request.kind === "device" ? (
+          <div className="space-y-2 text-sm">
+            <p className="font-medium">Device code: {request.userCode}</p>
+            <label className="flex items-start gap-2">
+              <input
+                type="checkbox"
+                checked={deviceConfirmed}
+                disabled={!request.userCode || pending}
+                onChange={(event) =>
+                  setConfirmed(
+                    event.target.checked && request.userCode
+                      ? { requestId, code: request.userCode }
+                      : null,
+                  )
+                }
+              />
+              I verified this code matches the one shown by my agent.
+            </label>
+          </div>
+        ) : (
+          <div className="space-y-1 text-sm">
+            <p className="font-medium">Return address</p>
+            <p className="break-all text-muted-foreground">
+              {request.redirectUri}
+            </p>
+          </div>
+        )}
         {error && (
           <p role="alert" className="text-destructive">
             {error}
@@ -104,7 +157,12 @@ export function ConsentPage() {
             >
               Deny
             </Button>
-            <Button disabled={pending} onClick={() => decide(true)}>
+            <Button
+              disabled={
+                pending || (request.kind === "device" && !deviceConfirmed)
+              }
+              onClick={() => decide(true)}
+            >
               Allow
             </Button>
             {pending && (

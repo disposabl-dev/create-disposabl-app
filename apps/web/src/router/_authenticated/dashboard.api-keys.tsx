@@ -9,7 +9,7 @@ import config from "../../../../../disposabl.json";
 export const Route = createFileRoute(
   "/_providers/_authenticated/dashboard/api-keys",
 )({ component: ApiKeys });
-export function ApiKeys() {
+function ApiKeys() {
   const enabled = config.platforms.includes("api");
   const connections = useQuery(api.mcp.listConnections, enabled ? {} : "skip");
   const create = useAction(api.mcp.createApiKey);
