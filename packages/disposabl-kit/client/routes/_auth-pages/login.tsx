@@ -17,16 +17,27 @@ import { Input } from "../../components/ui/input";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useSignInWithUsernamePassword } from "@convex-dev/auth/methods/username-password/react";
 import { api } from "../../../../backend/convex/_generated/api";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useConvexAuth } from "convex/react";
 import { getReturnTo } from "../../lib/return-to";
 
 export function LogIn() {
   const { request, returnTo } = Route.useSearch();
   const navigate = useNavigate();
+  const { isLoading, isAuthenticated } = useConvexAuth();
+  const submitted = useRef(false);
+
+  useEffect(() => {
+    if (!isLoading && isAuthenticated && !submitted.current) {
+      void navigate({ to: "/", replace: true });
+    }
+  }, [isLoading, isAuthenticated, navigate]);
   const { signIn, pending } = useSignInWithUsernamePassword(api.auth);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+
+  if (isLoading || (isAuthenticated && !submitted.current)) return null;
 
   return (
     <main className="flex min-h-[calc(100svh-73px)] flex-col items-center justify-center bg-muted p-6 md:p-10">
@@ -45,6 +56,7 @@ export function LogIn() {
             <form
               onSubmit={async (e) => {
                 e.preventDefault();
+                submitted.current = true;
                 setError(null);
                 const result = await signIn({ username, password });
                 if (result.status === "complete") {
@@ -53,6 +65,7 @@ export function LogIn() {
                   else window.location.assign(returnTo ?? "/dashboard");
                   return;
                 }
+                submitted.current = false;
                 setError(() => {
                   switch (result.userError.error) {
                     case "USER_NOT_FOUND":
