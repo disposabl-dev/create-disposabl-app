@@ -24,7 +24,7 @@
   "scripts": {
     "build": "bun build.ts",
     "typecheck": "bun check",
-    "lint": "eslint .",
+    "lint": "cd ../.. && packages/create-disposabl-app/node_modules/.bin/eslint --config packages/create-disposabl-app/eslint.config.ts packages/create-disposabl-app reset.ts",
     "format": "bun fmt"
   },
   "publishConfig": {

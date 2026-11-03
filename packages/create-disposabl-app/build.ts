@@ -1,5 +1,6 @@
-import { cp, mkdir, readdir, rename, rm } from "node:fs/promises";
-import { basename, join, relative, sep } from "node:path";
+import { cp, mkdtemp, readdir, rename, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { basename, join, resolve } from "node:path";
 import manifest from "./package.json";
 
 const dir = import.meta.dir;
@@ -42,30 +43,12 @@ if (!cli.success)
 await cp(join(root, "LICENSE"), join(dir, "LICENSE"));
 
 // Bundle the complete starter; the CLI keeps only the selected app folders.
-{
-  const templateDir = join(outdir, "templates/default");
-  await mkdir(templateDir, { recursive: true });
-  // Only reusable backend modules belong in a fresh app. New product modules
-  // must not leak into the starter when Disposabl adds a feature.
-  const backend = join(root, "packages/backend");
-  const starterModules = new Set([
-    "_generated",
-    "auth.ts",
-    "auth.config.ts",
-    "mcp.ts",
-    "tsconfig.json",
-    "users",
-  ]);
+const templateDir = await mkdtemp(join(tmpdir(), "disposabl-starter-"));
+try {
   const copySource = (source: string, destination: string) =>
     cp(source, destination, {
       recursive: true,
       filter: (path) =>
-        (!path.startsWith(join(backend, "convex") + sep) ||
-          starterModules.has(
-            relative(join(backend, "convex"), path).split(sep)[0]!,
-          )) &&
-        path !== join(backend, "generated") &&
-        path !== join(root, "packages/sdk/src/generated") &&
         ![
           ".git",
           "node_modules",
@@ -81,7 +64,6 @@ await cp(join(root, "LICENSE"), join(dir, "LICENSE"));
           ".DS_Store",
           "tests",
         ].includes(basename(path)) &&
-        path !== dir &&
         path !== join(root, "apps/mobile/android") &&
         path !== join(root, "apps/mobile/ios") &&
         path !== join(root, "apps/desktop/out") &&
@@ -94,11 +76,12 @@ await cp(join(root, "LICENSE"), join(dir, "LICENSE"));
     const entry = item.name;
     if (
       item.isDirectory()
-        ? ![".github", "apps", "packages", "patches"].includes(entry)
+        ? ![".github", "apps", "packages", "patches", "starter"].includes(entry)
         : ![
             "LICENSE",
             "AGENTS.md",
             "dev.ts",
+            "reset.ts",
             "package.json",
             "bun.lock",
             "bunfig.toml",
@@ -109,68 +92,21 @@ await cp(join(root, "LICENSE"), join(dir, "LICENSE"));
           ].includes(entry)
     )
       continue;
-    if (entry === ".github") {
-      await cp(join(root, entry), join(templateDir, entry), {
-        recursive: true,
-        filter: (path) => path !== join(root, ".github/workflows/publish.yml"),
-      });
-    } else if (entry === "packages") {
-      for (const pkg of await readdir(join(root, entry))) {
-        if (pkg !== "create-disposabl-app") {
-          await copySource(
-            join(root, entry, pkg),
-            join(templateDir, entry, pkg),
-          );
-        }
-      }
-    } else {
-      await copySource(join(root, entry), join(templateDir, entry));
-    }
+    await copySource(join(root, entry), join(templateDir, entry));
   }
-  await cp(
-    join(dir, "starter/backend"),
-    join(templateDir, "packages/backend"),
-    {
-      recursive: true,
-    },
-  );
-  const backendManifestPath = join(
-    templateDir,
-    "packages/backend/package.json",
-  );
-  const backendManifest = await Bun.file(backendManifestPath).json();
-  for (const dependency of [
-    "@convex-dev/workflow",
-    "@octokit/rest",
-    "@vercel/connect",
-    "libsodium-wrappers",
-    "node-forge",
-  ])
-    delete backendManifest.dependencies[dependency];
-  delete backendManifest.devDependencies["@types/node-forge"];
+  // Product-to-starter transformations belong to the app's reset script.
   await Bun.write(
-    backendManifestPath,
-    JSON.stringify(backendManifest, null, 2) + "\n",
+    join(templateDir, ".disposabl-staging.json"),
+    JSON.stringify({ source: resolve(root), directory: resolve(templateDir) }),
   );
-  // The generator runs outside the app and must not remain in its workspace.
-  const lockPath = join(templateDir, "bun.lock");
-  const lock = Bun.JSONC.parse(await Bun.file(lockPath).text()) as {
-    workspaces: Record<string, unknown>;
-    packages: Record<string, unknown>;
-  };
-  delete lock.workspaces["packages/create-disposabl-app"];
-  delete lock.packages["create-disposabl-app"];
-  lock.workspaces["packages/backend"] = {
-    name: backendManifest.name,
-    version: backendManifest.version,
-    dependencies: backendManifest.dependencies,
-    devDependencies: backendManifest.devDependencies,
-  };
-  await Bun.write(lockPath, JSON.stringify(lock, null, 2) + "\n");
-  const turboPath = join(templateDir, "turbo.json");
-  const turbo = await Bun.file(turboPath).json();
-  delete turbo.tasks["create-disposabl-app#build"];
-  await Bun.write(turboPath, JSON.stringify(turbo, null, 2) + "\n");
+  const reset = Bun.spawn([process.execPath, "reset.ts"], {
+    cwd: templateDir,
+    stdout: "inherit",
+    stderr: "inherit",
+  });
+  if ((await reset.exited) !== 0) throw new Error("Starter reset failed.");
+  for (const file of ["reset.ts", "starter", ".disposabl-staging.json"])
+    await rm(join(templateDir, file), { recursive: true, force: true });
   // npm omits .gitignore files from packed templates.
   for (const path of await readdir(templateDir, { recursive: true })) {
     if (basename(path) === ".gitignore") {
@@ -180,5 +116,8 @@ await cp(join(root, "LICENSE"), join(dir, "LICENSE"));
       );
     }
   }
+  await cp(templateDir, join(outdir, "templates/default"), { recursive: true });
   console.log("Built CLI and bundled app source.");
+} finally {
+  await rm(templateDir, { recursive: true, force: true });
 }
