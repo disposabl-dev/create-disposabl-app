@@ -5,7 +5,6 @@
   "scripts": {
     "generate": "bun generate.ts",
     "generate:watch": "bun generate.ts --watch",
-    "predev": "bun x --no-install --package @convex-dev/auth auth --keys-only",
     "dev": "convex dev",
     "logs": "convex logs",
     "typecheck": "tsc -p convex",

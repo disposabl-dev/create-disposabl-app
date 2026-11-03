@@ -9,8 +9,6 @@ import { v } from "convex/values";
 
 const app = defineApp({
   env: {
-    AUTH_PRIVATE_KEY: v.string(),
-    AUTH_JWKS: v.string(),
     CONVEX_OAUTH_CLIENT_ID: v.optional(v.string()),
     CONVEX_OAUTH_CLIENT_SECRET: v.optional(v.string()),
     GITHUB_APP_SLUG: v.optional(v.string()),
@@ -23,13 +21,8 @@ const app = defineApp({
   },
 });
 
-app.use(auth, {
-  httpPrefix: "/auth",
-  env: {
-    AUTH_PRIVATE_KEY: app.env.AUTH_PRIVATE_KEY,
-    AUTH_JWKS: app.env.AUTH_JWKS,
-  },
-});
+app.use(auth);
+
 app.use(passwordProvider);
 app.use(username);
 app.use(staticHosting);

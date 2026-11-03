@@ -11,6 +11,9 @@
 import type * as auth from "../auth.js";
 import type * as http from "../http.js";
 import type * as mcp from "../mcp.js";
+import type * as mcpEnterprise_internal from "../mcpEnterprise/internal.js";
+import type * as mcpEnterprise_provision from "../mcpEnterprise/provision.js";
+import type * as mcpEnterprise_validator from "../mcpEnterprise/validator.js";
 import type * as users_index from "../users/index.js";
 import type * as users_internal from "../users/internal.js";
 
@@ -24,6 +27,9 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   http: typeof http;
   mcp: typeof mcp;
+  "mcpEnterprise/internal": typeof mcpEnterprise_internal;
+  "mcpEnterprise/provision": typeof mcpEnterprise_provision;
+  "mcpEnterprise/validator": typeof mcpEnterprise_validator;
   "users/index": typeof users_index;
   "users/internal": typeof users_internal;
 }>;
