@@ -1,0 +1,26 @@
+[
+  {
+    "path": "/",
+    "authenticated": false
+  },
+  {
+    "path": "/consent",
+    "authenticated": false
+  },
+  {
+    "path": "/login",
+    "authenticated": false
+  },
+  {
+    "path": "/signup",
+    "authenticated": false
+  },
+  {
+    "path": "/dashboard",
+    "authenticated": true
+  },
+  {
+    "path": "/dashboard/api-keys",
+    "authenticated": true
+  }
+]

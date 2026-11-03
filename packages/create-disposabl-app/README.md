@@ -32,3 +32,10 @@ To get another development key in a worktree, run `disposabl previews token crea
 If app creation is interrupted, rerun `bun create disposabl-app@latest my-app` from the parent directory. It resumes setup using the existing files and app UUID.
 
 Generated apps do not include the `create-disposabl-app` package, its workspace lockfile entry, or its Turbo build task. The generator and bundled Disposabl CLI run externally.
+
+Generated backends start with only `users: defineTable({})`. The starter keeps
+authentication, static hosting, and API/MCP support, with `users/current` as its
+only application operation. Disposabl's apps, previews, releases, provider
+connections, GitHub handlers, and service credentials stay in the Disposabl
+backend. Product-generated API bindings, contracts, and SDK operations are not
+copied into new apps.
