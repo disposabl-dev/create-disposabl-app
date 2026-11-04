@@ -3,6 +3,8 @@
   "private": true,
   "scripts": {
     "check": "bun run generate && turbo run typecheck lint && bun fmt --check",
+    "test": "bun run --cwd packages/tests test",
+    "e2e": "bun run --cwd packages/tests e2e",
     "build": "turbo build",
     "dev": "turbo dev",
     "lint": "turbo lint",
@@ -20,7 +22,7 @@
   },
   "packageManager": "bun@1.4.4",
   "engines": {
-    "node": ">=22.12.0"
+    "node": "^22.22.3 || >=24.8.0"
   },
   "workspaces": [
     "apps/*",

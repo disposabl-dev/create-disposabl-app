@@ -29,9 +29,11 @@ Run lint and typecheck before declaring any task done.
 - Import `Link`, `router`, and `useLocalSearchParams` from `expo-router`.
 - Docs: https://docs.expo.dev/router/introduction.md
 
-## Building with EAS
+## Local builds and testing
 
-Use EAS to build, sign, and submit the app in the cloud (`eas build`, `eas submit`) and to ship over-the-air updates (`eas update`) — no local Xcode or Android Studio required. Run EAS CLI as `bunx eas-cli <command>` in Bun projects, or `npx eas-cli@latest <command>` otherwise; substitute that for bare `eas` in docs examples.
+Prefer `bun run ios` or `bun run android` from `apps/mobile` when the local Xcode or Android toolchain is available. Build and install the development client, keep Metro running, then run `bun run test --target ios` or `bun run test --target android` from the repository root. Read `packages/tests/README.md` and use E2E for behavior checks. Do not push or start a cloud build just to verify a local change.
+
+Use EAS or the release workflows for requested distribution when needed. A simulator build does not prove device signing or store readiness; do not submit to a store unless requested. Run EAS CLI as `bunx eas-cli <command>` in Bun projects.
 Docs: https://docs.expo.dev/eas/index.md
 
 ## Rules

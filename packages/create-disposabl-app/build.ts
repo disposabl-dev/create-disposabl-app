@@ -63,8 +63,9 @@ try {
           ".vinxi",
           ".convex",
           ".DS_Store",
-          "tests",
         ].includes(basename(path)) &&
+        (basename(path) !== "tests" || path === join(root, "packages/tests")) &&
+        basename(path) !== ".e2e" &&
         path !== join(root, "apps/mobile/android") &&
         path !== join(root, "apps/mobile/ios") &&
         path !== join(root, "apps/desktop/out") &&

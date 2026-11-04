@@ -4,7 +4,7 @@ Create a Disposabl app for web, mobile, desktop, and developer tools.
 
 ## Get started
 
-Install [Bun](https://bun.sh) and [Git](https://git-scm.com), then run:
+Install [Bun](https://bun.sh), [Git](https://git-scm.com), and [Node.js](https://nodejs.org) 24.8 or newer, then run:
 
 ```sh
 bunx create-disposabl-app@latest
@@ -23,7 +23,7 @@ bun run dev
 
 Use the app name you chose instead of `my-app`. Your website opens automatically. Mobile apps need a development build before you can open them on a device; they do not use Expo Go. See the generated `apps/mobile/README.md` for the next steps.
 
-You can also launch setup with npm, pnpm, or Yarn 2+. The generated project still requires Bun. These launchers also need Node.js 22.12 or newer.
+You can also launch setup with npm, pnpm, or Yarn 2+. The generated project still requires Bun. Tests need Node.js 22.22.3 or newer on Node 22, or Node.js 24.8 or newer.
 
 | Tool | Command                                |
 | ---- | -------------------------------------- |
@@ -70,7 +70,13 @@ Setup resumes using the existing project and app ID. If dependency installation 
 
 ## Development and publishing
 
-New apps start on the `main` branch with a configured local development environment. Use `bun run dev` for local work.
+New apps start on the `main` branch with a configured local development environment. Use `bun run dev` for local work. Build and test on your own machine whenever its tools are available; do not push changes just to get a test run.
+
+Every app includes E2E tests in `packages/tests`. Run `bun run test` for the selected web/mobile platforms and the backend, or `bun run test --target web,backend` for a smaller check. API checks run only when API is selected. No E2E login, AI subscription, or model key is needed.
+
+Mobile tests need a built app installed on a simulator or emulator. Debug builds need Metro running too. The included flows are starter checks; your coding agent should add tests for the features it builds. Desktop, MCP, CLI, and SDK clients are not covered by these flows.
+
+E2E telemetry is disabled. PostHog analytics is production-only. Read the generated `packages/tests/README.md` for test setup and CI instructions. Existing release workflows do not automatically run these tests.
 
 For a separate Git worktree, run this inside that worktree to configure its development environment:
 
