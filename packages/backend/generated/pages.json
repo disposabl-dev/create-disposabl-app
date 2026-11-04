@@ -8,6 +8,10 @@
     "authenticated": false
   },
   {
+    "path": "/legal",
+    "authenticated": false
+  },
+  {
     "path": "/login",
     "authenticated": false
   },
@@ -18,6 +22,22 @@
   {
     "path": "/dashboard",
     "authenticated": true
+  },
+  {
+    "path": "/legal/delete-account",
+    "authenticated": false
+  },
+  {
+    "path": "/legal/privacy",
+    "authenticated": false
+  },
+  {
+    "path": "/legal/privacy-request",
+    "authenticated": false
+  },
+  {
+    "path": "/legal/terms",
+    "authenticated": false
   },
   {
     "path": "/dashboard/api-keys",

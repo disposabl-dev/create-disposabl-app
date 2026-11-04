@@ -13,9 +13,14 @@ import { Route as DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteR
 import { Route as IndexRouteImport } from './router/index'
 import { Route as DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthenticatedRouteRouteImport } from './../../../packages/disposabl-kit/client/routes/_authenticated/route'
 import { Route as DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesConsentRouteImport } from './../../../packages/disposabl-kit/client/routes/consent'
+import { Route as DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalIndexRouteImport } from './../../../packages/disposabl-kit/client/routes/legal/index'
 import { Route as DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesLoginRouteImport } from './../../../packages/disposabl-kit/client/routes/_auth-pages/login'
 import { Route as DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesSignUpRouteImport } from './../../../packages/disposabl-kit/client/routes/_auth-pages/signUp'
 import { Route as AuthenticatedDashboardRouteImport } from './router/_authenticated/dashboard'
+import { Route as DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalDeleteAccountRouteImport } from './../../../packages/disposabl-kit/client/routes/legal/delete-account'
+import { Route as DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalPrivacyRouteImport } from './../../../packages/disposabl-kit/client/routes/legal/privacy'
+import { Route as DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalPrivacyRequestRouteImport } from './../../../packages/disposabl-kit/client/routes/legal/privacy-request'
+import { Route as DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalTermsRouteImport } from './../../../packages/disposabl-kit/client/routes/legal/terms'
 import { Route as AuthenticatedDashboardDotapiKeysRouteImport } from './router/_authenticated/dashboard.api-keys'
 import { Route as AuthenticatedDashboardDotconnectionsRouteImport } from './router/_authenticated/dashboard.connections'
 
@@ -49,6 +54,15 @@ const DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesConsentRoute =
         DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRoute,
     } as any,
   )
+const DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalIndexRoute =
+  DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalIndexRouteImport.update(
+    {
+      id: '/legal',
+      path: '/legal',
+      getParentRoute: () =>
+        DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRoute,
+    } as any,
+  )
 const DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesLoginRoute =
   DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesLoginRouteImport.update(
     {
@@ -73,6 +87,42 @@ const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   getParentRoute: () =>
     DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthenticatedRouteRoute,
 } as any)
+const DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalDeleteAccountRoute =
+  DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalDeleteAccountRouteImport.update(
+    {
+      id: '/legal/delete-account',
+      path: '/legal/delete-account',
+      getParentRoute: () =>
+        DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRoute,
+    } as any,
+  )
+const DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalPrivacyRoute =
+  DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalPrivacyRouteImport.update(
+    {
+      id: '/legal/privacy',
+      path: '/legal/privacy',
+      getParentRoute: () =>
+        DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRoute,
+    } as any,
+  )
+const DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalPrivacyRequestRoute =
+  DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalPrivacyRequestRouteImport.update(
+    {
+      id: '/legal/privacy-request',
+      path: '/legal/privacy-request',
+      getParentRoute: () =>
+        DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRoute,
+    } as any,
+  )
+const DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalTermsRoute =
+  DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalTermsRouteImport.update(
+    {
+      id: '/legal/terms',
+      path: '/legal/terms',
+      getParentRoute: () =>
+        DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRoute,
+    } as any,
+  )
 const AuthenticatedDashboardDotapiKeysRoute =
   AuthenticatedDashboardDotapiKeysRouteImport.update({
     id: '/api-keys',
@@ -91,7 +141,12 @@ export interface FileRoutesByFullPath {
   '/consent': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesConsentRoute
   '/login': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesLoginRoute
   '/signup': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesSignUpRoute
+  '/legal': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalIndexRoute
   '/dashboard': typeof AuthenticatedDashboardRouteWithChildren
+  '/legal/delete-account': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalDeleteAccountRoute
+  '/legal/privacy': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalPrivacyRoute
+  '/legal/privacy-request': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalPrivacyRequestRoute
+  '/legal/terms': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalTermsRoute
   '/dashboard/api-keys': typeof AuthenticatedDashboardDotapiKeysRoute
   '/dashboard/connections': typeof AuthenticatedDashboardDotconnectionsRoute
 }
@@ -100,7 +155,12 @@ export interface FileRoutesByTo {
   '/consent': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesConsentRoute
   '/login': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesLoginRoute
   '/signup': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesSignUpRoute
+  '/legal': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalIndexRoute
   '/dashboard': typeof AuthenticatedDashboardRouteWithChildren
+  '/legal/delete-account': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalDeleteAccountRoute
+  '/legal/privacy': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalPrivacyRoute
+  '/legal/privacy-request': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalPrivacyRequestRoute
+  '/legal/terms': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalTermsRoute
   '/dashboard/api-keys': typeof AuthenticatedDashboardDotapiKeysRoute
   '/dashboard/connections': typeof AuthenticatedDashboardDotconnectionsRoute
 }
@@ -112,7 +172,12 @@ export interface FileRoutesById {
   '/_providers/login': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesLoginRoute
   '/_providers/signup': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesSignUpRoute
   '/_providers/': typeof IndexRoute
+  '/_providers/legal': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalIndexRoute
   '/_providers/_authenticated/dashboard': typeof AuthenticatedDashboardRouteWithChildren
+  '/_providers/legal/delete-account': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalDeleteAccountRoute
+  '/_providers/legal/privacy': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalPrivacyRoute
+  '/_providers/legal/privacy-request': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalPrivacyRequestRoute
+  '/_providers/legal/terms': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalTermsRoute
   '/_providers/_authenticated/dashboard/api-keys': typeof AuthenticatedDashboardDotapiKeysRoute
   '/_providers/_authenticated/dashboard/connections': typeof AuthenticatedDashboardDotconnectionsRoute
 }
@@ -123,7 +188,12 @@ export interface FileRouteTypes {
     | '/consent'
     | '/login'
     | '/signup'
+    | '/legal'
     | '/dashboard'
+    | '/legal/delete-account'
+    | '/legal/privacy'
+    | '/legal/privacy-request'
+    | '/legal/terms'
     | '/dashboard/api-keys'
     | '/dashboard/connections'
   fileRoutesByTo: FileRoutesByTo
@@ -132,7 +202,12 @@ export interface FileRouteTypes {
     | '/consent'
     | '/login'
     | '/signup'
+    | '/legal'
     | '/dashboard'
+    | '/legal/delete-account'
+    | '/legal/privacy'
+    | '/legal/privacy-request'
+    | '/legal/terms'
     | '/dashboard/api-keys'
     | '/dashboard/connections'
   id:
@@ -143,7 +218,12 @@ export interface FileRouteTypes {
     | '/_providers/login'
     | '/_providers/signup'
     | '/_providers/'
+    | '/_providers/legal'
     | '/_providers/_authenticated/dashboard'
+    | '/_providers/legal/delete-account'
+    | '/_providers/legal/privacy'
+    | '/_providers/legal/privacy-request'
+    | '/_providers/legal/terms'
     | '/_providers/_authenticated/dashboard/api-keys'
     | '/_providers/_authenticated/dashboard/connections'
   fileRoutesById: FileRoutesById
@@ -182,6 +262,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesConsentRouteImport
       parentRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRoute
     }
+    '/_providers/legal': {
+      id: '/_providers/legal'
+      path: '/legal'
+      fullPath: '/legal'
+      preLoaderRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalIndexRouteImport
+      parentRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRoute
+    }
     '/_providers/login': {
       id: '/_providers/login'
       path: '/login'
@@ -202,6 +289,34 @@ declare module '@tanstack/react-router' {
       fullPath: '/dashboard'
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
       parentRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthenticatedRouteRoute
+    }
+    '/_providers/legal/delete-account': {
+      id: '/_providers/legal/delete-account'
+      path: '/legal/delete-account'
+      fullPath: '/legal/delete-account'
+      preLoaderRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalDeleteAccountRouteImport
+      parentRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRoute
+    }
+    '/_providers/legal/privacy': {
+      id: '/_providers/legal/privacy'
+      path: '/legal/privacy'
+      fullPath: '/legal/privacy'
+      preLoaderRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalPrivacyRouteImport
+      parentRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRoute
+    }
+    '/_providers/legal/privacy-request': {
+      id: '/_providers/legal/privacy-request'
+      path: '/legal/privacy-request'
+      fullPath: '/legal/privacy-request'
+      preLoaderRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalPrivacyRequestRouteImport
+      parentRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRoute
+    }
+    '/_providers/legal/terms': {
+      id: '/_providers/legal/terms'
+      path: '/legal/terms'
+      fullPath: '/legal/terms'
+      preLoaderRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalTermsRouteImport
+      parentRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRoute
     }
     '/_providers/_authenticated/dashboard/api-keys': {
       id: '/_providers/_authenticated/dashboard/api-keys'
@@ -258,6 +373,11 @@ interface DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRouteChil
   DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesLoginRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesLoginRoute
   DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesSignUpRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesSignUpRoute
   IndexRoute: typeof IndexRoute
+  DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalIndexRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalIndexRoute
+  DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalDeleteAccountRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalDeleteAccountRoute
+  DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalPrivacyRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalPrivacyRoute
+  DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalPrivacyRequestRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalPrivacyRequestRoute
+  DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalTermsRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalTermsRoute
 }
 
 const DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRouteChildren: DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRouteChildren =
@@ -271,6 +391,16 @@ const DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRouteChildren
     DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesSignUpRoute:
       DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesSignUpRoute,
     IndexRoute: IndexRoute,
+    DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalIndexRoute:
+      DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalIndexRoute,
+    DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalDeleteAccountRoute:
+      DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalDeleteAccountRoute,
+    DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalPrivacyRoute:
+      DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalPrivacyRoute,
+    DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalPrivacyRequestRoute:
+      DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalPrivacyRequestRoute,
+    DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalTermsRoute:
+      DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalTermsRoute,
   }
 
 const DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRouteWithChildren =
@@ -285,12 +415,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}

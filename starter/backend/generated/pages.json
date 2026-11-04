@@ -22,5 +22,25 @@
   {
     "path": "/dashboard/api-keys",
     "authenticated": true
+  },
+  {
+    "path": "/legal",
+    "authenticated": false
+  },
+  {
+    "path": "/legal/privacy",
+    "authenticated": false
+  },
+  {
+    "path": "/legal/terms",
+    "authenticated": false
+  },
+  {
+    "path": "/legal/privacy-request",
+    "authenticated": false
+  },
+  {
+    "path": "/legal/delete-account",
+    "authenticated": false
   }
 ]

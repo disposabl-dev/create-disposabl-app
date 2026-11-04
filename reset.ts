@@ -36,6 +36,8 @@ const touched = [
   ".github/workflows",
   "apps/web/src/router",
   "apps/web/src/components/connections",
+  "apps/web/src/components/agent-onboarding",
+  "packages/tests/flows/agent-onboarding.e2e.ts",
   "bun.lock",
   "turbo.json",
 ];
@@ -129,6 +131,8 @@ for (const path of [
   ".github/workflows/publish.yml",
   connectionPath,
   "apps/web/src/components/connections",
+  "apps/web/src/components/agent-onboarding",
+  "packages/tests/flows/agent-onboarding.e2e.ts",
 ])
   await rm(join(root, path), { recursive: true, force: true });
 await cp(join(root, "starter/backend"), join(root, "packages/backend"), {
@@ -140,7 +144,10 @@ await cp(
 );
 await Bun.write(
   join(root, dashboardPath),
-  dashboard.replace(connectionLink, ""),
+  dashboard
+    .replace(connectionLink, "")
+    .replace(/^import \{ AgentOnboarding \} from "[^"]+";\n/m, "")
+    .replace("      <AgentOnboarding />\n", ""),
 );
 
 for (const dependency of [

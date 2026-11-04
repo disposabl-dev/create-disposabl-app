@@ -10,6 +10,7 @@ const targets: E2EConfig["targets"][number][] = [
     name: "web",
     engine: web(),
     app: {
+      permissions: { "clipboard-write": "grant" },
       url: process.env.E2E_WEB_URL || "http://127.0.0.1:0",
       ...(!process.env.E2E_WEB_URL && {
         command: {

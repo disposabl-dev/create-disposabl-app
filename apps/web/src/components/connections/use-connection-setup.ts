@@ -195,18 +195,32 @@ export function useConnectionSetup() {
     install = provider === "github",
     region?: "us" | "eu",
   ) {
+    if (busy) return;
+    // Open during the click so popup blockers do not reject the async OAuth URL.
+    const tab = window.open("about:blank", "_blank");
+    if (!tab) {
+      setError("Allow a new tab to open, then try connecting again.");
+      return;
+    }
+    tab.opener = null;
+    tab.document.title = "Connect your account";
+    tab.document.body.textContent = "Opening connection setup…";
+    tab.sessionStorage.setItem(pendingKey, provider);
+    tab.sessionStorage.removeItem(selectionKey);
     void run(async () => {
-      const url = await start({
-        provider,
-        install,
-        ...(region ? { region } : {}),
-      });
-      sessionStorage.setItem(pendingKey, provider);
-      sessionStorage.removeItem(selectionKey);
-      setInstallations([]);
-      setInstallNeeded(false);
-      if (provider === "github") setGithubPending(true);
-      window.location.assign(url);
+      try {
+        const url = await start({
+          provider,
+          install,
+          ...(region ? { region } : {}),
+        });
+        if (tab.closed)
+          throw new Error("The connection tab was closed. Please try again.");
+        tab.location.replace(url);
+      } catch (cause) {
+        tab.close();
+        throw cause;
+      }
     });
   }
 

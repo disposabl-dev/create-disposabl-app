@@ -1,5 +1,5 @@
 import { PosthogConnection } from "../../components/connections/posthog-connection";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Check, ArrowRight } from "lucide-react";
 import { Button } from "@disposabl/disposabl-kit/client/components/ui/button";
@@ -25,6 +25,14 @@ function Connections() {
     analyticsRequired,
   } = setup;
   const [showExpo, setShowExpo] = useState(false);
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("connect") === "expo") {
+      setShowExpo(true);
+      url.searchParams.delete("connect");
+      window.history.replaceState(window.history.state, "", url);
+    }
+  }, []);
   const completed =
     Number(Boolean(status?.github)) +
     Number(Boolean(status?.convex)) +
@@ -158,7 +166,15 @@ function Connections() {
                       className="min-h-11"
                       disabled={busy || !status.available[id]}
                       onClick={() =>
-                        id === "expo" ? setShowExpo(!showExpo) : connect(id)
+                        id === "expo"
+                          ? showExpo
+                            ? setShowExpo(false)
+                            : window.open(
+                                "/dashboard/connections?connect=expo",
+                                "_blank",
+                                "noopener,noreferrer",
+                              )
+                          : connect(id)
                       }
                     >
                       {id === "expo" && showExpo ? "Cancel" : `Connect ${name}`}
@@ -173,8 +189,8 @@ function Connections() {
                 {id === "convex" && !connected && (
                   <p className="mt-4 text-sm text-muted-foreground">
                     Continue to Convex, sign in or create an account, then
-                    choose a team and approve access. You will return here when
-                    it is connected.
+                    choose a team and approve access in the new tab. This page
+                    updates automatically when it is connected.
                   </p>
                 )}
                 {id === "expo" && !connected && showExpo && (

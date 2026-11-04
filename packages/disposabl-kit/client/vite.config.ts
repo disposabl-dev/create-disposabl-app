@@ -19,6 +19,11 @@ export const createRoutes = (enabled: boolean) =>
   rootRoute("__root.tsx", [
     layout("_providers", kitRoute("route.tsx"), [
       physical("."),
+      route("/legal", kitRoute("legal/index.tsx")),
+      route("/legal/privacy", kitRoute("legal/privacy.tsx")),
+      route("/legal/terms", kitRoute("legal/terms.tsx")),
+      route("/legal/privacy-request", kitRoute("legal/privacy-request.tsx")),
+      route("/legal/delete-account", kitRoute("legal/delete-account.tsx")),
       ...(enabled
         ? [
             route("/login", kitRoute("_auth-pages/login.tsx")),

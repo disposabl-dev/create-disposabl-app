@@ -1,4 +1,6 @@
 import { Logo } from "../components/logo";
+import { LegalFooter } from "../components/legal-page";
+import { LogOut } from "../components/ui/log-out";
 import { useState } from "react";
 import { createFileRoute, Outlet } from "@tanstack/react-router";
 import { ConvexAuthProvider } from "@convex-dev/auth/react";
@@ -22,6 +24,7 @@ function Providers() {
     <AuthProvider client={client} enabled={authenticationEnabled}>
       <SiteHeader />
       <Outlet />
+      <LegalFooter />
     </AuthProvider>
   );
 }
@@ -72,7 +75,10 @@ function AuthLinks() {
   const { isAuthenticated, isLoading } = useConvexAuth();
   if (isLoading) return null;
   return isAuthenticated ? (
-    <a href="/dashboard">Dashboard</a>
+    <div className="flex items-center gap-5">
+      <a href="/dashboard">Dashboard</a>
+      <LogOut />
+    </div>
   ) : (
     <div className="flex items-center gap-5">
       <a href="/login">Login</a>
