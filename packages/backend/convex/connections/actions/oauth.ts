@@ -11,7 +11,9 @@ import { internal } from "../../_generated/api";
 import { env } from "../../_generated/server";
 import { management } from "../../previews/token/actions/management";
 import { vercelIdentity } from "../../github/actions/tokens";
-import { completion, oauthProvider } from "../validator";
+import { completion, oauthProvider, posthogRegion } from "../validator";
+import { completePosthog, posthogHost } from "./posthog";
+import { posthogCallback, posthogClientId, posthogScopes } from "../config";
 import { connectionsUrl, seal } from "./credentials";
 import { userInstallations } from "./github";
 
@@ -22,15 +24,19 @@ export const start = internalAction({
     ...identityFields,
     provider: oauthProvider,
     install: v.optional(v.boolean()),
+    region: v.optional(posthogRegion),
   },
   returns: v.string(),
-  handler: async (ctx, { userId, provider, install }): Promise<string> => {
+  handler: async (
+    ctx,
+    { userId, provider, install, region = "us" },
+  ): Promise<string> => {
     const status = await ctx.runQuery(internal.connections.internal.status, {
       userId,
     });
     if (!status.available[provider])
       throw new ConvexError(
-        `${provider === "github" ? "GitHub" : "Convex"} connections are not configured yet.`,
+        `${provider === "github" ? "GitHub" : provider === "posthog" ? "PostHog" : "Convex"} connections are not configured yet.`,
       );
     const state = randomBytes(32).toString("base64url");
     const verifier = randomBytes(32).toString("base64url");
@@ -39,6 +45,7 @@ export const start = internalAction({
       provider,
       hash: hash(state),
       verifier: provider === "github" && install ? "installation" : verifier,
+      ...(provider === "posthog" ? { region } : {}),
     });
     if (provider === "github" && install) {
       const url = new URL(status.githubInstallUrl!);
@@ -46,6 +53,19 @@ export const start = internalAction({
       return url.href;
     }
     const callback = `${connectionsUrl()}?provider=${provider}`;
+    if (provider === "posthog") {
+      const url = new URL("/oauth/authorize/", posthogHost(region));
+      url.search = new URLSearchParams({
+        client_id: posthogClientId(),
+        redirect_uri: posthogCallback(),
+        response_type: "code",
+        state,
+        code_challenge: hash(verifier),
+        code_challenge_method: "S256",
+        scope: posthogScopes.join(" "),
+      }).toString();
+      return url.href;
+    }
     if (provider === "github") {
       const result = await startAuthorization(
         env.GITHUB_CONNECTOR!,
@@ -84,7 +104,7 @@ export const complete = internalAction({
   ): Promise<Infer<typeof completion>> => {
     if (!code || code.length > 4096 || state.length > 128)
       throw new ConvexError("Invalid connection callback.");
-    const verifier = await ctx.runMutation(
+    const { verifier, region } = await ctx.runMutation(
       internal.connections.internal.consume,
       { userId, provider, hash: hash(state) },
     );
@@ -93,6 +113,11 @@ export const complete = internalAction({
         "Complete GitHub authorization after installing Disposabl.",
       );
     if (provider === "github") return userInstallations(ctx, userId);
+    if (provider === "posthog") {
+      if (!region)
+        throw new ConvexError("PostHog connection expired. Connect again.");
+      return completePosthog(ctx, userId, code, verifier, region);
+    }
     const response = await fetch("https://api.convex.dev/oauth/token", {
       method: "POST",
       redirect: "error",
@@ -151,7 +176,7 @@ export const resumeGithubInstall = internalAction({
       provider: "github",
       hash: hash(state),
     });
-    if (step !== "installation")
+    if (step.verifier !== "installation")
       throw new ConvexError("Restart GitHub setup to continue.");
     // Installation and user authorization form one setup step. The OAuth callback
     // still verifies account ownership before binding any installation.

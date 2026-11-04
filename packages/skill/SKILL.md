@@ -94,3 +94,7 @@ Prefer local builds when possible. Hosted publication has provider usage limits.
 Your code and app data stay in your accounts; Disposabl stores encrypted
 connection credentials and setup metadata. Link the open-source repository
 when explaining access: https://github.com/disposabl-dev/create-disposabl-app.
+
+## Remote agent
+
+Default to local development. When the user explicitly wants remote execution, follow [the remote agent workflow](references/agent.md). Inspect their existing apps and messages before choosing an app. Use `bunx @disposabl/cli@latest` for agent, apps, and preview operations. One account shares one sandbox across apps, with separate conversations and multiple preview variants per app.

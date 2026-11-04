@@ -8,6 +8,7 @@ import type { Doc } from "../../_generated/dataModel";
 import type { QueryCtx } from "../../_generated/server";
 import { ownedApp } from "../internal";
 import { pendingDelete, resources } from "../validator";
+import { components } from "../../_generated/api";
 
 export function assertActive(app: Doc<"apps">) {
   if (app.operation?.kind === "delete")
@@ -40,7 +41,21 @@ export const begin = internalMutation({
   handler: async (ctx, { userId, appId, kind }) => {
     const app = await ownedApp(ctx, userId, appId);
     if (kind === "setup") assertActive(app);
-    else await assertPreviewOnly(ctx, appId);
+    else {
+      await assertPreviewOnly(ctx, appId);
+      const agent = await ctx.db
+        .query("agentThreads")
+        .withIndex("by_appId", (q) => q.eq("appId", appId))
+        .unique();
+      if (
+        agent &&
+        (agent.lease ||
+          agent.pending.length ||
+          agent.stopUnconfirmed ||
+          ["processing", "stopping"].includes(agent.status))
+      )
+        throw new ConvexError("Stop this app's agent before deleting the app.");
+    }
     if (app.operation && app.operation.until > Date.now())
       throw new ConvexError(
         "This app has an operation in progress. Try again when it finishes.",
@@ -212,6 +227,26 @@ export const erase = internalMutation({
     for (const preview of previews)
       await ctx.db.delete("previews", preview._id);
     if (previews.length === 100) return false;
+    const agent = await ctx.db
+      .query("agentThreads")
+      .withIndex("by_appId", (q) => q.eq("appId", appId))
+      .unique();
+    if (agent) {
+      const events = await ctx.db
+        .query("agentEvents")
+        .withIndex("by_agentThreadId_eventId", (q) =>
+          q.eq("agentThreadId", agent._id),
+        )
+        .take(100);
+      for (const event of events) await ctx.db.delete("agentEvents", event._id);
+      if (events.length === 100) return false;
+      await ctx.runMutation(
+        components.agent.threads.deleteAllForThreadIdAsync,
+        { threadId: agent.threadId },
+      );
+      await ctx.db.delete("agentThreads", agent._id);
+    }
+    // The sandbox belongs to the user and may be running their other apps.
     await ctx.db.delete("apps", app._id);
     return true;
   },

@@ -5,10 +5,24 @@ import {
 } from "./mcpEnterprise/validator";
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+import { threadFields, eventFields } from "./agent/validator";
 import { pendingDelete } from "./apps/validator";
-import { deployment, platform, releases } from "./validator";
+import { deployment, platform, feature, releases } from "./validator";
+import {
+  connectionState,
+  tokenProvider,
+  posthogProject,
+} from "./connections/validator";
 
 export default defineSchema({
+  agentThreads: defineTable(threadFields)
+    .index("by_appId", ["appId"])
+    .index("by_userId_updatedAt", ["userId", "updatedAt"]),
+  agentEvents: defineTable(eventFields)
+    .index("by_messageId", ["messageId"])
+    .index("by_agentThreadId_taskId", ["agentThreadId", "taskId"])
+    .index("by_agentThreadId_eventId", ["agentThreadId", "eventId"])
+    .index("by_agentThreadId_streaming", ["agentThreadId", "streaming"]),
   mcpOrganizations: defineTable(organizationFields)
     .index("by_tenantId", ["tenantId"])
     .index("by_issuer", ["issuer"]),
@@ -38,27 +52,23 @@ export default defineSchema({
         confirmedAt: v.number(),
       }),
     ),
-    connectionState: v.optional(
-      v.object({
-        provider: v.union(v.literal("github"), v.literal("convex")),
-        hash: v.string(),
-        verifier: v.string(),
-        expiresAt: v.number(),
-      }),
-    ),
+    connectionState: v.optional(connectionState),
   }),
   connections: defineTable({
     userId: v.string(),
-    provider: v.union(v.literal("convex"), v.literal("expo")),
+    provider: tokenProvider,
     accountId: v.string(),
     name: v.string(),
     token: v.string(),
+    refreshingUntil: v.optional(v.number()),
   }).index("by_userId_provider", ["userId", "provider"]),
   apps: defineTable({
     appId: v.string(),
     userId: v.string(),
     name: v.string(),
     platforms: v.array(platform),
+    features: v.optional(v.array(feature)),
+    posthogProject: v.optional(posthogProject),
     githubOwner: v.optional(v.string()),
     githubRepo: v.optional(v.string()),
     convexProjectId: v.optional(v.number()),

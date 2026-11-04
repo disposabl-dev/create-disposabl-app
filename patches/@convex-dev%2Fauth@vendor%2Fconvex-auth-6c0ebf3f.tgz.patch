@@ -1,0 +1,212 @@
+diff --git a/dist/components/google/convex.config.d.ts b/dist/components/google/convex.config.d.ts
+index 599b138bb31b0f55ca8fccdf5f2080004ff681e5..3493951e03526f439286ecbde70b2a807d37d482 100644
+--- a/dist/components/google/convex.config.d.ts
++++ b/dist/components/google/convex.config.d.ts
+@@ -13,8 +13,9 @@
+  * ```
+  */
+ declare const component: import("convex/server").ComponentDefinition<any, {
+-    readonly CLIENT_ID: import("convex/values").VString<string, "required">;
+-    readonly CLIENT_SECRET: import("convex/values").VString<string, "required">;
++    readonly CLIENT_ID: import("convex/values").VString<string | undefined, "optional">;
++    readonly CALLBACK_URL: import("convex/values").VString<string | undefined, "optional">;
++    readonly CLIENT_SECRET: import("convex/values").VString<string | undefined, "optional">;
+ }>;
+ export default component;
+ //# sourceMappingURL=convex.config.d.ts.map
+\ No newline at end of file
+diff --git a/dist/components/google/convex.config.js b/dist/components/google/convex.config.js
+index 237f8eb8037d19bf35efadff9c2b48a0567e305a..14f003e418b09ca9896d701b59c2775c4059e5ce 100644
+--- a/dist/components/google/convex.config.js
++++ b/dist/components/google/convex.config.js
+@@ -16,8 +16,9 @@ import { v } from "convex/values";
+  */
+ const component = defineComponent("authGoogle", {
+     env: {
+-        CLIENT_ID: v.string(),
+-        CLIENT_SECRET: v.string(),
++        CLIENT_ID: v.optional(v.string()),
++        CLIENT_SECRET: v.optional(v.string()),
++    CALLBACK_URL: v.optional(v.string()),
+     },
+ });
+ export default component;
+diff --git a/dist/internal-types/components/google/convex.config.d.ts b/dist/internal-types/components/google/convex.config.d.ts
+index 599b138bb31b0f55ca8fccdf5f2080004ff681e5..3493951e03526f439286ecbde70b2a807d37d482 100644
+--- a/dist/internal-types/components/google/convex.config.d.ts
++++ b/dist/internal-types/components/google/convex.config.d.ts
+@@ -13,8 +13,9 @@
+  * ```
+  */
+ declare const component: import("convex/server").ComponentDefinition<any, {
+-    readonly CLIENT_ID: import("convex/values").VString<string, "required">;
+-    readonly CLIENT_SECRET: import("convex/values").VString<string, "required">;
++    readonly CLIENT_ID: import("convex/values").VString<string | undefined, "optional">;
++    readonly CALLBACK_URL: import("convex/values").VString<string | undefined, "optional">;
++    readonly CLIENT_SECRET: import("convex/values").VString<string | undefined, "optional">;
+ }>;
+ export default component;
+ //# sourceMappingURL=convex.config.d.ts.map
+\ No newline at end of file
+diff --git a/dist/internal-types/lib/oauth/authorize.d.ts b/dist/internal-types/lib/oauth/authorize.d.ts
+index 8a10a8b624d2becf62adbae9702ece4d18f017eb..704ff85ab30713a775aa67ff181ac10d8267df11 100644
+--- a/dist/internal-types/lib/oauth/authorize.d.ts
++++ b/dist/internal-types/lib/oauth/authorize.d.ts
+@@ -25,6 +25,8 @@ type CreateAuthorizationRequestRef = FunctionReference<"mutation", "internal", C
+ export declare function buildStartSignIn(options: {
+     /** Origins `redirectTo` may point at, already validated and normalized. */
+     allowedOrigins: string[];
++  /** Optional server-side routing envelope; the browser keeps the original state. */
++  authorizationState?: (state: string) => Promise<string>;
+     /** The provider's authorization endpoint (a full URL). */
+     authorizationEndpoint: string;
+     /** Scopes to request. Left off the URL entirely when empty. */
+diff --git a/dist/internal-types/methods/google/server.d.ts b/dist/internal-types/methods/google/server.d.ts
+index 302faf965c8eaa0398b7f4918eac9269debc1b77..e8d48f146fdd25bddefbea855100bc17e46e8225 100644
+--- a/dist/internal-types/methods/google/server.d.ts
++++ b/dist/internal-types/methods/google/server.d.ts
+@@ -49,6 +49,8 @@ export type GoogleProviderOptions = {
+      * for open-redirect prevention.
+      */
+     allowedRedirectOrigins: string[];
++  /** Optional signed state envelope for a shared callback. */
++  authorizationState?: (state: string) => Promise<string>;
+ };
+ /**
+  * Built-in sign-in method for Google. Wire it up with the Google oauth component:
+diff --git a/dist/lib/oauth/authorize.d.ts b/dist/lib/oauth/authorize.d.ts
+index 8a10a8b624d2becf62adbae9702ece4d18f017eb..704ff85ab30713a775aa67ff181ac10d8267df11 100644
+--- a/dist/lib/oauth/authorize.d.ts
++++ b/dist/lib/oauth/authorize.d.ts
+@@ -25,6 +25,8 @@ type CreateAuthorizationRequestRef = FunctionReference<"mutation", "internal", C
+ export declare function buildStartSignIn(options: {
+     /** Origins `redirectTo` may point at, already validated and normalized. */
+     allowedOrigins: string[];
++  /** Optional server-side routing envelope; the browser keeps the original state. */
++  authorizationState?: (state: string) => Promise<string>;
+     /** The provider's authorization endpoint (a full URL). */
+     authorizationEndpoint: string;
+     /** Scopes to request. Left off the URL entirely when empty. */
+diff --git a/dist/lib/oauth/authorize.js b/dist/lib/oauth/authorize.js
+index c4bed11bb8b0f4e5001d082c80e33c44cc96f5c7..9c76b49f0c3898e17ba487a6b4e39e7f9c182e76 100644
+--- a/dist/lib/oauth/authorize.js
++++ b/dist/lib/oauth/authorize.js
+@@ -54,7 +54,7 @@ export function buildStartSignIn(options) {
+                 response_type: "code",
+                 client_id: clientId,
+                 redirect_uri: callbackUrl,
+-                state,
++                state: options.authorizationState ? await options.authorizationState(state) : state,
+                 // Every provider gets a challenge. One that does not implement PKCE
+                 // ignores the parameters, which RFC 6749 requires of it.
+                 code_challenge: await sha256Base64Url(codeVerifier),
+diff --git a/dist/lib/oauth/dbHelpers.js b/dist/lib/oauth/dbHelpers.js
+index e2385d966243a0863f03baac8e7bc804b245ee27..28078af1bf3b10e51f03a3e1fa1b4d9cefd1aff8 100644
+--- a/dist/lib/oauth/dbHelpers.js
++++ b/dist/lib/oauth/dbHelpers.js
+@@ -25,7 +25,7 @@ export async function insertAuthorizationRequest(ctx, fields) {
+             "This requires a Convex backend with system env vars in component " +
+             "functions.");
+     }
+-    const callbackUrl = `${siteUrl}${CALLBACK_PATH}`;
++    const callbackUrl = process.env.CALLBACK_URL || `${siteUrl}${CALLBACK_PATH}`;
+     await ctx.db.insert("authorizationRequests", {
+         ...fields,
+         callbackUrl,
+diff --git a/dist/methods/google/server.d.ts b/dist/methods/google/server.d.ts
+index 302faf965c8eaa0398b7f4918eac9269debc1b77..e8d48f146fdd25bddefbea855100bc17e46e8225 100644
+--- a/dist/methods/google/server.d.ts
++++ b/dist/methods/google/server.d.ts
+@@ -49,6 +49,8 @@ export type GoogleProviderOptions = {
+      * for open-redirect prevention.
+      */
+     allowedRedirectOrigins: string[];
++  /** Optional signed state envelope for a shared callback. */
++  authorizationState?: (state: string) => Promise<string>;
+ };
+ /**
+  * Built-in sign-in method for Google. Wire it up with the Google oauth component:
+diff --git a/dist/methods/google/server.js b/dist/methods/google/server.js
+index 3d37769cfd9f343d48270ffe3a0e7337a9f853f3..382f7502acd36f303762561557a945a979db5c5e 100644
+--- a/dist/methods/google/server.js
++++ b/dist/methods/google/server.js
+@@ -83,6 +83,7 @@ export function setupGoogle(core, options) {
+             });
+             const startSignIn = buildStartSignIn({
+                 allowedOrigins,
++        authorizationState: options.authorizationState,
+                 authorizationEndpoint: AUTHORIZATION_ENDPOINT,
+                 scopes: SCOPES,
+                 createAuthorizationRequest: options.component.provider.createAuthorizationRequest,
+diff --git a/src/components/google/convex.config.ts b/src/components/google/convex.config.ts
+index bb59092149ebf7f91699edc86179a52e908817d1..4591deabdb6d1cf9f21ece821d5cf0aed296a04a 100644
+--- a/src/components/google/convex.config.ts
++++ b/src/components/google/convex.config.ts
+@@ -17,8 +17,9 @@ import { v } from "convex/values";
+  */
+ const component = defineComponent("authGoogle", {
+   env: {
+-    CLIENT_ID: v.string(),
+-    CLIENT_SECRET: v.string(),
++    CLIENT_ID: v.optional(v.string()),
++    CLIENT_SECRET: v.optional(v.string()),
++    CALLBACK_URL: v.optional(v.string()),
+   },
+ });
+ 
+diff --git a/src/lib/oauth/authorize.ts b/src/lib/oauth/authorize.ts
+index ab0748ed186ed6cee44b1bfdc3ab41483154f2b2..5d5981177a77afd3a79fc3923cebade9ccc566b8 100644
+--- a/src/lib/oauth/authorize.ts
++++ b/src/lib/oauth/authorize.ts
+@@ -54,6 +54,8 @@ type CreateAuthorizationRequestRef = FunctionReference<
+ export function buildStartSignIn(options: {
+   /** Origins `redirectTo` may point at, already validated and normalized. */
+   allowedOrigins: string[];
++  /** Optional server-side routing envelope; the browser keeps the original state. */
++  authorizationState?: (state: string) => Promise<string>;
+   /** The provider's authorization endpoint (a full URL). */
+   authorizationEndpoint: string;
+   /** Scopes to request. Left off the URL entirely when empty. */
+@@ -116,7 +118,7 @@ export function buildStartSignIn(options: {
+         response_type: "code",
+         client_id: clientId,
+         redirect_uri: callbackUrl,
+-        state,
++        state: options.authorizationState ? await options.authorizationState(state) : state,
+         // Every provider gets a challenge. One that does not implement PKCE
+         // ignores the parameters, which RFC 6749 requires of it.
+         code_challenge: await sha256Base64Url(codeVerifier),
+diff --git a/src/lib/oauth/dbHelpers.ts b/src/lib/oauth/dbHelpers.ts
+index 9960ef600739783a7d1a90ed123f0b4eef71511a..24ce33d376cd1310a1e8673f569861397e69f1cd 100644
+--- a/src/lib/oauth/dbHelpers.ts
++++ b/src/lib/oauth/dbHelpers.ts
+@@ -72,7 +72,7 @@ export async function insertAuthorizationRequest<
+         "functions.",
+     );
+   }
+-  const callbackUrl = `${siteUrl}${CALLBACK_PATH}`;
++  const callbackUrl = process.env.CALLBACK_URL || `${siteUrl}${CALLBACK_PATH}`;
+   await ctx.db.insert("authorizationRequests", {
+     ...fields,
+     callbackUrl,
+diff --git a/src/methods/google/server.ts b/src/methods/google/server.ts
+index 1adc52c51b921fa5f98a3462720decdb279aaf9b..2c7f319a8768d709d63b6a22c89a9c3c698a2a17 100644
+--- a/src/methods/google/server.ts
++++ b/src/methods/google/server.ts
+@@ -70,6 +70,8 @@ export type GoogleProviderOptions = {
+    * for open-redirect prevention.
+    */
+   allowedRedirectOrigins: string[];
++  /** Optional signed state envelope for a shared callback. */
++  authorizationState?: (state: string) => Promise<string>;
+ };
+ 
+ /**
+@@ -121,6 +123,7 @@ export function setupGoogle<UsersTable extends string>(
+ 
+       const startSignIn = buildStartSignIn({
+         allowedOrigins,
++        authorizationState: options.authorizationState,
+         authorizationEndpoint: AUTHORIZATION_ENDPOINT,
+         scopes: SCOPES,
+         createAuthorizationRequest:

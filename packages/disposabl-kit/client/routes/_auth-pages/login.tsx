@@ -1,4 +1,5 @@
 import { Logo } from "../../components/logo";
+import { GoogleSignIn } from "../../components/google-sign-in";
 import { Button } from "../../components/ui/button";
 import {
   Card,
@@ -29,9 +30,11 @@ function LogIn() {
 
   useEffect(() => {
     if (!isLoading && isAuthenticated && !submitted.current) {
-      void navigate({ to: "/", replace: true });
+      if (request)
+        void navigate({ to: "/consent", search: { request }, replace: true });
+      else window.location.replace(returnTo ?? "/dashboard");
     }
-  }, [isLoading, isAuthenticated, navigate]);
+  }, [isLoading, isAuthenticated, navigate, request, returnTo]);
   const { signIn, pending } = useSignInWithUsernamePassword(api.auth);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -53,6 +56,7 @@ function LogIn() {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            <GoogleSignIn />
             <form
               onSubmit={async (e) => {
                 e.preventDefault();

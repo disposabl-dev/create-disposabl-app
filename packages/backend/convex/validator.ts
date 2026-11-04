@@ -1,4 +1,7 @@
 import { v } from "convex/values";
+import { featureIds } from "@disposabl/disposabl-kit/feature-options";
+
+export const feature = v.union(...featureIds.map((id) => v.literal(id)));
 
 export const platformNames = [
   "web",
@@ -23,10 +26,12 @@ export const appFields = {
   appId: v.string(),
   name: v.string(),
   platforms: v.array(platform),
+  features: v.optional(v.array(feature)),
 };
 export const appArgs = {
   name: v.string(),
   platforms: v.array(platform),
+  features: v.optional(v.array(feature)),
 };
 export const appResult = v.object({
   ...appFields,

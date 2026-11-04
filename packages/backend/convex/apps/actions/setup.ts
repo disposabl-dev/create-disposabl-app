@@ -7,6 +7,8 @@ import {
 import { v } from "convex/values";
 import { internal } from "../../_generated/api";
 import { credential } from "../../connections/actions/credentials";
+import { requireConnections } from "../../connections/config";
+import { ensurePosthog } from "./posthog";
 import {
   ensureProject,
   management,
@@ -16,6 +18,14 @@ export const setup = internalAction({
   args: { ...identityFields, appId: v.string() },
   returns: v.number(),
   handler: async (ctx, args): Promise<number> => {
+    const app = await ctx.runQuery(internal.apps.internal.get, args);
+    requireConnections(
+      await ctx.runQuery(internal.connections.internal.status, {
+        userId: args.userId,
+        features: app.features,
+      }),
+    );
+    await ensurePosthog(ctx, args.userId, args.appId);
     const saved = await ctx.runQuery(internal.apps.internal.project, args);
     const { token, accountId: teamId } = await credential(
       ctx,

@@ -2,6 +2,8 @@
 
 The CLI connects to `https://www.disposabl.dev`.
 
+Install it with `bun add --dev @disposabl/cli@latest`, or run `bunx @disposabl/cli@latest`. New generated apps include `@disposabl/cli: "latest"` in root devDependencies. A lockfile keeps the installed version stable; use `bun update @disposabl/cli --latest` to refresh it.
+
 ```sh
 disposabl login status
 disposabl login
@@ -10,6 +12,11 @@ disposabl apps list --paginationOpts '{"numItems":20,"cursor":null}'
 disposabl apps get --appId <uuid>
 disposabl previews token create --configure .
 disposabl previews get
+disposabl agent getMessages
+disposabl agent sendMessage --prompt "Build a meal planner remotely"
+disposabl agent sendMessage --appId <uuid> --prompt "Try two preview variants"
+disposabl agent getMessages --appId <uuid>
+disposabl agent abortMessage --appId <uuid>
 disposabl apps delete --appId <uuid> --dangerously-delete-app
 disposabl logout
 ```

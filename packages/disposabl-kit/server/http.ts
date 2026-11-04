@@ -13,6 +13,7 @@ import { registerDocsRoutes } from "./lib/docs";
 // docs:end
 import { createOpenApi, createPlatforms } from "./lib/platform-spec";
 import { registerPageRoutes } from "./lib/static";
+import { googleRelay } from "./google";
 
 export { tool } from "@convex-dev/mcp";
 export type { McpServerOptions, McpUser, ToolCtx } from "@convex-dev/mcp";
@@ -59,6 +60,11 @@ export const {
 
 export default function createHttpRouter() {
   const http = httpRouter();
+  http.route({
+    path: "/oauth/relay/google",
+    method: "GET",
+    handler: googleRelay,
+  });
   if (mcp) {
     const authRoutes = httpRouter();
     mcp.registerRoutes(authRoutes);

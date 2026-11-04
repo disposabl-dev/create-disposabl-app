@@ -8,7 +8,10 @@ import {
   paginationResultValidator,
 } from "convex/server";
 import { ConvexError, v, type Infer } from "convex/values";
-import { appArgs, appResult, platform } from "../validator";
+import { appArgs, appResult, platform, feature } from "../validator";
+import { resolveFeatures } from "@disposabl/disposabl-kit/feature-options";
+import { requireConnections } from "../connections/config";
+import { internal } from "../_generated/api";
 import { validatePlatforms } from "@disposabl/disposabl-kit/platforms";
 import { githubConnection } from "../validator";
 import type { Doc } from "../_generated/dataModel";
@@ -30,6 +33,7 @@ export const insert = internalMutation({
       appId: args.appId,
       name,
       platforms,
+      features: resolveFeatures(args.features ?? []),
       expoAccountId: null,
     });
     return presentApp((await ctx.db.get("apps", id))!);
@@ -63,17 +67,39 @@ export const get = internalQuery({
 });
 export const update = internalMutation({
   platforms: true,
-  args: { ...identityFields, appId: v.string(), platforms: v.array(platform) },
+  args: {
+    ...identityFields,
+    appId: v.string(),
+    platforms: v.array(platform),
+    features: v.optional(v.array(feature)),
+  },
   returns: appResult,
-  handler: async (ctx, { userId, appId, platforms }) => {
+  handler: async (
+    ctx,
+    { userId, appId, platforms, features },
+  ): Promise<AppResult> => {
     const app = await ownedApp(ctx, userId, appId);
     if (app.operation)
       throw new ConvexError(
         "Wait for app setup to finish before changing platforms.",
       );
     const selected = validatePlatforms(platforms);
-    await ctx.db.patch("apps", app._id, { platforms: selected });
-    return presentApp({ ...app, platforms: selected });
+    const selectedFeatures = resolveFeatures(features ?? app.features ?? []);
+    requireConnections(
+      await ctx.runQuery(internal.connections.internal.status, {
+        userId,
+        features: selectedFeatures,
+      }),
+    );
+    await ctx.db.patch("apps", app._id, {
+      platforms: selected,
+      features: selectedFeatures,
+    });
+    return presentApp({
+      ...app,
+      platforms: selected,
+      features: selectedFeatures,
+    });
   },
 });
 export { remove as delete } from "./actions/delete";
@@ -104,6 +130,7 @@ function presentApp(app: Doc<"apps">): AppResult {
     appId: app.appId,
     name: app.name,
     platforms: app.platforms,
+    features: app.features ?? [],
     ...(app.githubOwner ? { githubOwner: app.githubOwner } : {}),
     ...(app.githubRepo ? { githubRepo: app.githubRepo } : {}),
     createdAt: app._creationTime,

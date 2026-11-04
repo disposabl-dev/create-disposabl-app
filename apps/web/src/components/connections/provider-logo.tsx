@@ -1,8 +1,19 @@
+// Official assets: https://brand.posthog.com/logo
+import posthogLogo from "./posthog-logo.svg";
+import posthogLogoDark from "./posthog-logo-dark.svg";
+
 export function ProviderLogo({
   provider,
 }: {
-  provider: "github" | "convex" | "expo";
+  provider: "github" | "convex" | "expo" | "posthog";
 }) {
+  if (provider === "posthog")
+    return (
+      <>
+        <img src={posthogLogo} alt="" className="w-8 dark:hidden" />
+        <img src={posthogLogoDark} alt="" className="hidden w-8 dark:block" />
+      </>
+    );
   if (provider === "github")
     return (
       <svg

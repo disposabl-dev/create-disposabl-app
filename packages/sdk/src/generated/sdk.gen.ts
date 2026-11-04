@@ -9,6 +9,15 @@ import type {
   TDataShape,
 } from "./client/index.js";
 import type {
+  AgentAbortMessageData,
+  AgentAbortMessageErrors,
+  AgentAbortMessageResponses,
+  AgentGetMessagesData,
+  AgentGetMessagesErrors,
+  AgentGetMessagesResponses,
+  AgentSendMessageData,
+  AgentSendMessageErrors,
+  AgentSendMessageResponses,
   AppsCreateData,
   AppsCreateErrors,
   AppsCreateResponses,
@@ -61,6 +70,68 @@ export type Options<
    */
   meta?: keyof ClientMeta extends never ? Record<string, unknown> : ClientMeta;
 };
+
+export const agentAbortMessage = <ThrowOnError extends boolean = false>(
+  options: Options<AgentAbortMessageData, ThrowOnError>,
+): RequestResult<
+  AgentAbortMessageResponses,
+  AgentAbortMessageErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    AgentAbortMessageResponses,
+    AgentAbortMessageErrors,
+    ThrowOnError
+  >({
+    security: [{ scheme: "bearer", type: "http" }],
+    url: "/api/agent/abortMessage",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+export const agentGetMessages = <ThrowOnError extends boolean = false>(
+  options?: Options<AgentGetMessagesData, ThrowOnError>,
+): RequestResult<
+  AgentGetMessagesResponses,
+  AgentGetMessagesErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    AgentGetMessagesResponses,
+    AgentGetMessagesErrors,
+    ThrowOnError
+  >({
+    querySerializer: {
+      parameters: { paginationOpts: { object: { style: "form" } } },
+    },
+    security: [{ scheme: "bearer", type: "http" }],
+    url: "/api/agent/getMessages",
+    ...options,
+  });
+
+export const agentSendMessage = <ThrowOnError extends boolean = false>(
+  options: Options<AgentSendMessageData, ThrowOnError>,
+): RequestResult<
+  AgentSendMessageResponses,
+  AgentSendMessageErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    AgentSendMessageResponses,
+    AgentSendMessageErrors,
+    ThrowOnError
+  >({
+    security: [{ scheme: "bearer", type: "http" }],
+    url: "/api/agent/sendMessage",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
 
 export const appsCreate = <ThrowOnError extends boolean = false>(
   options: Options<AppsCreateData, ThrowOnError>,

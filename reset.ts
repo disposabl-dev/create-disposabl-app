@@ -145,6 +145,8 @@ await Bun.write(
 
 for (const dependency of [
   "@convex-dev/workflow",
+  "@convex-dev/agent",
+  "@boatdev/convex",
   "@octokit/rest",
   "@vercel/connect",
   "libsodium-wrappers",
@@ -152,6 +154,9 @@ for (const dependency of [
 ])
   delete backend.dependencies[dependency];
 delete backend.devDependencies["@types/node-forge"];
+await rm(join(root, "packages/cli"), { recursive: true, force: true });
+delete lock.workspaces["packages/cli"];
+delete lock.packages["@disposabl/cli"];
 delete lock.workspaces["packages/create-disposabl-app"];
 delete lock.packages["create-disposabl-app"];
 lock.workspaces["packages/backend"] = {

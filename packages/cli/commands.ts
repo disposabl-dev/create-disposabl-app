@@ -252,9 +252,27 @@ export async function runCli(
             const ready = () =>
               value.ready && (!options.mobile || Boolean(value.expo));
             if (connectionStatus && options.wait && !ready()) {
-              const url = `${base}/dashboard/connections?mobile=${options.mobile ? "1" : "0"}`;
+              const requested = Array.isArray(input.features)
+                ? input.features
+                : [];
+              const connections = new URL("/dashboard/connections", base);
+              if (requested.includes("analytics"))
+                connections.searchParams.set("features", "analytics");
+              if (options.mobile) connections.searchParams.set("mobile", "1");
+              const url = connections.href;
+              const names: Record<string, string> = {
+                github: "GitHub",
+                convex: "Convex",
+                posthog: "PostHog",
+                expo: "Expo",
+              };
+              const missing = Array.isArray(value.missing)
+                ? value.missing
+                    .map((id: string) => names[id] ?? id)
+                    .join(" and ")
+                : "GitHub and Convex";
               console.error(
-                `Connect your personal GitHub account or organization, and Convex (plus Expo for mobile):\n${url}\nWaiting for connections. Press Ctrl+C to keep your files and finish later.`,
+                `Connect ${missing} for this app:\n${url}\nWaiting for connections. Press Ctrl+C to keep your files and finish later.`,
               );
               openUrl(url);
               const deadline = Date.now() + 15 * 60_000;

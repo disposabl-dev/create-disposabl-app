@@ -43,8 +43,9 @@ check_source() {
   if [[ "$CHANNEL" == production ]]; then test "$(gh api "repos/$GH_REPO/git/ref/heads/main" --jq .object.sha)" = "$SOURCE"
   else test "$(gh api "repos/$GH_REPO/pulls/$PR" --jq 'if .state == "open" then .head.sha else "closed" end')" = "$SOURCE"; fi
 }
-# Apple publication remains disabled along with the build jobs.
+# Desktop installers publish only from main. Android retains PR previews.
 for platform in android linux windows; do
+  [[ "$platform" == android || "$CHANNEL" == production ]] || continue
   directory="artifacts/release-$platform"
   test -d "$directory" || continue
   check_source

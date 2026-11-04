@@ -1,13 +1,31 @@
+import { v } from "convex/values";
 import passwordProvider from "@convex-dev/auth/components/password/convex.config.js";
 import username from "@convex-dev/auth/components/username/convex.config.js";
 import auth from "@convex-dev/auth/convex.config.js";
+import google from "@convex-dev/auth/components/google/convex.config.js";
 import mcp from "@convex-dev/mcp/convex.config.js";
 import staticHosting from "@convex-dev/static-hosting/convex.config";
 import { defineApp } from "convex/server";
 
-const app = defineApp();
+const app = defineApp({
+  env: {
+    AUTH_GOOGLE_CLIENT_ID: v.optional(v.string()),
+    AUTH_GOOGLE_CLIENT_SECRET: v.optional(v.string()),
+    AUTH_GOOGLE_RELAY_URL: v.optional(v.string()),
+    AUTH_GOOGLE_RELAY_SECRET: v.optional(v.string()),
+    AUTH_REDIRECT_ORIGINS: v.optional(v.string()),
+  },
+});
 
 app.use(auth);
+app.use(google, {
+  httpPrefix: "/oauth/google",
+  env: {
+    CLIENT_ID: app.env.AUTH_GOOGLE_CLIENT_ID,
+    CLIENT_SECRET: app.env.AUTH_GOOGLE_CLIENT_SECRET,
+    CALLBACK_URL: app.env.AUTH_GOOGLE_RELAY_URL,
+  },
+});
 
 app.use(passwordProvider);
 app.use(username);

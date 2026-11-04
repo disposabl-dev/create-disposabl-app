@@ -3,7 +3,7 @@ import { useAction, useMutation, useQuery } from "convex/react";
 import { ConvexError } from "convex/values";
 import { api } from "../../../../../packages/backend/convex/_generated/api";
 
-type Provider = "github" | "convex";
+type Provider = "github" | "convex" | "posthog";
 type Installation = {
   installationId: string;
   owner: string;
@@ -12,10 +12,13 @@ type Installation = {
 const pendingKey = "disposabl.pendingConnectionProvider";
 const selectionKey = "disposabl.githubAccountSelection";
 const isProvider = (value: string | null): value is Provider =>
-  value === "github" || value === "convex";
+  value === "github" || value === "convex" || value === "posthog";
 
 export function useConnectionSetup() {
-  const status = useQuery(api.connections.index.status, {});
+  const [analyticsRequired, setAnalyticsRequired] = useState(false);
+  const status = useQuery(api.connections.index.status, {
+    features: analyticsRequired ? ["analytics"] : [],
+  });
   const start = useAction(api.connections.index.start);
   const resumeInstall = useAction(api.connections.index.resumeGithubInstall);
   const complete = useAction(api.connections.index.complete);
@@ -42,6 +45,13 @@ export function useConnectionSetup() {
     if (consumed.current) return;
     consumed.current = true;
     const url = new URL(window.location.href);
+    const analyticsKey = "disposabl.setupAnalytics";
+    if (url.searchParams.has("features"))
+      sessionStorage.setItem(
+        analyticsKey,
+        url.searchParams.get("features") === "analytics" ? "1" : "0",
+      );
+    setAnalyticsRequired(sessionStorage.getItem(analyticsKey) === "1");
     const mobileKey = "disposabl.setupMobile";
     if (url.searchParams.has("mobile"))
       sessionStorage.setItem(
@@ -180,9 +190,17 @@ export function useConnectionSetup() {
       setBusy(false);
     }
   }
-  function connect(provider: Provider, install = provider === "github") {
+  function connect(
+    provider: Provider,
+    install = provider === "github",
+    region?: "us" | "eu",
+  ) {
     void run(async () => {
-      const url = await start({ provider, install });
+      const url = await start({
+        provider,
+        install,
+        ...(region ? { region } : {}),
+      });
       sessionStorage.setItem(pendingKey, provider);
       sessionStorage.removeItem(selectionKey);
       setInstallations([]);
@@ -214,5 +232,6 @@ export function useConnectionSetup() {
     installNeeded,
     githubPending,
     mobile,
+    analyticsRequired,
   };
 }

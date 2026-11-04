@@ -5,6 +5,7 @@ import {
 import { v } from "convex/values";
 import { internal } from "../../_generated/api";
 import { deployment, previewIdentity } from "../../validator";
+import { analyticsConfig } from "../../connections/validator";
 
 export const create = internalAction({
   platforms: true,
@@ -15,6 +16,7 @@ export const create = internalAction({
     deployKey: v.string(),
     productionConvexSiteUrl: v.optional(v.string()),
     repositoryUrl: v.optional(v.string()),
+    analytics: v.optional(analyticsConfig),
   }),
   handler: async (
     ctx,
@@ -28,5 +30,6 @@ export const create = internalAction({
     deployKey: string;
     productionConvexSiteUrl?: string;
     repositoryUrl?: string;
+    analytics?: { projectId: number; projectToken: string; host: string };
   }> => ctx.runAction(internal.previews.token.actions.create.create, args),
 });

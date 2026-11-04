@@ -8,7 +8,8 @@ permissions:
   contents: read
   pull-requests: read
 concurrency:
-  group: preview-${{ github.head_ref || github.ref_name }}
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # Cancel obsolete PRs; finish active production releases and keep only the latest pending run.
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 env:
   CHANNEL: &channel ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || 'production' }}
@@ -18,7 +19,7 @@ env:
   BUN_VERSION: &bun-version "1.4.4"
   NODE_VERSION: &node-version "24"
   LINUX_RUNNER: &linux-runner ubuntu-24.04
-  WEB_RUNNER: &web-runner ubuntu-24.04
+  WEB_RUNNER: ubuntu-24.04
   WINDOWS_RUNNER: windows-2025
   MACOS_RUNNER: macos-26
   RELEASE_PREFIX: app
@@ -31,19 +32,50 @@ env:
   SOURCE_PATH: ${{ github.event_name == 'pull_request' && format('pulls/{0}', github.event.number) || 'git/ref/heads/main' }}
   DISPOSABL_RELEASE_VERSION: 1.0.${{ github.run_number }}
 jobs:
+  changes:
+    name: Select work
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: read
+      pull-requests: read
+      actions: read
+    runs-on: *linux-runner
+    timeout-minutes: 5
+    outputs:
+      linux_runner: ${{ steps.platforms.outputs.linux_runner }}
+      macos_runner: ${{ steps.platforms.outputs.macos_runner }}
+      changed: ${{ steps.platforms.outputs.changed }}
+      android: ${{ steps.platforms.outputs.android }}
+      ios: ${{ steps.platforms.outputs.ios }}
+      desktop: ${{ steps.platforms.outputs.desktop }}
+      packages: ${{ steps.platforms.outputs.packages }}
+    steps:
+      - &checkout
+        uses: actions/checkout@v6
+        with: { ref: "${{ env.SOURCE }}", persist-credentials: false }
+      - name: Select affected platforms
+        shell: bash
+        id: platforms
+        env:
+          PR: ${{ github.event.number }}
+          EXPO_CONNECTED: ${{ secrets.EXPO_TOKEN != '' }}
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/platforms.sh"
   web:
     name: Web
+    needs: changes
     # Fork code must not run in a job with deployment credentials.
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    if: needs.changes.outputs.changed == 'true'
     permissions: &release-permissions
       contents: read
       pull-requests: read
       id-token: write
     timeout-minutes: 45
-    runs-on: *web-runner
+    runs-on: ${{ needs.changes.outputs.linux_runner }}
     outputs:
-      desktop: ${{ steps.platforms.outputs.desktop }}
-      ios: ${{ steps.platforms.outputs.ios }}
+      desktop: ${{ needs.changes.outputs.desktop }}
+      ios: ${{ needs.changes.outputs.ios }}
+      packages: ${{ needs.changes.outputs.packages }}
+      release: ${{ steps.artifacts.outcome == 'success' }}
       android_build: ${{ steps.fingerprint.outputs.build }}
       android_runtime: ${{ steps.fingerprint.outputs.runtime }}
       convex_url: ${{ steps.deploy.outputs.CONVEX_URL }}
@@ -57,18 +89,7 @@ jobs:
       EXPO_SLUG: ${{ secrets.EXPO_SLUG || vars.EXPO_SLUG }}
       EXPO_NO_DOTENV: "1"
     steps:
-      - &checkout
-        uses: actions/checkout@v6
-        with: { ref: "${{ env.SOURCE }}", persist-credentials: false }
-      - &platforms
-        name: Platforms
-        shell: bash
-        id: platforms
-        env:
-          BEFORE: ${{ github.event.before }}
-          PR: ${{ github.event.number }}
-          TRUSTED: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
-        run: bash "$GITHUB_WORKSPACE/.github/scripts/platforms.sh"
+      - *checkout
       - &node
         uses: actions/setup-node@v6
         with: { node-version: *node-version, package-manager-cache: false }
@@ -82,7 +103,7 @@ jobs:
           key: bun-${{ github.job == 'desktop' && 'desktop-' || '' }}${{ runner.os }}-${{ runner.arch }}-${{ env.BUN_VERSION }}-${{ hashFiles('bun.lock') }}
           restore-keys: bun-${{ github.job == 'desktop' && 'desktop-' || '' }}${{ runner.os }}-${{ runner.arch }}-${{ env.BUN_VERSION }}-
       - &install
-        run: bun install --frozen-lockfile ${{ github.job == 'desktop' && '--filter desktop' || (github.job == 'android') && '--filter @disposabl/mobile' || '' }}
+        run: bun install --frozen-lockfile ${{ github.job == 'desktop' && '--filter desktop' || (github.job == 'android' || startsWith(github.job, 'ios-')) && '--filter @disposabl/mobile' || '' }}
       - name: Report build start
         run: |
           node .github/scripts/disposabl.mjs report web,api,mcp building
@@ -97,7 +118,7 @@ jobs:
           done
       - name: Deploy
         id: deploy
-        timeout-minutes: 1
+        timeout-minutes: 10
         env:
           TRUSTED: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
           CONVEX_DEPLOY_KEY: ${{ secrets[github.event_name == 'push' && 'CONVEX_DEPLOY_KEY' || 'CONVEX_DEPLOY_KEY_PREVIEW'] }}
@@ -113,18 +134,17 @@ jobs:
       - name: Report web result
         if: always()
         run: node .github/scripts/disposabl.mjs report web,api,mcp ${{ steps.deploy.outcome == 'success' && 'ready' || 'failed' }}
-      - &expo
-        name: Expo
-        if: github.job == 'android' || steps.platforms.outputs.android == 'true'
+      - name: Expo
+        if: needs.changes.outputs.android == 'true'
         working-directory: apps/mobile
         run: bash "$GITHUB_WORKSPACE/.github/scripts/mobile.sh" expo-env
       - name: Channel
-        if: steps.platforms.outputs.android == 'true'
+        if: needs.changes.outputs.android == 'true'
         working-directory: apps/mobile
         run: bash "$GITHUB_WORKSPACE/.github/scripts/mobile.sh" expo-channel
       - name: Fingerprint
         id: fingerprint
-        if: steps.platforms.outputs.android == 'true'
+        if: needs.changes.outputs.android == 'true'
         working-directory: apps/mobile
         run: bash "$GITHUB_WORKSPACE/.github/scripts/mobile.sh" expo-fingerprint
       - name: Update
@@ -141,19 +161,21 @@ jobs:
         run: bash "$GITHUB_WORKSPACE/.github/scripts/release.sh" verify-artifacts
       - &artifacts
         name: Upload release artifacts
+        id: artifacts
         if: hashFiles('dist/release/*') != ''
         uses: actions/upload-artifact@v4
         with:
           name: release-${{ env.PLATFORM }}
           path: dist/release/
           retention-days: 3
+          compression-level: 0
           if-no-files-found: error
   android:
     name: Android
-    needs: web
+    needs: [changes, web]
     if: needs.web.outputs.android_build == 'true'
     permissions: *release-permissions
-    runs-on: *linux-runner
+    runs-on: ${{ needs.changes.outputs.linux_runner }}
     timeout-minutes: 60
     env:
       PLATFORM: android
@@ -168,14 +190,15 @@ jobs:
       EXPO_PUBLIC_CONVEX_SITE_URL: ${{ needs.web.outputs.convex_site_url }}
     steps:
       - *checkout
-      - *platforms
       - *node
       - *bun
       - *cache
       - *install
       - name: Report mobile build
         run: node .github/scripts/disposabl.mjs report "$PLATFORM" building
-      - *expo
+      - name: Expo
+        working-directory: apps/mobile
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/mobile.sh" expo-env
       - name: Java
         uses: actions/setup-java@v5
         with: { distribution: temurin, java-version: "17" }
@@ -203,10 +226,10 @@ jobs:
         run: node .github/scripts/disposabl.mjs report android failed
   ios-preview:
     name: iOS simulator preview
-    needs: web
+    needs: [changes, web]
     if: github.event_name == 'pull_request' && needs.web.outputs.ios == 'true'
     permissions: *release-permissions
-    runs-on: macos-26
+    runs-on: ${{ needs.changes.outputs.macos_runner }}
     timeout-minutes: 90
     env:
       CONVEX_URL: ${{ needs.web.outputs.convex_url }}
@@ -237,6 +260,7 @@ jobs:
           name: ios-simulator
           path: dist/apple/ios-simulator.zip
           retention-days: 3
+          compression-level: 0
           if-no-files-found: error
       - name: Report simulator archive
         run: |
@@ -247,10 +271,10 @@ jobs:
         run: node .github/scripts/disposabl.mjs report ios failed 'iOS simulator build failed; check the workflow log.'
   ios-production:
     name: iOS production and TestFlight
-    needs: web
+    needs: [changes, web]
     if: github.event_name == 'push' && needs.web.outputs.ios == 'true'
     permissions: *release-permissions
-    runs-on: ubuntu-latest
+    runs-on: ${{ needs.changes.outputs.linux_runner }}
     timeout-minutes: 120
     env:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
@@ -289,7 +313,7 @@ jobs:
     needs: web
     permissions: *release-permissions
     name: ${{ matrix.platform }}
-    if: needs.web.outputs.desktop != '[]' && needs.web.outputs.desktop != ''
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.web.outputs.desktop != '[]' && needs.web.outputs.desktop != ''
     strategy:
       fail-fast: false
       matrix:
@@ -327,6 +351,7 @@ jobs:
           name: release-${{ env.PLATFORM }}
           path: dist/release/
           retention-days: 3
+          compression-level: 0
           if-no-files-found: error
       - name: Upload unsigned macOS artifact
         if: matrix.platform == 'macos'
@@ -335,6 +360,7 @@ jobs:
           name: macos-unsigned
           path: dist/release/*.dmg
           retention-days: 3
+          compression-level: 0
           if-no-files-found: error
       - name: Report macOS artifact
         if: matrix.platform == 'macos'
@@ -346,20 +372,20 @@ jobs:
         run: node .github/scripts/disposabl.mjs report "$PLATFORM" failed
   packages:
     name: Package / ${{ matrix.package }}
-    needs: web
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
+    needs: [changes, web]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.web.outputs.packages != '[]' && needs.web.outputs.packages != ''
+    runs-on: ${{ needs.changes.outputs.linux_runner }}
+    timeout-minutes: 15
     permissions:
       contents: write
       id-token: write
     concurrency:
       group: npm-${{ matrix.package }}
       cancel-in-progress: false
-      queue: max
     strategy:
       fail-fast: false
       matrix:
-        package: [cli, sdk]
+        package: ${{ fromJSON(needs.web.outputs.packages) }}
     env:
       PACKAGE: ${{ matrix.package }}
     steps:
@@ -376,10 +402,10 @@ jobs:
 
   # The publisher executes scripts from main only; the authorizer verifies workflow_sha.
   publish:
-    needs: [web, android, desktop]
-    if: always() && !cancelled() && needs.web.result == 'success' && (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository)
+    needs: [changes, web, android, desktop]
+    if: always() && !cancelled() && needs.web.result == 'success' && (needs.web.outputs.release == 'true' || needs.android.result == 'success' || needs.desktop.result == 'success')
     environment: publishing
-    runs-on: ubuntu-latest
+    runs-on: ${{ needs.changes.outputs.linux_runner }}
     timeout-minutes: 15
     permissions:
       contents: write

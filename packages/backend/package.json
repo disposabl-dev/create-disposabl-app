@@ -12,6 +12,8 @@
     "format": "prettier --write 'convex/**/*.ts'"
   },
   "dependencies": {
+    "@boatdev/convex": "0.1.0",
+    "@convex-dev/agent": "0.7.9",
     "@convex-dev/auth": "catalog:",
     "@convex-dev/mcp": "catalog:",
     "@convex-dev/static-hosting": "catalog:",

@@ -7,8 +7,8 @@ import { env } from "../../_generated/server";
 import type { ActionCtx } from "../../_generated/server";
 import { internal } from "../../_generated/api";
 
-export const connectionsUrl = () =>
-  `${env.CONNECTIONS_ORIGIN || "https://www.disposabl.dev"}/dashboard/connections`;
+import { connectionsUrl } from "../config";
+export { connectionsUrl } from "../config";
 function encryptionKey() {
   const key = Buffer.from(env.CONNECTIONS_ENCRYPTION_KEY || "", "base64");
   if (key.length !== 32)

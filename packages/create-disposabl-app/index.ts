@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { execFileSync, spawnSync } from "node:child_process";
-import { lstatSync } from "node:fs";
+import { lstatSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Command, CommanderError } from "commander";
@@ -8,6 +8,7 @@ import * as p from "@clack/prompts";
 import { version } from "./package.json";
 import {
   features,
+  featureDependencies,
   platformDependencies,
   platforms,
   requiredFeatures,
@@ -23,6 +24,7 @@ import { createApp } from "./scaffold";
 import { commitApp, install, setupApp } from "./setup";
 
 type Options = {
+  appId?: string;
   yes?: boolean;
   platforms?: string;
   features?: string;
@@ -49,6 +51,10 @@ const program = new Command("create-disposabl-app")
   )
   .option("--skip-install", "Create files without running bun install")
   .option(
+    "--app-id <uuid>",
+    "Set up an existing Disposabl app in this directory",
+  )
+  .option(
     "--list-options",
     "List every platform and feature, including disabled choices",
   )
@@ -59,7 +65,7 @@ const program = new Command("create-disposabl-app")
   .helpOption("-h, --help")
   .addHelpText(
     "after",
-    "\nPlatforms:\n  web (required), android, ios, macos, windows, linux, api, mcp, cli, typescript-sdk\n  CLI and TypeScript SDK automatically include API.\n\nOptional features:\n  authentication, docs\n  Authentication is enabled by default. Use --features none to disable frontend authentication.\n\nExamples:\n  bun create disposabl-app@latest\n  bun create disposabl-app@latest my-app --yes\n  bun create disposabl-app@latest my-app --platforms web,android,ios,mcp --features docs --yes\n  bun create disposabl-app@latest my-app --platforms web --features none --skip-install --json\n  bun create disposabl-app@latest --list-options --json\n\nWithout a TTY, supply an app name. App options are not prompted, but login is still required.\nPlatform and feature choices are saved in disposabl.json.\nBackend authentication code is always included. Every app checks your Disposabl login, asks you to sign in if needed, and creates an app UUID and development environment through https://www.disposabl.dev. Rerun the same command to resume an existing app.\n",
+    "\nPlatforms:\n  web (required), android, ios, macos, windows, linux, api, mcp, cli, typescript-sdk\n  CLI and TypeScript SDK automatically include API.\n\nOptional features:\n  authentication, docs, analytics, faster-ci\n  Faster CI uses Blacksmith runners when its GitHub App is installed.\n  Analytics requires Authentication and a PostHog connection.\n  Authentication is enabled by default. Use --features none to disable frontend authentication.\n\nExamples:\n  bun create disposabl-app@latest\n  bun create disposabl-app@latest my-app --yes\n  bun create disposabl-app@latest my-app --platforms web,android,ios,mcp --features docs --yes\n  bun create disposabl-app@latest my-app --platforms web --features none --skip-install --json\n  bun create disposabl-app@latest --list-options --json\n\nWithout a TTY, supply an app name. App options are not prompted, but login is still required.\nPlatform and feature choices are saved in disposabl.json.\nBackend authentication code is always included. Every app checks your Disposabl login, asks you to sign in if needed, and creates an app UUID and development environment through https://www.disposabl.dev. Rerun the same command to resume an existing app.\n",
   )
   .configureOutput({ writeErr: () => {} })
   .exitOverride();
@@ -82,11 +88,12 @@ function showOptions(json: boolean) {
           platforms,
           platformDependencies,
           features,
+          featureDependencies,
           requiredFeatures,
           defaults: { platforms: ["web"], features: selectFeatures() },
           folders: {
             web: "apps/web",
-            cli: "packages/cli",
+            cli: "@disposabl/cli",
             "typescript-sdk": "packages/sdk",
             android: "apps/mobile",
             ios: "apps/mobile",
@@ -151,8 +158,24 @@ async function main() {
     );
   const invalidName = validateName(name);
   if (invalidName) throw new Error(invalidName);
+  if (
+    options.appId &&
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(
+      options.appId,
+    )
+  )
+    throw new Error("--app-id must be a lowercase UUID v4.");
   let directory = resolve(name);
   if (pathExists(join(directory, "disposabl.json"))) {
+    if (options.appId) {
+      const existing = JSON.parse(
+        readFileSync(join(directory, "disposabl.json"), "utf8"),
+      );
+      if (existing.appId !== options.appId)
+        throw new Error(
+          "This directory belongs to a different app. Choose a new directory.",
+        );
+    }
     const appId = await setupApp(directory, name);
     if (
       spawnSync("git", ["rev-parse", "--verify", "HEAD"], {
@@ -213,6 +236,7 @@ async function main() {
     );
   }
   const config: DisposablConfig = {
+    ...(options.appId ? { appId: options.appId } : {}),
     version: version,
     platforms: chosenPlatforms,
     features: chosenFeatures,

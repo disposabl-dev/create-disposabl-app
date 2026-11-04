@@ -8,21 +8,34 @@
  * @module
  */
 
+import type * as agent_actions_run from "../agent/actions/run.js";
+import type * as agent_boat from "../agent/boat.js";
+import type * as agent_events from "../agent/events.js";
+import type * as agent_index from "../agent/index.js";
+import type * as agent_internal from "../agent/internal.js";
+import type * as agent_state from "../agent/state.js";
+import type * as agent_validator from "../agent/validator.js";
 import type * as apps_actions_cleanup from "../apps/actions/cleanup.js";
 import type * as apps_actions_create from "../apps/actions/create.js";
 import type * as apps_actions_delete from "../apps/actions/delete.js";
 import type * as apps_actions_expo from "../apps/actions/expo.js";
+import type * as apps_actions_posthog from "../apps/actions/posthog.js";
 import type * as apps_actions_setup from "../apps/actions/setup.js";
 import type * as apps_internal from "../apps/internal.js";
 import type * as apps_operations_internal from "../apps/operations/internal.js";
+import type * as apps_posthog from "../apps/posthog.js";
 import type * as apps_validator from "../apps/validator.js";
 import type * as auth from "../auth.js";
 import type * as connections_actions_credentials from "../connections/actions/credentials.js";
 import type * as connections_actions_expo from "../connections/actions/expo.js";
 import type * as connections_actions_github from "../connections/actions/github.js";
 import type * as connections_actions_oauth from "../connections/actions/oauth.js";
+import type * as connections_actions_posthog from "../connections/actions/posthog.js";
+import type * as connections_config from "../connections/config.js";
+import type * as connections_http from "../connections/http.js";
 import type * as connections_index from "../connections/index.js";
 import type * as connections_internal from "../connections/internal.js";
+import type * as connections_posthog from "../connections/posthog.js";
 import type * as connections_validator from "../connections/validator.js";
 import type * as downloads_action from "../downloads/action.js";
 import type * as downloads_http from "../downloads/http.js";
@@ -57,21 +70,34 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  "agent/actions/run": typeof agent_actions_run;
+  "agent/boat": typeof agent_boat;
+  "agent/events": typeof agent_events;
+  "agent/index": typeof agent_index;
+  "agent/internal": typeof agent_internal;
+  "agent/state": typeof agent_state;
+  "agent/validator": typeof agent_validator;
   "apps/actions/cleanup": typeof apps_actions_cleanup;
   "apps/actions/create": typeof apps_actions_create;
   "apps/actions/delete": typeof apps_actions_delete;
   "apps/actions/expo": typeof apps_actions_expo;
+  "apps/actions/posthog": typeof apps_actions_posthog;
   "apps/actions/setup": typeof apps_actions_setup;
   "apps/internal": typeof apps_internal;
   "apps/operations/internal": typeof apps_operations_internal;
+  "apps/posthog": typeof apps_posthog;
   "apps/validator": typeof apps_validator;
   auth: typeof auth;
   "connections/actions/credentials": typeof connections_actions_credentials;
   "connections/actions/expo": typeof connections_actions_expo;
   "connections/actions/github": typeof connections_actions_github;
   "connections/actions/oauth": typeof connections_actions_oauth;
+  "connections/actions/posthog": typeof connections_actions_posthog;
+  "connections/config": typeof connections_config;
+  "connections/http": typeof connections_http;
   "connections/index": typeof connections_index;
   "connections/internal": typeof connections_internal;
+  "connections/posthog": typeof connections_posthog;
   "connections/validator": typeof connections_validator;
   "downloads/action": typeof downloads_action;
   "downloads/http": typeof downloads_http;
@@ -128,9 +154,12 @@ export declare const internal: FilterApi<
 
 export declare const components: {
   auth: import("@convex-dev/auth/_generated/component.js").ComponentApi<"auth">;
+  authGoogle: import("@convex-dev/auth/components/google/_generated/component.js").ComponentApi<"authGoogle">;
   authPassword: import("@convex-dev/auth/components/password/_generated/component.js").ComponentApi<"authPassword">;
   authUsername: import("@convex-dev/auth/components/username/_generated/component.js").ComponentApi<"authUsername">;
   staticHosting: import("@convex-dev/static-hosting/_generated/component.js").ComponentApi<"staticHosting">;
   mcp: import("@convex-dev/mcp/_generated/component.js").ComponentApi<"mcp">;
   workflow: import("@convex-dev/workflow/_generated/component.js").ComponentApi<"workflow">;
+  agent: import("@convex-dev/agent/_generated/component.js").ComponentApi<"agent">;
+  boat: import("@boatdev/convex/_generated/component.js").ComponentApi<"boat">;
 };

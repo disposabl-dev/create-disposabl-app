@@ -84,6 +84,8 @@ For a separate Git worktree, run this inside that worktree to configure its deve
 bunx --package create-disposabl-app disposabl previews token create --configure .
 ```
 
-Push the generated initial commit to `main` before opening feature pull requests. A same-repository pull request to `main` starts a CI preview; changes pushed to `main` start the production workflow. A feature branch push by itself does not deploy. Build and delivery requirements depend on the selected platforms.
+Push the generated initial commit to `main` before opening feature pull requests. A same-repository pull request to `main` starts a CI preview; changes pushed to `main` start the production workflow. A feature branch push by itself does not deploy. Desktop installers build only on pushes to `main`, when their inputs change; PRs retain web and mobile previews. Build and delivery requirements depend on the selected platforms.
 
 See the [coding-agent guide](https://github.com/disposabl-dev/create-disposabl-app/blob/main/packages/skill/SKILL.md) for the full delivery workflow, or [report a problem](https://github.com/disposabl-dev/create-disposabl-app/issues).
+
+Set `features` to include `faster-ci` in `disposabl.json` to use Blacksmith runners (the GitHub App must be installed). The initial selection job remains GitHub-hosted so it can read the configuration.

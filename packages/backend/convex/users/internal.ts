@@ -5,6 +5,7 @@ import {
 } from "@disposabl/disposabl-kit/server/lib/functions";
 import { v } from "convex/values";
 import { components } from "../_generated/api";
+import { vGoogleProfile } from "@convex-dev/auth/methods/google/server";
 
 export const current = internalQuery({
   platforms: true,
@@ -26,16 +27,23 @@ export const current = internalQuery({
 });
 
 /**
- * Create the user row for a new password account and return its id. This
+ * Create the user row for a new provider account and return its id. This
  * example keeps no data in the row, but your app can put a profile here.
  */
 export const createUser = internalMutation({
   args: {
-    provider: v.object({
-      name: v.literal("password"),
-      accountId: v.string(),
-      profile: v.object({}),
-    }),
+    provider: v.union(
+      v.object({
+        name: v.literal("password"),
+        accountId: v.string(),
+        profile: v.object({}),
+      }),
+      v.object({
+        name: v.literal("google"),
+        accountId: v.string(),
+        profile: vGoogleProfile,
+      }),
+    ),
   },
   returns: v.id("users"),
   handler: async (ctx) => {

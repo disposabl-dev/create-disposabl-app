@@ -3,12 +3,14 @@ import { ConvexError, v, type Infer } from "convex/values";
 import type { ActionCtx, MutationCtx, QueryCtx } from "../_generated/server";
 import { action, mutation, query } from "../_generated/server";
 import { internal } from "../_generated/api";
+import { feature } from "../validator";
 import {
   account,
   completion,
   connectionStatus,
   oauthProvider,
   provider,
+  posthogRegion,
 } from "./validator";
 
 async function requireUser(ctx: QueryCtx | MutationCtx | ActionCtx) {
@@ -17,15 +19,20 @@ async function requireUser(ctx: QueryCtx | MutationCtx | ActionCtx) {
   return id;
 }
 export const status = query({
-  args: {},
+  args: { features: v.optional(v.array(feature)) },
   returns: connectionStatus,
-  handler: async (ctx): Promise<Infer<typeof connectionStatus>> =>
+  handler: async (ctx, args): Promise<Infer<typeof connectionStatus>> =>
     ctx.runQuery(internal.connections.internal.status, {
+      ...args,
       userId: await requireUser(ctx),
     }),
 });
 export const start = action({
-  args: { provider: oauthProvider, install: v.optional(v.boolean()) },
+  args: {
+    provider: oauthProvider,
+    install: v.optional(v.boolean()),
+    region: v.optional(posthogRegion),
+  },
   returns: v.string(),
   handler: async (ctx, args): Promise<string> =>
     ctx.runAction(internal.connections.actions.oauth.start, {
@@ -47,6 +54,23 @@ export const selectGithub = action({
   returns: v.null(),
   handler: async (ctx, args): Promise<null> =>
     ctx.runAction(internal.connections.actions.github.selectGithub, {
+      ...args,
+      userId: await requireUser(ctx),
+    }),
+});
+export const posthogAccounts = action({
+  args: {},
+  returns: v.array(account),
+  handler: async (ctx): Promise<Infer<typeof account>[]> =>
+    ctx.runAction(internal.connections.actions.posthog.posthogAccounts, {
+      userId: await requireUser(ctx),
+    }),
+});
+export const selectPosthog = action({
+  args: { accountId: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args): Promise<null> =>
+    ctx.runAction(internal.connections.actions.posthog.selectPosthog, {
       ...args,
       userId: await requireUser(ctx),
     }),

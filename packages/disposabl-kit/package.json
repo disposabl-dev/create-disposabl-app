@@ -44,13 +44,15 @@
     "./client/lib/*": "./client/lib/*.ts",
     "./client/components/ui/*": "./client/components/ui/*.tsx",
     "./server/http": "./server/http.ts",
+    "./server/google": "./server/google.ts",
     "./server/lib/functions": "./server/lib/functions.ts",
     "./client/vite.config": "./client/vite.config.ts",
     "./platforms": "./platforms.ts",
     "./mobile": "./mobile/index.ts",
     "./features": "./features.ts",
     "./mobile/expo-plugin": "./mobile/expo-plugin.cjs",
-    "./server/mcp/identity": "./server/mcp/identity.ts"
+    "./server/mcp/identity": "./server/mcp/identity.ts",
+    "./feature-options": "./feature-options.ts"
   },
   "peerDependencies": {
     "expo": "~58.0.19",

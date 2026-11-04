@@ -3,6 +3,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { detectReference } from "../cli/preview";
+import { resolveFeatures } from "../disposabl-kit/feature-options";
 
 export type CliRunner = (
   args: string[],
@@ -49,6 +50,11 @@ export async function setupApp(
   run: CliRunner = runDisposabl,
 ) {
   const reference = detectReference(directory);
+  const path = join(directory, "disposabl.json");
+  const config = JSON.parse(await readFile(path, "utf8"));
+  config.features = resolveFeatures(config.features ?? []);
+  // Persist dependencies before leaving the terminal for any connection flow.
+  await writeFile(path, JSON.stringify(config, null, 2) + "\n");
   const status = (await run(["login", "status"])) as { currentUser: unknown };
   if (!status.currentUser) {
     await run(["login"], true);
@@ -58,32 +64,35 @@ export async function setupApp(
     if (!verified.currentUser)
       throw new Error("Login completed without a verified user.");
   }
-  const path = join(directory, "disposabl.json");
-  const config = JSON.parse(await readFile(path, "utf8"));
-  const mobile = config.platforms.some(
-    (p: string) => p === "ios" || p === "android",
-  );
   const connections = (await run([
     "connections",
     "status",
+    "--features",
+    JSON.stringify(config.features),
     "--wait",
-    ...(mobile ? ["--mobile"] : []),
+    ...(config.platforms.some((p: string) => p === "ios" || p === "android")
+      ? ["--mobile"]
+      : []),
   ])) as {
     ready: boolean;
+    connectionsUrl?: string;
   };
   if (!connections.ready)
     throw new Error(
-      "Connect your personal GitHub account or an organization, then connect Convex at https://www.disposabl.dev/dashboard/connections, then retry from the parent directory: bun create disposabl-app@latest " +
+      `Finish connecting your app's accounts at ${connections.connectionsUrl ?? "https://www.disposabl.dev/dashboard/connections"}, then retry from the parent directory: bun create disposabl-app@latest ` +
         basename(directory) +
         ". Your app files and login are saved.",
     );
   if (config.appId) {
     const app = (await run(["apps", "get", "--appId", config.appId])) as {
       platforms: string[];
+      features?: string[];
     };
     if (
       JSON.stringify([...app.platforms].sort()) !==
-      JSON.stringify([...config.platforms].sort())
+        JSON.stringify([...config.platforms].sort()) ||
+      JSON.stringify([...(app.features ?? [])].sort()) !==
+        JSON.stringify([...config.features].sort())
     )
       await run([
         "apps",
@@ -92,6 +101,8 @@ export async function setupApp(
         config.appId,
         "--platforms",
         JSON.stringify(config.platforms),
+        "--features",
+        JSON.stringify(config.features),
       ]);
   } else {
     const app = (await run([
@@ -101,6 +112,8 @@ export async function setupApp(
       name,
       "--platforms",
       JSON.stringify(config.platforms),
+      "--features",
+      JSON.stringify(config.features),
     ])) as { appId: string };
     config.appId = app.appId;
     await writeFile(path, JSON.stringify(config, null, 2) + "\n");

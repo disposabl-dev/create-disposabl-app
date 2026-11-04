@@ -10,6 +10,7 @@ import { credential } from "../../../connections/actions/credentials";
 import { previewIdentity, deployment } from "../../../validator";
 import { validateReference } from "../../internal";
 import { ensureDevelopment, productionDeployment } from "./management";
+import { analyticsConfig } from "../../../connections/validator";
 
 export const create = internalAction({
   args: { ...identityFields, ...previewIdentity },
@@ -19,6 +20,7 @@ export const create = internalAction({
     deployKey: v.string(),
     productionConvexSiteUrl: v.optional(v.string()),
     repositoryUrl: v.optional(v.string()),
+    analytics: v.optional(analyticsConfig),
   }),
   handler: async (
     ctx,
@@ -32,6 +34,7 @@ export const create = internalAction({
     deployKey: string;
     productionConvexSiteUrl?: string;
     repositoryUrl?: string;
+    analytics?: { projectId: number; projectToken: string; host: string };
   }> => {
     validateReference(args.reference);
     const identity = { userId: args.userId, appId: args.appId };
@@ -51,6 +54,9 @@ export const create = internalAction({
       const token = (await credential(ctx, args.userId, "convex")).token;
       const production = await productionDeployment(token, projectId);
       const app = await ctx.runQuery(internal.apps.internal.get, identity);
+      const posthog = app.features?.includes("analytics")
+        ? await ctx.runQuery(internal.apps.posthog.project, identity)
+        : null;
       if (!app.githubOwner || !app.githubRepo)
         throw new Error("App repository setup is incomplete.");
       const { deployKey, ...deployment } = await ensureDevelopment(
@@ -71,6 +77,15 @@ export const create = internalAction({
           ".convex.site",
         ),
         repositoryUrl: `https://github.com/${app.githubOwner}/${app.githubRepo}.git`,
+        ...(posthog
+          ? {
+              analytics: {
+                projectId: posthog.projectId,
+                projectToken: posthog.projectToken,
+                host: `https://${posthog.region}.i.posthog.com`,
+              },
+            }
+          : {}),
       };
     } finally {
       await ctx.runMutation(internal.apps.operations.internal.finish, {

@@ -38,6 +38,7 @@
     "@convex-dev/static-hosting": "0.2.1"
   },
   "patchedDependencies": {
-    "@convex-dev/static-hosting@0.2.1": "patches/@convex-dev%2Fstatic-hosting@0.2.1.patch"
+    "@convex-dev/static-hosting@0.2.1": "patches/@convex-dev%2Fstatic-hosting@0.2.1.patch",
+    "@convex-dev/auth@vendor/convex-auth-6c0ebf3f.tgz": "patches/@convex-dev%2Fauth@vendor%2Fconvex-auth-6c0ebf3f.tgz.patch"
   }
 }

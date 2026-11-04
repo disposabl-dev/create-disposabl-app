@@ -4,6 +4,171 @@ export type ClientOptions = {
   baseUrl: `${string}://${string}` | (string & {});
 };
 
+export type AgentAbortMessageData = {
+  body: {
+    appId: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/api/agent/abortMessage";
+};
+
+export type AgentAbortMessageErrors = {
+  /**
+   * Invalid arguments
+   */
+  400: unknown;
+  /**
+   * Authentication required
+   */
+  401: unknown;
+  /**
+   * Insufficient scope
+   */
+  403: unknown;
+  /**
+   * Internal error
+   */
+  500: unknown;
+};
+
+export type AgentAbortMessageResponses = {
+  /**
+   * Success
+   */
+  200: {
+    appId: string;
+    threadId: string;
+    status: "idle" | "processing" | "stopping" | "failed";
+  } | null;
+};
+
+export type AgentAbortMessageResponse =
+  AgentAbortMessageResponses[keyof AgentAbortMessageResponses];
+
+export type AgentGetMessagesData = {
+  body?: never;
+  path?: never;
+  query?: {
+    appId?: string;
+    paginationOpts?: {
+      numItems: number;
+      cursor: string | null;
+      endCursor?: string | null;
+      id?: number;
+      maximumRowsRead?: number;
+      maximumBytesRead?: number;
+    };
+  };
+  url: "/api/agent/getMessages";
+};
+
+export type AgentGetMessagesErrors = {
+  /**
+   * Invalid arguments
+   */
+  400: unknown;
+  /**
+   * Authentication required
+   */
+  401: unknown;
+  /**
+   * Insufficient scope
+   */
+  403: unknown;
+  /**
+   * Internal error
+   */
+  500: unknown;
+};
+
+export type AgentGetMessagesResponses = {
+  /**
+   * Success
+   */
+  200:
+    | {
+        kind: "messages";
+        appId: string;
+        threadId: string;
+        status: "idle" | "processing" | "stopping" | "failed";
+        error?: string;
+        page: Array<{
+          id: string;
+          role: string;
+          content: string;
+          status: string;
+          createdAt: number;
+          tools?: string;
+        }>;
+        continueCursor: string;
+        isDone: boolean;
+        splitCursor?: string | null;
+        pageStatus?: "SplitRecommended" | "SplitRequired" | null;
+      }
+    | {
+        kind: "threads";
+        page: Array<{
+          appId: string;
+          threadId: string;
+          status: "idle" | "processing" | "stopping" | "failed";
+          name: string;
+          updatedAt: number;
+          error?: string;
+        }>;
+        continueCursor: string;
+        isDone: boolean;
+        splitCursor?: string | null;
+        pageStatus?: "SplitRecommended" | "SplitRequired" | null;
+      };
+};
+
+export type AgentGetMessagesResponse =
+  AgentGetMessagesResponses[keyof AgentGetMessagesResponses];
+
+export type AgentSendMessageData = {
+  body: {
+    prompt: string;
+    appId?: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/api/agent/sendMessage";
+};
+
+export type AgentSendMessageErrors = {
+  /**
+   * Invalid arguments
+   */
+  400: unknown;
+  /**
+   * Authentication required
+   */
+  401: unknown;
+  /**
+   * Insufficient scope
+   */
+  403: unknown;
+  /**
+   * Internal error
+   */
+  500: unknown;
+};
+
+export type AgentSendMessageResponses = {
+  /**
+   * Success
+   */
+  200: {
+    appId: string;
+    threadId: string;
+    status: "idle" | "processing" | "stopping" | "failed";
+  };
+};
+
+export type AgentSendMessageResponse =
+  AgentSendMessageResponses[keyof AgentSendMessageResponses];
+
 export type AppsCreateData = {
   body: {
     name: string;
@@ -19,6 +184,7 @@ export type AppsCreateData = {
       | "typescript-sdk"
       | "cli"
     >;
+    features?: Array<"faster-ci" | "docs" | "authentication" | "analytics">;
   };
   path?: never;
   query?: never;
@@ -63,6 +229,7 @@ export type AppsCreateResponses = {
       | "typescript-sdk"
       | "cli"
     >;
+    features?: Array<"faster-ci" | "docs" | "authentication" | "analytics">;
     githubOwner?: string;
     githubRepo?: string;
     createdAt: number;
@@ -156,6 +323,7 @@ export type AppsGetResponses = {
       | "typescript-sdk"
       | "cli"
     >;
+    features?: Array<"faster-ci" | "docs" | "authentication" | "analytics">;
     githubOwner?: string;
     githubRepo?: string;
     createdAt: number;
@@ -219,6 +387,7 @@ export type AppsListResponses = {
         | "typescript-sdk"
         | "cli"
       >;
+      features?: Array<"faster-ci" | "docs" | "authentication" | "analytics">;
       githubOwner?: string;
       githubRepo?: string;
       createdAt: number;
@@ -247,6 +416,7 @@ export type AppsUpdateData = {
       | "typescript-sdk"
       | "cli"
     >;
+    features?: Array<"faster-ci" | "docs" | "authentication" | "analytics">;
   };
   path?: never;
   query?: never;
@@ -291,6 +461,7 @@ export type AppsUpdateResponses = {
       | "typescript-sdk"
       | "cli"
     >;
+    features?: Array<"faster-ci" | "docs" | "authentication" | "analytics">;
     githubOwner?: string;
     githubRepo?: string;
     createdAt: number;
@@ -302,7 +473,9 @@ export type AppsUpdateResponse = AppsUpdateResponses[keyof AppsUpdateResponses];
 export type ConnectionsStatusData = {
   body?: never;
   path?: never;
-  query?: never;
+  query?: {
+    features?: Array<"faster-ci" | "docs" | "authentication" | "analytics">;
+  };
   url: "/api/connections/status";
 };
 
@@ -340,11 +513,18 @@ export type ConnectionsStatusResponses = {
     expo: {
       name: string;
     } | null;
+    posthog: {
+      name: string;
+    } | null;
+    posthogPending: boolean;
     ready: boolean;
+    missing: Array<"github" | "convex" | "expo" | "posthog">;
+    connectionsUrl: string;
     available: {
       github: boolean;
       convex: boolean;
       expo: boolean;
+      posthog: boolean;
     };
     githubInstallUrl: string | null;
   };
@@ -550,6 +730,11 @@ export type PreviewsTokenCreateResponses = {
     deployKey: string;
     productionConvexSiteUrl?: string;
     repositoryUrl?: string;
+    analytics?: {
+      projectId: number;
+      projectToken: string;
+      host: string;
+    };
   };
 };
 

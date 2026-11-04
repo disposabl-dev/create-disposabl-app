@@ -6,18 +6,21 @@ import {
 import { ConvexError, v } from "convex/values";
 import type { QueryCtx } from "../_generated/server";
 import { env } from "../_generated/server";
+import { feature } from "../validator";
+import { connectionsUrl } from "./config";
 import {
   connectionStatus,
   oauthProvider,
   provider,
   storedConnection,
   tokenProvider,
+  posthogRegion,
 } from "./validator";
 
 const connection = (
   ctx: Pick<QueryCtx, "db">,
   userId: string,
-  provider: "convex" | "expo",
+  provider: "convex" | "expo" | "posthog",
 ) =>
   ctx.db
     .query("connections")
@@ -28,9 +31,9 @@ const connection = (
 
 export const status = internalQuery({
   platforms: true,
-  args: identityFields,
+  args: { ...identityFields, features: v.optional(v.array(feature)) },
   returns: connectionStatus,
-  handler: async (ctx, { userId }) => {
+  handler: async (ctx, { userId, features = [] }) => {
     const github = await ctx.db
       .query("githubConnections")
       .withIndex("by_userId", (q) => q.eq("userId", userId))
@@ -38,6 +41,12 @@ export const status = internalQuery({
       .first();
     const convex = await connection(ctx, userId, "convex");
     const expo = await connection(ctx, userId, "expo");
+    const posthog = await connection(ctx, userId, "posthog");
+    const missing: Array<"github" | "convex" | "posthog"> = [];
+    if (!github) missing.push("github");
+    if (!convex) missing.push("convex");
+    if (features.includes("analytics") && !posthog?.accountId)
+      missing.push("posthog");
     const encrypted = !!env.CONNECTIONS_ENCRYPTION_KEY;
     return {
       github: github
@@ -45,7 +54,11 @@ export const status = internalQuery({
         : null,
       convex: convex ? { name: convex.name } : null,
       expo: expo ? { name: expo.name } : null,
-      ready: !!github && !!convex,
+      posthog: posthog?.accountId ? { name: posthog.name } : null,
+      posthogPending: !!posthog && !posthog.accountId,
+      ready: missing.length === 0,
+      missing,
+      connectionsUrl: connectionsUrl(features),
       available: {
         github:
           encrypted &&
@@ -59,6 +72,7 @@ export const status = internalQuery({
           !!env.CONVEX_OAUTH_CLIENT_ID &&
           !!env.CONVEX_OAUTH_CLIENT_SECRET,
         expo: encrypted,
+        posthog: encrypted,
       },
       githubInstallUrl: env.GITHUB_APP_SLUG
         ? `https://github.com/apps/${encodeURIComponent(env.GITHUB_APP_SLUG)}/installations/new`
@@ -117,6 +131,7 @@ export const begin = internalMutation({
     provider: oauthProvider,
     hash: v.string(),
     verifier: v.string(),
+    region: v.optional(posthogRegion),
   },
   returns: v.null(),
   handler: async (ctx, { userId, ...state }) => {
@@ -130,7 +145,10 @@ export const begin = internalMutation({
 });
 export const consume = internalMutation({
   args: { ...identityFields, provider: oauthProvider, hash: v.string() },
-  returns: v.string(),
+  returns: v.object({
+    verifier: v.string(),
+    region: v.optional(posthogRegion),
+  }),
   handler: async (ctx, { userId, provider, hash }) => {
     const id = ctx.db.normalizeId("users", userId);
     const state = id
@@ -147,6 +165,6 @@ export const consume = internalMutation({
         "This connection link has expired. Please connect again.",
       );
     await ctx.db.patch("users", id, { connectionState: undefined });
-    return state.verifier;
+    return { verifier: state.verifier, region: state.region };
   },
 });

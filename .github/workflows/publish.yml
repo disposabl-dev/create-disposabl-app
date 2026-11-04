@@ -12,6 +12,7 @@ jobs:
   publish:
     if: github.repository == 'disposabl-dev/create-disposabl-app' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: packages/create-disposabl-app
@@ -21,7 +22,6 @@ jobs:
     concurrency:
       group: npm-publish
       cancel-in-progress: false
-      queue: max
     steps:
       - uses: actions/checkout@v6
         with:
@@ -34,10 +34,23 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.4.4"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ runner.arch }}-1.4.4-${{ hashFiles('bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-${{ runner.arch }}-1.4.4-
       - run: bun install --frozen-lockfile
       - run: bun fmt --check
       - run: bun run typecheck
       - run: bun run lint
+      - run: bun run typecheck
+        working-directory: packages/cli
+      # Release the CLI first so the generator can install its latest published version.
+      - run: bun run release
+        working-directory: packages/cli
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          npm_config_workspaces_update: "false"
       # semantic-release sets the package version, builds, tags this commit, and publishes.
       # Recovery after a publish failure: check npm and GitHub for the tagged version first.
       # A tagged version is skipped on rerun; restore missing artifacts from that exact commit/version.

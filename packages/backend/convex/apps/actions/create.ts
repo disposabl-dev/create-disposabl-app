@@ -4,8 +4,9 @@ import {
 } from "@disposabl/disposabl-kit/server/lib/functions";
 import { internal } from "../../_generated/api";
 import { appArgs, appResult } from "../../validator";
-import { ConvexError } from "convex/values";
-import type { Infer } from "convex/values";
+import { ConvexError, type Infer } from "convex/values";
+import { resolveFeatures } from "@disposabl/disposabl-kit/feature-options";
+import { requireConnections } from "../../connections/config";
 type AppResult = Infer<typeof appResult>;
 
 export const create = internalAction({
@@ -13,14 +14,12 @@ export const create = internalAction({
   args: { ...identityFields, ...appArgs },
   returns: appResult,
   handler: async (ctx, args): Promise<AppResult> => {
+    const features = resolveFeatures(args.features ?? []);
     const connections = await ctx.runQuery(
       internal.connections.internal.status,
-      { userId: args.userId },
+      { userId: args.userId, features },
     );
-    if (!connections.ready)
-      throw new ConvexError(
-        "Connect your personal GitHub account or an organization, then connect Convex at https://www.disposabl.dev/dashboard/connections, then retry setup. Your login remains active.",
-      );
+    requireConnections(connections);
     if (
       args.platforms.some((p) => p === "ios" || p === "android") &&
       !connections.expo
@@ -31,6 +30,7 @@ export const create = internalAction({
     // Return the UUID before external setup so the CLI can save it and resume safely.
     return ctx.runMutation(internal.apps.internal.insert, {
       ...args,
+      features,
       appId: crypto.randomUUID(),
     });
   },

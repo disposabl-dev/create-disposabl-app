@@ -213,6 +213,8 @@ main().catch((error) => {
     const manifestPath = join(destination, "package.json");
     const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
     manifest.name = name;
+    manifest.devDependencies ??= {};
+    manifest.devDependencies["@disposabl/cli"] = "latest";
     await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + "\n");
     if (folders.includes("apps/desktop")) {
       const desktopPath = join(destination, "apps/desktop/package.json");

@@ -39,6 +39,8 @@ If compilation succeeds but verification or publication fails, preserve the comp
 | An old commit's failure arrives after a fix                      | Match job ID and SHA to the already-diagnosed failure. Avoid another edit or rerun for the same stale notification.                                                                                                     |
 | Repeated dependency bot comment                                  | Compare the actual findings. An informational dependency inventory is not a new security finding.                                                                                                                       |
 
+For physical iPhone previews, follow [the Xcode signing procedure](iphone-preview.md). An unsigned device IPA is a build artifact, not an installed app; free Personal Team setup happens in Xcode, not Expo browser registration.
+
 ## Evidence and timing
 
 Record the source SHA, run/job URL, target, start/end times, failing step, and result. Parallel job durations are not additive wall time. Track queueing, compilation, upload/publication, and device verification separately when estimating delivery time.

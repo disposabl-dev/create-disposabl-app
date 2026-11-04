@@ -9,16 +9,15 @@ export {
   type Platform,
 } from "../disposabl-kit/platforms";
 
-export const features = [
-  { id: "docs", label: "Docs", hint: "apps/docs" },
-  {
-    id: "authentication",
-    label: "Authentication",
-    hint: "Frontend sign-in and sign-up",
-  },
-] as const;
-
-export type Feature = (typeof features)[number]["id"];
+import {
+  resolveFeatures,
+  type Feature,
+} from "../disposabl-kit/feature-options";
+export {
+  features,
+  featureDependencies,
+  type Feature,
+} from "../disposabl-kit/feature-options";
 export const requiredFeatures: readonly Feature[] = [];
 export type DisposablConfig = {
   appId?: string;
@@ -45,24 +44,11 @@ export function selectPlatforms(input = "web"): Platform[] {
 }
 
 export function selectFeatures(input = "authentication"): Feature[] {
-  const requested = input === "none" ? [] : parseList(input);
-  for (const id of requested) {
-    if (!features.some((feature) => feature.id === id)) {
-      throw new Error(
-        "Unknown feature " +
-          JSON.stringify(id) +
-          ". Use --features none or --list-options to see valid IDs.",
-      );
-    }
-  }
-  return features
-    .filter((option) => requested.includes(option.id))
-    .map((option) => option.id);
+  return resolveFeatures(input === "none" ? [] : parseList(input));
 }
 
 export function selectedFolders(config: DisposablConfig): string[] {
   const result = ["apps/web"];
-  if (config.platforms.includes("cli")) result.push("packages/cli");
   if (config.platforms.includes("typescript-sdk")) result.push("packages/sdk");
   if (
     config.platforms.some(
@@ -76,9 +62,7 @@ export function selectedFolders(config: DisposablConfig): string[] {
     )
   )
     result.push("apps/desktop");
-  for (const feature of config.features) {
-    if (feature !== "authentication") result.push("apps/" + feature);
-  }
+  if (config.features.includes("docs")) result.push("apps/docs");
   return result;
 }
 

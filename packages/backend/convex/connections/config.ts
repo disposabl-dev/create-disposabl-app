@@ -1,0 +1,33 @@
+import { ConvexError } from "convex/values";
+import { env } from "../_generated/server";
+import type { Infer } from "convex/values";
+import type { connectionStatus } from "./validator";
+
+export const connectionsUrl = (features: readonly string[] = []) => {
+  const url = new URL(
+    "/dashboard/connections",
+    env.CONNECTIONS_ORIGIN || "https://www.disposabl.dev",
+  );
+  if (features.includes("analytics"))
+    url.searchParams.set("features", "analytics");
+  return url.href;
+};
+
+export function requireConnections(status: Infer<typeof connectionStatus>) {
+  if (!status.ready)
+    throw new ConvexError({
+      code: "connections_required",
+      missing: status.missing,
+      connectionsUrl: status.connectionsUrl,
+      message: `Connect ${status.missing.map((provider) => ({ github: "GitHub", convex: "Convex", posthog: "PostHog", expo: "Expo" })[provider]).join(" and ")} to continue setup. Your app choices and login are saved.`,
+    });
+}
+
+export const posthogScopes = [
+  "organization:read",
+  "project:read",
+  "project:write",
+];
+export const posthogClientId = () =>
+  new URL("/.well-known/posthog-client.json", connectionsUrl()).href;
+export const posthogCallback = () => `${connectionsUrl()}?provider=posthog`;

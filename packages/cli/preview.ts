@@ -33,6 +33,7 @@ type Development = {
   deployKey: string;
   productionConvexSiteUrl?: string;
   repositoryUrl?: string;
+  analytics?: { projectId: number; projectToken: string; host: string };
 };
 async function updateEnv(
   file: string,
@@ -93,6 +94,19 @@ export async function configureDevelopment(
     !/^https:\/\/[a-z0-9-]+\.convex\.site$/.test(value.productionConvexSiteUrl)
   )
     throw new Error("Unexpected production Convex site URL.");
+  if (config.features?.includes("analytics") && !value.analytics)
+    throw new Error(
+      "Analytics setup is incomplete. Connect PostHog and retry app setup.",
+    );
+  if (
+    value.analytics &&
+    (!Number.isSafeInteger(value.analytics.projectId) ||
+      !value.analytics.projectToken.startsWith("phc_") ||
+      !["https://us.i.posthog.com", "https://eu.i.posthog.com"].includes(
+        value.analytics.host,
+      ))
+  )
+    throw new Error("Unexpected PostHog project configuration.");
   if (value.repositoryUrl) {
     const repository =
       /^https:\/\/github\.com\/([a-zA-Z0-9-]+)\/([a-zA-Z0-9_.-]+)\.git$/.exec(
@@ -142,11 +156,13 @@ export async function configureDevelopment(
     if (ignored.status !== 0 || tracked.status !== 1)
       throw new Error(`${file} must be untracked and ignored by Git.`);
   }
-  if (
-    value.productionConvexSiteUrl &&
-    config.productionConvexSiteUrl !== value.productionConvexSiteUrl
-  ) {
-    config.productionConvexSiteUrl = value.productionConvexSiteUrl;
+  if (value.productionConvexSiteUrl || value.analytics || config.analytics) {
+    if (value.productionConvexSiteUrl)
+      config.productionConvexSiteUrl = value.productionConvexSiteUrl;
+    // Project tokens are public ingestion configuration. OAuth credentials stay in Disposabl.
+    if (config.features?.includes("analytics"))
+      config.analytics = value.analytics;
+    else delete config.analytics;
     await writeFile(
       join(root, "disposabl.json"),
       JSON.stringify(config, null, 2) + "\n",

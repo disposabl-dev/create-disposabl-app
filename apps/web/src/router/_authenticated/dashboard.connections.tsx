@@ -1,3 +1,4 @@
+import { PosthogConnection } from "../../components/connections/posthog-connection";
 import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Check, ArrowRight } from "lucide-react";
@@ -13,13 +14,23 @@ export const Route = createFileRoute(
 
 function Connections() {
   const setup = useConnectionSetup();
-  const { status, busy, error, run, connect, disconnect, mobile } = setup;
+  const {
+    status,
+    busy,
+    error,
+    run,
+    connect,
+    disconnect,
+    mobile,
+    analyticsRequired,
+  } = setup;
   const [showExpo, setShowExpo] = useState(false);
   const completed =
     Number(Boolean(status?.github)) +
     Number(Boolean(status?.convex)) +
-    Number(mobile && Boolean(status?.expo));
-  const required = mobile ? 3 : 2;
+    Number(mobile && Boolean(status?.expo)) +
+    Number(analyticsRequired && Boolean(status?.posthog));
+  const required = 2 + Number(mobile) + Number(analyticsRequired);
   const ready = status?.ready && (!mobile || Boolean(status.expo));
   const providers = [
     {
@@ -83,6 +94,19 @@ function Connections() {
       ) : (
         <div className="space-y-3">
           <GithubConnection setup={setup} />
+          <PosthogConnection
+            connected={status.posthog}
+            pending={status.posthogPending}
+            required={analyticsRequired}
+            available={status.available.posthog}
+            busy={busy}
+            connect={(region) => connect("posthog", false, region)}
+            disconnect={() =>
+              void run(async () => {
+                await disconnect({ provider: "posthog" });
+              })
+            }
+          />
           {providers.map(({ id, name, description }) => {
             const connected = status[id];
             return (
