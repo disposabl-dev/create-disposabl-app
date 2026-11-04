@@ -77,6 +77,7 @@ function AuthLinks() {
   return isAuthenticated ? (
     <div className="flex items-center gap-5">
       <a href="/dashboard">Dashboard</a>
+      <a href="/change-password">Change password</a>
       <LogOut />
     </div>
   ) : (

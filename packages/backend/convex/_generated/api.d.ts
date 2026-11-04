@@ -26,6 +26,8 @@ import type * as apps_operations_internal from "../apps/operations/internal.js";
 import type * as apps_posthog from "../apps/posthog.js";
 import type * as apps_validator from "../apps/validator.js";
 import type * as auth from "../auth.js";
+import type * as authEmail from "../authEmail.js";
+import type * as authSetup from "../authSetup.js";
 import type * as connections_actions_credentials from "../connections/actions/credentials.js";
 import type * as connections_actions_expo from "../connections/actions/expo.js";
 import type * as connections_actions_github from "../connections/actions/github.js";
@@ -40,6 +42,7 @@ import type * as connections_validator from "../connections/validator.js";
 import type * as downloads_action from "../downloads/action.js";
 import type * as downloads_http from "../downloads/http.js";
 import type * as downloads_internal from "../downloads/internal.js";
+import type * as emails from "../emails.js";
 import type * as github_actions_http from "../github/actions/http.js";
 import type * as github_actions_internal from "../github/actions/internal.js";
 import type * as github_actions_oidc from "../github/actions/oidc.js";
@@ -88,6 +91,8 @@ declare const fullApi: ApiFromModules<{
   "apps/posthog": typeof apps_posthog;
   "apps/validator": typeof apps_validator;
   auth: typeof auth;
+  authEmail: typeof authEmail;
+  authSetup: typeof authSetup;
   "connections/actions/credentials": typeof connections_actions_credentials;
   "connections/actions/expo": typeof connections_actions_expo;
   "connections/actions/github": typeof connections_actions_github;
@@ -102,6 +107,7 @@ declare const fullApi: ApiFromModules<{
   "downloads/action": typeof downloads_action;
   "downloads/http": typeof downloads_http;
   "downloads/internal": typeof downloads_internal;
+  emails: typeof emails;
   "github/actions/http": typeof github_actions_http;
   "github/actions/internal": typeof github_actions_internal;
   "github/actions/oidc": typeof github_actions_oidc;
@@ -155,6 +161,8 @@ export declare const internal: FilterApi<
 export declare const components: {
   auth: import("@convex-dev/auth/_generated/component.js").ComponentApi<"auth">;
   authGoogle: import("@convex-dev/auth/components/google/_generated/component.js").ComponentApi<"authGoogle">;
+  authEmail: import("@convex-dev/auth/components/email/_generated/component.js").ComponentApi<"authEmail">;
+  resend: import("@convex-dev/resend/_generated/component.js").ComponentApi<"resend">;
   authPassword: import("@convex-dev/auth/components/password/_generated/component.js").ComponentApi<"authPassword">;
   authUsername: import("@convex-dev/auth/components/username/_generated/component.js").ComponentApi<"authUsername">;
   staticHosting: import("@convex-dev/static-hosting/_generated/component.js").ComponentApi<"staticHosting">;

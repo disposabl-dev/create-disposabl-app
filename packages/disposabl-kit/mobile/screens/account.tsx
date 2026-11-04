@@ -8,6 +8,7 @@ import { api } from "../lib/convex";
 
 export function AccountScreen() {
   const user = useQuery(api.users.index.current);
+  const account = useQuery(api.auth.account);
   const { signOut } = useAuthActions();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -39,7 +40,9 @@ export function AccountScreen() {
         <View style={styles.card}>
           <Text style={styles.label}>You are logged in</Text>
           <Text style={styles.body}>
-            Username: {user.username ?? "Not set"}
+            {account?.email
+              ? `Email: ${account.email}`
+              : `Username: ${user.username ?? "Not set"}`}
           </Text>
           <Text style={styles.body} selectable>
             User ID: {user.id}
@@ -48,6 +51,11 @@ export function AccountScreen() {
             Your account was verified by the server.
           </Text>
         </View>
+      )}
+      {user && (
+        <Link href="/(authenticated)/change-password" style={styles.link}>
+          Change password
+        </Link>
       )}
       <AuthButton
         title={pending ? "Logging out..." : "Log out"}

@@ -3,7 +3,8 @@ import {
   internalQuery,
   internalMutation,
 } from "@disposabl/disposabl-kit/server/lib/functions";
-import { v } from "convex/values";
+import { env } from "../_generated/server";
+import { ConvexError, v } from "convex/values";
 import { components } from "../_generated/api";
 import { vGoogleProfile } from "@convex-dev/auth/methods/google/server";
 
@@ -34,6 +35,11 @@ export const createUser = internalMutation({
   args: {
     provider: v.union(
       v.object({
+        name: v.literal("emailPassword"),
+        accountId: v.string(),
+        profile: v.object({}),
+      }),
+      v.object({
         name: v.literal("password"),
         accountId: v.string(),
         profile: v.object({}),
@@ -46,7 +52,12 @@ export const createUser = internalMutation({
     ),
   },
   returns: v.id("users"),
-  handler: async (ctx) => {
+  handler: async (ctx, { provider }) => {
+    if (provider.name === "password" && env.RESEND_API_KEY?.trim()) {
+      throw new ConvexError(
+        "New accounts must use verified email and password.",
+      );
+    }
     return await ctx.db.insert("users", {});
   },
 });

@@ -1,6 +1,7 @@
+import { getAuthUserId } from "@convex-dev/auth/server";
 import { setupUsernamePassword } from "@convex-dev/auth/methods/username-password/server";
 import { setupGoogle } from "@convex-dev/auth/methods/google/server";
-import { setupConvexAuth } from "@convex-dev/auth/server";
+import { auth } from "./authSetup";
 import {
   googleAuthorizationState,
   googleConfigured,
@@ -9,7 +10,6 @@ import { v } from "convex/values";
 import { components, internal } from "./_generated/api";
 import { env, query } from "./_generated/server";
 
-const auth = setupConvexAuth({ component: components.auth });
 export const { signOut, refreshSession, isAuthenticated } = auth;
 
 export const {
@@ -38,8 +38,41 @@ export const { startSignInWithGoogle, completeSignInWithGoogle } = setupGoogle(
 /** Publish availability only; provider credentials stay on the backend. */
 export const providers = query({
   args: {},
-  returns: v.object({ google: v.boolean() }),
+  returns: v.object({
+    google: v.boolean(),
+    emailPassword: v.boolean(),
+    emailDelivery: v.boolean(),
+  }),
   handler: async () => ({
     google: googleConfigured(),
+    emailPassword: Boolean(env.RESEND_API_KEY?.trim()),
+    emailDelivery: Boolean(
+      env.RESEND_API_KEY?.trim() && env.RESEND_FROM_EMAIL?.trim(),
+    ),
   }),
+});
+
+/** Password capabilities for the signed-in account, never supplied by the client. */
+export const account = query({
+  args: {},
+  returns: v.union(
+    v.null(),
+    v.object({
+      username: v.union(v.string(), v.null()),
+      email: v.union(v.string(), v.null()),
+    }),
+  ),
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) return null;
+    return {
+      username: await ctx.runQuery(components.authUsername.public.getUsername, {
+        userId,
+      }),
+      email: await ctx.runQuery(
+        components.authEmail.verifiedEmails.getPrimaryEmail,
+        { userId },
+      ),
+    };
+  },
 });

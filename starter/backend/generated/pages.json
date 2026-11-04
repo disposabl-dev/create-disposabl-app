@@ -8,7 +8,19 @@
     "authenticated": false
   },
   {
+    "path": "/forgot-password",
+    "authenticated": false
+  },
+  {
+    "path": "/legal",
+    "authenticated": false
+  },
+  {
     "path": "/login",
+    "authenticated": false
+  },
+  {
+    "path": "/reset-password",
     "authenticated": false
   },
   {
@@ -16,15 +28,19 @@
     "authenticated": false
   },
   {
+    "path": "/verify-email",
+    "authenticated": false
+  },
+  {
+    "path": "/change-password",
+    "authenticated": true
+  },
+  {
     "path": "/dashboard",
     "authenticated": true
   },
   {
-    "path": "/dashboard/api-keys",
-    "authenticated": true
-  },
-  {
-    "path": "/legal",
+    "path": "/legal/delete-account",
     "authenticated": false
   },
   {
@@ -32,15 +48,15 @@
     "authenticated": false
   },
   {
-    "path": "/legal/terms",
-    "authenticated": false
-  },
-  {
     "path": "/legal/privacy-request",
     "authenticated": false
   },
   {
-    "path": "/legal/delete-account",
+    "path": "/legal/terms",
     "authenticated": false
+  },
+  {
+    "path": "/dashboard/api-keys",
+    "authenticated": true
   }
 ]

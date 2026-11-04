@@ -1,4 +1,6 @@
 import { v } from "convex/values";
+import email from "@convex-dev/auth/components/email/convex.config.js";
+import resend from "@convex-dev/resend/convex.config.js";
 import passwordProvider from "@convex-dev/auth/components/password/convex.config.js";
 import username from "@convex-dev/auth/components/username/convex.config.js";
 import auth from "@convex-dev/auth/convex.config.js";
@@ -9,6 +11,10 @@ import { defineApp } from "convex/server";
 
 const app = defineApp({
   env: {
+    RESEND_API_KEY: v.optional(v.string()),
+    RESEND_FROM_EMAIL: v.optional(v.string()),
+    RESEND_WEBHOOK_SECRET: v.optional(v.string()),
+    AUTH_EMAIL_ORIGIN: v.optional(v.string()),
     AUTH_GOOGLE_CLIENT_ID: v.optional(v.string()),
     AUTH_GOOGLE_CLIENT_SECRET: v.optional(v.string()),
     AUTH_GOOGLE_RELAY_URL: v.optional(v.string()),
@@ -27,6 +33,8 @@ app.use(google, {
   },
 });
 
+app.use(email);
+app.use(resend);
 app.use(passwordProvider);
 app.use(username);
 app.use(staticHosting);

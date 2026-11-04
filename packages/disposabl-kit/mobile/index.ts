@@ -8,3 +8,6 @@ export { HomeScreen, PublicHomeScreen } from "./screens/home";
 export { AccountScreen } from "./screens/account";
 export { LoginScreen } from "./screens/login";
 export { SignupScreen } from "./screens/signup";
+export { ChangePasswordScreen } from "./screens/change-password";
+
+export { ForgotPasswordScreen } from "./screens/forgot-password";

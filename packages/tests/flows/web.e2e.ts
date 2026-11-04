@@ -17,7 +17,6 @@ test(
   async ({ app, screen }) => {
     await app.open("/dashboard");
     if (project.features.includes("authentication")) {
-      await expect(screen.getByLabel("Username")).toBeVisible();
       await expect(screen.getByLabel("Password")).toBeVisible();
       await expect(screen.getByRole("button", "Log in")).toBeVisible();
       const response = await fetch(`${backendUrl()}/api/query`, {
@@ -34,6 +33,9 @@ test(
       const providers = await response.json();
       expect(providers.status).toBe("success");
       expect(typeof providers.value.google).toBe("boolean");
+      await expect(
+        screen.getByLabel(providers.value.emailPassword ? "Email" : "Username"),
+      ).toBeVisible();
       await expect(
         screen.getByRole("button", "Sign in with Google"),
       ).toHaveCount(providers.value.google ? 1 : 0);

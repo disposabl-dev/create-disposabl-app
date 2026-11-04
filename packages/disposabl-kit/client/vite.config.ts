@@ -29,9 +29,29 @@ export const createRoutes = (enabled: boolean) =>
             route("/login", kitRoute("_auth-pages/login.tsx")),
             route("/signup", kitRoute("_auth-pages/signUp.tsx")),
             route("/consent", kitRoute("consent.tsx")),
+            route(
+              "/forgot-password",
+              kitRoute("_auth-pages/forgot-password.tsx"),
+            ),
+            route(
+              "/reset-password",
+              kitRoute("_auth-pages/reset-password.tsx"),
+            ),
+            route("/verify-email", kitRoute("_auth-pages/verify-email.tsx")),
           ]
         : []),
-      layout("_authenticated", kitRoute("_authenticated/route.tsx"), []),
+      layout(
+        "_authenticated",
+        kitRoute("_authenticated/route.tsx"),
+        enabled
+          ? [
+              route(
+                "/change-password",
+                kitRoute("_authenticated/change-password.tsx"),
+              ),
+            ]
+          : [],
+      ),
     ]),
   ]);
 

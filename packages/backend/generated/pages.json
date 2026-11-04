@@ -8,6 +8,10 @@
     "authenticated": false
   },
   {
+    "path": "/forgot-password",
+    "authenticated": false
+  },
+  {
     "path": "/legal",
     "authenticated": false
   },
@@ -16,8 +20,20 @@
     "authenticated": false
   },
   {
+    "path": "/reset-password",
+    "authenticated": false
+  },
+  {
     "path": "/signup",
     "authenticated": false
+  },
+  {
+    "path": "/verify-email",
+    "authenticated": false
+  },
+  {
+    "path": "/change-password",
+    "authenticated": true
   },
   {
     "path": "/dashboard",

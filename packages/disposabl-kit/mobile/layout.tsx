@@ -68,6 +68,10 @@ export function AuthLayout() {
     <Stack screenOptions={{ headerTintColor: "#161b2e" }}>
       <Stack.Screen name="login" options={{ title: "Log in" }} />
       <Stack.Screen name="signup" options={{ title: "Create account" }} />
+      <Stack.Screen
+        name="forgot-password"
+        options={{ title: "Reset password" }}
+      />
     </Stack>
   );
 }
@@ -91,6 +95,10 @@ function AccountRoutes() {
   return (
     <Stack screenOptions={{ headerTintColor: "#161b2e" }}>
       <Stack.Screen name="account" options={{ title: "Account" }} />
+      <Stack.Screen
+        name="change-password"
+        options={{ title: "Change password" }}
+      />
     </Stack>
   );
 }

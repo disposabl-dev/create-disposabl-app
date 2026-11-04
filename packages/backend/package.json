@@ -16,6 +16,7 @@
     "@convex-dev/agent": "0.7.9",
     "@convex-dev/auth": "catalog:",
     "@convex-dev/mcp": "catalog:",
+    "@convex-dev/resend": "^0.2.10",
     "@convex-dev/static-hosting": "catalog:",
     "@convex-dev/workflow": "^0.4.10",
     "@disposabl/disposabl-kit": "workspace:*",

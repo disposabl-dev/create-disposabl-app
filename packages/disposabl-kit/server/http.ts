@@ -13,6 +13,7 @@ import { registerDocsRoutes } from "./lib/docs";
 // docs:end
 import { createOpenApi, createPlatforms } from "./lib/platform-spec";
 import { registerPageRoutes } from "./lib/static";
+import { resend } from "../../backend/convex/emails";
 import { googleRelay } from "./google";
 
 export { tool } from "@convex-dev/mcp";
@@ -60,6 +61,31 @@ export const {
 
 export default function createHttpRouter() {
   const http = httpRouter();
+  if (config.features.includes("authentication")) {
+    http.route({
+      path: "/.well-known/change-password",
+      method: "GET",
+      handler: httpActionGeneric(
+        async () =>
+          new Response(null, {
+            status: 302,
+            headers: {
+              Location: "/change-password",
+              "Cache-Control": "no-store",
+            },
+          }),
+      ),
+    });
+  }
+  if (env.RESEND_WEBHOOK_SECRET) {
+    http.route({
+      path: "/resend-webhook",
+      method: "POST",
+      handler: httpActionGeneric((ctx, request) =>
+        resend.handleResendEventWebhook(ctx, request),
+      ),
+    });
+  }
   http.route({
     path: "/oauth/relay/google",
     method: "GET",
