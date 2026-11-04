@@ -9,7 +9,7 @@ Build the user's requested app and keep its preview visible. Preserve their chos
 
 ## Create and configure
 
-On a fresh machine, check Bun, Git, and Node.js 22.12 or newer. Report a missing prerequisite and follow its official installation instructions; do not assume another machine's tools, login, or credentials exist here.
+On a fresh machine, check Bun, Git, and Node.js 24.8 or newer. Report a missing prerequisite and follow its official installation instructions; do not assume another machine's tools, login, or credentials exist here.
 
 Discover platform and feature IDs, then create the app with explicit selections:
 
@@ -34,6 +34,16 @@ Use command help and the current API contract for other operations. If login is 
 Choose a visual direction suited to the product. Use `frontend-design` when available and read [app branding and visual design](references/design.md). If that skill is unavailable, proceed with the user's brief and report the limitation without blocking development.
 
 Read [delivery checks](references/delivery.md) before native builds or delivery repairs. Aim to show a usable web preview early; first native builds can take longer. Do not promise a build deadline.
+
+Prefer local development, builds, and verification whenever the toolchain is available. Do not push or start GitHub Actions merely to test changes. Use the existing release workflows for authorized publication.
+
+## Testing
+
+Read `packages/tests/README.md`. Keep behavior tests in that workspace and use `bun run e2e guide` for the installed E2E documentation. Extend deterministic flows as features change, then run `bun run test` before delivery. No E2E login or model subscription is required. Backend checks always run; web and native targets follow `disposabl.json`, and API checks require the API platform.
+
+For a scoped run, use `bun run test --target web,backend` or a selected native target. Build and install mobile apps locally first and keep Metro running for debug builds. Report the exact targets verified and any unavailable platform; do not turn missing devices into passing or silently skipped tests. E2E telemetry stays disabled until Disposabl controls its preference.
+
+## Publish a preview
 
 A generated app already has an Initial commit and a provisioned Git remote. For authorized delivery, publish that scaffold to `main`, then develop on an isolated feature branch/worktree:
 
@@ -80,7 +90,7 @@ user, open the free account signup in a separate tab and have them return to
 Disposabl after signup. Then install Disposabl, choose their account on GitHub,
 and finish authorization. A clicked link does not prove setup is complete; wait
 for the connected account to appear. Connect Convex next, and Expo for mobile apps.
-Builds use standard GitHub-hosted runners; GitHub Actions usage limits apply.
+Prefer local builds when possible. Hosted publication has provider usage limits.
 Your code and app data stay in your accounts; Disposabl stores encrypted
 connection credentials and setup metadata. Link the open-source repository
 when explaining access: https://github.com/disposabl-dev/create-disposabl-app.

@@ -16,7 +16,7 @@ Tell your agent your idea. It can guide you through setup and help build your fi
 
 ## Or start in your terminal
 
-Install [Bun](https://bun.sh) and [Git](https://git-scm.com), then run:
+Install [Bun](https://bun.sh), [Git](https://git-scm.com), and [Node.js](https://nodejs.org) 24.8 or newer, then run:
 
 ```sh
 bunx create-disposabl-app@latest
@@ -36,7 +36,7 @@ Replace `my-app` with the name you chose. Your website opens in the browser.
 <details>
 <summary>Using npm, pnpm, or Yarn?</summary>
 
-Choose one of these commands. All create the same project, which uses Bun to install dependencies and run locally. npm, pnpm, and Yarn also need Node.js 22.12 or newer.
+Choose one of these commands. All create the same project, which uses Bun to install dependencies and run locally. Tests need Node.js 22.22.3 or newer on Node 22, or Node.js 24.8 or newer.
 
 | Tool    | Command                                |
 | ------- | -------------------------------------- |
@@ -57,6 +57,36 @@ Choose one of these commands. All create the same project, which uses Bun to ins
 | Developers    | An API, command-line tool, and TypeScript SDK |
 
 Choose only what you need. App sign-in is included by default. Native apps need their platform's build tools; running the website does not install a mobile or desktop app.
+
+## Build and test locally
+
+Use your own machine for development and testing whenever it has the tools you need. You do not need to push a commit or wait for GitHub Actions to check a change.
+
+Every new app includes [E2E](https://github.com/tester-army/e2e) tests in `packages/tests`. After starting your development environment with `bun run dev`, run:
+
+```sh
+bun run test
+```
+
+This checks the backend and the web/mobile platforms you selected. API checks run only when API is enabled. There are no extra setup questions, E2E accounts, AI subscriptions, or model keys to provide. Your coding agent can add tests as it builds features.
+
+For a quicker check of just the website and backend:
+
+```sh
+bun run test --target web,backend
+```
+
+Mobile tests need an app built and installed on a simulator or emulator first. iOS needs a Mac with Xcode; Android needs the Android SDK. Build locally with `bun run --cwd apps/mobile ios` or `bun run --cwd apps/mobile android`, then run the matching test target. Debug builds also need Metro running.
+
+The included tests are a starting point, not complete coverage of your app. They do not test desktop, MCP, CLI, or SDK clients. See [the testing guide](packages/tests/README.md) for adding flows, choosing devices, and running in CI.
+
+E2E telemetry is disabled. PostHog analytics is for production only.
+
+## Publish when you are ready
+
+Generated apps still include GitHub Actions workflows for previews and releases. These are separate from local testing. The current release workflows do not automatically run the new E2E suite; a full release gate needs an isolated backend and the required mobile devices.
+
+See [builds and publication](.github/README.md) for what runs locally and what runs on GitHub.
 
 ## Need more detail?
 
