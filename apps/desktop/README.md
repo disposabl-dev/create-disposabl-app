@@ -57,7 +57,7 @@ Main releases use separate platform/run tags. Forge itself does not publish.
 
 Windows and Linux installers are unsigned. macOS builds use ad hoc signing by
 default; Developer ID signing and notarization are optional. In-app updates are not configured. The release version is
-`1.0.<workflow run number>`. See the root `.github/README.md` for release behavior.
+`1.0.<workflow run number>`. See the [app workflow](../../.github/workflows/pipeline.yml) for release behavior.
 
 ## macOS signing
 

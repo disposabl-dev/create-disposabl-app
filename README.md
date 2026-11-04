@@ -1,8 +1,19 @@
-# Disposabl
+# Create Disposabl App
 
 Create an app for web, mobile, and desktop. Start with a prompt in your coding agent or a command in your terminal.
 
 Disposabl sets up the project, sign-in, and a development environment. You and your coding agent build the app from there. Your code lives in your GitHub account.
+
+## What you get
+
+- **A working starting point:** a website with sign-in and a dashboard, ready for your own screens and features.
+- **A shared backend:** a database and server functions powered by Convex, used by your website and other selected apps.
+- **The platforms you choose:** mobile and desktop apps, plus optional tools for developers and AI assistants.
+- **Tests included:** starter checks in a separate `packages/tests` folder, with no E2E account or AI subscription needed.
+- **Help for your coding agent:** project instructions and a Disposabl skill covering setup, development, testing, and delivery.
+- **A path to publishing:** GitHub workflows for previews and releases when you are ready to share your app.
+
+This is a starter kit. You or your coding agent still add your app's features and tests. You can read, change, and keep the generated source code.
 
 ## Start with your coding agent
 
@@ -58,9 +69,49 @@ Choose one of these commands. All create the same project, which uses Bun to ins
 
 Choose only what you need. App sign-in is included by default. Native apps need their platform's build tools; running the website does not install a mobile or desktop app.
 
+The API lets other software use your app. The CLI provides terminal commands, and the TypeScript SDK helps developers call your app from code. Choosing the CLI or SDK also enables the API. You can also include a documentation site.
+
+## Tech stack
+
+These are the main tools behind the starter. You do not need to learn all of them before creating an app.
+
+| Part            | Technology                             | What it does                                                   |
+| --------------- | -------------------------------------- | -------------------------------------------------------------- |
+| Language        | TypeScript                             | Keeps application code and data types consistent               |
+| Website         | React, TanStack Start and Router, Vite | Builds pages, navigation, and the local web development server |
+| Styling         | Tailwind CSS                           | Styles the website                                             |
+| Backend         | Convex                                 | Stores data, runs server functions, and delivers live updates  |
+| Sign-in         | Convex Auth                            | Provides account creation and username/password sign-in        |
+| Mobile          | Expo, React Native, Expo Router        | Builds iOS and Android apps                                    |
+| Desktop         | Electron, Electron Forge               | Packages the web experience as a desktop app                   |
+| Developer tools | OpenAPI, TypeScript SDK, CLI, MCP      | Connects other software and AI assistants to your app          |
+| Documentation   | Fumadocs and Fumapress                 | Builds the optional documentation site                         |
+| Testing         | TesterArmy E2E                         | Runs repeatable browser, mobile, backend, and API checks       |
+| Project tools   | Bun and Turborepo                      | Installs dependencies and runs commands across the project     |
+| Publishing      | GitHub Actions and Expo EAS            | Builds previews and releases for the selected platforms        |
+
+Web and the backend are always included. Other apps and features follow your selections in `disposabl.json`.
+
+## Where things live
+
+| Folder                            | Contents                                              |
+| --------------------------------- | ----------------------------------------------------- |
+| `apps/web`                        | Website                                               |
+| `apps/mobile`                     | iOS and Android app, when selected                    |
+| `apps/desktop`                    | Desktop app, when selected                            |
+| `apps/docs`                       | Documentation site, when selected                     |
+| `packages/backend`                | Database schema, server functions, API, and MCP tools |
+| `packages/tests`                  | End-to-end test configuration and flows               |
+| `packages/cli` and `packages/sdk` | Optional developer clients                            |
+| `packages/skill`                  | Instructions for coding agents                        |
+
+The root `AGENTS.md` explains how agents should work in the project. In this repository, `packages/create-disposabl-app` contains the generator that creates new apps.
+
 ## Build and test locally
 
 Use your own machine for development and testing whenever it has the tools you need. You do not need to push a commit or wait for GitHub Actions to check a change.
+
+The frontend runs locally and connects to your Convex development backend. Setup still needs internet access and the connected accounts.
 
 Every new app includes [E2E](https://github.com/tester-army/e2e) tests in `packages/tests`. After starting your development environment with `bun run dev`, run:
 
@@ -86,7 +137,13 @@ E2E telemetry is disabled. PostHog analytics is for production only.
 
 Generated apps still include GitHub Actions workflows for previews and releases. These are separate from local testing. The current release workflows do not automatically run the new E2E suite; a full release gate needs an isolated backend and the required mobile devices.
 
-See [builds and publication](.github/README.md) for what runs locally and what runs on GitHub.
+Use `bun run test` before a local web build. Native tests run after building and installing the app they will check. See the [testing guide](packages/tests/README.md#ci) for the commands and environment needed in CI.
+
+Install Disposabl on your personal GitHub account or an organization you administer, then connect Convex. Mobile apps also need Expo. A GitHub organization and a separate runner service are not required.
+
+Hosted builds use GitHub's Linux, Windows, and macOS runners. Production iOS distribution uses EAS Build. The [app workflow](.github/workflows/pipeline.yml) contains the current build settings. Existing generated repositories keep their workflows until you update them.
+
+GitHub Actions, Expo, and hosting providers have usage limits and may charge beyond their included allowances. Local builds avoid using hosted build minutes.
 
 ## Need more detail?
 
