@@ -1,5 +1,8 @@
 import site from "./site.json" with { type: "json" };
-import { accountPaths } from "@disposabl/disposabl-kit/lib/indexing";
+import {
+  accountPaths,
+  isProductionSite,
+} from "@disposabl/disposabl-kit/lib/indexing";
 // docs:start
 import { cp } from "node:fs/promises";
 // docs:end
@@ -51,9 +54,7 @@ const config = defineConfig(({ mode }) => {
   )
     throw new Error("VITE_PUBLIC_SITE_URL must be an HTTP(S) origin");
   const siteUrl = publicUrl.origin;
-  const indexable =
-    mode === "production" &&
-    (!site.backendOrigin || site.backendOrigin === url.origin);
+  const indexable = isProductionSite(mode, url.origin, site);
 
   return {
     define: {

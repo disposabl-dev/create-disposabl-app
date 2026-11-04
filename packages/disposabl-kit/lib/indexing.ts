@@ -11,3 +11,16 @@ export const accountPaths = [
 ];
 export const isAccountPage = (path: string) =>
   accountPaths.includes(path.replace(/\/$/, ""));
+
+/** Convex exposes either its deployment host or the app's custom production host. */
+export function isProductionSite(
+  mode: string,
+  backendOrigin: string,
+  site: { origin: string; backendOrigin: string },
+) {
+  return (
+    mode === "production" &&
+    (!site.backendOrigin ||
+      [site.backendOrigin, site.origin].includes(backendOrigin))
+  );
+}

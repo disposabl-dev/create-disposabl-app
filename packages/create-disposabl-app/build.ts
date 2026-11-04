@@ -69,7 +69,8 @@ try {
         path !== join(root, "apps/mobile/android") &&
         path !== join(root, "apps/mobile/ios") &&
         path !== join(root, "apps/desktop/out") &&
-        !/\.test\.[^.]+$/.test(basename(path)) &&
+        (!/\.test\.[^.]+$/.test(basename(path)) ||
+          path.startsWith(join(root, "packages/tests") + sep)) &&
         (!basename(path).endsWith(".tgz") ||
           path.startsWith(join(root, "vendor") + sep)) &&
         !basename(path).endsWith(".tsbuildinfo") &&

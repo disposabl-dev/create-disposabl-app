@@ -72,9 +72,12 @@ export function registerPageRoutes(http: HttpRouter) {
       const contentType = asset.contentType;
       const headers = {
         "Content-Type": contentType,
-        "Cache-Control": contentType.includes("text/html")
-          ? "no-cache"
-          : "public, max-age=3600",
+        "Cache-Control":
+          contentType.includes("text/html") ||
+          path === "/robots.txt" ||
+          path === "/sitemap.xml"
+            ? "no-cache"
+            : "public, max-age=3600",
         "X-Content-Type-Options": "nosniff",
         ...(page?.authenticated || isAccountPage(path)
           ? { "X-Robots-Tag": "noindex" }

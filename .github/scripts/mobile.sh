@@ -44,7 +44,7 @@ bun -e '
     appendFileSync(process.env.GITHUB_ENV, `${key}<<${delimiter}\n${value}\n${delimiter}\n`);
   }
   const site = JSON.parse(readFileSync("../web/site.json", "utf8"));
-  const enabled = process.env.CHANNEL === "production" && site.analytics === true && (!site.backendOrigin || site.backendOrigin === process.env.CONVEX_SITE_URL);
+  const enabled = process.env.CHANNEL === "production" && site.analytics === true && (!site.backendOrigin || [site.backendOrigin, site.origin].includes(process.env.CONVEX_SITE_URL));
   appendFileSync(process.env.GITHUB_ENV, `EXPO_PUBLIC_DISPOSABL_ANALYTICS_ENABLED=${enabled}\n`);
 '
     ;;
