@@ -6,7 +6,7 @@ import { internal } from "../../_generated/api";
 import type { ActionCtx } from "../../_generated/server";
 import { platform, releaseDetails } from "../../validator";
 import { githubRequest, githubToken } from "./tokens";
-import { verifyGitHubToken } from "./oidc";
+import { verifyGitHubToken, workflowRepository } from "./oidc";
 
 type WorkflowRun = {
   id: number;
@@ -24,16 +24,13 @@ async function authorize(ctx: ActionCtx, appId: string, token: string) {
   const claims = await verifyGitHubToken(token);
   const app = await ctx.runQuery(internal.apps.internal.githubApp, { appId });
   if (!app) throw new Error("Repository is not linked to this app.");
-  const repository = `${app.githubOwner}/${app.githubRepo}`;
   const publisher = claims.environment === "publishing";
   const workflowPath = ".github/workflows/pipeline.yml";
-  const workflow = `${repository}/${workflowPath}@${claims.ref}`;
-  if (
-    claims.repository !== repository ||
-    claims.workflow_ref !== workflow ||
-    (claims.job_workflow_ref && claims.job_workflow_ref !== workflow)
-  )
-    throw new Error("Unexpected workflow.");
+  const repository = workflowRepository(
+    claims,
+    `${app.githubOwner}/${app.githubRepo}`,
+    workflowPath,
+  );
   const productionEvent =
     claims.event_name === "push" && claims.ref === "refs/heads/main";
   if (claims.event_name !== "pull_request" && !productionEvent)

@@ -1,5 +1,23 @@
 "use node";
 
+/** Repository names ignore case; workflow paths and Git refs do not. */
+export function workflowRepository(
+  claims: Record<string, string>,
+  linkedRepository: string,
+  workflowPath: string,
+) {
+  const repository = claims.repository;
+  const workflow = `${repository}/${workflowPath}@${claims.ref}`;
+  if (
+    typeof repository !== "string" ||
+    repository.toLowerCase() !== linkedRepository.toLowerCase() ||
+    claims.workflow_ref !== workflow ||
+    (claims.job_workflow_ref && claims.job_workflow_ref !== workflow)
+  )
+    throw new Error("Unexpected workflow.");
+  return repository;
+}
+
 const decode = (value: string) =>
   Uint8Array.from(atob(value.replace(/-/g, "+").replace(/_/g, "/")), (char) =>
     char.charCodeAt(0),
