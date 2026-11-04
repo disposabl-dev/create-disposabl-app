@@ -121,6 +121,14 @@ try {
   );
   for (const file of ["reset.ts", "starter", ".disposabl-staging.json"])
     await rm(join(templateDir, file), { recursive: true, force: true });
+  // Removing product dependencies changes Bun's dependency graph and hoisting.
+  // Resolve the starter lockfile without installing packages or running scripts.
+  const lockfile = Bun.spawn(
+    [process.execPath, "install", "--lockfile-only", "--ignore-scripts"],
+    { cwd: templateDir, stdout: "inherit", stderr: "inherit" },
+  );
+  if ((await lockfile.exited) !== 0)
+    throw new Error("Starter lockfile generation failed.");
   // npm omits .gitignore files from packed templates.
   for (const path of await readdir(templateDir, { recursive: true })) {
     if (basename(path) === ".gitignore") {
