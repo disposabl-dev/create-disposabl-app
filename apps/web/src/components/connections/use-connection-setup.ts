@@ -4,8 +4,13 @@ import { ConvexError } from "convex/values";
 import { api } from "../../../../../packages/backend/convex/_generated/api";
 
 type Provider = "github" | "convex";
-type Installation = { installationId: string; owner: string };
+type Installation = {
+  installationId: string;
+  owner: string;
+  organization: boolean;
+};
 const pendingKey = "disposabl.pendingConnectionProvider";
+const selectionKey = "disposabl.githubAccountSelection";
 const isProvider = (value: string | null): value is Provider =>
   value === "github" || value === "convex";
 
@@ -13,9 +18,6 @@ export function useConnectionSetup() {
   const status = useQuery(api.connections.index.status, {});
   const start = useAction(api.connections.index.start);
   const resumeInstall = useAction(api.connections.index.resumeGithubInstall);
-  const confirmBlacksmith = useMutation(
-    api.connections.index.confirmBlacksmith,
-  );
   const complete = useAction(api.connections.index.complete);
   const selectGithub = useAction(api.connections.index.selectGithub);
   const disconnect = useMutation(api.connections.index.disconnect);
@@ -24,6 +26,7 @@ export function useConnectionSetup() {
   const [installations, setInstallations] = useState<Installation[]>([]);
   const [proof, setProof] = useState<string>();
   const [installNeeded, setInstallNeeded] = useState(false);
+  const [githubPending, setGithubPending] = useState(false);
   const [mobile, setMobile] = useState(false);
   const consumed = useRef(false);
   const fail = (cause: unknown) =>
@@ -48,6 +51,7 @@ export function useConnectionSetup() {
     setMobile(sessionStorage.getItem(mobileKey) === "1");
     const queryProvider = url.searchParams.get("provider");
     const pending = sessionStorage.getItem(pendingKey);
+    setGithubPending(pending === "github");
     const provider = isProvider(queryProvider)
       ? queryProvider
       : isProvider(pending)
@@ -92,7 +96,37 @@ export function useConnectionSetup() {
       state !== null ||
       denial !== null ||
       queryProvider !== null;
-    if (!callback) return;
+    if (!callback) {
+      try {
+        const selection = JSON.parse(
+          sessionStorage.getItem(selectionKey) || "null",
+        );
+        if (
+          selection &&
+          selection.expiresAt > Date.now() &&
+          typeof selection.proof === "string" &&
+          Array.isArray(selection.installations) &&
+          selection.installations.every(
+            (item: unknown) =>
+              typeof item === "object" &&
+              item !== null &&
+              "installationId" in item &&
+              "owner" in item &&
+              "organization" in item &&
+              typeof item.installationId === "string" &&
+              typeof item.owner === "string" &&
+              typeof item.organization === "boolean",
+          )
+        ) {
+          setInstallations(selection.installations);
+          setProof(selection.proof);
+        } else sessionStorage.removeItem(selectionKey);
+      } catch {
+        sessionStorage.removeItem(selectionKey);
+      }
+      return;
+    }
+    sessionStorage.removeItem(selectionKey);
     if (!provider || !code || !state) {
       setError(
         "The authorization response is incomplete. Please connect again to restart authorization.",
@@ -114,9 +148,19 @@ export function useConnectionSetup() {
             proof: result.proof,
             installationId: installation.installationId,
           });
+          setGithubPending(false);
         } else {
           setInstallations(result.installations);
           setProof(result.proof);
+          if (result.installations.length > 1 && result.proof)
+            sessionStorage.setItem(
+              selectionKey,
+              JSON.stringify({
+                installations: result.installations,
+                proof: result.proof,
+                expiresAt: Date.now() + 10 * 60_000,
+              }),
+            );
           setInstallNeeded(result.installations.length === 0);
         }
       })
@@ -136,21 +180,26 @@ export function useConnectionSetup() {
       setBusy(false);
     }
   }
-  function connect(provider: Provider) {
+  function connect(provider: Provider, install = provider === "github") {
     void run(async () => {
-      const url = await start({ provider, install: provider === "github" });
+      const url = await start({ provider, install });
       sessionStorage.setItem(pendingKey, provider);
+      sessionStorage.removeItem(selectionKey);
+      setInstallations([]);
+      setInstallNeeded(false);
+      if (provider === "github") setGithubPending(true);
       window.location.assign(url);
     });
   }
 
-  function chooseOrganization(installationId: string) {
+  function chooseAccount(installationId: string) {
     void run(async () => {
-      if (!proof)
-        throw new Error("Restart GitHub setup to choose an organization.");
+      if (!proof) throw new Error("Restart GitHub setup to choose an account.");
       await selectGithub({ proof, installationId });
+      sessionStorage.removeItem(selectionKey);
       setInstallations([]);
       setProof(undefined);
+      setGithubPending(false);
     });
   }
   return {
@@ -161,9 +210,9 @@ export function useConnectionSetup() {
     connect,
     disconnect,
     installations,
-    chooseOrganization,
+    chooseAccount,
     installNeeded,
-    confirmBlacksmith,
+    githubPending,
     mobile,
   };
 }

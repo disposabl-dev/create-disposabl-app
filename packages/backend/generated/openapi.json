@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Application API",
-    "version": "4.0.0"
+    "version": "5.0.0"
   },
   "security": [
     {
@@ -536,23 +536,6 @@
                         }
                       ]
                     },
-                    "blacksmith": {
-                      "anyOf": [
-                        {
-                          "type": "object",
-                          "properties": {
-                            "owner": {
-                              "type": "string"
-                            }
-                          },
-                          "required": ["owner"],
-                          "additionalProperties": false
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
-                    },
                     "convex": {
                       "anyOf": [
                         {
@@ -601,16 +584,10 @@
                         },
                         "expo": {
                           "type": "boolean"
-                        },
-                        "blacksmith": {
-                          "type": "boolean"
                         }
                       },
-                      "required": ["github", "convex", "expo", "blacksmith"],
+                      "required": ["github", "convex", "expo"],
                       "additionalProperties": false
-                    },
-                    "blacksmithInstallUrl": {
-                      "type": "string"
                     },
                     "githubInstallUrl": {
                       "anyOf": [
@@ -625,12 +602,10 @@
                   },
                   "required": [
                     "github",
-                    "blacksmith",
                     "convex",
                     "expo",
                     "ready",
                     "available",
-                    "blacksmithInstallUrl",
                     "githubInstallUrl"
                   ],
                   "additionalProperties": false

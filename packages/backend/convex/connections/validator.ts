@@ -4,7 +4,6 @@ export const provider = v.union(
   v.literal("github"),
   v.literal("convex"),
   v.literal("expo"),
-  v.literal("blacksmith"),
 );
 export const oauthProvider = v.union(v.literal("github"), v.literal("convex"));
 export const tokenProvider = v.union(v.literal("convex"), v.literal("expo"));
@@ -12,6 +11,7 @@ export const account = v.object({ id: v.string(), name: v.string() });
 export const installation = v.object({
   installationId: v.string(),
   owner: v.string(),
+  organization: v.boolean(),
 });
 export const completion = v.object({
   installations: v.array(installation),
@@ -22,7 +22,6 @@ export const connectionStatus = v.object({
     v.object({ owner: v.string(), organization: v.boolean() }),
     v.null(),
   ),
-  blacksmith: v.union(v.object({ owner: v.string() }), v.null()),
   convex: v.union(v.object({ name: v.string() }), v.null()),
   expo: v.union(v.object({ name: v.string() }), v.null()),
   ready: v.boolean(),
@@ -30,9 +29,7 @@ export const connectionStatus = v.object({
     github: v.boolean(),
     convex: v.boolean(),
     expo: v.boolean(),
-    blacksmith: v.boolean(),
   }),
-  blacksmithInstallUrl: v.string(),
   githubInstallUrl: v.union(v.string(), v.null()),
 });
 export const storedConnection = v.object({

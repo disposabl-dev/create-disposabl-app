@@ -33,6 +33,7 @@ const permissions = [
 
 export async function userInstallations(ctx: ActionCtx, userId: string) {
   const token = await githubUserToken(ctx, userId);
+  const user = await githubRequest<{ login: string }>(token, "/user");
   const organizations = new Set<string>();
   for (let page = 1; ; page++) {
     const memberships = await githubRequest<
@@ -52,15 +53,19 @@ export async function userInstallations(ctx: ActionCtx, userId: string) {
     for (const item of result.installations) {
       if (item.app_slug !== env.GITHUB_APP_SLUG || item.suspended_at) continue;
       if (!permissions.every((p) => item.permissions[p] === "write")) continue;
-      // Blacksmith supports organization repositories. Require an organization admin.
-      if (
-        item.account.type !== "Organization" ||
-        !organizations.has(item.account.login.toLowerCase())
+      const organization = item.account.type === "Organization";
+      if (organization) {
+        // Account-wide repository creation requires an organization admin.
+        if (!organizations.has(item.account.login.toLowerCase())) continue;
+      } else if (
+        item.account.type !== "User" ||
+        item.account.login.toLowerCase() !== user.login.toLowerCase()
       )
         continue;
       installations.push({
         installationId: String(item.id),
         owner: item.account.login.toLowerCase(),
+        organization,
       });
     }
     if (result.installations.length < 100) break;
@@ -90,11 +95,10 @@ export const selectGithub = internalAction({
       throw new ConvexError("Connect GitHub again to choose an account.");
     // Re-check membership and the granted permissions before saving the binding.
     const current = await userInstallations(ctx, userId);
-    if (
-      !current.installations.some(
-        (i) => i.installationId === installationId && i.owner === chosen.owner,
-      )
-    )
+    const verifiedChoice = current.installations.find(
+      (i) => i.installationId === installationId && i.owner === chosen.owner,
+    );
+    if (!verifiedChoice)
       throw new ConvexError(
         "GitHub access changed. Install Disposabl with the requested permissions.",
       );
@@ -105,8 +109,7 @@ export const selectGithub = internalAction({
     );
     await ctx.runMutation(internal.github.internal.connect, {
       userId,
-      ...chosen,
-      organization: true,
+      ...verifiedChoice,
     });
     return null;
   },

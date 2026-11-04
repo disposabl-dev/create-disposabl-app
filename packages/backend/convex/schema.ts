@@ -30,6 +30,7 @@ export default defineSchema({
     lease: v.optional(v.string()),
   }).index("by_key", ["key"]),
   users: defineTable({
+    // Legacy confirmation data is retained for schema compatibility, never required.
     blacksmith: v.optional(
       v.object({
         owner: v.string(),

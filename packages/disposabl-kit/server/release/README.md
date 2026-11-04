@@ -1,6 +1,6 @@
 # CLI and SDK releases
 
-Publishing runs in GitHub Actions through npm trusted publishing. The generated app's pipeline checks whether `packages/cli` and `packages/sdk` exist, builds the selected clients on PRs, and publishes them only after a production push to `main` and a successful web/backend deployment. Package publishing uses GitHub-hosted Ubuntu runners because npm OIDC does not support the pipeline's Blacksmith runners.
+Publishing runs in GitHub Actions through npm trusted publishing. The generated app's pipeline checks whether `packages/cli` and `packages/sdk` exist, builds the selected clients on PRs, and publishes them only after a production push to `main` and a successful web/backend deployment. Package publishing uses GitHub-hosted Ubuntu runners for npm trusted publishing.
 
 Each client uses semantic-release, like create-disposabl-app, with a separate `<package-name>@<version>` tag. Only commits touching that package, the shared release helper, or the API contract cause a release. Conventional commits choose patch/minor/major; an accepted contract major change forces a client major release even if the commit says `fix`. Multiple merged PRs are evaluated since each package's last tag. Releases are serialized per package and production runs are not cancelled by newer commits.
 

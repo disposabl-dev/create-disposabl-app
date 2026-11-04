@@ -73,7 +73,7 @@ export async function setupApp(
   };
   if (!connections.ready)
     throw new Error(
-      "Install Disposabl and Blacksmith in a GitHub organization, then connect Convex at https://www.disposabl.dev/dashboard/connections, then retry from the parent directory: bun create disposabl-app@latest " +
+      "Connect your personal GitHub account or an organization, then connect Convex at https://www.disposabl.dev/dashboard/connections, then retry from the parent directory: bun create disposabl-app@latest " +
         basename(directory) +
         ". Your app files and login are saved.",
     );

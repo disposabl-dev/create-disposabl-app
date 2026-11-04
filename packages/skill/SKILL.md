@@ -18,7 +18,7 @@ bun create disposabl-app@latest --list-options
 bun create disposabl-app@latest my-app --platforms web,android,mcp --features authentication --yes
 ```
 
-Use the requested platforms and features. Creation handles Disposabl login, required GitHub organization/Blacksmith/Convex setup, and the app's scoped development environment. Resume interrupted setup in the same directory. Do not create a replacement Convex project or delete an app unless requested. Never print credentials.
+Use the requested platforms and features. Creation handles Disposabl login, required GitHub and Convex setup, and the app's scoped development environment. Resume interrupted setup in the same directory. Do not create a replacement Convex project or delete an app unless requested. Never print credentials.
 
 The CLI is bundled with `create-disposabl-app`; do not use the retired `@disposabl/cli` package. Commands below use the published CLI and work without a global install:
 
@@ -74,16 +74,13 @@ If the response is `expo_manual_delete_required`, GitHub/Convex cleanup has comp
 ## Account setup
 
 All provider accounts are free to create; builds and hosting have usage limits.
-Use one GitHub step to install Disposabl and finish authorization. Blacksmith
-requires an organization, even for a solo user. Recommend one new, dedicated
-organization for all of the user's Disposabl apps, and reuse it for future apps.
-Keep an existing organization as an alternative. Explain that it is a free workspace, open https://github.com/organizations/plan when
-browser setup is requested, and guide them through the Free plan. Do not convert
-their personal account or report a missing organization as a failed connection.
-Then install Blacksmith in that same organization with All repositories access so new app repositories can build,
-and connect Convex. Expo is required for mobile apps. Blacksmith's 3,000 free
-monthly minutes are equivalent Linux 2-vCPU minutes; other runners consume more.
-Blacksmith installation is user-confirmed until a build proves runner access.
+Connect GitHub using a personal account or an organization the user administers.
+No new organization or third-party runner service is required. For a new GitHub
+user, open the free account signup in a separate tab and have them return to
+Disposabl after signup. Then install Disposabl, choose their account on GitHub,
+and finish authorization. A clicked link does not prove setup is complete; wait
+for the connected account to appear. Connect Convex next, and Expo for mobile apps.
+Builds use standard GitHub-hosted runners; GitHub Actions usage limits apply.
 Your code and app data stay in your accounts; Disposabl stores encrypted
 connection credentials and setup metadata. Link the open-source repository
 when explaining access: https://github.com/disposabl-dev/create-disposabl-app.

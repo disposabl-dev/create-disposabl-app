@@ -38,25 +38,14 @@ export const status = internalQuery({
       .first();
     const convex = await connection(ctx, userId, "convex");
     const expo = await connection(ctx, userId, "expo");
-    const id = ctx.db.normalizeId("users", userId);
-    const confirmed = id
-      ? (await ctx.db.get("users", id))?.blacksmith
-      : undefined;
-    const blacksmith =
-      github?.organization &&
-      confirmed?.owner === github.owner &&
-      confirmed.installationId === github.installationId
-        ? { owner: github.owner }
-        : null;
     const encrypted = !!env.CONNECTIONS_ENCRYPTION_KEY;
     return {
       github: github
         ? { owner: github.owner, organization: github.organization === true }
         : null,
-      blacksmith,
       convex: convex ? { name: convex.name } : null,
       expo: expo ? { name: expo.name } : null,
-      ready: !!github?.organization && !!blacksmith && !!convex,
+      ready: !!github && !!convex,
       available: {
         github:
           encrypted &&
@@ -70,9 +59,7 @@ export const status = internalQuery({
           !!env.CONVEX_OAUTH_CLIENT_ID &&
           !!env.CONVEX_OAUTH_CLIENT_SECRET,
         expo: encrypted,
-        blacksmith: !!github?.organization,
       },
-      blacksmithInstallUrl: "https://app.blacksmith.sh",
       githubInstallUrl: env.GITHUB_APP_SLUG
         ? `https://github.com/apps/${encodeURIComponent(env.GITHUB_APP_SLUG)}/installations/new`
         : null,
@@ -112,7 +99,7 @@ export const disconnect = internalMutation({
         .query("githubConnections")
         .withIndex("by_userId", (q) => q.eq("userId", userId)))
         await ctx.db.delete("githubConnections", row._id);
-    } else if (provider !== "blacksmith") {
+    } else {
       const row = await connection(ctx, userId, provider);
       if (row) await ctx.db.delete("connections", row._id);
     }
@@ -120,9 +107,6 @@ export const disconnect = internalMutation({
     if (id)
       await ctx.db.patch("users", id, {
         connectionState: undefined,
-        ...(provider === "github" || provider === "blacksmith"
-          ? { blacksmith: undefined }
-          : {}),
       });
     return null;
   },
@@ -164,30 +148,5 @@ export const consume = internalMutation({
       );
     await ctx.db.patch("users", id, { connectionState: undefined });
     return state.verifier;
-  },
-});
-
-export const confirmBlacksmith = internalMutation({
-  args: { ...identityFields, owner: v.string() },
-  returns: v.null(),
-  handler: async (ctx, { userId, owner }) => {
-    const github = await ctx.db
-      .query("githubConnections")
-      .withIndex("by_userId", (q) => q.eq("userId", userId))
-      .order("desc")
-      .first();
-    const id = ctx.db.normalizeId("users", userId);
-    if (!id || !github?.organization || github.owner !== owner)
-      throw new ConvexError(
-        "Choose your GitHub organization before confirming Blacksmith setup.",
-      );
-    await ctx.db.patch("users", id, {
-      blacksmith: {
-        owner: github.owner,
-        installationId: github.installationId,
-        confirmedAt: Date.now(),
-      },
-    });
-    return null;
   },
 });
