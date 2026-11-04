@@ -24,7 +24,9 @@ function ChangePassword() {
     <PasswordPage title="Change password">
       {account === undefined || !providers ? (
         <p>Loading…</p>
-      ) : !account || (!account.username && !account.email) ? (
+      ) : providers.googleOnly ||
+        !account ||
+        (!account.username && !account.email) ? (
         <p>
           This account uses an external sign-in provider. Change your password
           with that provider.

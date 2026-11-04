@@ -45,6 +45,7 @@
     "./client/components/ui/*": "./client/components/ui/*.tsx",
     "./server/http": "./server/http.ts",
     "./server/google": "./server/google.ts",
+    "./server/lib/telemetry": "./server/lib/telemetry.ts",
     "./server/lib/functions": "./server/lib/functions.ts",
     "./client/vite.config": "./client/vite.config.ts",
     "./platforms": "./platforms.ts",
@@ -52,7 +53,8 @@
     "./features": "./features.ts",
     "./mobile/expo-plugin": "./mobile/expo-plugin.cjs",
     "./server/mcp/identity": "./server/mcp/identity.ts",
-    "./feature-options": "./feature-options.ts"
+    "./feature-options": "./feature-options.ts",
+    "./lib/indexing": "./lib/indexing.ts"
   },
   "peerDependencies": {
     "expo": "~58.0.19",

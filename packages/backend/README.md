@@ -28,3 +28,11 @@ Email signup pauses with a clear unavailable state if a key exists without a sen
 Signed-in password accounts can use `/change-password`, also discoverable at `/.well-known/change-password`. Password changes verify the current password and can revoke other sessions. Recovery links expire after 10 minutes, are single-use, and revoke existing sessions on completion. Google-only accounts change their credentials with Google.
 
 `convex/emails.ts` exports the official Resend component client for other authorized application emails. It queues sends with production delivery enabled; never expose an unauthenticated arbitrary-email mutation. Configure sender credentials separately for development. Test commands do not enable analytics.
+
+### Production sign-in policy and analytics
+
+`AUTH_GOOGLE_ONLY=true` makes the web login and signup screens Google-only and rejects new password accounts and password sign-ins on the backend. Disposabl.dev uses this setting. Leave it unset in generated apps to retain conditional password providers. Password recovery URLs redirect to login in Google-only deployments; existing sessions remain valid.
+
+Analytics requires `POSTHOG_ENABLED=true`, `POSTHOG_PROJECT_TOKEN`, and an approved `POSTHOG_HOST` (`https://us.i.posthog.com` or `https://eu.i.posthog.com`) on the production backend only. `apps/web/site.json` controls the public origin, social preview and frontend analytics opt-in. Generated apps reset that metadata and opt-in; no Disposabl project credentials are bundled. Production mobile builds use `EXPO_PUBLIC_DISPOSABL_ANALYTICS_ENABLED=true`; the release pipeline derives this from site configuration and the production channel. Development clients do not emit screen events.
+
+Events cover page/screen categories, API operations (including CLI/SDK source), MCP tools and backend setup outcomes with durations. They contain no passwords, tokens, user content, input values, full URLs or raw error messages. Events currently use anonymous per-event identifiers, so these counts do not measure unique users or retention. Transport failures do not fail the application request. Test transport behavior with `bun test packages/tests/telemetry.test.ts` from the repository root.

@@ -6,6 +6,7 @@ import {
   type ToolCtx,
   type ToolDefinition,
 } from "@convex-dev/mcp";
+import { captureTelemetry } from "./telemetry";
 import { makeFunctionReference as reference } from "convex/server";
 import {
   v,
@@ -65,24 +66,46 @@ export function createPlatforms(
         args: toJsonSchema(v.object(args)),
         returns: toJsonSchema(fn.returns),
       });
+      const runOperation: ToolDefinition["handler"] = async (
+        ctx,
+        input,
+        user,
+      ) => {
+        const params = { ...input, userId: user.userId };
+        if (type === "query")
+          return ctx.runQuery(reference<"query">(id), params);
+        if (type === "mutation")
+          return ctx.runMutation(reference<"mutation">(id), params);
+        return ctx.runAction(reference<"action">(id), params);
+      };
       tools[name] = tool({
         description: `Call ${id}.`,
         ...(fn.isQuery ? { annotations: { readOnlyHint: true } } : {}),
         args,
         returns: fn.returns,
         handler: async (ctx, input, user) => {
-          const params = {
-            ...input,
-            userId: user.userId,
-          };
-          if (type === "query")
-            return ctx.runQuery(reference<"query">(id), params);
-          if (type === "mutation")
-            return ctx.runMutation(reference<"mutation">(id), params);
-          return ctx.runAction(reference<"action">(id), params);
+          const startedAt = Date.now();
+          try {
+            const result = await runOperation(ctx, input, user);
+            await captureTelemetry("mcp_operation", {
+              source: "mcp",
+              operation: id,
+              outcome: "success",
+              duration_ms: Date.now() - startedAt,
+            });
+            return result;
+          } catch (error) {
+            await captureTelemetry("mcp_operation", {
+              source: "mcp",
+              operation: id,
+              outcome: "error",
+              duration_ms: Date.now() - startedAt,
+            });
+            throw error;
+          }
         },
       });
-      routes.set(route, tools[name]);
+      routes.set(route, { ...tools[name], handler: runOperation });
     }
   }
   return {

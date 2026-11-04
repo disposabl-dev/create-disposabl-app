@@ -4,7 +4,12 @@ import { LogOut } from "../components/ui/log-out";
 import { useState } from "react";
 import { createFileRoute, Outlet } from "@tanstack/react-router";
 import { ConvexAuthProvider } from "@convex-dev/auth/react";
-import { ConvexProvider, ConvexReactClient, useConvexAuth } from "convex/react";
+import {
+  ConvexProvider,
+  ConvexReactClient,
+  useConvexAuth,
+  useQuery,
+} from "convex/react";
 import { authenticationEnabled } from "../../features";
 import { api } from "../../../backend/convex/_generated/api";
 
@@ -73,11 +78,14 @@ function SiteHeader() {
 
 function AuthLinks() {
   const { isAuthenticated, isLoading } = useConvexAuth();
+  const providers = useQuery(api.auth.providers);
   if (isLoading) return null;
   return isAuthenticated ? (
     <div className="flex items-center gap-5">
       <a href="/dashboard">Dashboard</a>
-      <a href="/change-password">Change password</a>
+      {providers && !providers.googleOnly && (
+        <a href="/change-password">Change password</a>
+      )}
       <LogOut />
     </div>
   ) : (

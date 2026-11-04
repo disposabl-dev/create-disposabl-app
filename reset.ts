@@ -35,6 +35,8 @@ const touched = [
   "starter",
   ".github/workflows",
   "apps/web/src/router",
+  "apps/web/site.json",
+  "apps/web/public/og",
   "apps/web/src/components/connections",
   "apps/web/src/components/agent-onboarding",
   "packages/tests/flows/agent-onboarding.e2e.ts",
@@ -87,6 +89,7 @@ const keep = new Set([
   "authSetup.ts",
   "authEmail.ts",
   "emails.ts",
+  "telemetry.ts",
   "auth.config.ts",
   "mcp.ts",
   "mcpEnterprise",
@@ -108,6 +111,26 @@ for (const path of [
   await readFile(join(root, "starter/backend", path));
 
 await readFile(join(root, "starter/cli/README.md"));
+
+// Generated apps start with their own origin and copy, never Disposabl's SEO.
+await Bun.write(
+  join(root, "apps/web/site.json"),
+  JSON.stringify(
+    {
+      name: "My App",
+      title: "My App",
+      description: "A clean starting point for your next application.",
+      origin: "",
+      backendOrigin: "",
+      image: "",
+      imageAlt: "",
+      analytics: false,
+    },
+    null,
+    2,
+  ) + "\n",
+);
+await rm(join(root, "apps/web/public/og"), { recursive: true, force: true });
 
 const dashboardPath = "apps/web/src/router/_authenticated/dashboard.tsx";
 const connectionPath =

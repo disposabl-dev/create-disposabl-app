@@ -1,3 +1,4 @@
+import { isAccountPage } from "@disposabl/disposabl-kit/lib/indexing";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
@@ -93,7 +94,8 @@ export function createPrerenderFilter(
       source = nextSource;
     }
     const authenticated = isAuthenticated!(pathname);
-    if (authenticated) page.sitemap = { ...page.sitemap, exclude: true };
+    if (authenticated || isAccountPage(pathname))
+      page.sitemap = { ...page.sitemap, exclude: true };
     return !authenticated;
   };
 }

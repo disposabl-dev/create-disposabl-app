@@ -19,7 +19,10 @@ export const {
 } = setupUsernamePassword(auth, {
   component: components.authPassword,
   usernameComponent: components.authUsername,
-}).attachUserCallbacks({ createUser: internal.users.internal.createUser });
+}).attachUserCallbacks({
+  createUser: internal.users.internal.createUser,
+  onSignIn: internal.users.internal.onSignIn,
+});
 
 export const { startSignInWithGoogle, completeSignInWithGoogle } = setupGoogle(
   auth,
@@ -33,21 +36,30 @@ export const { startSignInWithGoogle, completeSignInWithGoogle } = setupGoogle(
         .map((origin) => origin.trim()),
     ].filter((origin): origin is string => Boolean(origin)),
   },
-).attachUserCallbacks({ createUser: internal.users.internal.createUser });
+).attachUserCallbacks({
+  createUser: internal.users.internal.createUser,
+  onSignIn: internal.users.internal.onSignIn,
+});
 
 /** Publish availability only; provider credentials stay on the backend. */
 export const providers = query({
   args: {},
   returns: v.object({
     google: v.boolean(),
+    googleOnly: v.boolean(),
     emailPassword: v.boolean(),
     emailDelivery: v.boolean(),
   }),
   handler: async () => ({
     google: googleConfigured(),
-    emailPassword: Boolean(env.RESEND_API_KEY?.trim()),
+    googleOnly: env.AUTH_GOOGLE_ONLY === "true",
+    emailPassword: Boolean(
+      env.AUTH_GOOGLE_ONLY !== "true" && env.RESEND_API_KEY?.trim(),
+    ),
     emailDelivery: Boolean(
-      env.RESEND_API_KEY?.trim() && env.RESEND_FROM_EMAIL?.trim(),
+      env.AUTH_GOOGLE_ONLY !== "true" &&
+      env.RESEND_API_KEY?.trim() &&
+      env.RESEND_FROM_EMAIL?.trim(),
     ),
   }),
 });

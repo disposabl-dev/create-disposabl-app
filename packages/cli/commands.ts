@@ -61,6 +61,7 @@ export async function runCli(
         fetch(`${base}/api/users/current`, {
           headers: {
             Authorization: `Bearer ${await accessToken(base, refresh)}`,
+            "X-Disposabl-Source": "cli",
           },
           redirect: "error",
           signal: AbortSignal.timeout(30_000),
@@ -229,6 +230,7 @@ export async function runCli(
                 headers: {
                   Authorization: `Bearer ${await accessToken(base, refresh)}`,
                   "Content-Type": "application/json",
+                  "X-Disposabl-Source": "cli",
                 },
                 body: method === "post" ? JSON.stringify(input) : undefined,
               });

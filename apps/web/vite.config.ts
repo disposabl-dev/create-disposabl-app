@@ -1,3 +1,5 @@
+import site from "./site.json" with { type: "json" };
+import { accountPaths } from "@disposabl/disposabl-kit/lib/indexing";
 // docs:start
 import { cp } from "node:fs/promises";
 // docs:end
@@ -15,7 +17,11 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 
 const config = defineConfig(({ mode }) => {
-  const { VITE_CONVEX_SITE_URL } = loadEnv(mode, process.cwd(), "VITE_");
+  const { VITE_CONVEX_SITE_URL, VITE_PUBLIC_SITE_URL } = loadEnv(
+    mode,
+    process.cwd(),
+    "VITE_",
+  );
   if (!VITE_CONVEX_SITE_URL) {
     throw new Error(
       "Set VITE_CONVEX_SITE_URL to the public Convex site origin",
@@ -34,10 +40,30 @@ const config = defineConfig(({ mode }) => {
       "VITE_CONVEX_SITE_URL must be an HTTP(S) origin without a path, query, or credentials",
     );
   }
-  const siteUrl = url.origin;
+  const publicUrl = new URL(VITE_PUBLIC_SITE_URL || site.origin || url.origin);
+  if (
+    !["http:", "https:"].includes(publicUrl.protocol) ||
+    publicUrl.pathname !== "/" ||
+    publicUrl.search ||
+    publicUrl.hash ||
+    publicUrl.username ||
+    publicUrl.password
+  )
+    throw new Error("VITE_PUBLIC_SITE_URL must be an HTTP(S) origin");
+  const siteUrl = publicUrl.origin;
+  const indexable =
+    mode === "production" &&
+    (!site.backendOrigin || site.backendOrigin === url.origin);
 
   return {
-    define: { "import.meta.env.VITE_CONVEX_SITE_URL": JSON.stringify(siteUrl) },
+    define: {
+      "import.meta.env.VITE_CONVEX_SITE_URL": JSON.stringify(url.origin),
+      "import.meta.env.VITE_PUBLIC_SITE_URL": JSON.stringify(siteUrl),
+      "import.meta.env.VITE_SEARCH_INDEXABLE": JSON.stringify(indexable),
+      "import.meta.env.VITE_DISPOSABL_ANALYTICS_ENABLED": JSON.stringify(
+        indexable && site.analytics ? "true" : "false",
+      ),
+    },
     resolve: { tsconfigPaths: true },
     plugins: [
       // docs:start
@@ -88,7 +114,9 @@ const config = defineConfig(({ mode }) => {
           this.emitFile({
             type: "asset",
             fileName: "robots.txt",
-            source: `User-agent: *\nAllow: /\n\nSitemap: ${siteUrl}/sitemap.xml\n`,
+            source: indexable
+              ? `User-agent: *\nAllow: /\n${accountPaths.map((path) => `Disallow: ${path}`).join("\n")}\nDisallow: /dashboard\n\nSitemap: ${siteUrl}/sitemap.xml\n`
+              : "User-agent: *\nDisallow: /\n",
           });
         },
       },

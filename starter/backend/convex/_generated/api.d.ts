@@ -24,6 +24,7 @@ import type * as mcpEnterprise_provision from "../mcpEnterprise/provision.js";
 import type * as mcpEnterprise_validator from "../mcpEnterprise/validator.js";
 import type * as users_index from "../users/index.js";
 import type * as users_internal from "../users/internal.js";
+import type * as telemetry from "../telemetry.js";
 
 /**
  * A utility for referencing Convex functions in your app's API.
@@ -45,6 +46,7 @@ declare const fullApi: ApiFromModules<{
   "mcpEnterprise/validator": typeof mcpEnterprise_validator;
   "users/index": typeof users_index;
   "users/internal": typeof users_internal;
+  telemetry: typeof telemetry;
 }>;
 export declare const api: FilterApi<
   typeof fullApi,
@@ -54,7 +56,6 @@ export declare const internal: FilterApi<
   typeof fullApi,
   FunctionReference<any, "internal">
 >;
-
 export declare const components: {
   auth: import("@convex-dev/auth/_generated/component.js").ComponentApi<"auth">;
   authGoogle: import("@convex-dev/auth/components/google/_generated/component.js").ComponentApi<"authGoogle">;

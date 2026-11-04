@@ -78,11 +78,13 @@ export function GoogleSignIn() {
           {error}
         </p>
       )}
-      <div className="flex items-center gap-3 text-sm text-muted-foreground">
-        <span className="h-px flex-1 bg-border" />
-        <span>or</span>
-        <span className="h-px flex-1 bg-border" />
-      </div>
+      {!providers.googleOnly && (
+        <div className="flex items-center gap-3 text-sm text-muted-foreground">
+          <span className="h-px flex-1 bg-border" />
+          <span>or</span>
+          <span className="h-px flex-1 bg-border" />
+        </div>
+      )}
     </div>
   );
 }

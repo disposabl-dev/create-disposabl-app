@@ -14,6 +14,10 @@ import { v } from "convex/values";
 
 const app = defineApp({
   env: {
+    AUTH_GOOGLE_ONLY: v.optional(v.string()),
+    POSTHOG_ENABLED: v.optional(v.string()),
+    POSTHOG_PROJECT_TOKEN: v.optional(v.string()),
+    POSTHOG_HOST: v.optional(v.string()),
     RESEND_API_KEY: v.optional(v.string()),
     RESEND_FROM_EMAIL: v.optional(v.string()),
     RESEND_WEBHOOK_SECRET: v.optional(v.string()),

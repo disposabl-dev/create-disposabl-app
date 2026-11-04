@@ -9,6 +9,7 @@ const serializeQuery = (query: Record<string, unknown>) =>
 
 export const createClientConfig: CreateClientConfig = (config) => ({
   ...config,
+  headers: { ...config?.headers, "X-Disposabl-Source": "sdk" },
   // Generated object parameters otherwise override the client's JSON serializer.
   requestValidator: async (options) => {
     (options as { querySerializer: typeof serializeQuery }).querySerializer =

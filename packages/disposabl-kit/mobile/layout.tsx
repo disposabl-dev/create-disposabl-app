@@ -1,7 +1,7 @@
 import { ConvexAuthProvider } from "@convex-dev/auth/react";
 import { ConvexProvider, ConvexReactClient, useConvexAuth } from "convex/react";
-import { Redirect, Stack } from "expo-router";
-import { useState } from "react";
+import { Redirect, Stack, usePathname } from "expo-router";
+import { useEffect, useState } from "react";
 import { ActivityIndicator, Text, View } from "react-native";
 import { authenticationEnabled } from "../features";
 import { styles } from "./components/auth-ui";
@@ -9,6 +9,7 @@ import { authStorage } from "./lib/auth-storage";
 import { api } from "./lib/convex";
 
 export function MobileLayout() {
+  useScreenTelemetry();
   const [client] = useState(() => {
     const url = process.env.EXPO_PUBLIC_CONVEX_URL;
     return url ? new ConvexReactClient(url) : null;
@@ -106,4 +107,31 @@ function AccountRoutes() {
 /** A route group without a session requirement. */
 export function PublicLayout() {
   return <Stack screenOptions={{ headerTintColor: "#161b2e" }} />;
+}
+
+function useScreenTelemetry() {
+  const pathname = usePathname();
+  useEffect(() => {
+    if (
+      __DEV__ ||
+      process.env.EXPO_PUBLIC_DISPOSABL_ANALYTICS_ENABLED !== "true" ||
+      !process.env.EXPO_PUBLIC_CONVEX_SITE_URL
+    )
+      return;
+    const page =
+      pathname === "/"
+        ? "home"
+        : pathname === "/login"
+          ? "login"
+          : pathname === "/signup"
+            ? "signup"
+            : pathname === "/account"
+              ? "account"
+              : "other";
+    void fetch(`${process.env.EXPO_PUBLIC_CONVEX_SITE_URL}/telemetry/page`, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify({ platform: "mobile", page }),
+    }).catch(() => {});
+  }, [pathname]);
 }

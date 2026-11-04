@@ -1,3 +1,4 @@
+import { isAccountPage } from "../../lib/indexing";
 import { httpActionGeneric, type HttpRouter } from "convex/server";
 import { components } from "../../../backend/convex/_generated/api";
 import pages from "../../../backend/generated/pages.json";
@@ -33,6 +34,23 @@ export function registerPageRoutes(http: HttpRouter) {
       } catch {
         return new Response("Bad Request", { status: 400 });
       }
+      if (
+        process.env.AUTH_GOOGLE_ONLY === "true" &&
+        [
+          "/forgot-password",
+          "/reset-password",
+          "/verify-email",
+          "/change-password",
+        ].includes(path.replace(/\/$/, ""))
+      )
+        return new Response(null, {
+          status: 302,
+          headers: {
+            Location: "/login",
+            "Cache-Control": "no-store",
+            "X-Robots-Tag": "noindex",
+          },
+        });
       const page = routes.find(({ pattern }) => pattern.test(path));
       const file =
         page && !path.split("/").at(-1)?.includes(".")
@@ -46,7 +64,11 @@ export function registerPageRoutes(http: HttpRouter) {
         components.staticHosting.lib.resolveAssetForHttp,
         { path: file, spaFallback: false },
       );
-      if (!asset) return new Response("Not Found", { status: 404 });
+      if (!asset)
+        return new Response("Not Found", {
+          status: 404,
+          headers: { "Cache-Control": "no-store" },
+        });
       const contentType = asset.contentType;
       const headers = {
         "Content-Type": contentType,
@@ -54,7 +76,7 @@ export function registerPageRoutes(http: HttpRouter) {
           ? "no-cache"
           : "public, max-age=3600",
         "X-Content-Type-Options": "nosniff",
-        ...(page?.authenticated || path === "/_shell.html"
+        ...(page?.authenticated || isAccountPage(path)
           ? { "X-Robots-Tag": "noindex" }
           : {}),
       };

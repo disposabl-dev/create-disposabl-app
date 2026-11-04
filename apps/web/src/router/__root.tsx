@@ -1,14 +1,23 @@
-import { HeadContent, Scripts, createRootRoute } from "@tanstack/react-router";
+import { usePageTelemetry } from "@disposabl/disposabl-kit/client/lib/telemetry";
+import {
+  HeadContent,
+  Scripts,
+  createRootRoute,
+  useRouterState,
+} from "@tanstack/react-router";
+
+import site from "../../site.json";
+import { isAccountPage } from "@disposabl/disposabl-kit/lib/indexing";
 
 import appCss from "../index.css?url";
 
 export const Route = createRootRoute({
   head: ({ matches }) => {
-    const title = "Disposabl";
-    const description =
-      "A starter kit for web and mobile apps built with TanStack Start, Expo, and Convex.";
+    const { title, description } = site;
     const pathname = matches[matches.length - 1]?.pathname ?? "/";
-    const url = new URL(pathname, import.meta.env.VITE_CONVEX_SITE_URL).href;
+    const origin = import.meta.env.VITE_PUBLIC_SITE_URL;
+    const url = new URL(pathname, origin).href;
+    const image = site.image ? new URL(site.image, origin).href : null;
 
     return {
       meta: [
@@ -18,20 +27,54 @@ export const Route = createRootRoute({
         {
           name: "robots",
           content:
-            import.meta.env.MODE === "production"
+            import.meta.env.PROD &&
+            import.meta.env.VITE_SEARCH_INDEXABLE &&
+            !isAccountPage(pathname)
               ? "index, follow"
               : "noindex, nofollow",
         },
         { name: "description", content: description },
-        { property: "og:site_name", content: title },
+        { property: "og:site_name", content: site.name },
+        { property: "og:locale", content: "en_US" },
+        { name: "theme-color", content: "#F8F5EF" },
         { property: "og:type", content: "website" },
         { property: "og:title", content: title },
         { property: "og:description", content: description },
         { property: "og:url", content: url },
-        { name: "twitter:card", content: "summary" },
+        {
+          name: "twitter:card",
+          content: image ? "summary_large_image" : "summary",
+        },
+        ...(image
+          ? [
+              { property: "og:image", content: image },
+              { property: "og:image:secure_url", content: image },
+              { property: "og:image:type", content: "image/png" },
+              { property: "og:image:width", content: "1200" },
+              { property: "og:image:height", content: "630" },
+              { property: "og:image:alt", content: site.imageAlt },
+              { name: "twitter:image", content: image },
+              { name: "twitter:image:alt", content: site.imageAlt },
+            ]
+          : []),
         { name: "twitter:title", content: title },
         { name: "twitter:description", content: description },
       ],
+      scripts:
+        pathname === "/"
+          ? [
+              {
+                type: "application/ld+json",
+                children: JSON.stringify({
+                  "@context": "https://schema.org",
+                  "@type": "WebSite",
+                  name: site.name,
+                  url,
+                  description,
+                }).replace(/</g, "\\u003c"),
+              },
+            ]
+          : [],
       links: [
         { rel: "canonical", href: url },
         { rel: "icon", href: "/disposabl-logo.svg" },
@@ -55,9 +98,18 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body>
+        <PageTelemetry />
         {children}
         <Scripts />
       </body>
     </html>
   );
+}
+
+function PageTelemetry() {
+  const pathname = useRouterState({
+    select: (state) => state.location.pathname,
+  });
+  usePageTelemetry(pathname);
+  return null;
 }

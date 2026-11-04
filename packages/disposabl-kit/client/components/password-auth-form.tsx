@@ -66,6 +66,28 @@ export function PasswordAuthForm({
   if (isLoading || !providers || (isAuthenticated && !submitting.current))
     return null;
 
+  if (providers.googleOnly)
+    return (
+      <main className="flex min-h-[calc(100svh-73px)] items-center justify-center bg-muted p-6">
+        <div className="w-full max-w-sm space-y-6">
+          <a href="/" className="block">
+            <Logo />
+          </a>
+          <Card>
+            <CardHeader className="text-center">
+              <CardTitle className="text-xl">Welcome to Disposabl</CardTitle>
+              <CardDescription>
+                Sign in or create an account with Google.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <GoogleSignIn />
+            </CardContent>
+          </Card>
+        </div>
+      </main>
+    );
+
   return (
     <main className="flex min-h-[calc(100svh-73px)] items-center justify-center bg-muted p-6 md:p-10">
       <div className="flex w-full max-w-sm flex-col gap-6">

@@ -39,4 +39,7 @@ export const {
     changeEmail: `${origin}/verify-email`,
     recovery: `${origin}/reset-password`,
   },
-}).attachUserCallbacks({ createUser: internal.users.internal.createUser });
+}).attachUserCallbacks({
+  createUser: internal.users.internal.createUser,
+  onSignIn: internal.users.internal.onSignIn,
+});

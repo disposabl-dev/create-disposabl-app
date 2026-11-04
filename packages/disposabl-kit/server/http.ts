@@ -15,6 +15,7 @@ import { createOpenApi, createPlatforms } from "./lib/platform-spec";
 import { registerPageRoutes } from "./lib/static";
 import { resend } from "../../backend/convex/emails";
 import { googleRelay } from "./google";
+import { captureTelemetry } from "./lib/telemetry";
 
 export { tool } from "@convex-dev/mcp";
 export type { McpServerOptions, McpUser, ToolCtx } from "@convex-dev/mcp";
@@ -70,7 +71,10 @@ export default function createHttpRouter() {
           new Response(null, {
             status: 302,
             headers: {
-              Location: "/change-password",
+              Location:
+                process.env.AUTH_GOOGLE_ONLY === "true"
+                  ? "/login"
+                  : "/change-password",
               "Cache-Control": "no-store",
             },
           }),
@@ -103,7 +107,8 @@ export default function createHttpRouter() {
     const cors = {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Authorization, Content-Type",
+      "Access-Control-Allow-Headers":
+        "Authorization, Content-Type, X-Disposabl-Source",
       "Cache-Control": "no-store",
     };
     http.route({
@@ -121,17 +126,41 @@ export default function createHttpRouter() {
         pathPrefix: "/api/",
         method,
         handler: httpActionGeneric(async (ctx, request) => {
-          const response =
+          const startedAt = Date.now();
+          const operation =
             method === "OPTIONS"
-              ? new Response(null, { status: 204 })
-              : await platforms.handleApi(
-                  ctx,
-                  request,
-                  mcp.authenticate.bind(mcp),
+              ? undefined
+              : platforms.spec.find(
+                  (item) => item.path === new URL(request.url).pathname,
                 );
-          for (const [key, value] of Object.entries(cors))
-            response.headers.set(key, value);
-          return response;
+          const header = request.headers.get("X-Disposabl-Source");
+          const source = header === "cli" || header === "sdk" ? header : "api";
+          const record = async (outcome: "success" | "error") => {
+            if (operation)
+              await captureTelemetry("api_operation", {
+                source,
+                operation: operation.name,
+                outcome,
+                duration_ms: Date.now() - startedAt,
+              });
+          };
+          try {
+            const response =
+              method === "OPTIONS"
+                ? new Response(null, { status: 204 })
+                : await platforms.handleApi(
+                    ctx,
+                    request,
+                    mcp.authenticate.bind(mcp),
+                  );
+            await record(response.ok ? "success" : "error");
+            for (const [key, value] of Object.entries(cors))
+              response.headers.set(key, value);
+            return response;
+          } catch (error) {
+            await record("error");
+            throw error;
+          }
         }),
       });
   }

@@ -62,6 +62,7 @@ import type * as previews_token_actions_create from "../previews/token/actions/c
 import type * as previews_token_actions_management from "../previews/token/actions/management.js";
 import type * as previews_token_internal from "../previews/token/internal.js";
 import type * as releases_internal from "../releases/internal.js";
+import type * as telemetry from "../telemetry.js";
 import type * as users_index from "../users/index.js";
 import type * as users_internal from "../users/internal.js";
 import type * as validator from "../validator.js";
@@ -127,6 +128,7 @@ declare const fullApi: ApiFromModules<{
   "previews/token/actions/management": typeof previews_token_actions_management;
   "previews/token/internal": typeof previews_token_internal;
   "releases/internal": typeof releases_internal;
+  telemetry: typeof telemetry;
   "users/index": typeof users_index;
   "users/internal": typeof users_internal;
   validator: typeof validator;
