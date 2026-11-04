@@ -124,7 +124,7 @@ export async function runCli(
           if (connectionStatus)
             command.option(
               "--wait",
-              "Open setup and continue when GitHub, Blacksmith and Convex are ready",
+              "Open setup and continue when GitHub and Convex are ready",
             );
           if (connectionStatus)
             command.option(
@@ -254,7 +254,7 @@ export async function runCli(
             if (connectionStatus && options.wait && !ready()) {
               const url = `${base}/dashboard/connections?mobile=${options.mobile ? "1" : "0"}`;
               console.error(
-                `Set up your free GitHub organization, Blacksmith and Convex accounts (plus Expo for mobile):\n${url}\nWaiting for connections. Press Ctrl+C to keep your files and finish later.`,
+                `Connect your personal GitHub account or organization, and Convex (plus Expo for mobile):\n${url}\nWaiting for connections. Press Ctrl+C to keep your files and finish later.`,
               );
               openUrl(url);
               const deadline = Date.now() + 15 * 60_000;

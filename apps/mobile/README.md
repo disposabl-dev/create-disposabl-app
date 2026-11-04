@@ -72,7 +72,7 @@ installable APK in a separate 4-vCPU Android job. Later runs with the same finge
 publish EAS Update from Web. Native jobs install only the mobile workspace using
 the shared dependency cache. Android and iOS native builds run in parallel.
 Linux and Windows start alongside Web.
-Build jobs use Blacksmith; package publishing keeps GitHub-hosted runners and production iOS uses EAS Build. See [.github/README.md](../../.github/README.md)
+Build jobs use standard GitHub-hosted runners and production iOS uses EAS Build. See [.github/README.md](../../.github/README.md)
 for the job order and cache behavior.
 
 Each PR uses its own `pr-<number>` channel and Android application ID. Production
@@ -165,7 +165,7 @@ them to the same native authentication flow used during development.
 When iOS is enabled and affected, the Web runner checks the latest
 published iOS release for the same channel, project, bundle ID and runtime.
 A matching IPA with a verified GitHub digest and unexpired provisioning profile
-uses EAS Update. Otherwise a Blacksmith macOS runner performs an EAS local release
+uses EAS Update. Otherwise a GitHub-hosted macOS runner performs an EAS local release
 build using the remote signing credentials, then publishes its own iOS release.
 That runner starts only when a new IPA is needed, after Web finishes, in parallel with any Android native build.
 

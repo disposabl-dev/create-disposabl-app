@@ -41,7 +41,7 @@ on macOS. Linux builders need `fakeroot`, `dpkg`, and `rpm` installed.
 
 The single root `.github/workflows/pipeline.yml` selects affected desktop targets from
 `disposabl.json`. Windows x64, Linux x64 and macOS arm64 build in parallel alongside
-web/backend deployment on Blacksmith. Each runner uses:
+web/backend deployment on GitHub-hosted runners. Each runner uses:
 
 ```sh
 DISPOSABL_DESKTOP_PLATFORM=linux DISPOSABL_RELEASE_VERSION=1.0.42 bun run --cwd apps/desktop preview

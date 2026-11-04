@@ -3,8 +3,8 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { Check, ArrowRight } from "lucide-react";
 import { Button } from "@disposabl/disposabl-kit/client/components/ui/button";
 import { ProviderLogo } from "../../components/connections/provider-logo";
-
 import { ExpoConnection } from "../../components/connections/expo-connection";
+import { GithubConnection } from "../../components/connections/github-connection";
 import { useConnectionSetup } from "../../components/connections/use-connection-setup";
 
 export const Route = createFileRoute(
@@ -12,40 +12,20 @@ export const Route = createFileRoute(
 )({ component: Connections });
 
 function Connections() {
-  const {
-    status,
-    busy,
-    error,
-    run,
-    connect,
-    disconnect,
-    installations,
-    chooseOrganization,
-    installNeeded,
-    confirmBlacksmith,
-    mobile,
-  } = useConnectionSetup();
+  const setup = useConnectionSetup();
+  const { status, busy, error, run, connect, disconnect, mobile } = setup;
   const [showExpo, setShowExpo] = useState(false);
-  const [githubWorkspaceReady, setGithubWorkspaceReady] = useState(false);
-  const [blacksmithOpened, setBlacksmithOpened] = useState(false);
-  const githubCanInstall = githubWorkspaceReady || installations.length > 0;
+  const completed =
+    Number(Boolean(status?.github)) +
+    Number(Boolean(status?.convex)) +
+    Number(mobile && Boolean(status?.expo));
+  const required = mobile ? 3 : 2;
+  const ready = status?.ready && (!mobile || Boolean(status.expo));
   const providers = [
-    {
-      id: "github",
-      name: "GitHub",
-      description:
-        "Install Disposabl in a GitHub organization to keep your code there.",
-    },
-    {
-      id: "blacksmith",
-      name: "Blacksmith",
-      description:
-        "Faster builds. Includes 3,000 free build minutes per month.",
-    },
     {
       id: "convex",
       name: "Convex",
-      description: "Store your app’s data in your own account.",
+      description: "Store your app's data in your own account.",
     },
     {
       id: "expo",
@@ -53,11 +33,6 @@ function Connections() {
       description: "Connect your mobile app builds and updates.",
     },
   ] as const;
-  const completed =
-    Number(Boolean(status?.github?.organization)) +
-    Number(Boolean(status?.blacksmith)) +
-    Number(Boolean(status?.convex));
-  const ready = status?.ready && (!mobile || Boolean(status.expo));
 
   return (
     <main className="mx-auto max-w-3xl px-5 py-10 sm:px-8 sm:py-16">
@@ -66,22 +41,27 @@ function Connections() {
           Set up your workspace
         </p>
         <h1 className="max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">
-          Set up your app in three steps.
+          Connect your accounts.
         </h1>
         <p className="mt-4 max-w-xl text-sm leading-6 text-muted-foreground sm:text-base">
-          All accounts are free to create. Your code and app data stay in your
-          accounts. Add Expo for mobile apps.
+          Start with GitHub for your code, then Convex for your app's data.{" "}
+          {mobile
+            ? "Your mobile app also needs Expo."
+            : "Add Expo if you want a mobile app."}{" "}
+          Your code and data stay in accounts you control.
         </p>
       </header>
       <div className="mb-5 flex items-center justify-between gap-3 text-sm">
-        <span className="font-medium">Connect your accounts</span>
-        <span className="text-muted-foreground">{completed} of 3 ready</span>
+        <span className="font-medium">Setup progress</span>
+        <span className="text-muted-foreground">
+          {completed} of {required} connected
+        </span>
       </div>
       <div
         className="mb-6 flex gap-1.5"
-        aria-label={`${completed} of 3 steps ready`}
+        aria-label={`${completed} of ${required} required accounts connected`}
       >
-        {[1, 2, 3].map((step) => (
+        {Array.from({ length: required }, (_, i) => i + 1).map((step) => (
           <div
             key={step}
             className={`h-1.5 flex-1 rounded-full ${completed >= step ? "bg-primary" : "bg-muted"}`}
@@ -102,14 +82,13 @@ function Connections() {
         </p>
       ) : (
         <div className="space-y-3">
-          {providers.map(({ id, name, description }, index) => {
-            const connected =
-              id === "github" && !status.github?.organization
-                ? null
-                : status[id];
+          <GithubConnection setup={setup} />
+          {providers.map(({ id, name, description }) => {
+            const connected = status[id];
             return (
               <section
                 key={id}
+                aria-label={name}
                 className="rounded-2xl border bg-card p-5 shadow-sm sm:p-6"
               >
                 <div className="flex flex-wrap items-center gap-4 sm:flex-nowrap">
@@ -121,29 +100,20 @@ function Connections() {
                       <h2 className="font-semibold">{name}</h2>
                       {connected ? (
                         <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-400">
-                          <Check className="size-3" />{" "}
-                          {id === "blacksmith"
-                            ? "Confirmed by you"
-                            : "Connected"}
-                        </span>
-                      ) : id === "expo" ? (
-                        <span className="text-xs text-muted-foreground">
-                          {mobile
-                            ? "Required for your mobile app"
-                            : "For mobile"}
+                          <Check className="size-3" /> Connected
                         </span>
                       ) : (
                         <span className="text-xs text-muted-foreground">
-                          Step {index + 1}
+                          {id === "convex"
+                            ? "Step 2"
+                            : mobile
+                              ? "Step 3 · Required for mobile"
+                              : "Optional · For mobile"}
                         </span>
                       )}
                     </div>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      {connected
-                        ? "owner" in connected
-                          ? connected.owner
-                          : connected.name
-                        : description}
+                      {connected ? connected.name : description}
                     </p>
                   </div>
                   {connected ? (
@@ -157,198 +127,30 @@ function Connections() {
                         })
                       }
                     >
-                      {id === "blacksmith"
-                        ? "Reset confirmation"
-                        : "Disconnect"}
+                      Disconnect
                     </Button>
                   ) : (
                     <Button
                       className="min-h-11"
                       disabled={busy || !status.available[id]}
                       onClick={() =>
-                        id === "expo"
-                          ? setShowExpo(!showExpo)
-                          : id === "blacksmith"
-                            ? (() => {
-                                window.open(
-                                  status.blacksmithInstallUrl,
-                                  "_blank",
-                                  "noopener,noreferrer",
-                                );
-                                setBlacksmithOpened(true);
-                              })()
-                            : id === "github" && !githubCanInstall
-                              ? (() => {
-                                  window.open(
-                                    "https://github.com/organizations/plan",
-                                    "_blank",
-                                    "noopener,noreferrer",
-                                  );
-                                  setGithubWorkspaceReady(true);
-                                })()
-                              : connect(id)
+                        id === "expo" ? setShowExpo(!showExpo) : connect(id)
                       }
                     >
-                      {id === "expo" && showExpo
-                        ? "Cancel"
-                        : id === "github"
-                          ? githubCanInstall
-                            ? "Install Disposabl"
-                            : "Create a free workspace"
-                          : id === "blacksmith"
-                            ? "Install Blacksmith"
-                            : "Connect"}
+                      {id === "expo" && showExpo ? "Cancel" : `Connect ${name}`}
                     </Button>
                   )}
                 </div>
                 {!status.available[id] && !connected && (
                   <p className="mt-4 text-sm text-muted-foreground">
-                    {id === "blacksmith"
-                      ? "Complete GitHub setup first."
-                      : "Temporarily unavailable."}
+                    Temporarily unavailable.
                   </p>
                 )}
-                {id === "github" && !connected && (
-                  <div className="mt-4 space-y-2 text-sm text-muted-foreground">
-                    <p>
-                      Recommended: create one free GitHub organization just for
-                      your Disposabl apps. Use this workspace for future apps
-                      too.
-                    </p>
-                    <p>
-                      Install Disposabl and Blacksmith only there to keep their
-                      repository access separate from your other projects.
-                    </p>
-                    {!githubWorkspaceReady ? (
-                      <button
-                        type="button"
-                        disabled={busy}
-                        className="font-medium text-foreground underline underline-offset-4 disabled:opacity-50"
-                        onClick={() => setGithubWorkspaceReady(true)}
-                      >
-                        Use an existing organization instead
-                      </button>
-                    ) : (
-                      <p>
-                        Once your workspace is ready, click{" "}
-                        <strong>Install Disposabl</strong> and select it on
-                        GitHub.
-                      </p>
-                    )}
-                  </div>
-                )}
-                {id === "github" && !connected && (
-                  <details
-                    className="mt-3 rounded-lg bg-muted/50 p-4 text-sm"
-                    open={installNeeded || githubWorkspaceReady || undefined}
-                  >
-                    <summary className="cursor-pointer font-medium">
-                      How to create your free workspace
-                    </summary>
-                    <ol className="mt-3 list-decimal space-y-2 pl-5 text-muted-foreground">
-                      <li>
-                        Sign in to GitHub or{" "}
-                        <a
-                          className="underline"
-                          href="https://github.com/signup"
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          create a free account
-                        </a>
-                        .
-                      </li>
-                      <li>
-                        Open{" "}
-                        <a
-                          className="underline"
-                          href="https://github.com/organizations/plan"
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          Create an organization
-                        </a>{" "}
-                        and choose the <strong>Free</strong> plan. This creates
-                        a workspace; it does not replace your personal account.
-                      </li>
-                      <li>
-                        Choose a name, add your email, and complete GitHub’s
-                        verification. You can skip inviting other people.
-                      </li>
-                      <li>
-                        Return here, click <strong>Install Disposabl</strong>,
-                        and select your new organization. Approve GitHub’s
-                        requested access to finish this step.
-                      </li>
-                    </ol>
-                  </details>
-                )}
-                {id === "blacksmith" && (
-                  <div className="mt-4 space-y-3 text-sm text-muted-foreground">
-                    <p>
-                      Install in{" "}
-                      {status.github?.organization ? (
-                        <strong>{status.github.owner}</strong>
-                      ) : (
-                        "the same GitHub organization"
-                      )}{" "}
-                      and choose All repositories so newly created apps can
-                      build.{" "}
-                      <a
-                        href="https://www.blacksmith.sh/pricing"
-                        target="_blank"
-                        rel="noreferrer"
-                        className="underline underline-offset-4"
-                      >
-                        Free-minute allowance
-                      </a>{" "}
-                      varies by runner size and platform.
-                    </p>
-                    {blacksmithOpened &&
-                      !connected &&
-                      status.github?.organization && (
-                        <Button
-                          variant="outline"
-                          disabled={busy}
-                          onClick={() =>
-                            void run(async () => {
-                              await confirmBlacksmith({
-                                owner: status.github!.owner,
-                              });
-                            })
-                          }
-                        >
-                          I’ve installed Blacksmith in {status.github.owner}
-                        </Button>
-                      )}
-                  </div>
-                )}
-                {id === "github" && installations.length > 1 && (
-                  <div className="mt-5 border-t pt-4">
-                    <p className="mb-3 text-sm font-medium">
-                      Choose your organization
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {installations.map((installation) => (
-                        <Button
-                          key={installation.installationId}
-                          variant="outline"
-                          disabled={busy}
-                          onClick={() =>
-                            chooseOrganization(installation.installationId)
-                          }
-                        >
-                          {installation.owner}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {id === "github" && installNeeded && (
-                  <p className="mt-4 text-sm">
-                    Your next step is to choose or create a free organization.
-                    Follow the guide above, then install Disposabl in that
-                    workspace.
+                {id === "convex" && !connected && (
+                  <p className="mt-4 text-sm text-muted-foreground">
+                    Continue to Convex, sign in or create an account, then
+                    choose a team and approve access. You will return here when
+                    it is connected.
                   </p>
                 )}
                 {id === "expo" && !connected && showExpo && (
@@ -365,14 +167,14 @@ function Connections() {
       )}
       {busy && (
         <p role="status" className="mt-4 text-sm text-muted-foreground">
-          Connecting…
+          Finishing authorization. You may be redirected to confirm access…
         </p>
       )}
       <div className="mt-8 flex flex-wrap items-center justify-between gap-4 border-t pt-6">
         <p className="text-sm text-muted-foreground">
           {ready
-            ? "Your accounts are connected. Continue in your terminal or dashboard."
-            : "Complete the required setup steps to continue."}
+            ? "Your accounts are connected. Continue here or return to your terminal."
+            : "Complete the required connections to continue."}
         </p>
         {ready ? (
           <Link
@@ -389,8 +191,9 @@ function Connections() {
       </div>
       <aside className="mt-8 space-y-2 border-t pt-6 text-sm leading-6 text-muted-foreground">
         <p>
-          Accounts are free to create. Build and hosting services have free
-          usage allowances; charges may apply beyond those limits.
+          Accounts are free to create. GitHub Actions runs your builds. Build
+          and hosting services have usage limits; charges may apply beyond
+          included allowances.
         </p>
         <p>
           Your repositories and backend belong to you. Disposabl uses the access
@@ -407,7 +210,7 @@ function Connections() {
           >
             Read the code on GitHub
           </a>
-          . You can revoke access in each provider’s settings.
+          . You can revoke access in each provider's settings.
         </p>
       </aside>
     </main>

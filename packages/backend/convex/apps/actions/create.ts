@@ -19,7 +19,7 @@ export const create = internalAction({
     );
     if (!connections.ready)
       throw new ConvexError(
-        "Install Disposabl and Blacksmith in a GitHub organization, then connect Convex at https://www.disposabl.dev/dashboard/connections, then retry setup. Your login remains active.",
+        "Connect your personal GitHub account or an organization, then connect Convex at https://www.disposabl.dev/dashboard/connections, then retry setup. Your login remains active.",
       );
     if (
       args.platforms.some((p) => p === "ios" || p === "android") &&

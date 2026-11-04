@@ -88,12 +88,3 @@ export const resumeGithubInstall = action({
       userId: await requireUser(ctx),
     }),
 });
-export const confirmBlacksmith = mutation({
-  args: { owner: v.string() },
-  returns: v.null(),
-  handler: async (ctx, args): Promise<null> =>
-    ctx.runMutation(internal.connections.internal.confirmBlacksmith, {
-      ...args,
-      userId: await requireUser(ctx),
-    }),
-});
