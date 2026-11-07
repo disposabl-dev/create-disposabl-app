@@ -23,6 +23,8 @@ node --input-type=module -e '
   const faster = config.features?.includes("faster-ci");
   const runners = faster ? {linux: "blacksmith-2vcpu-ubuntu-2404", windows: "blacksmith-2vcpu-windows-2025", macos: "blacksmith-6vcpu-macos-26"} : {linux: "ubuntu-24.04", windows: "windows-2025", macos: "macos-26"};
   for (const [name, runner] of Object.entries(runners)) console.log(`${name}_runner=${runner}`);
+  // Universal Android builds compile four ABIs; keep lighter Linux work on two CPUs.
+  console.log(`android_runner=${faster ? "blacksmith-8vcpu-ubuntu-2404" : runners.linux}`);
   const api = path => JSON.parse(execFileSync("gh", ["api", `repos/${process.env.GH_REPO}/${path}`], {encoding: "utf8", stdio: ["ignore", "pipe", "ignore"]}));
   const changes = platform => {
     if (!process.env.PR) return paths;

@@ -10,7 +10,7 @@ import {
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
-test("iOS builds can be paused independently of Android", () => {
+test("platform selection keeps iOS optional and sizes Android independently", () => {
   const dir = mkdtempSync(join(tmpdir(), "disposabl-platforms-"));
   try {
     mkdirSync(join(dir, "bin"));
@@ -40,6 +40,34 @@ test("iOS builds can be paused independently of Android", () => {
     );
     assert.match(readFileSync(out, "utf8"), /^ios=false$/m);
     assert.match(readFileSync(out, "utf8"), /^android=true$/m);
+    for (const features of [undefined, [], ["faster-ci"]]) {
+      writeFileSync(
+        join(dir, "disposabl.json"),
+        JSON.stringify({ platforms: ["web", "android", "ios"], features }),
+      );
+      writeFileSync(out, "");
+      execFileSync(
+        "bash",
+        [resolve(import.meta.dirname, "../../.github/scripts/platforms.sh")],
+        { cwd: dir, env },
+      );
+      const selected = Object.fromEntries(
+        readFileSync(out, "utf8")
+          .trim()
+          .split("\n")
+          .map((line) => line.split("=")),
+      );
+      const faster = features?.includes("faster-ci");
+      assert.equal(
+        selected.android_runner,
+        faster ? "blacksmith-8vcpu-ubuntu-2404" : "ubuntu-24.04",
+      );
+      assert.equal(
+        selected.linux_runner,
+        faster ? "blacksmith-2vcpu-ubuntu-2404" : "ubuntu-24.04",
+      );
+      assert.equal(selected.android, "true");
+    }
     writeFileSync(out, "");
     execFileSync(
       "bash",

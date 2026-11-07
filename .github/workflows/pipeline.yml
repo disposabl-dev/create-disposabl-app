@@ -43,6 +43,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       linux_runner: ${{ steps.platforms.outputs.linux_runner }}
+      android_runner: ${{ steps.platforms.outputs.android_runner }}
       macos_runner: ${{ steps.platforms.outputs.macos_runner }}
       changed: ${{ steps.platforms.outputs.changed }}
       android: ${{ steps.platforms.outputs.android }}
@@ -179,7 +180,7 @@ jobs:
     needs: [changes, web]
     if: needs.web.outputs.android_build == 'true'
     permissions: *release-permissions
-    runs-on: ${{ needs.changes.outputs.linux_runner }}
+    runs-on: ${{ needs.changes.outputs.android_runner }}
     timeout-minutes: 20
     env:
       PLATFORM: android

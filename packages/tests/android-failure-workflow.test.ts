@@ -20,6 +20,22 @@ const workflow = JSON.parse(
   ),
 );
 
+test("Android uses its selected runner while retaining the twenty-minute limit", () => {
+  assert.equal(
+    workflow.jobs.changes.outputs.android_runner,
+    "${{ steps.platforms.outputs.android_runner }}",
+  );
+  assert.equal(
+    workflow.jobs.android["runs-on"],
+    "${{ needs.changes.outputs.android_runner }}",
+  );
+  assert.equal(workflow.jobs.android["timeout-minutes"], 20);
+  assert.equal(
+    workflow.jobs.web["runs-on"],
+    "${{ needs.changes.outputs.linux_runner }}",
+  );
+});
+
 test("Android failure reporting handles failed and cancelled builds independently", () => {
   const job = workflow.jobs["android-failure"];
   assert.equal(job.needs, "android");
