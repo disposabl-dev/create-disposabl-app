@@ -1,5 +1,5 @@
 import project from "../../../package.json";
-import settings from "../../../disposabl.json";
+import { authenticationEnabled, analyticsEnabled } from "../features";
 
 // Public draft details. Each app publisher must review these before launch.
 export const legalConfig = {
@@ -18,7 +18,7 @@ export const legalConfig = {
       name: "Convex",
       purpose: "Application database, hosting, and account authentication",
     },
-    ...(settings.features.includes("authentication")
+    ...(authenticationEnabled
       ? [
           {
             name: "Google",
@@ -27,7 +27,7 @@ export const legalConfig = {
           },
         ]
       : []),
-    ...(settings.features.includes("analytics")
+    ...(analyticsEnabled
       ? [
           {
             name: "PostHog",

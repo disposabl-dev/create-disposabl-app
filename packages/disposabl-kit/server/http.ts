@@ -6,6 +6,7 @@ import { env } from "../../backend/convex/_generated/server";
 import modules from "../../backend/generated/platforms";
 import openapi from "../../backend/generated/openapi.json";
 import config from "../../../disposabl.json";
+import { authenticationEnabled } from "../features";
 import { validatePlatforms } from "../platforms";
 // docs:start
 import { registerDocsRoutes } from "./lib/docs";
@@ -63,7 +64,7 @@ export const {
 
 export default function createHttpRouter(apiPolicy?: ApiPolicy) {
   const http = httpRouter();
-  if (config.features.includes("authentication")) {
+  if (authenticationEnabled) {
     if (
       enabled.some((platform) => platform === "ios" || platform === "android")
     )

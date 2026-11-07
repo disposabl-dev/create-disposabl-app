@@ -34,11 +34,30 @@ test("reset welcome reflects selected platforms and hides disabled docs", async 
         true,
       );
       assert.equal(existsSync(join(app, "apps/docs")), docs);
+      assert.equal(
+        existsSync(join(app, "apps/web/src/router/mobile-login.tsx")),
+        false,
+      );
+      assert.equal(
+        existsSync(join(app, "packages/tests/desktop-updates.test.ts")),
+        false,
+      );
+      assert.equal(
+        existsSync(join(app, "packages/tests/desktop-publication.test.ts")),
+        false,
+      );
+      assert.equal(
+        existsSync(join(app, "packages/tests/app-telemetry.test.ts")),
+        false,
+      );
       await symlink(
         resolve(import.meta.dirname, "../../node_modules"),
         join(app, "node_modules"),
         "dir",
       );
+      await exec("bun", ["run", "--cwd", "packages/tests", "typecheck"], {
+        cwd: app,
+      });
       await writeFile(
         join(app, "welcome-check.tsx"),
         `

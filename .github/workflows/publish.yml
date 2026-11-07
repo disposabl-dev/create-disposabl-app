@@ -64,6 +64,9 @@ jobs:
       - run: bun run lint
       - run: bun run typecheck
         working-directory: packages/cli
+      - name: Verify fresh generated projects
+        if: inputs.recovery_version == ''
+        run: bun run build && bun run verify:starter
       # semantic-release sets the package version, builds, tags this commit, and publishes.
       # Recovery after a publish failure: check npm and GitHub for the tagged version first.
       # A tagged version is skipped on rerun; restore missing artifacts from that exact commit/version.

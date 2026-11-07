@@ -1,14 +1,14 @@
 import { openMobile } from "../helpers/mobile";
 import { test } from "@e2e-dev/mobile";
 import { expect } from "e2e";
-import config from "../../../disposabl.json";
+import { project } from "../project";
 
 test(
   "disabled authentication blocks the retained password link",
   { platforms: ["ios", "android"] },
   async ({ app, device, screen }) => {
     test.skip(
-      config.features.includes("authentication"),
+      project.features.includes("authentication"),
       "Requires authentication disabled",
     );
     await openMobile({ app, device, screen });

@@ -89,3 +89,7 @@ Push the generated initial commit to `main` before opening feature pull requests
 See the [coding-agent guide](https://github.com/disposabl-dev/create-disposabl-app/blob/main/packages/skill/SKILL.md) for the full delivery workflow, or [report a problem](https://github.com/disposabl-dev/create-disposabl-app/issues).
 
 Set `features` to include `faster-ci` in `disposabl.json` to use Blacksmith runners (the GitHub App must be installed). The initial selection job remains GitHub-hosted so it can read the configuration.
+
+## Generator release checks
+
+Before publishing the generator, `bun run --cwd packages/create-disposabl-app build && bun run --cwd packages/create-disposabl-app verify:starter` creates fresh minimal-web, Web + Android, mobile-without-authentication, and all-platform projects. Each follows the CLI's formatting and installation steps, then runs the first CI frozen install, `bun run check`, its retained unit tests, and web and selected CLI/SDK builds. Pass `web-minimal`, `web-android`, `mobile-minimal`, or `all-platforms` after `verify:starter` to check one selection. These checks use no provider credentials and do not provision or deploy resources. Native builds and installed-app behavior still need the platform checks below.

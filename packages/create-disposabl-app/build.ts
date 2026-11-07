@@ -53,6 +53,7 @@ try {
         !lstatSync(path).isSymbolicLink() &&
         path !== join(root, "packages/tests/generator-reconfigure.test.ts") &&
         path !== join(root, "packages/tests/starter-welcome.test.ts") &&
+        path !== join(root, "packages/tests/starter-ci.ts") &&
         path !== join(root, "packages/tests/generator-cli.test.ts") &&
         path !== join(root, "apps/web/src/components/landing") &&
         ![

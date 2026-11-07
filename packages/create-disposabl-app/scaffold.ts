@@ -77,11 +77,22 @@ export async function createApp(
           force: true,
         });
     }
+    const tests = join(destination, "packages/tests");
+    for (const entry of await readdir(tests)) {
+      if (
+        (!folders.includes("apps/desktop") &&
+          /^desktop-.*\.test\.ts$/.test(entry)) ||
+        (!folders.includes("apps/mobile") &&
+          /^(mobile-.*|native-billing|ios-ota)\.test\.ts$/.test(entry))
+      )
+        await rm(join(tests, entry));
+    }
     if (!config.features.includes("authentication")) {
       // These are auth screens and starter examples, not backend capabilities.
       for (const path of [
         "packages/disposabl-kit/client/routes/_auth-pages",
         "packages/disposabl-kit/client/routes/consent.tsx",
+        "packages/disposabl-kit/client/routes/_authenticated/change-password.tsx",
         "apps/web/src/router/_authenticated/dashboard.api-keys.tsx",
         "apps/mobile/src/app/(auth)",
       ]) {
