@@ -10,7 +10,7 @@ import { api } from "./lib/convex";
 import { sendPageTelemetry } from "../lib/telemetry";
 import { sessionId } from "../lib/auth-session";
 import { UpdatePrompt } from "./updates/update-prompt";
-import { ThemeProvider } from "./design/theme-provider";
+import { ThemeProvider, useResolvedColorScheme } from "./design/theme-provider";
 import { useTheme } from "./design/use-theme";
 
 export function MobileLayout({ children }: { children?: ReactNode }) {
@@ -64,9 +64,11 @@ function SessionRoutes() {
 
 function Routes({ isAuthenticated = false }: { isAuthenticated?: boolean }) {
   const colors = useTheme();
+  const dark = useResolvedColorScheme() === "dark";
   return (
     <Stack
       screenOptions={{
+        statusBarStyle: dark ? "light" : "dark",
         headerTintColor: colors.foreground,
         headerStyle: { backgroundColor: colors.background },
         contentStyle: { backgroundColor: colors.background },
@@ -176,9 +178,11 @@ function AccountRoutes() {
 /** A route group without a session requirement. */
 export function PublicLayout() {
   const colors = useTheme();
+  const dark = useResolvedColorScheme() === "dark";
   return (
     <Stack
       screenOptions={{
+        statusBarStyle: dark ? "light" : "dark",
         headerTintColor: colors.foreground,
         headerStyle: { backgroundColor: colors.background },
         contentStyle: { backgroundColor: colors.background },
