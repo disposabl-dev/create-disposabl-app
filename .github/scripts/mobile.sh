@@ -123,12 +123,11 @@ if [[ "$CHANNEL" == production ]]; then
 fi
 bun x --no-install expo prebuild --platform android --no-install
 test "$(bun x --no-install expo-updates runtimeversion:resolve --platform android --workflow managed | jq -er .runtimeVersion)" = "$RUNTIME"
-task=assembleRelease
 artifact=android.apk
 binary=android/app/build/outputs/apk/release/app-release.apk
 fingerprint=assets/fingerprint
 
-(cd android && ./gradlew ":app:$task" --no-daemon --build-cache)
+(cd android && bash ../../../.github/scripts/android-runner.sh build)
 test "$(unzip -p "$binary" "$fingerprint")" = "$RUNTIME"
 test "$(bun x --no-install expo-updates runtimeversion:resolve --platform android --workflow managed | jq -er .runtimeVersion)" = "$RUNTIME"
 mkdir -p ../../dist/release

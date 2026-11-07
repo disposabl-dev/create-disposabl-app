@@ -23,5 +23,20 @@ case "${1:?operation required}" in
       exit 1
     fi
     ;;
+  build)
+    # Keep aggregate CPU/memory samples in the job log, including interrupted builds.
+    # Do not print process arguments or environment values, which can contain secrets.
+    sampler=""
+    trap 'if [[ -n "$sampler" ]]; then kill "$sampler" 2>/dev/null || true; wait "$sampler" 2>/dev/null || true; fi' EXIT
+    if [[ "${RUNNER_OS:-}" == Linux ]] && command -v vmstat >/dev/null; then
+      printf 'Android runner processors: %s\n' "$(getconf _NPROCESSORS_ONLN)"
+      vmstat -w -t 15 &
+      sampler=$!
+    fi
+    TIMEFORMAT='Gradle elapsed: %3R seconds; shell and child CPU: %3U user, %3S system'
+    status=0
+    time ./gradlew :app:assembleRelease --no-daemon --build-cache || status=$?
+    exit "$status"
+    ;;
   *) echo "Unknown operation: $1" >&2; exit 1 ;;
 esac

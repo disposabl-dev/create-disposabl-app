@@ -5,6 +5,62 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 
+test("Android build diagnostics preserve Gradle arguments and failure status", () => {
+  const dir = mkdtempSync(join(tmpdir(), "android-build-"));
+  try {
+    writeFileSync(
+      join(dir, "gradlew"),
+      '#!/bin/sh\nwhile [ ! -f "$SAMPLER_PID" ]; do sleep 0.01; done\nprintf "%s\\n" "$*"\nexit "$GRADLE_RESULT"\n',
+      { mode: 0o755 },
+    );
+    writeFileSync(
+      join(dir, "vmstat"),
+      '#!/bin/sh\necho $$ > "$SAMPLER_PID"\nexec sleep 30\n',
+      {
+        mode: 0o755,
+      },
+    );
+    for (const status of [0, 42]) {
+      const samplerPid = join(dir, `sampler-${status}`);
+      const result = spawnSync(
+        "bash",
+        [
+          resolve(
+            import.meta.dirname,
+            "../../.github/scripts/android-runner.sh",
+          ),
+          "build",
+        ],
+        {
+          cwd: dir,
+          encoding: "utf8",
+          timeout: 5000,
+          env: {
+            ...process.env,
+            PATH: `${dir}:${process.env.PATH}`,
+            RUNNER_OS: "Linux",
+            GRADLE_RESULT: String(status),
+            SAMPLER_PID: samplerPid,
+          },
+        },
+      );
+      assert.equal(result.status, status, result.stderr);
+      assert.match(
+        result.stdout,
+        /:app:assembleRelease --no-daemon --build-cache/,
+      );
+      assert.match(result.stdout, /Android runner processors: \d+/);
+      assert.match(result.stderr, /Gradle elapsed:/);
+      assert.throws(
+        () => process.kill(Number(readFileSync(samplerPid, "utf8")), 0),
+        { code: "ESRCH" },
+      );
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("Android disk preparation only removes unused hosted-runner toolchains", () => {
   const dir = mkdtempSync(join(tmpdir(), "android-runner-"));
   try {
