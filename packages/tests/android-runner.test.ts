@@ -60,7 +60,7 @@ test("Android disk preparation only removes unused hosted-runner toolchains", ()
     assert.equal(run("prepare").status, 0);
     assert.equal(
       readFileSync(calls, "utf8"),
-      "rm -rf -- /usr/share/dotnet /usr/local/.ghcup /opt/ghc /opt/hostedtoolcache/CodeQL /usr/share/swift /usr/share/miniconda /opt/microsoft/powershell /usr/local/share/powershell\n",
+      "rm -rf -- /usr/share/dotnet /usr/local/.ghcup /opt/ghc /opt/hostedtoolcache/CodeQL /usr/share/swift /usr/share/miniconda /opt/microsoft/powershell /usr/local/share/powershell /usr/local/share/vcpkg /home/linuxbrew\n",
     );
     assert.equal(run("check").status, 0);
     assert.equal(run("check", { AVAILABLE: "26214400" }).status, 0);
