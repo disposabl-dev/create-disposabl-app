@@ -20,10 +20,13 @@ const workflow = JSON.parse(
   ),
 );
 
-test("Android failure reporting runs independently only for an Android failure", () => {
+test("Android failure reporting handles failed and cancelled builds independently", () => {
   const job = workflow.jobs["android-failure"];
   assert.equal(job.needs, "android");
-  assert.equal(job.if, "failure() && needs.android.result == 'failure'");
+  assert.equal(
+    job.if,
+    "always() && (needs.android.result == 'failure' || needs.android.result == 'cancelled')",
+  );
   assert.deepEqual(job.permissions, { contents: "read", "id-token": "write" });
   assert.equal(job["runs-on"], "ubuntu-24.04");
   assert.equal(job["timeout-minutes"], 5);
@@ -31,7 +34,7 @@ test("Android failure reporting runs independently only for an Android failure",
   assert.equal(job.steps[1].uses, "actions/setup-node@v6");
   assert.equal(
     job.steps[2].run,
-    "node .github/scripts/disposabl.mjs report android failed",
+    'node .github/scripts/disposabl.mjs report android failed "Android build failed or was cancelled; check the workflow log."',
   );
   assert.equal(
     workflow.jobs.android.steps.some((step: { run?: string }) =>

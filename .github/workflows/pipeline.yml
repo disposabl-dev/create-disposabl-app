@@ -230,7 +230,7 @@ jobs:
   android-failure:
     name: Report Android failure
     needs: android
-    if: failure() && needs.android.result == 'failure'
+    if: always() && (needs.android.result == 'failure' || needs.android.result == 'cancelled')
     permissions:
       contents: read
       id-token: write
@@ -239,7 +239,7 @@ jobs:
     steps:
       - *checkout
       - *node
-      - run: node .github/scripts/disposabl.mjs report android failed
+      - run: node .github/scripts/disposabl.mjs report android failed "Android build failed or was cancelled; check the workflow log."
   ios-preview:
     name: iOS simulator preview
     needs: [changes, web]
