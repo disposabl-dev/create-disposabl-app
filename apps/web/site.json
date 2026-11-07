@@ -1,10 +1,10 @@
 {
   "name": "Disposabl",
-  "title": "Disposabl | Your AI. Your computer. Your code.",
-  "description": "Build web, mobile, and desktop apps with your favorite coding agent. Free local development. Open-source code you own. No Disposabl subscription.",
+  "title": "Disposabl | Your idea. Your next app.",
+  "description": "Turn your idea into apps for web, mobile, and desktop. Start free on your computer, with your AI and code you own.",
   "origin": "https://www.disposabl.dev",
   "backendOrigin": "https://vivid-caterpillar-633.convex.site",
-  "image": "/og/disposabl-social.png",
-  "imageAlt": "Disposabl. Build the app you wish existed. Your AI. Your computer. Your code. Free on your computer.",
+  "image": "/og/disposabl-ecosystem.png",
+  "imageAlt": "Disposabl. Your idea. Your next app. Your AI. Your computer. Your code. Start building free.",
   "analytics": true
 }

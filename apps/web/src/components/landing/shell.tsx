@@ -1,5 +1,6 @@
 import { useState, useRef, type ReactNode } from "react";
-import { ArrowUpRight, Menu, X } from "lucide-react";
+import { ArrowUpRight, Menu, X, Sun, Moon } from "lucide-react";
+import { useTheme } from "@disposabl/disposabl-kit/client/lib/theme";
 import { BrandIcon } from "./brand-icon";
 
 export const repository =
@@ -28,6 +29,7 @@ export function MarketingShell({
   onStart?: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const { resolvedTheme, setTheme } = useTheme();
   const menuButton = useRef<HTMLButtonElement>(null);
   return (
     <div className="launch-site">
@@ -91,6 +93,17 @@ export function MarketingShell({
               </a>
             )}
           </div>
+          <button
+            type="button"
+            className="theme-toggle"
+            aria-label="Toggle light and dark mode"
+            onClick={() =>
+              setTheme(resolvedTheme === "dark" ? "light" : "dark")
+            }
+          >
+            <Sun className="theme-sun" size={22} aria-hidden="true" />
+            <Moon className="theme-moon" size={22} aria-hidden="true" />
+          </button>
         </nav>
       </header>
       {children}
@@ -100,7 +113,6 @@ export function MarketingShell({
             <a className="wordmark" href="/">
               disposabl<span className="brand-period">.</span>
             </a>
-            <p>Your AI. Your computer. Your code.</p>
             <a
               className="text-link"
               href={repository}

@@ -25,8 +25,7 @@ export function BuildEvidence() {
   return (
     <aside className="build-evidence" aria-labelledby="build-evidence-title">
       <div className="evidence-heading">
-        <h3 id="build-evidence-title">Build durations</h3>
-        <span>November 4, 2026</span>
+        <h3 id="build-evidence-title">Build times on November 4, 2026</h3>
       </div>
       <div className="evidence-grid">
         {observations.map(({ label, time, job, detail }) => (

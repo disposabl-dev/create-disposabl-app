@@ -1,670 +1,517 @@
-@media (max-width: 1100px) {
+@media (max-width: 1150px) {
   .launch-container {
-    padding-inline: 32px;
+    padding-inline: 38px;
   }
-  .marketing-links {
+  .launch-nav nav {
     gap: 20px;
   }
-  .platform-toggles {
-    grid-template-columns: repeat(5, 1fr);
+  .marketing-links {
+    gap: 18px;
   }
-  .platform-toggle {
-    min-height: 100px;
+  .marketing-links .nav-start {
+    padding-inline: 16px;
   }
-  .preview-scene {
-    height: 460px;
-    padding: 45px 65px 0 25px;
+  .launch-hero {
+    min-height: 610px;
+    padding-block: 40px 70px;
   }
-  .demo-layout {
-    grid-template-columns: 120px 1fr;
+  .launch-hero h1 {
+    font-size: 75px;
   }
-  .demo-content {
-    padding: 24px 20px;
-  }
-  .demo-add {
-    display: none;
-  }
-  .demo-phone {
-    right: 18px;
-    width: 185px;
-  }
-  .demo-note p {
+  .launch-site .hero-description {
     font-size: 20px;
   }
-  .shared-stack {
-    align-items: flex-start;
-    flex-direction: column;
+  .platform-art {
+    transform: scale(0.85);
+    transform-origin: left center;
+    width: 480px;
+    margin-left: -12px;
   }
-  .shared-stack > div {
-    gap: 24px;
+  .outcome-grid {
+    gap: 14px;
+  }
+  .outcome-art {
+    height: 180px;
+  }
+  .outcome-title {
+    padding: 20px;
+    font-size: 18px;
   }
   .agent-section {
-    gap: 40px;
+    gap: 45px;
   }
-  .language-section {
-    gap: 50px;
+  .price-card {
+    padding: 35px;
+  }
+  .footer-bottom {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .guide-layout {
+    gap: 45px;
+    grid-template-columns: 200px 1fr;
   }
 }
-@media (max-width: 800px) {
+@media (max-width: 1000px) {
   .launch-nav nav {
-    height: 64px;
+    height: 76px;
+  }
+  .wordmark {
+    margin-right: auto;
   }
   .mobile-menu-button {
     display: grid;
     place-items: center;
-    width: 40px;
-    height: 40px;
+    width: 46px;
+    height: 46px;
     border: 1px solid var(--line);
-    border-radius: 9px;
+    border-radius: 50%;
+    order: 3;
+  }
+  .theme-toggle {
+    order: 2;
   }
   .marketing-links {
     display: none;
     position: absolute;
-    top: 64px;
+    top: 76px;
     left: 0;
     right: 0;
-    padding: 16px 24px 24px;
-    background: white;
+    padding: 20px 38px 28px;
+    background: var(--surface);
     border-bottom: 1px solid var(--line);
-    box-shadow: 0 12px 16px #13233c0a;
+    box-shadow: 0 12px 16px #0002;
   }
   .marketing-links.is-open {
     display: flex;
     align-items: stretch;
     flex-direction: column;
-    gap: 5px;
+    gap: 10px;
   }
   .marketing-links .nav-start {
     justify-content: center;
-    margin-top: 6px;
+    margin-top: 10px;
   }
   .nav-github {
     width: fit-content;
   }
   .launch-hero {
-    padding-top: 40px;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    min-height: 560px;
+    padding-block: 50px;
   }
   .launch-hero h1 {
-    font-size: clamp(48px, 7.8vw, 64px);
+    font-size: 63px;
   }
   .launch-site .hero-description {
     font-size: 18px;
-    margin-top: 20px;
   }
   .hero-actions {
-    gap: 16px;
+    margin-top: 28px;
   }
   .hero-actions .primary-link {
-    font-size: 13px;
-    gap: 8px;
-    padding-inline: 17px;
-  }
-  .hero-actions .primary-link > svg:last-child {
-    display: none;
+    font-size: 16px;
+    padding-inline: 22px;
   }
   .store-button {
-    padding-inline: 10px;
-    font-size: 14px;
+    padding-inline: 14px;
+    gap: 8px;
   }
-  .preview-scene {
-    height: 390px;
-    padding: 40px 40px 0 25px;
+  .platform-art {
+    transform: scale(0.68);
+    margin-left: 0;
   }
-  .demo-layout {
-    grid-template-columns: 95px 1fr;
-    min-height: 380px;
+  .outcome-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
   }
-  .demo-sidebar {
-    padding: 25px 10px;
+  .outcome-art {
+    height: 230px;
   }
-  .demo-sidebar > strong {
-    font-size: 14px;
-    gap: 3px;
-  }
-  .demo-sidebar > span {
-    font-size: 9px;
-    padding-inline: 5px;
-  }
-  .demo-sidebar > span svg {
-    width: 11px;
-  }
-  .demo-content {
-    padding: 22px 18px;
-  }
-  .launch-site .demo-heading h3 {
-    font-size: 19px;
-  }
-  .demo-note {
-    display: none;
-  }
-  .demo-cards {
-    grid-template-columns: 1fr;
-    margin-right: 70px;
-  }
-  .demo-phone {
-    width: 168px;
-    right: 20px;
-    bottom: -30px;
-    padding-inline: 12px;
-  }
-  .demo-phone > p {
-    margin-top: 18px;
-  }
-  .launch-site .demo-phone h3 {
-    font-size: 25px;
+  .outcome-title {
+    min-height: 80px;
+    font-size: 20px;
   }
   .platform-section {
-    padding-block: 75px;
+    border-radius: 24px;
+  }
+  .platform-toggles {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+  .platform-toggle {
+    padding-inline: 8px;
+  }
+  .platform-toggle .brand-icon {
+    width: 30px;
+    height: 30px;
   }
   .stack-results {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .agent-section {
     grid-template-columns: 1fr;
-    padding-block: 20px 75px;
-    gap: 30px;
+    gap: 45px;
+    padding-block: 80px;
   }
   .agent-pair {
-    min-height: 180px;
+    min-height: 210px;
   }
   .agent-choice-icons {
     flex-direction: row;
-    gap: 10px;
   }
-  .agent-choice-icons img {
-    width: 44px;
-    height: 44px;
-    padding: 8px;
-  }
-  .disposabl-pair-icon {
-    width: 65px;
-    height: 65px;
-  }
-  .pricing-section {
-    padding-block: 65px;
-  }
-  .price-card {
-    padding: 26px;
-  }
-  .price-card .price-number {
-    font-size: 54px;
-    gap: 10px;
-  }
-  .price-number span {
-    font-size: 15px;
-  }
-  .price-title {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 8px;
-  }
-  .agent-price .price-number {
-    margin-top: 15px;
+  .agent-section p {
+    max-width: 700px;
   }
   .language-section {
-    padding-block: 75px;
-    gap: 35px;
+    gap: 40px;
+    padding-block: 90px;
   }
   .language-art {
-    font-size: 30px;
-    gap: 15px;
+    font-size: 40px;
+    gap: 20px;
   }
   .language-art span:nth-child(2) {
-    font-size: 21px;
+    font-size: 30px;
   }
-  .footer-top p {
-    display: none;
-  }
-  .footer-bottom {
-    align-items: flex-start;
+  .final-section {
     flex-direction: column;
-  }
-  .footer-bottom nav {
-    gap: 16px;
+    align-items: flex-start;
+    gap: 35px;
   }
   .guide-layout {
     grid-template-columns: 1fr;
-    gap: 30px;
+    gap: 35px;
   }
   .guide-index {
     position: static;
     border-bottom: 1px solid var(--line);
-    padding-bottom: 28px;
+    padding-bottom: 30px;
   }
   .guide-hero h1 {
-    font-size: 58px;
+    font-size: 60px;
   }
   .evidence-grid {
     grid-template-columns: 1fr;
   }
 }
-@media (max-width: 560px) {
+@media (max-width: 700px) {
+  .launch-container {
+    padding-inline: 26px;
+  }
+  .launch-hero {
+    grid-template-columns: minmax(0, 1fr);
+    min-height: 0;
+    padding-block: 40px 25px;
+    overflow: hidden;
+  }
+  .launch-hero h1 {
+    font-size: 76px;
+  }
+  .launch-site .hero-description {
+    font-size: 21px;
+  }
+  .hero-actions .primary-link {
+    font-size: 18px;
+  }
+  .platform-art {
+    width: 480px;
+    height: 500px;
+    transform: scale(0.8);
+    transform-origin: top center;
+    justify-self: center;
+    margin: 30px 0 -100px;
+  }
+  .outcome-section {
+    padding-block: 45px 65px;
+  }
+  .outcome-art {
+    height: 180px;
+  }
+  .outcome-title {
+    min-height: 100px;
+    font-size: 18px;
+    padding: 20px;
+  }
+  .platform-section {
+    padding-block: 60px;
+    border-radius: 0;
+  }
+  .platform-toggles {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .platform-toggle {
+    min-height: 125px;
+  }
+  .stack-results {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+  .shared-stack > div {
+    gap: 24px;
+  }
+  .pricing-section {
+    padding-block: 70px;
+  }
+  .pricing-grid {
+    grid-template-columns: 1fr;
+    gap: 22px;
+  }
+  .pricing-section h2 {
+    margin-bottom: 35px;
+  }
+  .price-card {
+    padding: 32px;
+  }
+  .price-card .price-number {
+    font-size: 74px;
+  }
+  .language-section {
+    grid-template-columns: 1fr;
+    padding-block: 75px;
+    gap: 40px;
+  }
+  .language-art {
+    justify-content: flex-start;
+    font-size: 43px;
+    gap: 20px 28px;
+  }
+  .language-art span:nth-child(2) {
+    font-size: 32px;
+  }
+  .faq-section {
+    padding-block: 5px 65px;
+  }
+  .faq-list summary {
+    font-size: 18px;
+    gap: 18px;
+    padding-block: 23px;
+  }
+  .faq-list p {
+    font-size: 18px;
+  }
+  .final-section {
+    padding-block: 30px 75px;
+  }
+  .guide-hero {
+    padding-block: 35px 45px;
+  }
+  .guide-hero h1 {
+    font-size: 48px;
+  }
+  .guide-back {
+    margin-bottom: 24px;
+  }
+  .guide-article h2 {
+    font-size: 32px;
+  }
+  .guide-end {
+    padding: 26px;
+  }
+  .build-evidence {
+    padding: 22px;
+  }
+}
+@media (max-width: 420px) {
   .launch-container {
     padding-inline: 20px;
   }
+  .launch-nav nav {
+    height: 70px;
+    gap: 12px;
+  }
   .wordmark {
-    font-size: 23px;
+    font-size: 27px;
+    gap: 6px;
   }
   .wordmark img {
-    width: 27px;
-    height: 27px;
+    width: 28px;
+    height: 28px;
+  }
+  .theme-toggle,
+  .mobile-menu-button {
+    width: 42px;
+    height: 42px;
+  }
+  .marketing-links {
+    top: 70px;
+    padding-inline: 20px;
   }
   .launch-hero {
-    padding-top: 27px;
+    padding-top: 30px;
   }
   .launch-hero h1 {
-    font-size: clamp(43px, 10.2vw, 57px);
-    letter-spacing: -0.065em;
+    font-size: clamp(49px, 14vw, 58px);
   }
   .launch-site .hero-description {
-    font-size: 15px;
-    margin-top: 18px;
+    font-size: 18px;
+    margin-top: 25px;
+    max-width: 300px;
   }
   .hero-actions {
-    flex-direction: column;
-    align-items: center;
-    gap: 14px;
-    margin-top: 24px;
+    margin-top: 28px;
+    gap: 16px;
   }
   .hero-actions .primary-link {
-    min-height: 49px;
-    font-size: 14px;
-    width: 281px;
-    max-width: 100%;
+    min-height: 56px;
+    padding-inline: 22px;
+    gap: 11px;
+    font-size: 16px;
   }
-  .hero-actions .primary-link > svg:last-child {
-    display: block;
+  .store-buttons {
+    gap: 10px;
   }
   .store-button {
-    height: 48px;
-    width: 136px;
+    font-size: 16px;
+    min-height: 50px;
     padding-inline: 12px;
-    font-size: 14px;
     gap: 8px;
   }
   .store-button .brand-icon {
     width: 21px;
     height: 21px;
   }
-  .store-status {
-    top: 54px;
-    font-size: 10px;
-  }
   .store-tooltip {
-    top: 78px;
-    width: 185px;
-  }
-  .store-control:first-child .store-tooltip {
-    left: 0;
-    transform: none;
+    width: 250px;
   }
   .store-control:last-child .store-tooltip {
     left: auto;
     right: 0;
-    transform: none;
   }
-  .launch-site .hero-cost {
-    margin-top: 36px;
-    font-size: 10px;
-  }
-  .hero-platforms {
+  .platform-art {
+    transform: scale(0.63);
     margin-top: 20px;
-    gap: 23px;
+    margin-bottom: -180px;
+    width: 470px;
   }
-  .hero-platforms .brand-icon {
-    width: 20px;
-    height: 20px;
+  .outcome-section h2 {
+    margin-bottom: 28px;
   }
-  .app-preview {
-    margin-top: 28px;
+  .outcome-grid {
+    gap: 13px;
   }
-  .preview-scene {
-    height: 315px;
-    border-radius: 18px;
-    padding: 30px 0 0 17px;
+  .outcome-art {
+    height: 145px;
   }
-  .demo-browser {
-    width: 435px;
+  .outcome-art > svg {
+    width: 65px;
+    height: 65px;
   }
-  .demo-browser-bar {
-    height: 27px;
-    font-size: 8px;
+  .outcome-art > span {
+    width: 100px;
+    height: 100px;
+    transform: translate(35px, -30px);
   }
-  .demo-layout {
-    grid-template-columns: 80px 1fr;
-    min-height: 305px;
-  }
-  .demo-sidebar {
-    padding: 22px 7px;
-  }
-  .demo-sidebar > strong {
-    font-size: 12px;
-    margin-bottom: 22px;
-  }
-  .demo-sidebar > strong svg {
-    width: 14px;
-  }
-  .demo-sidebar > span {
-    font-size: 8px;
-    gap: 4px;
-  }
-  .demo-sidebar-bottom {
-    font-size: 8px;
-    bottom: 18px;
-  }
-  .demo-content {
-    padding: 19px 14px;
-  }
-  .launch-site .demo-heading h3 {
+  .outcome-title {
+    padding: 16px;
     font-size: 18px;
+    gap: 8px;
+    min-height: 112px;
   }
-  .demo-week {
-    margin-top: 18px;
+  .outcome-title svg {
+    width: 20px;
   }
-  .demo-day {
-    padding-block: 5px;
-    gap: 5px;
-  }
-  .demo-day b {
-    font-size: 13px;
-  }
-  .demo-cards {
-    margin-right: 42px;
-    margin-top: 16px;
-  }
-  .demo-task {
-    padding: 10px;
-  }
-  .demo-phone {
-    width: 144px;
-    right: 13px;
-    bottom: -21px;
-    border-width: 5px;
-    border-radius: 27px;
-    padding: 28px 10px 13px;
-  }
-  .demo-phone-heading {
-    font-size: 13px;
-    gap: 5px;
-  }
-  .demo-phone-heading svg {
-    width: 17px;
-  }
-  .demo-phone-island {
-    height: 11px;
-    width: 43px;
-    top: 7px;
-  }
-  .demo-phone > p {
-    font-size: 7px;
-    margin-top: 14px;
-  }
-  .launch-site .demo-phone h3 {
-    font-size: 22px;
-  }
-  .demo-phone-date {
-    margin-block: 13px;
-    font-size: 8px;
-  }
-  .demo-phone-date .selected {
-    padding: 5px;
-  }
-  .phone-task {
-    padding: 9px;
-    margin-top: 7px;
-  }
-  .phone-task b {
-    font-size: 8px;
-  }
-  .phone-task small {
-    font-size: 7px;
-  }
-  .demo-phone-home {
-    margin-top: 14px;
-  }
-  .app-preview figcaption {
-    font-size: 10px;
-  }
-  .app-preview figcaption span {
-    font-size: 8px;
-  }
-  .platform-section {
-    padding-block: 64px;
-  }
-  .section-heading {
-    margin-bottom: 27px;
-  }
-  .section-heading p {
-    font-size: 14px;
-    margin-top: 12px;
+  .outcome-card {
+    border-radius: 18px;
   }
   .platform-toggles {
-    gap: 7px;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
   }
   .platform-toggle {
-    min-height: 87px;
-    padding-top: 19px;
-    gap: 10px;
-    font-size: 9px;
-    border-radius: 10px;
-    line-height: 1.2;
-  }
-  .platform-toggle .brand-icon {
-    width: 23px;
-    height: 23px;
-  }
-  .toggle-check {
-    width: 12px;
-    height: 12px;
-    top: 5px;
-    right: 5px;
-  }
-  .toggle-check svg {
-    width: 9px;
-  }
-  .stack-results {
-    grid-template-columns: 1fr;
-    gap: 9px;
-    padding-top: 15px;
-  }
-  .stack-card {
-    padding-block: 14px 21px;
-  }
-  .stack-card h3 {
-    margin-bottom: 14px;
-    font-size: 14px;
-  }
-  .stack-tags {
-    gap: 18px;
-  }
-  .stack-tags > span {
-    font-size: 11px;
-  }
-  .shared-stack {
-    padding-top: 25px;
-    gap: 18px;
-  }
-  .shared-stack > div {
-    gap: 18px;
-  }
-  .stack-brand {
-    font-size: 11px;
-    gap: 6px;
-  }
-  .stack-brand .brand-icon {
-    width: 20px;
-    height: 20px;
-  }
-  .workbench-footer {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 16px;
-  }
-  .workbench-footer p {
-    font-size: 11px;
+    min-height: 126px;
+    padding: 25px 10px;
   }
   .agent-section {
-    padding-block: 0 65px;
+    padding-block: 65px;
+    gap: 32px;
   }
   .agent-pair {
+    min-height: 165px;
     gap: 16px;
-    min-height: 145px;
-    border-radius: 18px;
+    border-radius: 22px;
   }
   .agent-pair > span {
-    font-size: 22px;
+    font-size: 28px;
   }
   .agent-choice-icons {
     gap: 7px;
   }
   .agent-choice-icons img {
-    width: 35px;
-    height: 35px;
-    padding: 6px;
-    border-radius: 8px;
+    width: 39px;
+    height: 39px;
+    padding: 7px;
+    border-radius: 10px;
   }
   .disposabl-pair-icon {
-    width: 53px;
-    height: 53px;
+    width: 65px;
+    height: 65px;
+    padding: 7px;
+    border-radius: 16px;
   }
   .agent-section p {
-    font-size: 14px;
-    margin-top: 17px;
-  }
-  .pricing-grid {
-    grid-template-columns: 1fr;
-    gap: 16px;
-  }
-  .price-card {
-    padding: 28px;
-    border-radius: 18px;
-  }
-  .price-title {
-    align-items: center;
-    flex-direction: row;
-  }
-  .agent-price .price-number {
-    margin-top: 25px;
-  }
-  .price-card .price-number {
-    font-size: 58px;
-  }
-  .price-number span {
     font-size: 18px;
   }
-  .language-section {
-    grid-template-columns: 1fr;
-    gap: 35px;
-    padding-block: 64px;
+  .price-card {
+    padding: 27px;
+  }
+  .price-card h3 {
+    font-size: 26px;
+  }
+  .price-card ul {
+    font-size: 18px;
+    gap: 19px;
   }
   .language-art {
-    padding-block: 10px;
-    justify-content: flex-start;
-    font-size: 36px;
-    gap: 12px 25px;
+    gap: 18px;
+    font-size: 37px;
   }
   .language-art span:nth-child(2) {
-    font-size: 28px;
+    font-size: 27px;
   }
-  .language-section p {
-    font-size: 14px;
-    margin-top: 17px;
+  .footer-bottom nav {
+    gap: 20px;
   }
-  .faq-section {
-    padding-block: 5px 60px;
+  .footer-bottom {
+    font-size: 16px;
   }
-  .faq-section h2 {
-    margin-bottom: 20px;
-  }
-  .faq-list summary {
-    font-size: 14px;
-    gap: 18px;
-    padding-block: 19px;
-  }
-  .faq-list p {
-    font-size: 13px;
-  }
-  .final-section {
-    padding-block: 20px 70px;
-  }
-  .final-section h2 {
-    font-size: 37px;
+  .footer-top .wordmark {
+    font-size: 30px;
   }
   .start-dialog {
     padding: 22px;
-    border-radius: 17px;
+    border-radius: 20px;
   }
   .dialog-heading h2 {
-    font-size: 24px;
+    font-size: 26px;
+  }
+  .dialog-heading button {
+    width: 38px;
+    height: 38px;
   }
   .start-dialog .agent-logo-stack {
-    gap: 6px;
+    gap: 8px;
   }
   .start-dialog .agent-logo {
-    width: 28px;
-    height: 28px;
+    width: 38px;
+    height: 38px;
   }
-  .start-dialog .agent-logo img {
-    width: 22px;
-    height: 22px;
+  .start-dialog .landing-modes {
+    gap: 20px;
   }
   .start-dialog .landing-composer {
-    padding: 16px;
+    padding: 20px;
   }
   .start-dialog .landing-prompt {
-    font-size: 14px;
-  }
-  .start-dialog .landing-composer-footer {
-    gap: 10px;
-  }
-  .start-dialog .landing-copy-button {
-    font-size: 12px;
-    padding-inline: 10px;
-  }
-  .start-dialog .landing-composer-footer > p {
-    font-size: 10px;
+    font-size: 18px;
   }
   .start-dialog .landing-managers {
-    gap: 15px;
-  }
-  .guide-hero {
-    padding-block: 35px 40px;
+    gap: 17px;
+    flex-wrap: wrap;
   }
   .guide-hero h1 {
-    font-size: 44px;
-  }
-  .guide-hero .guide-intro {
-    font-size: 16px;
-  }
-  .guide-back {
-    margin-bottom: 24px;
-  }
-  .guide-article h2 {
-    font-size: 28px;
-  }
-  .guide-article section p {
-    font-size: 14px;
+    font-size: 42px;
   }
   .guide-end {
     padding: 22px;
-  }
-  .evidence-heading {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 10px;
-  }
-  .build-evidence {
-    padding: 18px;
-  }
-}
-
-@media (max-width: 560px) {
-  .demo-phone {
-    width: 180px;
-    transform: rotate(4deg) scale(0.74);
-    transform-origin: top right;
-    top: 20px;
-    bottom: auto;
   }
 }

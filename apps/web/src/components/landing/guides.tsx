@@ -67,7 +67,7 @@ const buildSections: Section[] = [
     id: "agent-mode",
     title: "When the work needs more room.",
     paragraphs: [
-      "Local mode uses your machine and your coding agent. Agent Mode runs work in a remote sandbox. Planned credit pricing is $1 = 100 credits, with no subscription. Credit billing is coming soon. Task consumption will vary; credits are not a fixed price per prompt or completed app.",
+      "Local mode uses your machine and your coding agent. Agent Mode runs work in a remote sandbox. Agent Mode costs $5 and includes 500 credits. There is no subscription. Task consumption will vary; credits are not a fixed price per prompt or completed app.",
       "Use it for longer changes, debugging loops, or comparing several approaches. An agent can create parallel previews, run checks, inspect the results, and improve the most promising version. This repeated build-test-improve process is sometimes called hill climbing.",
       "Parallel previews are agent-directed. They don't guarantee independent sandboxes, automatic scoring, or a better result. Give the agent a concrete success condition and review the evidence before accepting a change. Remote sandbox work also sends project context outside your computer.",
     ],

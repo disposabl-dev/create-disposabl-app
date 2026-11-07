@@ -1,0 +1,172 @@
+.platform-art {
+  position: relative;
+  height: 500px;
+  width: 100%;
+  isolation: isolate;
+  perspective: 1100px;
+}
+.platform-orbit {
+  position: absolute;
+  border: 1px solid var(--raised-border);
+  border-radius: 50%;
+  width: 400px;
+  height: 400px;
+  top: 46px;
+  left: 55px;
+  transform: rotateX(55deg) rotateZ(-22deg);
+}
+.orbit-two {
+  transform: rotateX(55deg) rotateZ(38deg);
+  width: 490px;
+  height: 490px;
+  top: 0;
+  left: 10px;
+}
+.orbit-three {
+  transform: rotateY(55deg) rotateZ(12deg);
+  width: 360px;
+  height: 360px;
+  top: 65px;
+  left: 75px;
+}
+.platform-slab {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 24px;
+  box-shadow:
+    9px 15px 0 #080a0d,
+    10px 20px 45px #0003;
+}
+.slab-web {
+  width: 285px;
+  height: 208px;
+  background: #ceff47;
+  border: 2px solid #090b0d;
+  top: 45px;
+  left: 22px;
+  transform: rotateY(-22deg) rotateZ(-12deg);
+}
+.slab-window-bar {
+  position: absolute;
+  top: 18px;
+  left: 22px;
+  display: flex;
+  gap: 8px;
+}
+.slab-window-bar i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #101113;
+}
+.slab-web .brand-icon {
+  width: 86px;
+  height: 86px;
+  color: #101113;
+}
+.slab-mobile {
+  width: 140px;
+  height: 245px;
+  top: 190px;
+  left: 43px;
+  border: 6px solid #090b0d;
+  border-radius: 30px;
+  background: #d9d2ff;
+  flex-direction: column;
+  gap: 26px;
+  transform: rotateY(15deg) rotateZ(-15deg);
+}
+.slab-mobile .brand-icon {
+  width: 42px;
+  height: 42px;
+}
+.slab-island {
+  position: absolute;
+  top: 10px;
+  width: 40px;
+  height: 10px;
+  border-radius: 8px;
+  background: #101113;
+}
+.slab-home {
+  position: absolute;
+  bottom: 9px;
+  width: 42px;
+  height: 4px;
+  background: #101113;
+  border-radius: 4px;
+}
+.slab-desktop {
+  width: 210px;
+  height: 140px;
+  right: -6px;
+  bottom: 30px;
+  background: #f7f8fa;
+  border: 2px solid #101113;
+  gap: 25px;
+  transform: rotateY(-25deg) rotateZ(12deg);
+}
+.slab-desktop .brand-icon {
+  width: 46px;
+  height: 46px;
+}
+.platform-hub {
+  position: absolute;
+  z-index: 2;
+  top: 185px;
+  right: 20px;
+  width: 145px;
+  height: 145px;
+  padding: 15px;
+  display: grid;
+  place-items: center;
+  border: 2px solid #101113;
+  border-radius: 38px;
+  background: #fff;
+  box-shadow:
+    10px 10px 0 #101113,
+    16px 20px 45px #0003;
+  transform: rotateY(-18deg) rotateZ(10deg);
+}
+.platform-hub img {
+  width: 100%;
+  height: 100%;
+}
+.platform-node {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  background: #101113;
+  border: 1px solid #566035;
+  border-radius: 20px;
+  box-shadow: 5px 5px 0 #ceff47;
+}
+.platform-node .brand-icon {
+  filter: brightness(0) invert(1);
+  width: 35px;
+  height: 35px;
+}
+.node-react {
+  right: 24px;
+  top: 60px;
+  transform: rotate(15deg);
+}
+.node-mcp {
+  left: 226px;
+  bottom: 10px;
+  transform: rotate(-12deg);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .platform-hub {
+    animation: hub-float 7s ease-in-out infinite;
+  }
+  @keyframes hub-float {
+    50% {
+      transform: translateY(-12px) rotateY(-18deg) rotateZ(10deg);
+    }
+  }
+}

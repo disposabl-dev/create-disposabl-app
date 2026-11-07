@@ -9,62 +9,52 @@ export function Pricing({ onStart }: { onStart: () => void }) {
       aria-labelledby="pricing-title"
     >
       <div className="launch-container">
-        <div className="section-heading">
-          <h2 id="pricing-title">Build freely.</h2>
-          <p>No subscriptions. No platform upgrade tiers.</p>
-        </div>
+        <h2 id="pricing-title">
+          Big possibilities.
+          <br />
+          Small price.
+        </h2>
         <div className="pricing-grid">
           <article className="price-card local-price">
-            <h3>On your computer</h3>
-            <p className="price-number">
-              Free<span>forever</span>
-            </p>
-            <p>Your AI. All platforms. All your code.</p>
+            <h3>Local</h3>
+            <p className="price-number">Free</p>
             <ul>
               {[
-                "Unlimited local editing and builds",
-                "MIT-licensed source you can keep",
-                "Tests and release workflows included",
+                "Unlimited local builds",
+                "Every platform included",
+                "Your AI, computer, and code",
+                "MIT-licensed source",
+                "AI and cloud costs billed separately",
               ].map((text) => (
                 <li key={text}>
-                  <Check size={16} />
+                  <Check size={20} />
                   {text}
                 </li>
               ))}
             </ul>
             <button onClick={onStart} className="primary-link">
-              Start building <ArrowUpRight size={17} />
+              Start building
+              <ArrowUpRight size={20} />
             </button>
-            <p className="price-footnote">
-              Your AI and cloud providers may charge separately.
-            </p>
           </article>
           <article className="price-card agent-price">
-            <div className="price-title">
-              <h3>Agent Mode</h3>
-              <span className="planned-label">Planned pricing</span>
-            </div>
-            <p className="price-number">
-              $1<span>= 100 credits</span>
-            </p>
-            <p>Remote sandboxes for the bigger jobs.</p>
+            <h3>Agent Mode</h3>
+            <p className="price-number">$5</p>
             <ul>
               {[
-                "Work through complex tasks",
-                "Iterate, test, and improve",
-                "Compare approaches in parallel previews",
+                "500 credits",
+                "Remote sandbox execution",
+                "Complex tasks and repeated iteration",
+                "Parallel previews and comparisons",
+                "No subscription",
               ].map((text) => (
                 <li key={text}>
-                  <Check size={16} />
+                  <Check size={20} />
                   {text}
                 </li>
               ))}
             </ul>
-            <TextLink href="/build#agent-mode">How Agent Mode works</TextLink>
-            <p className="price-footnote">
-              Credit billing is coming soon. No subscription planned. Usage
-              varies by task.
-            </p>
+            <TextLink href="/build#agent-mode">Explore Agent Mode</TextLink>
           </article>
         </div>
       </div>
@@ -75,7 +65,7 @@ export function Pricing({ onStart }: { onStart: () => void }) {
 export const faqs = [
   [
     "Is Disposabl really free?",
-    "Local mode is free, including the starter, supported platforms, source code, and local builds. Your coding agent, model API, cloud backend, hosted builds, and store developer accounts may charge separately. Planned Agent Mode pricing is $1 = 100 credits, with no subscription. Credit billing is coming soon.",
+    "Local mode is free, including the starter, supported platforms, source code, and local builds. Your coding agent, model API, cloud backend, hosted builds, and store developer accounts may charge separately. Agent Mode costs $5 and includes 500 credits, with no subscription.",
   ],
   [
     "Why use this if I already have Claude Code or Codex?",
@@ -99,7 +89,7 @@ export const faqs = [
   ],
   [
     "What does Agent Mode do, and how do credits work?",
-    "Agent Mode runs work remotely in a sandbox. It suits longer tasks and repeated improvement: build an approach, test it, compare alternatives, and refine. Agents can use parallel previews to compare results; this is not a guarantee of automatic quality ranking. Planned pricing is $1 = 100 credits, with no subscription. Credit billing is coming soon. Consumption will vary by task rather than a fixed price per app.",
+    "Agent Mode runs work remotely in a sandbox. It suits longer tasks and repeated improvement: build an approach, test it, compare alternatives, and refine. Agents can use parallel previews to compare results; this is not a guarantee of automatic quality ranking. Agent Mode costs $5 and includes 500 credits, with no subscription. Consumption will vary by task rather than a fixed price per app.",
   ],
   [
     "Can I build an app for my business?",
@@ -111,7 +101,7 @@ export const faqs = [
   ],
   [
     "Are the mobile builder and 85+ languages available now?",
-    "Not yet. The Disposabl mobile builder's App Store and Google Play links are placeholders marked Coming soon. The planned General Translation integration for 85+ languages is also coming soon. You can already create iOS and Android app projects from your computer.",
+    "Not yet. The Disposabl mobile builder's App Store and Google Play links are placeholders marked Coming soon. Support for 85+ languages is also coming soon. You can already create iOS and Android app projects from your computer.",
   ],
 ];
 

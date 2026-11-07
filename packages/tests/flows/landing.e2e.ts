@@ -38,6 +38,12 @@ test(
       browser.locator('[data-stack="desktop"] .selected-targets'),
     ).toHaveText("Selected: macOS + Windows + Linux");
     await expect(browser.locator('[data-stack="mcp"]')).toBeVisible();
+    await browser.locator("#start").tap();
+    await expect(browser.locator(".landing-prompt")).toContainText("macos");
+    await screen.getByRole("button", "Run a command").tap();
+    await expect(browser.locator(".landing-terminal code")).toContainText(
+      "--platforms web,macos,windows,linux,mcp",
+    );
   },
 );
 
@@ -100,7 +106,7 @@ test(
     ]) {
       await screen.getByRole("button", name, { exact: true }).tap();
       await expect(browser.locator(".landing-terminal code")).toHaveText(
-        `${command} create-disposabl-app@latest`,
+        `${command} create-disposabl-app@latest --platforms web,android,ios`,
       );
     }
   },
@@ -132,7 +138,7 @@ test(
       .getByText("Is Disposabl really free?", { exact: true })
       .tap();
     await expect(browser.locator("#faq details[open] p")).toContainText(
-      "$1 = 100 credits",
+      "$5 and includes 500 credits",
     );
     await screen.getByRole("button", "Open menu").tap();
     await screen.getByRole("link", "How it works", { exact: true }).tap();
@@ -237,5 +243,113 @@ test(
     await browser.keyboard.press("Escape");
     await app.open("/#start");
     await expect(browser.locator(".start-dialog[open]")).toBeVisible();
+  },
+);
+
+test(
+  "outcome choices prepare useful prompts and pricing shows the credit allowance",
+  { platforms: ["web"], tags: ["landing"] },
+  async ({ app, browser, screen }) => {
+    await app.open("/");
+    await expect(browser.locator(".agent-price .price-number")).toHaveText(
+      "$5",
+    );
+    await expect(browser.locator(".agent-price ul")).toContainText(
+      "500 credits",
+    );
+    for (const [name, text] of [
+      ["Take bookings", "appointment booking"],
+      ["Open your shop", "online shop"],
+      ["Bring your team together", "workspace"],
+      ["Teach what you know", "learning app"],
+    ]) {
+      await screen.getByRole("button", name, { exact: true }).tap();
+      await expect(
+        browser.locator(".start-dialog[open] .landing-prompt"),
+      ).toContainText(text);
+      await screen.getByRole("button", "Copy prompt", { exact: true }).tap();
+      await expect(screen.getByRole("status")).toHaveText(
+        "Copied to clipboard.",
+      );
+      await browser.keyboard.press("Escape");
+    }
+    await browser.locator("#start").tap();
+    await expect(browser.locator(".landing-prompt")).toHaveText(
+      "Build my app with create-disposabl-app@latest. Ask me what I want to make. Use these platforms: web, android, ios.",
+    );
+  },
+);
+
+test(
+  "themes follow the system then persist the visitor choice without small text",
+  { platforms: ["web"], tags: ["landing"], timeout: 120000 },
+  async ({ app, browser, screen }) => {
+    await browser.emulateMedia({
+      colorScheme: "dark",
+      reducedMotion: "reduce",
+    });
+    await app.open("/");
+    await expect(browser.locator("html")).toHaveAttribute("class", "dark");
+    await browser.emulateMedia({ colorScheme: "light" });
+    await expect(browser.locator("html")).toHaveAttribute("class", "light");
+    await screen.getByRole("button", "Toggle light and dark mode").tap();
+    await expect(browser.locator("html")).toHaveAttribute("class", "dark");
+    await app.open("/stack");
+    await expect(browser.locator("html")).toHaveAttribute("class", "dark");
+    for (const theme of ["dark", "light"]) {
+      if (theme === "light")
+        await screen.getByRole("button", "Toggle light and dark mode").tap();
+      for (const width of [320, 390, 768, 1440]) {
+        await browser.setViewport({ width, height: 900 });
+        for (const path of ["/", "/stack", "/build", "/why-disposabl"]) {
+          await app.open(path);
+          await expect(browser.locator("html")).toHaveAttribute("class", theme);
+          await expect(browser.locator("main h1")).toBeVisible();
+          for (const dialog of path === "/" ? [false, true] : [false]) {
+            if (dialog) await browser.locator("#start").tap();
+            const undersized = await browser.evaluate(() => {
+              const root = document.querySelector(".launch-site")!;
+              const walker = document.createTreeWalker(
+                root,
+                NodeFilter.SHOW_TEXT,
+              );
+              const failures: string[] = [];
+              let node: Node | null;
+              while ((node = walker.nextNode())) {
+                const el = node.parentElement;
+                if (
+                  !el ||
+                  !node.textContent?.trim() ||
+                  el.closest('.sr-only,[aria-hidden="true"],script,style')
+                )
+                  continue;
+                const range = document.createRange();
+                range.selectNodeContents(node);
+                const box = range.getBoundingClientRect();
+                const style = getComputedStyle(el);
+                if (
+                  box.width > 0 &&
+                  box.height > 0 &&
+                  style.visibility !== "hidden" &&
+                  parseFloat(style.fontSize) < 16
+                )
+                  failures.push(
+                    `${node.textContent.trim()}: ${style.fontSize}`,
+                  );
+              }
+              return failures;
+            });
+            expect(undersized).toEqual([]);
+            if (dialog) await browser.keyboard.press("Escape");
+          }
+          expect(
+            await browser.evaluate(
+              () => document.documentElement.scrollWidth === innerWidth,
+            ),
+          ).toBe(true);
+          if (path === "/") await app.screenshot(`landing-${theme}-${width}`);
+        }
+      }
+    }
   },
 );

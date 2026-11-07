@@ -18,11 +18,15 @@ test(
     await expect(screen.getByRole("status")).toHaveText("Copied to clipboard.");
     await screen.getByRole("button", "Run a command").tap();
     await expect(
-      screen.getByText("bunx create-disposabl-app@latest"),
+      screen.getByText(
+        "bunx create-disposabl-app@latest --platforms web,android,ios",
+      ),
     ).toBeVisible();
     await screen.getByRole("button", "npm", { exact: true }).tap();
     await expect(
-      screen.getByText("npx create-disposabl-app@latest"),
+      screen.getByText(
+        "npx create-disposabl-app@latest --platforms web,android,ios",
+      ),
     ).toBeVisible();
     await screen.getByRole("button", "Copy command").tap();
     await expect(screen.getByRole("status")).toHaveText("Copied to clipboard.");

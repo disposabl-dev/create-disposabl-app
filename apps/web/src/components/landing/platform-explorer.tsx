@@ -98,8 +98,7 @@ export function PlatformExplorer({
       aria-labelledby="platform-title"
     >
       <div className="section-heading">
-        <h2 id="platform-title">More than a website.</h2>
-        <p>Choose your platforms. See what powers them.</p>
+        <h2 id="platform-title">Pick your platforms.</h2>
       </div>
       <div
         className="platform-toggles"
@@ -160,7 +159,6 @@ export function PlatformExplorer({
         ))}
       </div>
       <div className="shared-stack">
-        <span>In every project</span>
         <div>
           {["TypeScript", "Convex", "Bun", "Turborepo", "GitHub Actions"].map(
             (name) => (
@@ -173,7 +171,6 @@ export function PlatformExplorer({
         </div>
       </div>
       <div className="workbench-footer">
-        <p>Web is included. CLI and SDK also enable API.</p>
         <TextLink href="/stack">Explore the stack</TextLink>
       </div>
     </section>

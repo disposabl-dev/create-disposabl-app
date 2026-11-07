@@ -6,7 +6,8 @@ import { MarketingShell, TextLink } from "./shell";
 import { PlatformExplorer } from "./platform-explorer";
 import { Pricing, Questions } from "./sections";
 import { BrandIcon } from "./brand-icon";
-import { AppPreview } from "./app-preview";
+import { PlatformArt } from "./platform-art";
+import { OutcomePicker } from "./outcome-picker";
 import claude from "../agent-onboarding/assets/claude.svg";
 import codex from "../agent-onboarding/assets/codex.png";
 import cursor from "../agent-onboarding/assets/cursor.svg";
@@ -19,6 +20,7 @@ export function Home() {
     "ios",
   ]);
   const dialog = useRef<HTMLDialogElement>(null);
+  const [idea, setIdea] = useState("");
   useEffect(() => {
     const openFromLink = () => {
       if (window.location.hash === "#start") dialog.current?.showModal();
@@ -27,7 +29,14 @@ export function Home() {
     window.addEventListener("hashchange", openFromLink);
     return () => window.removeEventListener("hashchange", openFromLink);
   }, []);
-  const start = () => dialog.current?.showModal();
+  const start = () => {
+    setIdea("");
+    dialog.current?.showModal();
+  };
+  const startIdea = (value: string) => {
+    setIdea(value);
+    dialog.current?.showModal();
+  };
   return (
     <MarketingShell onStart={start}>
       <main id="main" className="launch-home">
@@ -35,39 +44,27 @@ export function Home() {
           className="launch-hero launch-container"
           aria-labelledby="hero-title"
         >
-          <h1 id="hero-title">
-            Build the app
-            <br />
-            <span>you wish existed.</span>
-          </h1>
-          <p className="hero-description">Your AI. Your computer. Your code.</p>
-          <div className="hero-actions">
-            <button
-              id="start"
-              className="primary-link"
-              onClick={() => dialog.current?.showModal()}
-            >
-              <Laptop size={20} /> Start building free{" "}
-              <ArrowUpRight size={18} />
-            </button>
-            <StoreButtons />
+          <div className="hero-copy">
+            <h1 id="hero-title">
+              Your idea.
+              <br />
+              <span>Your next app.</span>
+            </h1>
+            <p className="hero-description">
+              Your AI. Your computer. Your code.
+            </p>
+            <div className="hero-actions">
+              <button id="start" className="primary-link" onClick={start}>
+                <Laptop size={23} />
+                Start building free
+                <ArrowUpRight size={22} />
+              </button>
+              <StoreButtons />
+            </div>
           </div>
-          <p className="hero-cost">
-            Free on your computer. No Disposabl subscription.
-          </p>
-          <div
-            className="hero-platforms"
-            aria-label="Build for web, mobile and desktop"
-          >
-            {["Web", "Apple", "Android", "Windows", "Linux"].map((name) => (
-              <span key={name} title={name}>
-                <BrandIcon name={name} />
-                <span className="sr-only">{name}</span>
-              </span>
-            ))}
-          </div>
-          <AppPreview />
+          <PlatformArt />
         </section>
+        <OutcomePicker onSelect={startIdea} />
         <PlatformExplorer selected={selected} onChange={setSelected} />
         <section
           className="agent-section launch-container"
@@ -88,15 +85,15 @@ export function Home() {
           </div>
           <div>
             <h2 id="agent-title">
-              Keep your favorite AI.
+              Your whole ecosystem.
               <br />
-              Skip the setup work.
+              Already connected.
             </h2>
             <p>
-              Claude Code, Codex, Cursor. Give your agent a project with the
-              platforms, backend, tests, and publishing already connected.
+              Apps, backend, sign-in, tests, and publishing. Give your AI the
+              full picture from the first prompt.
             </p>
-            <TextLink href="/why-disposabl">Why use them together?</TextLink>
+            <TextLink href="/why-disposabl">Why Disposabl?</TextLink>
           </div>
         </section>
         <Pricing onStart={start} />
@@ -116,21 +113,18 @@ export function Home() {
               <br />
               Coming soon.
             </h2>
-            <p>
-              Localization with{" "}
-              <a className="inline-link" href="https://generaltranslation.com/">
-                General Translation
-              </a>
-              . Planned for the starter.
-            </p>
           </div>
         </section>
         <Questions />
         <section className="final-section launch-container">
-          <h2>What will you make?</h2>
+          <h2>
+            Make your
+            <br />
+            next big thing.
+          </h2>
           <button
             className="primary-link"
-            onClick={() => dialog.current?.showModal()}
+            onClick={start}
           >
             Start building free <ArrowUpRight size={18} />
           </button>
@@ -154,11 +148,7 @@ export function Home() {
             <X size={22} />
           </button>
         </div>
-        <AgentOnboarding />
-        <p className="dialog-note">
-          Local development is free. AI and cloud providers may charge
-          separately.
-        </p>
+        <AgentOnboarding idea={idea} platforms={selected} />
       </dialog>
     </MarketingShell>
   );
@@ -175,12 +165,15 @@ function StoreButtons() {
               aria-disabled="true"
               aria-describedby={`store-tip-${index}`}
               className="store-button"
+              onClick={(event) => event.currentTarget.focus()}
+              aria-label={
+                index === 0
+                  ? "Download on the App Store"
+                  : "Get it on Google Play"
+              }
             >
               <BrandIcon name={index === 0 ? "Apple" : "Google Play"} />
-              <span>
-                <small>{index === 0 ? "Download on the" : "Get it on"}</small>
-                {name}
-              </span>
+              <span>{name}</span>
             </button>
             <span
               id={`store-tip-${index}`}
@@ -192,7 +185,6 @@ function StoreButtons() {
           </div>
         ))}
       </div>
-      <span className="store-status">Mobile builder coming soon</span>
     </div>
   );
 }
