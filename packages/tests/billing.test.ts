@@ -4,7 +4,6 @@ import {
   balanceFromCustomer,
   billingConfig,
   billingContext,
-  billingPlans,
   billingRequest,
   purchaseRequest,
   monthlyPlanFromCustomer,
@@ -19,11 +18,25 @@ import { resolveFeatures } from "../disposabl-kit/feature-options";
 
 describe("billing boundary", () => {
   test("editable starter prices drive server quantities and displayed allowances", () => {
-    assert.equal(formatPrice(pricing.monthly.price), "$5");
-    assert.equal(creditQuantity("monthly"), 500);
-    assert.equal(creditQuantity("topup"), 500);
+    const example: Pricing = {
+      currency: "USD",
+      creditsPerDollar: 100,
+      featureId: "credits",
+      monthly: { planId: "credits_monthly", price: 5 },
+      topup: { planId: "credits_topup", price: 5 },
+    };
+    assert.equal(formatPrice(example.monthly.price, example), "$5");
+    assert.equal(creditQuantity("monthly", example), 500);
+    assert.equal(creditQuantity("topup", example), 500);
+    assert.equal(
+      creditQuantity("topup", {
+        ...example,
+        topup: { ...example.topup, price: 1.1 },
+      }),
+      110,
+    );
     const custom: Pricing = {
-      ...pricing,
+      ...example,
       featureId: "workspace_credits",
       creditsPerDollar: 80,
       monthly: { planId: "workspace_monthly", price: 12 },
@@ -90,15 +103,19 @@ describe("billing boundary", () => {
       "https://app.example/pricing",
     );
     assert.equal(monthly.customer_id, "user");
-    assert.equal(monthly.plan_id, billingPlans.monthly);
+    assert.equal(monthly.plan_id, pricing.monthly.planId);
     const topup = purchaseRequest(
       "user",
       "topup",
       "https://app.example/pricing",
     );
-    assert.equal(topup.plan_id, billingPlans.topup);
+    assert.equal(topup.plan_id, pricing.topup.planId);
     assert.deepEqual(topup.feature_quantities, [
-      { feature_id: "credits", quantity: 500, adjustable: false },
+      {
+        feature_id: pricing.featureId,
+        quantity: creditQuantity("topup"),
+        adjustable: false,
+      },
     ]);
     assert.throws(() =>
       purchaseRequest("user", "other" as never, "https://app.example/pricing"),
@@ -106,7 +123,9 @@ describe("billing boundary", () => {
   });
   test("reads provider balances and hides provider errors", async () => {
     assert.equal(
-      balanceFromCustomer({ balances: { credits: { remaining: 750 } } }),
+      balanceFromCustomer({
+        balances: { [pricing.featureId]: { remaining: 750 } },
+      }),
       750,
     );
     assert.equal(balanceFromCustomer({}), null);

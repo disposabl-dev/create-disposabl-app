@@ -5,10 +5,6 @@ import {
   type Purchase,
 } from "../payments/config";
 
-export const billingPlans = {
-  monthly: pricing.monthly.planId,
-  topup: pricing.topup.planId,
-} as const;
 export type { Purchase } from "../payments/config";
 
 export function billingConfig(
@@ -68,7 +64,7 @@ export function purchaseRequest(
   returnUrl: string,
   config: Pricing = pricing,
 ) {
-  if (!Object.hasOwn(billingPlans, purchase))
+  if (purchase !== "monthly" && purchase !== "topup")
     throw new Error("Invalid purchase.");
   return {
     customer_id: customerId,

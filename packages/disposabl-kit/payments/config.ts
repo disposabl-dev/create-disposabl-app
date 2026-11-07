@@ -18,7 +18,8 @@ export const pricing: Pricing = {
 export type Purchase = "monthly" | "topup";
 
 export function creditQuantity(purchase: Purchase, config: Pricing = pricing) {
-  return config[purchase].price * config.creditsPerDollar;
+  // Credits are whole units; decimal prices must not leak floating-point noise.
+  return Math.round(config[purchase].price * config.creditsPerDollar);
 }
 
 export function formatPrice(amount: number, config: Pricing = pricing) {
