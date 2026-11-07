@@ -54,11 +54,9 @@ Run `bun run android` or `bun run ios` once to install it, then use `bun run dev
 Expo Go is not supported. No browser redirect or custom token exchange is needed
 for username/password login. OAuth would require a separate browser flow.
 
-Checked npm and the Convex Auth `reboot` branch on 2026-11-02. The latest v2 beta
-is still `2.0.0-beta.0`. Its React provider already supports async SecureStore
-storage. The relevant upstream provider and session code at
-`db15c82e6f568d7717563783447010f9a5534359` adds no native password requirement,
-so this integration uses the published package without another auth patch.
+Mobile uses the same [Convex Auth snapshot](../../vendor/README.md) as web and
+the backend. Its React provider supports async SecureStore storage; native
+password login needs no platform-specific Auth patch.
 
 Mobile previews are release builds with embedded JavaScript, not development
 clients. Android uses `assembleRelease`; iOS internal profiles explicitly disable
@@ -72,13 +70,39 @@ installable APK in a separate 4-vCPU Android job. Later runs with the same finge
 publish EAS Update from Web. Native jobs install only the mobile workspace using
 the shared dependency cache. Android and iOS native builds run in parallel.
 Linux and Windows start alongside Web.
+Production iOS checks the latest finished EAS store build for the same app and
+channel. If its fingerprint matches, CI publishes an iOS OTA update and skips
+the native build. A missing or incompatible binary requires a new EAS build.
+This check proves build compatibility, not App Store availability: distribute
+the initial native build through TestFlight or the App Store. CI also checks
+submissions for the matching build: missing or failed submissions retry the
+existing binary once credentials are configured, while pending submissions
+are not duplicated. Apple processing and store release remain separate.
+With Expo connected,
+PRs publish iOS OTA to their own channel and also produce a simulator archive.
 Build jobs use standard GitHub-hosted runners and production iOS uses EAS Build. See the [app workflow](../../.github/workflows/pipeline.yml)
 for the job order and cache behavior.
 
 Each PR uses its own `pr-<number>` channel and Android application ID. Production
 uses `production`. A new PR needs its own first APK even when another PR has the
 same native dependencies. Install that APK once; compatible JavaScript and asset
-updates download on launch and normally apply on the following cold launch.
+updates download on launch and apply on the following cold launch. The shared
+`UpdatePrompt` also checks when the app returns after at least five minutes
+inactive. Brief interruptions and time spent using the app do not trigger checks.
+The native `ON_LOAD` policy starts from the newest cached bundle immediately and
+downloads compatible updates for the following cold launch. Once downloaded,
+the banner offers **Update now** for a user-confirmed restart without interrupting work,
+rechecks the server before applying an update, and respects rollback directives.
+If Expo is still checking or downloading when a long inactive interval ends,
+one foreground check waits until the app is active and Expo is idle. A generic
+no-update response does not hide a bundle that Expo still reports as pending.
+Offline checks leave the current app usable. Development builds skip this flow;
+set `EXPO_PUBLIC_E2E=true` when building a release artifact for isolated tests.
+This sets native `updates.enabled=false` as well as hiding the prompt, so tests
+keep running the embedded bundle across cold launches. Normal builds retain
+Expo's update and recovery settings. Removing an update on the server is not
+a guarantee that cached bundles cannot launch; use Expo's rollback controls.
+Verify real updates with a release APK or iOS simulator build, not a Metro client.
 
 The last published APK is the baseline. Failed builds and partial uploads do
 not advance it. A missing APK forces another build. Reverting a native change
@@ -91,7 +115,7 @@ Each generated app needs its own Expo project. From `apps/mobile`, run:
 
 ```sh
 bunx eas-cli@27.2.0 init
-bunx eas-cli@27.2.0 update:configure --platform android --environment preview
+bunx eas-cli@27.2.0 update:configure --platform all --environment preview
 ```
 
 For dynamic app config, the CLI may ask you to add the returned project ID.

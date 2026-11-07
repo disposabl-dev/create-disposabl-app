@@ -13,6 +13,7 @@
     ".expo/types/**/*.ts",
     "expo-env.d.ts",
     "../../packages/disposabl-kit/mobile/**/*.ts",
-    "../../packages/disposabl-kit/mobile/**/*.tsx"
+    "../../packages/disposabl-kit/mobile/**/*.tsx",
+    "nativewind-env.d.ts"
   ]
 }

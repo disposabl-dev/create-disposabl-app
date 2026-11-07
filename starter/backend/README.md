@@ -1,8 +1,8 @@
 # Backend
 
-Fresh apps start with a `users` table and organization/member records for optional Claude auto-connect. Authentication, API/MCP access, and static hosting use the shared kit and Convex components. Add your app's tables to `convex/schema.ts` and its operations in feature folders.
+Fresh apps start with a `users` table and the selected authentication, billing, and analytics features. Authentication, API/MCP access, and static hosting use the shared kit and Convex components. Add your app's tables to `convex/schema.ts` and its operations in feature folders.
 
-See `convex/mcpEnterprise/README.md` for Claude organization setup and `../../vendor/README.md` for the pinned Convex Auth source.
+MCP authentication uses the installed MCP component. See `../../vendor/README.md` for the pinned Convex Auth source.
 
 Run `bun run dev` at the workspace root. Run `bun run generate` after changing operations to regenerate the API/MCP contract and selected SDK.
 
@@ -26,3 +26,7 @@ Email signup pauses with a clear unavailable state if a key exists without a sen
 Signed-in password accounts can use `/change-password`, also discoverable at `/.well-known/change-password`. Password changes verify the current password and can revoke other sessions. Recovery links expire after 10 minutes, are single-use, and revoke existing sessions on completion. Google-only accounts change their credentials with Google.
 
 `convex/emails.ts` exports the official Resend component client for other authorized application emails. It queues sends with production delivery enabled; never expose an unauthenticated arbitrary-email mutation. Configure sender credentials separately for development. Test commands do not enable analytics.
+
+## File storage
+
+Authenticated callers can upload up to 5 MiB with `api.files.index.upload`, then use the returned `files` ID with `getDownload`, `resolveAttachments`, or `remove`. R2 download URLs expire after five minutes; request a fresh one when needed. Convex storage URLs remain valid until the file is deleted. Configure `R2_ACCOUNT_ID`, `R2_BUCKET_NAME`, `R2_ACCESS_KEY_ID`, and `R2_SECRET_ACCESS_KEY` on each Convex deployment to use an existing Cloudflare R2 bucket. The token needs object read, write, and delete access. Without all four values, new files use Convex storage. Existing R2 files require the same account and bucket configuration to read or delete. Do not expose these credentials to clients.

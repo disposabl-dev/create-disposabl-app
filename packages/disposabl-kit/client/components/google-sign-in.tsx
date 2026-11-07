@@ -6,6 +6,7 @@ import {
 } from "@convex-dev/auth/methods/google/react";
 import { api } from "../../../backend/convex/_generated/api";
 import { Button } from "./ui/button";
+import googleLogo from "../../lib/google-logo.png";
 
 export function GoogleSignIn() {
   const providers = useQuery(api.auth.providers);
@@ -41,7 +42,7 @@ export function GoogleSignIn() {
       <Button
         type="button"
         variant="outline"
-        className="w-full"
+        className="w-full gap-2.5 border-[#747775] bg-white text-[#1F1F1F] hover:bg-[#f2f2f2] hover:text-[#1F1F1F] dark:border-[#8E918F] dark:bg-[#131314] dark:text-[#E3E3E3] dark:hover:bg-[#232324]"
         disabled={pending}
         onClick={async () => {
           setStartError(null);
@@ -53,24 +54,11 @@ export function GoogleSignIn() {
           }
         }}
       >
-        <svg aria-hidden="true" viewBox="0 0 24 24" className="size-4">
-          <path
-            fill="#4285F4"
-            d="M21.6 12.23c0-.71-.06-1.39-.18-2.05H12v3.88h5.38a4.6 4.6 0 0 1-2 3.02v2.51h3.24c1.9-1.75 2.98-4.33 2.98-7.36Z"
-          />
-          <path
-            fill="#34A853"
-            d="M12 22c2.7 0 4.96-.9 6.62-2.41l-3.24-2.51c-.9.6-2.05.97-3.38.97-2.6 0-4.8-1.76-5.59-4.12H3.07v2.59A10 10 0 0 0 12 22Z"
-          />
-          <path
-            fill="#FBBC05"
-            d="M6.41 13.93a6 6 0 0 1 0-3.86V7.48H3.07a10 10 0 0 0 0 9.04l3.34-2.59Z"
-          />
-          <path
-            fill="#EA4335"
-            d="M12 5.95c1.47 0 2.79.51 3.83 1.51l2.87-2.87A9.6 9.6 0 0 0 12 2a10 10 0 0 0-8.93 5.48l3.34 2.59C7.2 7.71 9.4 5.95 12 5.95Z"
-          />
-        </svg>
+        <img
+          src={googleLogo}
+          alt=""
+          className="size-5 shrink-0 object-contain"
+        />
         {pending ? "Opening Google…" : "Sign in with Google"}
       </Button>
       {error && (

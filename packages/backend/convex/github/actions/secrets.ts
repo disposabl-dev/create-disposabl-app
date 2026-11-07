@@ -5,6 +5,7 @@ import {
   internalAction,
 } from "@disposabl/disposabl-kit/server/lib/functions";
 import { v } from "convex/values";
+import { platform } from "../../validator";
 import { internal } from "../../_generated/api";
 import { credential, unseal } from "../../connections/actions/credentials";
 import { ensureExpo } from "../../apps/actions/expo";
@@ -17,13 +18,14 @@ import { githubRequest, githubToken } from "./tokens";
 import { generateAndroidSigning } from "./signing";
 
 export const configure = internalAction({
-  args: { ...identityFields, appId: v.string(), projectId: v.number() },
+  args: {
+    ...identityFields,
+    appId: v.string(),
+    projectId: v.number(),
+    platforms: v.array(platform),
+  },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const details = await ctx.runQuery(internal.apps.internal.get, {
-      userId: args.userId,
-      appId: args.appId,
-    });
     const app = await ctx.runQuery(internal.apps.internal.githubApp, {
       appId: args.appId,
     });
@@ -56,7 +58,7 @@ export const configure = internalAction({
     ];
     const legacyCount = legacySigning.filter((name) => names.has(name)).length;
     if (
-      details.platforms.includes("android") &&
+      args.platforms.includes("android") &&
       !names.has("DISPOSABL_ANDROID_SIGNING") &&
       legacyCount > 0 &&
       legacyCount < legacySigning.length
@@ -89,7 +91,7 @@ export const configure = internalAction({
       );
     };
     if (
-      details.platforms.includes("android") &&
+      args.platforms.includes("android") &&
       !names.has("DISPOSABL_ANDROID_SIGNING") &&
       legacyCount === 0
     ) {
@@ -135,7 +137,7 @@ export const configure = internalAction({
     });
     if (
       expo &&
-      details.platforms.some(
+      args.platforms.some(
         (platform) => platform === "android" || platform === "ios",
       )
     ) {

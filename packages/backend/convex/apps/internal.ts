@@ -2,6 +2,7 @@ import {
   identityFields,
   internalMutation,
   internalQuery,
+  internalAction,
 } from "@disposabl/disposabl-kit/server/lib/functions";
 import {
   paginationOptsValidator,
@@ -13,12 +14,21 @@ import { resolveFeatures } from "@disposabl/disposabl-kit/feature-options";
 import { requireConnections } from "../connections/config";
 import { internal } from "../_generated/api";
 import { validatePlatforms } from "@disposabl/disposabl-kit/platforms";
+import { assertActive } from "./operations/internal";
 import { githubConnection } from "../validator";
 import type { Doc } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
+import { result as agentResult } from "../agent/validator";
 type AppResult = Infer<typeof appResult>;
 
 export { create } from "./actions/create";
+export const repositoryToken = internalAction({
+  platforms: true,
+  args: { ...identityFields, appId: v.string() },
+  returns: v.object({ token: v.string(), repository: v.string() }),
+  handler: async (ctx, args): Promise<{ token: string; repository: string }> =>
+    ctx.runAction(internal.apps.actions.repository.token, args),
+});
 export const insert = internalMutation({
   args: { ...identityFields, ...appArgs, appId: v.string() },
   returns: appResult,
@@ -90,6 +100,7 @@ export const update = internalMutation({
         userId,
         features: selectedFeatures,
       }),
+      selected,
     );
     await ctx.db.patch("apps", app._id, {
       platforms: selected,
@@ -102,6 +113,57 @@ export const update = internalMutation({
     });
   },
 });
+/** Commit selections only after setup succeeds, while holding its existing lease. */
+export const applyConfiguration = internalMutation({
+  args: {
+    ...identityFields,
+    appId: v.string(),
+    until: v.number(),
+    platforms: v.array(platform),
+    features: v.array(feature),
+  },
+  returns: v.null(),
+  handler: async (ctx, { userId, appId, until, platforms, features }) => {
+    const app = await ownedApp(ctx, userId, appId);
+    if (
+      app.operation?.kind !== "setup" ||
+      app.operation.until !== until ||
+      until <= Date.now()
+    )
+      throw new ConvexError("App setup lease expired. Retry setup.");
+    await ctx.db.patch("apps", app._id, { platforms, features });
+    return null;
+  },
+});
+
+/** Queue repository changes; applied selections are synchronized by generator setup. */
+export const requestConfiguration = internalMutation({
+  platforms: true,
+  args: {
+    ...identityFields,
+    appId: v.string(),
+    platforms: v.array(platform),
+    features: v.array(feature),
+  },
+  returns: agentResult,
+  handler: async (
+    ctx,
+    { userId, appId, platforms, features },
+  ): Promise<Infer<typeof agentResult>> => {
+    const app = await ownedApp(ctx, userId, appId);
+    assertActive(app);
+    const selected = validatePlatforms(platforms);
+    const selectedFeatures = resolveFeatures(features);
+    return ctx.runMutation(internal.agent.internal.sendMessage, {
+      userId,
+      appId,
+      prompt: `Apply this configuration change to the existing app repository. Requested platforms: ${selected.join(",")}. Requested features: ${selectedFeatures.join(",") || "none"}.
+Read the generator version from this app's disposabl.json. Use that exact version (not latest) with the existing-project reconfiguration flow from /home/user/apps: bun create disposabl-app@<matching-version> ${appId} --platforms ${selected.join(",")} --features ${selectedFeatures.join(",") || "none"} --yes.
+Preserve this app ID, source customizations and user data. Restore newly selected platform/auth files using the generator; do not scaffold a replacement. Complete its existing setup/provisioning flow and run the selected-platform checks. If a template conflict or account connection blocks setup, explain the exact blocker and stop. Report applied files, setup outcome and test evidence; a queued request or metadata update alone is not completion.`,
+    });
+  },
+});
+
 export { remove as delete } from "./actions/delete";
 
 function assertAppId(appId: string) {

@@ -31,7 +31,7 @@ Use command help and the current API contract for other operations. If login is 
 
 ## Implement and deliver
 
-Choose a visual direction suited to the product. Use `frontend-design` when available and read [app branding and visual design](references/design.md). If that skill is unavailable, proceed with the user's brief and report the limitation without blocking development.
+Choose a visual direction suited to the product. Read the `frontend-design` skill when available and read [app branding and visual design](references/design.md). If that skill is unavailable, proceed with the user's brief and report the limitation without blocking development.
 
 Read [delivery checks](references/delivery.md) before native builds or delivery repairs. Aim to show a usable web preview early; first native builds can take longer. Do not promise a build deadline.
 
@@ -45,7 +45,7 @@ For a scoped run, use `bun run test --target web,backend` or a selected native t
 
 ## Publish a preview
 
-A generated app already has an Initial commit and a provisioned Git remote. For authorized delivery, publish that scaffold to `main`, then develop on an isolated feature branch/worktree:
+A generated app already has an Initial commit and a provisioned Git remote. For user-requested app creation and delivery, push the scaffold to `main` immediately after successful setup. Create a feature branch and open a same-repository PR early, before product generation, so its preview can start:
 
 ```sh
 cd my-app
@@ -58,6 +58,10 @@ bun run dev
 ```
 
 Use the host's worktree and delegation tools when required. Keep tokens in ignored environment files. Local development, PR previews, and production are separate deployments. Opening a same-repository PR to `main` triggers its preview; a branch push alone does not. Push only the intended reviewed changes and preserve unrelated work.
+
+Before generating the product, write a concise `APP_BRIEF.md` with its purpose, selected platforms and intended user flow. Commit that real change, push the feature branch, and open its PR. Keep the starter usable while the selected native builds from the initial `main` push run in parallel with generation.
+
+An installer from `main` receives production updates, not PR preview updates. After the generated app passes review and its selected-platform checks, merge through the authorized delivery workflow to publish the production update. Compatible Android JavaScript and asset changes use EAS Update; native dependency or configuration changes need a new binary. Desktop delivery needs its configured native update feed. Do not report that an update reached an installed app until that behavior is verified.
 
 ## Preview updates every two minutes
 
@@ -97,4 +101,4 @@ when explaining access: https://github.com/disposabl-dev/create-disposabl-app.
 
 ## Remote agent
 
-Default to local development. When the user explicitly wants remote execution, follow [the remote agent workflow](references/agent.md). Inspect their existing apps and messages before choosing an app. Use `bunx @disposabl/cli@latest` for agent, apps, and preview operations. One account shares one sandbox across apps, with separate conversations and multiple preview variants per app.
+Default to local development. When the user explicitly wants remote execution, follow [the remote agent workflow](references/agent.md). Inspect their existing apps and messages before choosing an app. Use `bunx --package create-disposabl-app@latest disposabl` for agent, apps, and preview operations. One account shares one sandbox across apps, with separate conversations and multiple preview variants per app.

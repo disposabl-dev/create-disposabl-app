@@ -1,17 +1,16 @@
-import { Command } from "commander";
 import { openExpoDeletion } from "./delete";
-import manifest from "./package.json";
+import { apiUrl, openUrl } from "./auth";
 import {
-  NotAuthenticated,
-  accessToken,
-  apiUrl,
-  hasCredentials,
-  login,
-  logout,
-  openUrl,
-} from "./auth";
+  createProgram,
+  loadContract,
+  addOperation,
+  operationFields,
+  requestOperation,
+  needsContract,
+} from "./client";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { configureRepository } from "./repository";
 import {
   configureDevelopment,
   detectReference,
@@ -21,111 +20,29 @@ import {
 export const SERVICE_ORIGIN = "https://www.disposabl.dev";
 export async function runCli(
   argv = process.argv,
-  serviceOrigin = SERVICE_ORIGIN,
+  serviceOrigin = process.env.DISPOSABL_API_ORIGIN || SERVICE_ORIGIN,
 ) {
-  type Schema = {
-    type?: string;
-    properties?: Record<string, Schema>;
-    required?: string[];
-  };
-  type Operation = {
-    operationId: string;
-    parameters?: {
-      name: string;
-      required?: boolean;
-      content: { "application/json": { schema: Schema } };
-    }[];
-    requestBody?: { content: { "application/json": { schema: Schema } } };
-  };
-  const program = new Command()
-    .name(Object.keys(manifest.bin)[0])
-    .version(manifest.version);
+  const program = createProgram(serviceOrigin);
   const origin = () => apiUrl(serviceOrigin);
-  const loginCommand = program
-    .command("login")
-    .option("--no-browser", "Print the login URL without opening a browser")
-    .action(async (options) => {
-      await login(origin(), options.browser);
-      console.error("Signed in.");
-    });
-  loginCommand
-    .command("status")
-    .description("Return the server-verified current user")
-    .action(async () => {
-      const base = origin();
-      if (!(await hasCredentials(base))) {
-        console.log(JSON.stringify({ currentUser: null }));
-        return;
-      }
-      const send = async (refresh = false) =>
-        fetch(`${base}/api/users/current`, {
-          headers: {
-            Authorization: `Bearer ${await accessToken(base, refresh)}`,
-            "X-Disposabl-Source": "cli",
-          },
-          redirect: "error",
-          signal: AbortSignal.timeout(30_000),
-        });
-      let response: Response;
-      try {
-        response = await send();
-        if (response.status === 401 && !process.env.DISPOSABL_API_KEY)
-          response = await send(true);
-      } catch (error) {
-        if (!(error instanceof NotAuthenticated)) throw error;
-        console.log(JSON.stringify({ currentUser: null }));
-        return;
-      }
-      if (response.status === 401) {
-        console.log(JSON.stringify({ currentUser: null }));
-        return;
-      }
-      if (!response.ok)
-        throw new Error(`Login status failed (${response.status}).`);
-      console.log(JSON.stringify({ currentUser: await response.json() }));
-    });
-  program.command("logout").action(async () => {
-    await logout(origin());
-    console.error("Signed out.");
-  });
 
   async function main() {
-    // Help, version and login work without fetching the application contract.
-    const args = argv.slice(2);
-    const global = program.parseOptions(args);
-    const commandName = global.operands[0];
-    if (commandName && !["login", "logout", "help"].includes(commandName)) {
+    if (needsContract(program, argv, serviceOrigin)) {
       const base = origin();
-      const response = await fetch(`${base}/openapi.json`, {
-        redirect: "error",
-        signal: AbortSignal.timeout(30_000),
-      });
-      if (!response.ok)
-        throw new Error(`Could not load OpenAPI (${response.status}).`);
-      const spec = (await response.json()) as {
-        paths: Record<string, Record<string, Operation>>;
-      };
+      const spec = await loadContract(base);
       for (const [path, methods] of Object.entries(spec.paths)) {
-        if (
-          !path.startsWith("/api/") ||
-          path.includes("?") ||
-          path.includes("#")
-        )
-          throw new Error("Invalid API path in contract.");
         for (const [method, operation] of Object.entries(methods)) {
           if (!["get", "post"].includes(method)) continue;
-          const parts = path.slice(5).split("/");
-          let parent = program;
-          for (const part of parts.slice(0, -1))
-            parent =
-              parent.commands.find((command) => command.name() === part) ??
-              parent.command(part);
-          const command = parent.command(parts.at(-1)!);
+          const command = addOperation(program, path);
           const connectionStatus = path === "/api/connections/status";
           if (connectionStatus)
             command.option(
               "--wait",
               "Open setup and continue when GitHub and Convex are ready",
+            );
+          if (connectionStatus)
+            command.option(
+              "--setup-origin",
+              "Show the terminal setup completion screen",
             );
           if (connectionStatus)
             command.option(
@@ -140,6 +57,12 @@ export async function runCli(
             );
           const previewGet = path === "/api/previews/get";
           const tokenCreate = path === "/api/previews/token/create";
+          const repositoryToken = path === "/api/apps/repositoryToken";
+          if (repositoryToken)
+            command.option(
+              "--configure",
+              "Save repository credentials privately outside the project",
+            );
           if (previewGet)
             command.option("--json", "Print the full preview as JSON");
           if (tokenCreate)
@@ -147,22 +70,7 @@ export async function runCli(
               "--configure <directory>",
               "Write local development environment files",
             );
-          const schema =
-            operation.requestBody?.content["application/json"].schema;
-          const fields =
-            method === "get"
-              ? (operation.parameters ?? []).map((p) => ({
-                  name: p.name,
-                  required: p.required,
-                  schema: p.content["application/json"].schema,
-                }))
-              : Object.entries(schema?.properties ?? {}).map(
-                  ([name, value]) => ({
-                    name,
-                    required: schema?.required?.includes(name),
-                    schema: value,
-                  }),
-                );
+          const fields = operationFields(method, operation);
           for (const field of fields) {
             if (deleteApp && field.name === "dangerouslyDeleteApp") {
               command.option(
@@ -216,27 +124,14 @@ export async function runCli(
                     : JSON.parse(options[field.name]),
                 ]),
             );
-            const target = new URL(path, base);
-            if (target.origin !== base || !target.pathname.startsWith("/api/"))
-              throw new Error("Invalid operation URL.");
-            if (method === "get")
-              for (const [name, value] of Object.entries(input))
-                target.searchParams.set(name, JSON.stringify(value));
-            const send = async (refresh = false) =>
-              fetch(target, {
-                method: method.toUpperCase(),
-                redirect: "error",
-                signal: AbortSignal.timeout(deleteApp ? 300_000 : 30_000),
-                headers: {
-                  Authorization: `Bearer ${await accessToken(base, refresh)}`,
-                  "Content-Type": "application/json",
-                  "X-Disposabl-Source": "cli",
-                },
-                body: method === "post" ? JSON.stringify(input) : undefined,
-              });
+            const send = requestOperation(
+              base,
+              path,
+              method,
+              input,
+              deleteApp ? 300_000 : 30_000,
+            );
             let result = await send();
-            if (result.status === 401 && !process.env.DISPOSABL_API_KEY)
-              result = await send(true);
             if (deleteApp && !result.ok)
               openExpoDeletion(
                 await result
@@ -258,8 +153,16 @@ export async function runCli(
                 ? input.features
                 : [];
               const connections = new URL("/dashboard/connections", base);
-              if (requested.includes("analytics"))
-                connections.searchParams.set("features", "analytics");
+              if (options.setupOrigin)
+                connections.searchParams.set("origin", "cli");
+              const requiredFeatures = requested.filter(
+                (f: string) => f === "analytics" || f === "payments",
+              );
+              if (requiredFeatures.length)
+                connections.searchParams.set(
+                  "features",
+                  requiredFeatures.join(","),
+                );
               if (options.mobile) connections.searchParams.set("mobile", "1");
               const url = connections.href;
               const names: Record<string, string> = {
@@ -267,6 +170,7 @@ export async function runCli(
                 convex: "Convex",
                 posthog: "PostHog",
                 expo: "Expo",
+                autumn: "Autumn",
               };
               const missing = Array.isArray(value.missing)
                 ? value.missing
@@ -281,8 +185,6 @@ export async function runCli(
               while (!ready() && Date.now() < deadline) {
                 await new Promise((resolve) => setTimeout(resolve, 3000));
                 result = await send();
-                if (result.status === 401 && !process.env.DISPOSABL_API_KEY)
-                  result = await send(true);
                 if (!result.ok)
                   throw new Error(
                     `Connection status failed (${result.status}). Your login and app files are saved.`,
@@ -294,7 +196,15 @@ export async function runCli(
                   `Connections are still incomplete. Finish at ${url}, then retry setup.`,
                 );
             }
-            if (tokenCreate && options.configure) {
+            if (repositoryToken && options.configure) {
+              console.log(
+                JSON.stringify(
+                  await configureRepository(base, options.appId, value),
+                  null,
+                  2,
+                ),
+              );
+            } else if (tokenCreate && options.configure) {
               await configureDevelopment(options.configure, value);
               const { deployKey: _secret, ...details } = value;
               console.log(

@@ -11,6 +11,13 @@ import { defineApp } from "convex/server";
 
 const app = defineApp({
   env: {
+    R2_ACCOUNT_ID: v.optional(v.string()),
+    R2_BUCKET_NAME: v.optional(v.string()),
+    R2_ACCESS_KEY_ID: v.optional(v.string()),
+    R2_SECRET_ACCESS_KEY: v.optional(v.string()),
+    AUTUMN_SECRET_KEY: v.optional(v.string()),
+    BILLING_RETURN_URL: v.optional(v.string()),
+    DISPOSABL_ENVIRONMENT: v.optional(v.string()),
     POSTHOG_ENABLED: v.optional(v.string()),
     POSTHOG_PROJECT_TOKEN: v.optional(v.string()),
     POSTHOG_HOST: v.optional(v.string()),

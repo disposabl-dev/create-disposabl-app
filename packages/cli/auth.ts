@@ -1,4 +1,5 @@
 import { lock } from "proper-lockfile";
+import manifest from "./package.json";
 import {
   auth,
   type OAuthClientProvider,
@@ -118,7 +119,7 @@ function provider(
   return {
     redirectUrl: session.redirectUrl,
     clientMetadata: {
-      client_name: "Disposabl CLI",
+      client_name: `${Object.keys(manifest.bin)[0]} CLI`,
       redirect_uris: session.redirectUrl ? [session.redirectUrl] : [],
       grant_types: ["authorization_code", "refresh_token"],
       response_types: ["code"],
@@ -246,6 +247,10 @@ async function unlockedAccessToken(url: string, forceRefresh = false) {
     !session.expiresAt ||
     Date.now() >= session.expiresAt - 30_000
   ) {
+    if (!session.client || !session.tokens.refresh_token)
+      throw new NotAuthenticated(
+        "Session cannot be renewed. Sign in again or start a newly authorized agent run.",
+      );
     const oauth = provider(url, session, () => {
       throw new NotAuthenticated("Session expired. Run login again.");
     });

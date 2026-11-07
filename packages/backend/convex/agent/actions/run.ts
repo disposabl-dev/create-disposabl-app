@@ -12,9 +12,14 @@ import {
 } from "../boat";
 import { thread } from "../validator";
 import { syncResponses } from "../events";
+import {
+  agentEnvironment,
+  authorizeSandbox,
+  credentialInstructions,
+} from "../bootstrap";
 
 export const tick = internalAction({
-  args: { id: v.id("agentThreads") },
+  args: { id: v.string() },
   returns: v.null(),
   handler: async (ctx, { id }): Promise<null> => {
     const lease = { id, token: crypto.randomUUID() };
@@ -27,7 +32,7 @@ export const tick = internalAction({
     try {
       let sandbox = await ctx.runQuery(components.boat.sandboxes.get, ref);
       if (current.status === "stopping") {
-        // Never interrupt the whole user sandbox. Other apps may be running.
+        // Confirm the conversation stopped before accepting more work.
         if (sandbox?.sandboxId) {
           sandbox = await boat.refresh(ctx, ref);
           if (["ready", "idle", "running"].includes(sandbox.state)) {
@@ -112,6 +117,7 @@ export const tick = internalAction({
           options: {
             type: "default",
             ttlSeconds: 900,
+            env: agentEnvironment(),
             // The configured environment supplies the operator's Codex OAuth account.
             ...(env.BOAT_AGENT_ENVIRONMENT
               ? { environment: env.BOAT_AGENT_ENVIRONMENT }
@@ -125,13 +131,14 @@ export const tick = internalAction({
             ...ref,
             options: {
               ttlSeconds: 900,
+              env: agentEnvironment(),
               ...(env.BOAT_AGENT_ENVIRONMENT
                 ? { environment: env.BOAT_AGENT_ENVIRONMENT }
                 : { noEnv: true }),
             },
           });
         } catch (error) {
-          // Another app may have resumed this user's shared sandbox first.
+          // A timed-out resume may have succeeded remotely.
           sandbox = await boat.refresh(ctx, ref);
           if (
             ![
@@ -201,15 +208,21 @@ export const tick = internalAction({
             }
           }
         }
-        sent ??= await boat.prompt(ctx, {
-          ...ref,
-          provider: "codex",
-          prompt:
-            `Disposabl delivery ${queued.messageId}\n` +
-            (conversationId ? "" : instructions(current.appId, app)) +
-            queued.prompt,
-          ...(conversationId ? { conversationId } : { newConversation: true }),
-        });
+        if (!sent) {
+          await authorizeSandbox(ctx, current, lease);
+          sent = await boat.prompt(ctx, {
+            ...ref,
+            provider: "codex",
+            prompt:
+              `Disposabl delivery ${queued.messageId}\n` +
+              credentialInstructions(current.appId) +
+              (conversationId ? "" : instructions(current.appId, app)) +
+              queued.prompt,
+            ...(conversationId
+              ? { conversationId }
+              : { newConversation: true }),
+          });
+        }
         if (!sent.conversationId)
           throw new Error("Boat did not return a conversation ID.");
         promptId = sent.promptId;

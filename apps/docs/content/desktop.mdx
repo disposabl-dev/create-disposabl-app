@@ -1,0 +1,10 @@
+---
+title: Desktop
+description: Package your web app for desktop.
+---
+
+The Electron app in `apps/desktop` opens your deployed website. Keep privileged desktop operations in its main process; do not give hosted pages unrestricted Node access.
+
+The release workflow builds installers for selected desktop targets. Signing, notarization, and publication depend on the configured platform credentials. Inspect the resulting artifact and install it on the target operating system before sharing it.
+
+In-app update distribution is not configured in this starter yet. Publishing another installer does not update an existing installation automatically.

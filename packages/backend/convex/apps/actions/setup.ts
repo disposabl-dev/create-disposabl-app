@@ -5,8 +5,9 @@ import {
   internalAction,
 } from "@disposabl/disposabl-kit/server/lib/functions";
 import { v } from "convex/values";
-import { captureTelemetry } from "@disposabl/disposabl-kit/server/lib/telemetry";
+import { scheduleTelemetry } from "@disposabl/disposabl-kit/server/lib/telemetry";
 import { internal } from "../../_generated/api";
+import { platform, feature } from "../../validator";
 import { credential } from "../../connections/actions/credentials";
 import { requireConnections } from "../../connections/config";
 import { ensurePosthog } from "./posthog";
@@ -16,20 +17,29 @@ import {
 } from "../../previews/token/actions/management";
 
 export const setup = internalAction({
-  args: { ...identityFields, appId: v.string() },
+  args: {
+    ...identityFields,
+    appId: v.string(),
+    platforms: v.array(platform),
+    features: v.array(feature),
+  },
   returns: v.number(),
   handler: async (ctx, args): Promise<number> => {
     const startedAt = Date.now();
+    const identity = { userId: args.userId, appId: args.appId };
     try {
-      const app = await ctx.runQuery(internal.apps.internal.get, args);
       requireConnections(
         await ctx.runQuery(internal.connections.internal.status, {
           userId: args.userId,
-          features: app.features,
+          features: args.features,
         }),
+        args.platforms,
       );
-      await ensurePosthog(ctx, args.userId, args.appId);
-      const saved = await ctx.runQuery(internal.apps.internal.project, args);
+      await ensurePosthog(ctx, args.userId, args.appId, args.features);
+      const saved = await ctx.runQuery(
+        internal.apps.internal.project,
+        identity,
+      );
       const { token, accountId: teamId } = await credential(
         ctx,
         args.userId,
@@ -49,24 +59,35 @@ export const setup = internalAction({
         saved ?? (await ensureProject(token, teamId, args.appId));
       if (saved === null)
         await ctx.runMutation(internal.apps.internal.saveProject, {
-          ...args,
+          ...identity,
           projectId,
         });
-      await ctx.runAction(internal.github.actions.provision.run, args);
+      await ctx.runAction(internal.github.actions.provision.run, identity);
       await ctx.runAction(internal.github.actions.secrets.configure, {
-        ...args,
+        ...identity,
+        platforms: args.platforms,
         projectId,
       });
-      await captureTelemetry("app_setup", {
-        outcome: "success",
-        duration_ms: Date.now() - startedAt,
-      });
+      await scheduleTelemetry(
+        ctx,
+        "app_setup",
+        {
+          outcome: "success",
+          duration_ms: Date.now() - startedAt,
+        },
+        args.userId,
+      );
       return projectId;
     } catch (error) {
-      await captureTelemetry("app_setup", {
-        outcome: "error",
-        duration_ms: Date.now() - startedAt,
-      });
+      await scheduleTelemetry(
+        ctx,
+        "app_setup",
+        {
+          outcome: "error",
+          duration_ms: Date.now() - startedAt,
+        },
+        args.userId,
+      );
       throw error;
     }
   },

@@ -16,6 +16,7 @@ import { Route as DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesConsen
 import { Route as DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesForgotPasswordRouteImport } from './../../../packages/disposabl-kit/client/routes/_auth-pages/forgot-password'
 import { Route as DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalIndexRouteImport } from './../../../packages/disposabl-kit/client/routes/legal/index'
 import { Route as DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesLoginRouteImport } from './../../../packages/disposabl-kit/client/routes/_auth-pages/login'
+import { Route as DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesPricingRouteImport } from './../../../packages/disposabl-kit/client/routes/pricing'
 import { Route as DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesResetPasswordRouteImport } from './../../../packages/disposabl-kit/client/routes/_auth-pages/reset-password'
 import { Route as DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesSignUpRouteImport } from './../../../packages/disposabl-kit/client/routes/_auth-pages/signUp'
 import { Route as DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesVerifyEmailRouteImport } from './../../../packages/disposabl-kit/client/routes/_auth-pages/verify-email'
@@ -81,6 +82,15 @@ const DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesLoginRout
     {
       id: '/login',
       path: '/login',
+      getParentRoute: () =>
+        DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRoute,
+    } as any,
+  )
+const DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesPricingRoute =
+  DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesPricingRouteImport.update(
+    {
+      id: '/pricing',
+      path: '/pricing',
       getParentRoute: () =>
         DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRoute,
     } as any,
@@ -181,6 +191,7 @@ export interface FileRoutesByFullPath {
   '/consent': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesConsentRoute
   '/forgot-password': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesForgotPasswordRoute
   '/login': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesLoginRoute
+  '/pricing': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesPricingRoute
   '/reset-password': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesResetPasswordRoute
   '/signup': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesSignUpRoute
   '/verify-email': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesVerifyEmailRoute
@@ -199,6 +210,7 @@ export interface FileRoutesByTo {
   '/consent': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesConsentRoute
   '/forgot-password': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesForgotPasswordRoute
   '/login': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesLoginRoute
+  '/pricing': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesPricingRoute
   '/reset-password': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesResetPasswordRoute
   '/signup': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesSignUpRoute
   '/verify-email': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesVerifyEmailRoute
@@ -219,6 +231,7 @@ export interface FileRoutesById {
   '/_providers/consent': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesConsentRoute
   '/_providers/forgot-password': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesForgotPasswordRoute
   '/_providers/login': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesLoginRoute
+  '/_providers/pricing': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesPricingRoute
   '/_providers/reset-password': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesResetPasswordRoute
   '/_providers/signup': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesSignUpRoute
   '/_providers/verify-email': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesVerifyEmailRoute
@@ -240,6 +253,7 @@ export interface FileRouteTypes {
     | '/consent'
     | '/forgot-password'
     | '/login'
+    | '/pricing'
     | '/reset-password'
     | '/signup'
     | '/verify-email'
@@ -258,6 +272,7 @@ export interface FileRouteTypes {
     | '/consent'
     | '/forgot-password'
     | '/login'
+    | '/pricing'
     | '/reset-password'
     | '/signup'
     | '/verify-email'
@@ -277,6 +292,7 @@ export interface FileRouteTypes {
     | '/_providers/consent'
     | '/_providers/forgot-password'
     | '/_providers/login'
+    | '/_providers/pricing'
     | '/_providers/reset-password'
     | '/_providers/signup'
     | '/_providers/verify-email'
@@ -345,6 +361,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesLoginRouteImport
+      parentRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRoute
+    }
+    '/_providers/pricing': {
+      id: '/_providers/pricing'
+      path: '/pricing'
+      fullPath: '/pricing'
+      preLoaderRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesPricingRouteImport
       parentRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRoute
     }
     '/_providers/reset-password': {
@@ -467,6 +490,7 @@ interface DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRouteChil
   DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesConsentRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesConsentRoute
   DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesForgotPasswordRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesForgotPasswordRoute
   DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesLoginRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesLoginRoute
+  DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesPricingRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesPricingRoute
   DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesResetPasswordRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesResetPasswordRoute
   DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesSignUpRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesSignUpRoute
   DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesVerifyEmailRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesVerifyEmailRoute
@@ -488,6 +512,8 @@ const DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRouteChildren
       DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesForgotPasswordRoute,
     DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesLoginRoute:
       DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesLoginRoute,
+    DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesPricingRoute:
+      DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesPricingRoute,
     DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesResetPasswordRoute:
       DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesResetPasswordRoute,
     DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesSignUpRoute:
@@ -519,12 +545,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}

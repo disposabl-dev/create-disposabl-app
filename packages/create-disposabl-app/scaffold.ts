@@ -82,7 +82,6 @@ export async function createApp(
         "packages/disposabl-kit/client/routes/consent.tsx",
         "apps/web/src/router/_authenticated/dashboard.api-keys.tsx",
         "apps/mobile/src/app/(auth)",
-        "apps/mobile/src/app/(authenticated)/account.tsx",
       ]) {
         await rm(join(destination, path), { recursive: true, force: true });
       }
@@ -99,10 +98,6 @@ export const Route = createFileRoute("/_providers/_authenticated/dashboard")({
         await writeFile(
           join(destination, "apps/mobile/src/app/index.tsx"),
           'export { PublicHomeScreen as default } from "@disposabl/disposabl-kit/mobile";\n',
-        );
-        await writeFile(
-          join(destination, "apps/mobile/src/app/(authenticated)/_layout.tsx"),
-          'export { PublicLayout as default } from "@disposabl/disposabl-kit/mobile";\n',
         );
       }
     }
@@ -213,8 +208,6 @@ main().catch((error) => {
     const manifestPath = join(destination, "package.json");
     const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
     manifest.name = name;
-    manifest.devDependencies ??= {};
-    manifest.devDependencies["@disposabl/cli"] = "latest";
     await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + "\n");
     if (folders.includes("apps/desktop")) {
       const desktopPath = join(destination, "apps/desktop/package.json");

@@ -42,6 +42,12 @@ module.exports = ({ config }) => {
   }
   return {
     ...config,
+    scheme: [
+      ...new Set([
+        ...[config.scheme || []].flat(),
+        `disposabl-${project.name.replace(/[^a-z0-9.-]/g, "-")}`,
+      ]),
+    ],
     owner: process.env.EXPO_OWNER || config.owner,
     slug: process.env.EXPO_SLUG || config.slug,
     ios: {
@@ -62,17 +68,40 @@ module.exports = ({ config }) => {
           : `${basePackage}.${channel.replaceAll("-", "")}`,
       versionCode,
     },
-    plugins: [...(config.plugins || []), "./plugins/with-android-signing.js"],
+    plugins: [
+      ...(config.plugins || []),
+      "./plugins/with-android-signing.js",
+      ...(process.env.EXPO_PUBLIC_E2E === "true"
+        ? [
+            [
+              "expo-dev-client",
+              {
+                toolsButton: false,
+                skipOnboarding: true,
+                showMenuAtLaunch: false,
+              },
+            ],
+          ]
+        : []),
+    ],
     ...(projectId
       ? {
           runtimeVersion: { policy: "fingerprint" },
-          updates: {
-            ...config.updates,
-            url: `https://u.expo.dev/${projectId}`,
-            requestHeaders: { "expo-channel-name": channel },
-          },
           extra: { ...config.extra, eas: { ...config.extra?.eas, projectId } },
         }
       : {}),
+    updates: {
+      ...config.updates,
+      // Start from the newest cached bundle while downloading for the next launch.
+      checkAutomatically: "ON_LOAD",
+      fallbackToCacheTimeout: 0,
+      ...(projectId
+        ? {
+            url: `https://u.expo.dev/${projectId}`,
+            requestHeaders: { "expo-channel-name": channel },
+          }
+        : {}),
+      ...(process.env.EXPO_PUBLIC_E2E === "true" ? { enabled: false } : {}),
+    },
   };
 };

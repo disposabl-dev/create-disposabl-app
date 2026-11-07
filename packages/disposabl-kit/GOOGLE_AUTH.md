@@ -10,9 +10,17 @@ The backend permits redirects to its own HTTP origin. Set `AUTH_REDIRECT_ORIGINS
 
 Keep production in a separate Google Cloud project/client from development and previews. Finish Google's branding and publishing requirements before treating an external production client as generally available.
 
+## iOS and Android
+
+The native sign-in screen uses Expo's system authentication browser and the same Google web client as the website. Convex first returns to its own `/oauth/mobile` endpoint, which forwards a one-time ticket to the app's registered URL scheme. The native Convex Auth client redeems that ticket with its saved flow state and stores the session in SecureStore. Session tokens never appear in the redirect URL.
+
+`apps/mobile/app.config.js` registers an additional scheme derived from the root package name and preserves custom schemes. Rebuild the native app after changing its package name or this configuration. Set `EXPO_PUBLIC_CONVEX_SITE_URL` to the same deployment as `EXPO_PUBLIC_CONVEX_URL`; no additional Google redirect URI or mobile OAuth client is needed. The return endpoint exists only when authentication and a mobile platform are selected.
+
+Cancellation returns to the sign-in screen. A successful sign-in opens home; Disposabl's management home then handles its connections step. Set `AUTH_GOOGLE_ONLY=true` to hide password forms on both web and mobile.
+
 ## Shared preview callback
 
-Convex Auth includes Google sign-in. This snapshot does not include a shared callback across deployments; the small Auth patch and `server/google.ts` provide it.
+Convex Auth includes Google sign-in. The vendored snapshot includes the Google callback extensions used by `server/google.ts` for shared preview callbacks; see [its provenance and changes](../../vendor/README.md).
 
 1. Choose a stable non-production Convex deployment for the callback. Register `https://<stable-deployment>.convex.site/oauth/relay/google` on the development Google client.
 2. Set `AUTH_GOOGLE_RELAY_URL` to that URL and `AUTH_GOOGLE_RELAY_SECRET` to a random secret of at least 32 characters. Set the same Google credentials and relay settings on the callback deployment and the trusted previews.

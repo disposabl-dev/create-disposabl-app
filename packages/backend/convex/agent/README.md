@@ -1,39 +1,29 @@
 # Remote agent
 
-The public API, MCP, and CLI expose three operations:
+The public API, MCP, CLI, web, and mobile use the same authenticated operations:
 
-- `sendMessage({ prompt, appId? })` saves a user message and schedules delivery. Without an app ID it creates a remote app record. Each user has one Boat sandbox, shared by all their apps. Each app has one Convex Agent thread and one Boat conversation.
-- `abortMessage({ appId })` cancels queued messages and interrupts the conversation. The worker confirms completion before reporting `idle`.
-- `getMessages({ appId?, paginationOpts? })` reads messages for one app or lists the authenticated user's threads. Pages default to 20 items and allow at most 100.
+- `sendMessage({ prompt, appId?, platforms?, features? })` saves a message and schedules delivery. Without `appId`, it creates an app with the selected platforms and features after checking connections. Selections on an existing app use its configuration action. Each app has one Agent thread and one Boat conversation.
+- `abortMessage({ appId })` cancels queued messages and interrupts only that app's conversation. The worker confirms the stop before reporting `idle`.
+- `getMessages({ appId?, paginationOpts? })` reads an app's messages or lists the user's app-linked threads by last update. Pages default to 20 items, with a maximum of 100.
 
-Web and mobile use `agent/index.ts`. API/MCP authenticate before calling the platform functions in `agent/internal.ts`. Ownership is checked before accessing an app. Internal worker functions are not platform operations.
+The unmodified Agent component owns threads and messages. The existing app record holds its thread ID, execution state, and bounded delivery queue. Ownership and app identity come from that record; there is no separate threads table or package patch. Agent's `title` and `summary` remain human-readable thread information.
 
-The Convex Agent component owns message text. `agentThreads` holds execution state and a bounded delivery queue of message IDs. `agentEvents` maps Boat event IDs to component messages and retains tool event data. Boat response snapshots update the same assistant message while streaming. Cursor checkpoints and event IDs prevent duplicate messages when a page is replayed. These are reactive message updates from short scheduled polls, not a browser connection to Boat.
-
-One leased worker handles each app. The lease outlives Convex's action timeout and has a scheduled recovery call, cancelled after normal completion. A send checks Boat's prompt status, steers a running turn, and starts a new turn in the same conversation when idle. A turn that has not started yet is retried. An ambiguous delivery failure stops the remote run instead of submitting the prompt again.
+`agentEvents` maps Boat event IDs to component messages for deduplication and tool output. Its `threadId` is the component thread ID. One leased worker handles each thread. Cursor checkpoints, lease fencing, and delivery reconciliation prevent replayed responses or ambiguous network failures from submitting duplicate work.
 
 ## Configuration
 
-`BOAT_API_KEY` stays in Convex. It is passed to the Boat component and used server-side for steer/interrupt because component version 0.1.0 does not expose those methods.
+`BOAT_API_KEY` stays on the backend. `BOAT_AGENT_ENVIRONMENT` explicitly selects the remote environment; without it, sandboxes use `noEnv: true`. Each user shares one sandbox across their apps, with a separate conversation per app. Stop requests always specify a conversation. App deletion requires the agent to be stopped and removes its history without deleting the shared sandbox.
 
-Without `BOAT_AGENT_ENVIRONMENT`, sandboxes use `noEnv: true`. They inherit no account secrets, repositories, or model credentials. Codex needs credentials before it can run.
+## Automatic sandbox login
 
-The current deployment uses `BOAT_AGENT_ENVIRONMENT=agent-sandbox-backend`, as requested, with the operator's existing Codex OAuth account configured in Boat. The application does not copy or print those OAuth credentials. Per-user API keys and third-party credential isolation are deferred. The environment is selected explicitly so the default Boat environment and unrelated secrets are not inherited. Sandboxes auto-stop after 15 minutes; Boat extends the deadline while its agent is working. An archived sandbox resumes its saved disk. Concurrent apps reuse that sandbox and keep separate conversations. Aborts always name the app conversation; they never interrupt the whole sandbox.
+Before starting a remote turn, the leased worker installs a CLI session under `/home/user/.config/disposabl/apps/<appId>`. The session uses the current Disposabl deployment, so a preview agent does not accidentally call production. Each turn supplies that app's config directory and a separate GitHub config directory. No second Google login is needed. Atomic file replacement prevents concurrent apps from overwriting each other's sessions; tokens stay out of prompts, Git repositories, and command output.
 
-App code lives under `/home/user/apps/<appId>`. Preview experiments use separate branches and worktrees under `/home/user/previews/<appId>/<variant>`, each with its own preview token, backend, and development ports. Multiple previews keep the same app ID. Deleting an idle app removes its message history and leaves the user sandbox available for their other apps.
+The Disposabl bearer is stored only as a SHA-256 hash on `apps.agent`. It expires after four hours and is invalidated on rotation, abort, completion, or failure. REST accepts it only for current-user/connection reads and setup, repository authorization, preview, and release reads for the assigned app. It cannot create/delete app records, send recursive messages, or authenticate to MCP. Normal OAuth sessions keep their existing behavior.
 
-The generator accepts `--app-id` to bind new files to the already registered app. It verifies ownership through normal setup. The remote worker never passes a user's provider connection tokens into a sandbox.
+The sandbox is a **user-level trust boundary**, not isolation between that user's apps. Code running there can read that user's other workspace files. GitHub repository tokens and Convex development keys have their own provider lifetimes; stopping an agent revokes its Disposabl bearer, not credentials already issued by those providers. Selected features can install that user's Expo and Autumn credentials into their app's CI/backend. Do not put service-operator credentials in generated app environments or claim these provider credentials are app-isolated.
 
-## Verification, November 4, 2026
+After repository setup, `disposabl apps repositoryToken --appId <appId> --configure` saves a repository-scoped GitHub token privately and returns its file path. The agent reads it into `GH_TOKEN` without printing it and uses `gh auth setup-git`. It refreshes through this command when GitHub access expires. Git remotes retain clean HTTPS URLs.
 
-Real Boat calls through an isolated local Convex deployment verified saved replies, native steering, conversation memory, two apps sharing one sandbox, and aborting one conversation while the other continued and completed. Stopping and resuming the sandbox preserved the other app's conversation. Boat reported `ttlSeconds: 900` after resume. Unauthenticated reads and another user's app reads were rejected. The CLI discovered the agent commands from the local OpenAPI endpoint, and a generated app retained its supplied app ID with the CLI devDependency and no copied CLI workspace.
+## Verification
 
-Backend, CLI, generator, and SDK typechecks passed. Backend and generator lint passed. No automated tests or test files were added. The shared development deployment (`clean-marlin-251`) now succeeds with Agent and Boat installed. The Auth mismatch was resolved using upstream's reboot migration: back up the deployment, clear obsolete sessions and refresh tokens, and deploy the unchanged upstream schema. Live sign-up, sign-in, refresh, sign-out, and authenticated agent-history access passed; existing accounts and app data were preserved. See the [Auth migration record](../../../../vendor/README.md#development-migration-2026-11-04). The CLI publication workflow is prepared, but npm has no public `@disposabl/cli` version yet and first-publication authentication remains to be configured. No hosted preview variants were deployed during these checks.
-
-## Login and desktop proposal, not implemented
-
-Prefer a Disposabl browser approval link that the user opens on their own machine. The sandbox would request a short-lived, single-use login challenge, the signed-in user would approve the named app, and only that sandbox would exchange the challenge for a scoped credential. Check ownership, expiration, one-time use, and cancellation on the server. Existing CLI login uses a loopback OAuth callback, so forwarding its authorization URL to another machine is insufficient.
-
-Provider connection setup already belongs to the Disposabl account and can happen in the user's browser. The sandbox can then retry the required connection check.
-
-Offer desktop access separately when the user must interact with the sandbox's browser. Boat's desktop endpoint issues a secret-bearing viewer URL with a ten-minute login window. A future Disposabl page should check app ownership and obtain a fresh URL on each opening. Do not save viewer tokens in chat history. See [Boat desktop URL documentation](https://docs.boat.dev/desktop-streaming/urls-and-security) and [agent credentials](https://docs.boat.dev/integrated-agents/keys).
+Authenticated TesterArmy E2E tests live in `packages/tests`. They use a development or isolated backend with telemetry disabled. The loopback fixture verifies automatic CLI login, REST app boundaries, token rotation, and stop invalidation without real Boat calls or model credentials. Live sandbox installation, provider provisioning, and cancellation still require a separate configured Boat run.

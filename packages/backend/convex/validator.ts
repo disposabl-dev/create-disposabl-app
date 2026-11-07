@@ -39,6 +39,10 @@ export const appResult = v.object({
   githubRepo: v.optional(v.string()),
   createdAt: v.number(),
 });
+export const requestedConfiguration = {
+  platforms: v.optional(v.array(platform)),
+  features: v.optional(v.array(feature)),
+};
 export const previewIdentity = { appId: v.string(), reference: v.string() };
 export const deployment = v.object({
   name: v.string(),

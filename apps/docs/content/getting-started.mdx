@@ -1,0 +1,26 @@
+---
+title: Your workspace
+description: What is included and where to start.
+---
+
+`disposabl.json` records your selected platforms and features. The welcome screen reads that file, so it stays in step with your setup.
+
+Run `bun install`, then `bun run dev` from the project root. Complete setup when prompted. Keep the terminal open while your development servers run. Setup may need provider connections before the app can reach its backend.
+
+## Make it yours
+
+Your app starts with a working welcome page. You or your coding agent can replace it while the development server runs. The welcome page is a starting point, not a generation or deployment progress indicator.
+
+- Web pages live in `apps/web/src/router`.
+- Mobile routes live in `apps/mobile/src/app`.
+- Shared presentation and backend helpers live in `packages/disposabl-kit`.
+- App backend functions live in `packages/backend/convex`.
+- Behavior tests live in `packages/tests`.
+
+Authentication, analytics, payments, and documentation are optional. Use the generator's reconfiguration command to change selections; editing the configuration file alone does not provision providers or restore omitted packages.
+
+## Before you share
+
+Run `bun run test` for your selected platforms. Native tests require a locally installed build and an available simulator or emulator. Check the visible login, empty state, and first useful action on each target.
+
+If you selected payments, the starter includes editable examples: a $5 monthly plan with 500 credits and a $5 top-up with 500 non-expiring credits. Configure the provider and verify sandbox purchases before enabling live payments. See `packages/disposabl-kit/PAYMENTS.md`.

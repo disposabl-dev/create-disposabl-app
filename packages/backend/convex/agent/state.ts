@@ -3,14 +3,11 @@ import { internalMutation } from "@disposabl/disposabl-kit/server/lib/functions"
 import { v, type Infer } from "convex/values";
 import { components, internal } from "../_generated/api";
 import type { MutationCtx } from "../_generated/server";
-import type { Id } from "../_generated/dataModel";
+import { getThread, patchThread } from "./threads";
 import { event, thread, workerArgs } from "./validator";
 
-async function locked(
-  ctx: MutationCtx,
-  args: { id: Id<"agentThreads">; token: string },
-) {
-  const current = await ctx.db.get("agentThreads", args.id);
+async function locked(ctx: MutationCtx, args: { id: string; token: string }) {
+  const current = await getThread(ctx, args.id);
   if (!current || current.lease?.token !== args.token)
     throw new Error("Agent worker lease expired.");
   return current;
@@ -20,7 +17,7 @@ export const claim = internalMutation({
   args: workerArgs,
   returns: v.union(thread, v.null()),
   handler: async (ctx, { id, token }): Promise<Infer<typeof thread> | null> => {
-    const current = await ctx.db.get("agentThreads", id);
+    const current = await getThread(ctx, id);
     if (!current || (current.lease && current.lease.expiresAt > Date.now()))
       return null;
     if (
@@ -45,7 +42,7 @@ export const claim = internalMutation({
           }
         : {}),
     };
-    await ctx.db.patch("agentThreads", id, patch);
+    await patchThread(ctx, current, patch);
     return { ...current, ...patch };
   },
 });
@@ -65,7 +62,7 @@ export const next = internalMutation({
       { messageIds: [messageId] },
     );
     if (!message?.text) throw new Error("Saved user message is missing.");
-    await ctx.db.patch("agentThreads", args.id, { delivery: messageId });
+    await patchThread(ctx, current, { delivery: messageId });
     return { messageId, prompt: message.text };
   },
 });
@@ -80,7 +77,7 @@ export const delivered = internalMutation({
   returns: v.boolean(),
   handler: async (ctx, args) => {
     const current = await locked(ctx, args);
-    await ctx.db.patch("agentThreads", args.id, {
+    await patchThread(ctx, current, {
       promptId: args.promptId,
       conversationId: args.conversationId,
       delivery: undefined,
@@ -95,8 +92,8 @@ export const attachConversation = internalMutation({
   args: { ...workerArgs, conversationId: v.string() },
   returns: v.null(),
   handler: async (ctx, args) => {
-    await locked(ctx, args);
-    await ctx.db.patch("agentThreads", args.id, {
+    const current = await locked(ctx, args);
+    await patchThread(ctx, current, {
       conversationId: args.conversationId,
       delivery: undefined,
     });
@@ -117,8 +114,8 @@ export const append = internalMutation({
     for (const e of args.events) {
       let existing = await ctx.db
         .query("agentEvents")
-        .withIndex("by_agentThreadId_eventId", (q) =>
-          q.eq("agentThreadId", args.id).eq("eventId", e.id),
+        .withIndex("by_threadId_eventId", (q) =>
+          q.eq("threadId", args.id).eq("eventId", e.id),
         )
         .unique();
       // Boat can replace a transient response ID when it commits the final
@@ -126,8 +123,8 @@ export const append = internalMutation({
       if (!existing && e.taskId && e.content && !e.tools) {
         const candidates = await ctx.db
           .query("agentEvents")
-          .withIndex("by_agentThreadId_taskId", (q) =>
-            q.eq("agentThreadId", args.id).eq("taskId", e.taskId),
+          .withIndex("by_threadId_taskId", (q) =>
+            q.eq("threadId", args.id).eq("taskId", e.taskId),
           )
           .order("desc")
           .take(20);
@@ -176,7 +173,7 @@ export const append = internalMutation({
           metadata: { status, provider: "codex" },
         });
         await ctx.db.insert("agentEvents", {
-          agentThreadId: args.id,
+          threadId: args.id,
           eventId: e.id,
           messageId,
           streaming: e.streaming,
@@ -186,7 +183,7 @@ export const append = internalMutation({
       }
     }
     if (args.cursor !== undefined && !mutable)
-      await ctx.db.patch("agentThreads", args.id, { cursor: args.cursor });
+      await patchThread(ctx, current, { cursor: args.cursor });
     return mutable;
   },
 });
@@ -237,8 +234,8 @@ export const finish = internalMutation({
     if (args.stopped || args.done) {
       const outputs = await ctx.db
         .query("agentEvents")
-        .withIndex("by_agentThreadId_streaming", (q) =>
-          q.eq("agentThreadId", args.id).eq("streaming", true),
+        .withIndex("by_threadId_streaming", (q) =>
+          q.eq("threadId", args.id).eq("streaming", true),
         )
         .take(100);
       for (const output of outputs) {
@@ -259,9 +256,10 @@ export const finish = internalMutation({
         });
       }
     }
-    await ctx.db.patch("agentThreads", args.id, {
+    await patchThread(ctx, current, {
       status,
       pending,
+      ...(status !== "processing" ? { access: undefined } : {}),
       error: args.unconfirmed
         ? "Boat delivery could not be confirmed. Retry abortMessage to reconcile this app's conversation; other apps were not interrupted."
         : error,

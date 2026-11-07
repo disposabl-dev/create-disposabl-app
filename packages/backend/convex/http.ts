@@ -1,11 +1,25 @@
-import { page as telemetryPage } from "./telemetry";
+import {
+  page as telemetryPage,
+  options as telemetryOptions,
+} from "./telemetry";
 import { download } from "./downloads/http";
 import { token, report } from "./github/actions/http";
 import createHttpRouter from "@disposabl/disposabl-kit/server/http";
-import { posthogMetadata } from "./connections/http";
+import { posthogMetadata, connectionCallback } from "./connections/http";
+import { agentApiPolicy } from "./agent/api_policy";
 
-const http = createHttpRouter();
+const http = createHttpRouter(agentApiPolicy);
+http.route({
+  path: "/dashboard/connections",
+  method: "GET",
+  handler: connectionCallback,
+});
 http.route({ path: "/telemetry/page", method: "POST", handler: telemetryPage });
+http.route({
+  path: "/telemetry/page",
+  method: "OPTIONS",
+  handler: telemetryOptions,
+});
 http.route({
   path: "/.well-known/posthog-client.json",
   method: "GET",

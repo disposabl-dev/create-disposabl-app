@@ -9,6 +9,7 @@ import {
 import { v } from "convex/values";
 import { components, internal } from "./_generated/api";
 import { env, query } from "./_generated/server";
+import { account as accountValidator } from "./users/validator";
 
 export const { signOut, refreshSession, isAuthenticated } = auth;
 
@@ -67,24 +68,35 @@ export const providers = query({
 /** Password capabilities for the signed-in account, never supplied by the client. */
 export const account = query({
   args: {},
-  returns: v.union(
-    v.null(),
-    v.object({
-      username: v.union(v.string(), v.null()),
-      email: v.union(v.string(), v.null()),
-    }),
-  ),
+  returns: v.union(v.null(), accountValidator),
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (userId === null) return null;
-    return {
-      username: await ctx.runQuery(components.authUsername.public.getUsername, {
+    const id = ctx.db.normalizeId("users", userId);
+    const user = id ? await ctx.db.get("users", id) : null;
+    if (!user) return null;
+    const username = await ctx.runQuery(
+      components.authUsername.public.getUsername,
+      {
         userId,
-      }),
-      email: await ctx.runQuery(
-        components.authEmail.verifiedEmails.getPrimaryEmail,
-        { userId },
-      ),
+      },
+    );
+    const email = await ctx.runQuery(
+      components.authEmail.verifiedEmails.getPrimaryEmail,
+      { userId },
+    );
+    return {
+      username,
+      email,
+      profile: user.profile ?? null,
+      passwordMethod:
+        env.AUTH_GOOGLE_ONLY === "true"
+          ? null
+          : email
+            ? ("email" as const)
+            : username
+              ? ("username" as const)
+              : null,
     };
   },
 });

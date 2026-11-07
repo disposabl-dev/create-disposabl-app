@@ -23,6 +23,14 @@ For an isolated preview or CI deployment, set `E2E_CONVEX_URL` and `E2E_CONVEX_S
 
 The initial flows check the public web page, the dashboard's authentication boundary, an anonymous backend auth query, the API contract when enabled, and the mobile home screen. They do not create users or modify data. Add product-specific flows here as behavior changes, including login and saved-state checks using dedicated test users. Keep required flows deterministic; an agent can write and debug tests without adding model calls to their execution.
 
+The repository's agent fixture flow (`flows/agent.e2e.ts`) creates test users, an app, and component history to verify ownership, pagination, and worker state without calling Boat. It requires `E2E_CONVEX_ADMIN_KEY` and explicitly skips when the key is absent; admin fixture calls are restricted to a loopback backend. Use only a disposable local deployment and keep the key out of source control and logs. Run through the `bun run e2e` or `bun run test` wrappers so E2E telemetry stays disabled.
+
+The connections browser flow additionally exercises invalid Autumn key submission when `E2E_CONNECTIONS_ENABLED=1`. Set a temporary `CONNECTIONS_ENCRYPTION_KEY` on the isolated backend for that run; the invalid input is rejected before any Autumn request. Restore the backend setting afterward.
+
+## Email provider verification
+
+`bun run e2e run email-delivery.e2e.ts --target backend --retries 0` tests signup, email verification, a new login, and the verified account. It requires an isolated loopback backend configured with `RESEND_API_KEY` and `RESEND_FROM_EMAIL`, plus `E2E_RESEND_API_KEY` for reading the test message. This explicit provider test sends to a unique `delivered+…@resend.dev` address and polls Resend for that message and consumes one email from the sending quota. It never sends to a person. It skips when the test credential is absent. Keep credentials in the process environment and restore the backend configuration after this run before running username-based fixtures.
+
 ## Mobile
 
 Use a development build, not Expo Go. From the repository root:
@@ -35,6 +43,8 @@ bun run --cwd apps/mobile android      # Android SDK; builds and installs locall
 Debug builds need Metro running with the current source. A release build embeds JavaScript and must be rebuilt after changes. Configure the app's backend URLs before building. Missing SDKs, devices, or installed apps are setup failures, not passing tests.
 
 The config evaluates `apps/mobile/app.config.js` to use the same bundle IDs and channel as the build. Match `DISPOSABL_MOBILE_CHANNEL` to the installed app. Override with `E2E_IOS_APP_ID` or `E2E_ANDROID_APP_ID` when testing a different artifact. Set `E2E_IOS_DEVICE` to a simulator name/UDID or `E2E_ANDROID_DEVICE` to an emulator serial to reserve a specific device. Keep each device under one owner's control.
+
+For a development client with several Metro servers running, set `E2E_MOBILE_DEV_URL` to this app's Metro URL and `E2E_MOBILE_DEV_SCHEME` to its unique installed URL scheme. The mobile flows explicitly connect after launch and restart. This prevents accidentally testing another server or backend. Release builds omit both variables.
 
 ## CI
 

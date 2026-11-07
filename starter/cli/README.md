@@ -11,4 +11,6 @@ node dist/index.js users current
 node dist/index.js logout
 ```
 
-Run `node dist/index.js --help` for available commands. Use `login --no-browser` to print the sign-in URL.
+With an app origin configured, `node dist/index.js --help` lists commands from its API contract. Use `help users` for a group or `users current --help` for an operation. Without an origin, help lists the built-in authentication commands. Login, logout, and version work without loading the API contract.
+
+Use `login --no-browser` to print the sign-in URL.

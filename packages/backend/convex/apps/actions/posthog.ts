@@ -20,9 +20,10 @@ export async function ensurePosthog(
   ctx: ActionCtx,
   userId: string,
   appId: string,
+  features: readonly string[],
 ) {
   const app = await ctx.runQuery(internal.apps.internal.get, { userId, appId });
-  if (!app.features?.includes("analytics")) return;
+  if (!features.includes("analytics")) return;
   const { access, accountId } = await posthogAccess(ctx, userId);
   if (!accountId)
     throw new ConvexError(

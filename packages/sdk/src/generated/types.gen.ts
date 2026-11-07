@@ -89,6 +89,7 @@ export type AgentGetMessagesResponses = {
   200:
     | {
         kind: "messages";
+        stopUnconfirmed?: boolean;
         appId: string;
         threadId: string;
         status: "idle" | "processing" | "stopping" | "failed";
@@ -130,6 +131,21 @@ export type AgentSendMessageData = {
   body: {
     prompt: string;
     appId?: string;
+    platforms?: Array<
+      | "web"
+      | "android"
+      | "ios"
+      | "macos"
+      | "windows"
+      | "linux"
+      | "api"
+      | "mcp"
+      | "typescript-sdk"
+      | "cli"
+    >;
+    features?: Array<
+      "faster-ci" | "docs" | "authentication" | "payments" | "analytics"
+    >;
   };
   path?: never;
   query?: never;
@@ -184,7 +200,9 @@ export type AppsCreateData = {
       | "typescript-sdk"
       | "cli"
     >;
-    features?: Array<"faster-ci" | "docs" | "authentication" | "analytics">;
+    features?: Array<
+      "faster-ci" | "docs" | "authentication" | "payments" | "analytics"
+    >;
   };
   path?: never;
   query?: never;
@@ -229,7 +247,9 @@ export type AppsCreateResponses = {
       | "typescript-sdk"
       | "cli"
     >;
-    features?: Array<"faster-ci" | "docs" | "authentication" | "analytics">;
+    features?: Array<
+      "faster-ci" | "docs" | "authentication" | "payments" | "analytics"
+    >;
     githubOwner?: string;
     githubRepo?: string;
     createdAt: number;
@@ -323,7 +343,9 @@ export type AppsGetResponses = {
       | "typescript-sdk"
       | "cli"
     >;
-    features?: Array<"faster-ci" | "docs" | "authentication" | "analytics">;
+    features?: Array<
+      "faster-ci" | "docs" | "authentication" | "payments" | "analytics"
+    >;
     githubOwner?: string;
     githubRepo?: string;
     createdAt: number;
@@ -387,7 +409,9 @@ export type AppsListResponses = {
         | "typescript-sdk"
         | "cli"
       >;
-      features?: Array<"faster-ci" | "docs" | "authentication" | "analytics">;
+      features?: Array<
+        "faster-ci" | "docs" | "authentication" | "payments" | "analytics"
+      >;
       githubOwner?: string;
       githubRepo?: string;
       createdAt: number;
@@ -400,6 +424,104 @@ export type AppsListResponses = {
 };
 
 export type AppsListResponse = AppsListResponses[keyof AppsListResponses];
+
+export type AppsRepositoryTokenData = {
+  body: {
+    appId: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/api/apps/repositoryToken";
+};
+
+export type AppsRepositoryTokenErrors = {
+  /**
+   * Invalid arguments
+   */
+  400: unknown;
+  /**
+   * Authentication required
+   */
+  401: unknown;
+  /**
+   * Insufficient scope
+   */
+  403: unknown;
+  /**
+   * Internal error
+   */
+  500: unknown;
+};
+
+export type AppsRepositoryTokenResponses = {
+  /**
+   * Success
+   */
+  200: {
+    token: string;
+    repository: string;
+  };
+};
+
+export type AppsRepositoryTokenResponse =
+  AppsRepositoryTokenResponses[keyof AppsRepositoryTokenResponses];
+
+export type AppsRequestConfigurationData = {
+  body: {
+    appId: string;
+    platforms: Array<
+      | "web"
+      | "android"
+      | "ios"
+      | "macos"
+      | "windows"
+      | "linux"
+      | "api"
+      | "mcp"
+      | "typescript-sdk"
+      | "cli"
+    >;
+    features: Array<
+      "faster-ci" | "docs" | "authentication" | "payments" | "analytics"
+    >;
+  };
+  path?: never;
+  query?: never;
+  url: "/api/apps/requestConfiguration";
+};
+
+export type AppsRequestConfigurationErrors = {
+  /**
+   * Invalid arguments
+   */
+  400: unknown;
+  /**
+   * Authentication required
+   */
+  401: unknown;
+  /**
+   * Insufficient scope
+   */
+  403: unknown;
+  /**
+   * Internal error
+   */
+  500: unknown;
+};
+
+export type AppsRequestConfigurationResponses = {
+  /**
+   * Success
+   */
+  200: {
+    appId: string;
+    threadId: string;
+    status: "idle" | "processing" | "stopping" | "failed";
+  };
+};
+
+export type AppsRequestConfigurationResponse =
+  AppsRequestConfigurationResponses[keyof AppsRequestConfigurationResponses];
 
 export type AppsUpdateData = {
   body: {
@@ -416,7 +538,9 @@ export type AppsUpdateData = {
       | "typescript-sdk"
       | "cli"
     >;
-    features?: Array<"faster-ci" | "docs" | "authentication" | "analytics">;
+    features?: Array<
+      "faster-ci" | "docs" | "authentication" | "payments" | "analytics"
+    >;
   };
   path?: never;
   query?: never;
@@ -461,7 +585,9 @@ export type AppsUpdateResponses = {
       | "typescript-sdk"
       | "cli"
     >;
-    features?: Array<"faster-ci" | "docs" | "authentication" | "analytics">;
+    features?: Array<
+      "faster-ci" | "docs" | "authentication" | "payments" | "analytics"
+    >;
     githubOwner?: string;
     githubRepo?: string;
     createdAt: number;
@@ -474,7 +600,9 @@ export type ConnectionsStatusData = {
   body?: never;
   path?: never;
   query?: {
-    features?: Array<"faster-ci" | "docs" | "authentication" | "analytics">;
+    features?: Array<
+      "faster-ci" | "docs" | "authentication" | "payments" | "analytics"
+    >;
   };
   url: "/api/connections/status";
 };
@@ -516,15 +644,19 @@ export type ConnectionsStatusResponses = {
     posthog: {
       name: string;
     } | null;
+    autumn: {
+      name: string;
+    } | null;
     posthogPending: boolean;
     ready: boolean;
-    missing: Array<"github" | "convex" | "expo" | "posthog">;
+    missing: Array<"github" | "convex" | "expo" | "posthog" | "autumn">;
     connectionsUrl: string;
     available: {
       github: boolean;
       convex: boolean;
       expo: boolean;
       posthog: boolean;
+      autumn: boolean;
     };
     githubInstallUrl: string | null;
   };
@@ -692,6 +824,21 @@ export type PreviewsTokenCreateData = {
   body: {
     appId: string;
     reference: string;
+    platforms?: Array<
+      | "web"
+      | "android"
+      | "ios"
+      | "macos"
+      | "windows"
+      | "linux"
+      | "api"
+      | "mcp"
+      | "typescript-sdk"
+      | "cli"
+    >;
+    features?: Array<
+      "faster-ci" | "docs" | "authentication" | "payments" | "analytics"
+    >;
   };
   path?: never;
   query?: never;

@@ -1,10 +1,12 @@
+import app from "../../disposabl.json";
 import site from "./site.json" with { type: "json" };
 import {
   accountPaths,
   isProductionSite,
 } from "@disposabl/disposabl-kit/lib/indexing";
 // docs:start
-import { cp } from "node:fs/promises";
+import { cp, rm } from "node:fs/promises";
+import { serveDocs } from "../docs/dev";
 // docs:end
 import kitRouter from "@disposabl/disposabl-kit/client/vite.config";
 import {
@@ -55,6 +57,9 @@ const config = defineConfig(({ mode }) => {
     throw new Error("VITE_PUBLIC_SITE_URL must be an HTTP(S) origin");
   const siteUrl = publicUrl.origin;
   const indexable = isProductionSite(mode, url.origin, site);
+  const productionBackend =
+    (app as { productionConvexSiteUrl?: string }).productionConvexSiteUrl ||
+    site.backendOrigin;
 
   return {
     define: {
@@ -62,17 +67,28 @@ const config = defineConfig(({ mode }) => {
       "import.meta.env.VITE_PUBLIC_SITE_URL": JSON.stringify(siteUrl),
       "import.meta.env.VITE_SEARCH_INDEXABLE": JSON.stringify(indexable),
       "import.meta.env.VITE_DISPOSABL_ANALYTICS_ENABLED": JSON.stringify(
-        indexable && site.analytics ? "true" : "false",
+        indexable &&
+          !!productionBackend &&
+          url.origin === productionBackend &&
+          process.env.E2E_TELEMETRY_DISABLED !== "1" &&
+          (app.features as readonly string[]).includes("analytics")
+          ? "true"
+          : "false",
       ),
     },
     resolve: { tsconfigPaths: true },
     plugins: [
       // docs:start
       {
-        name: "copy-docs",
-        apply: "build",
+        name: "docs",
+        configureServer(server) {
+          if ((app.features as readonly string[]).includes("docs"))
+            serveDocs(server);
+        },
         async closeBundle() {
-          if (this.environment.name === "client")
+          if (this.environment.name !== "client") return;
+          await rm("dist/client/docs", { recursive: true, force: true });
+          if ((app.features as readonly string[]).includes("docs"))
             await cp("../docs/dist/public", "dist/client/docs", {
               recursive: true,
             });

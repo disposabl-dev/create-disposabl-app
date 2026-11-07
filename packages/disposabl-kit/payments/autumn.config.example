@@ -1,0 +1,13 @@
+import { atmn, feature, plan } from "atmn";
+
+export const credits = feature({ featureId: "credits", name: "Credits", type: "metered", consumable: true });
+export const monthly = plan({
+  planId: "credits_monthly", versionSlug: "v1", active: true, name: "Monthly credits",
+  price: { amount: 5, interval: "month" },
+  items: [{ featureId: credits.featureId, included: 500, reset: { interval: "month" } }],
+});
+export const topup = plan({
+  planId: "credits_topup", versionSlug: "v1", active: true, name: "Credits top-up", addOn: true,
+  items: [{ featureId: credits.featureId, price: { amount: 5, billingUnits: 500, interval: "one_off", billingMethod: "prepaid" } }],
+});
+export default atmn({ features: [credits], plans: [monthly, topup] });

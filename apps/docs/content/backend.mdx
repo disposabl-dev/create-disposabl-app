@@ -1,0 +1,39 @@
+---
+title: Backend and integrations
+description: One backend for your selected clients.
+---
+
+App functions live in `packages/backend/convex`. Shared authentication, storage, telemetry, and payment helpers live in `packages/disposabl-kit/server`.
+
+Use the app's own development or isolated preview backend while coding and testing. Keep provider credentials on the backend; never expose secret keys through public client environment variables.
+
+## Selected integrations
+
+import config from "../../../disposabl.json";
+
+<ul>
+  {[
+    [
+      "api",
+      "API: expose validated operations and verify their authentication boundary.",
+    ],
+    ["mcp", "MCP: give agents discoverable tools backed by app operations."],
+    ["cli", "CLI: call your app from the terminal."],
+    [
+      "typescript-sdk",
+      "TypeScript SDK: use the generated typed client in other applications.",
+    ],
+  ]
+    .filter(([id]) => config.platforms.includes(id))
+    .map(([id, description]) => (
+      <li key={id}>{description}</li>
+    ))}
+</ul>
+
+Only selected platforms are included. Run the repository's generation commands after changing public operation contracts, then test with a real signed-in user and a signed-out request.
+
+## Files and analytics
+
+Files use Convex storage by default. Configuring all required Cloudflare R2 variables enables R2 for new uploads; existing file records retain their storage provider.
+
+Analytics is optional and production-only. Local development and E2E runs must emit no telemetry. Keep captured metadata free of prompts, private content, credentials, and full URLs.

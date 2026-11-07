@@ -20,7 +20,7 @@ import {
 const connection = (
   ctx: Pick<QueryCtx, "db">,
   userId: string,
-  provider: "convex" | "expo" | "posthog",
+  provider: "convex" | "expo" | "posthog" | "autumn",
 ) =>
   ctx.db
     .query("connections")
@@ -42,7 +42,9 @@ export const status = internalQuery({
     const convex = await connection(ctx, userId, "convex");
     const expo = await connection(ctx, userId, "expo");
     const posthog = await connection(ctx, userId, "posthog");
-    const missing: Array<"github" | "convex" | "posthog"> = [];
+    const autumn = await connection(ctx, userId, "autumn");
+    const missing: Array<"github" | "convex" | "posthog" | "autumn"> = [];
+    if (features.includes("payments") && !autumn) missing.push("autumn");
     if (!github) missing.push("github");
     if (!convex) missing.push("convex");
     if (features.includes("analytics") && !posthog?.accountId)
@@ -55,6 +57,7 @@ export const status = internalQuery({
       convex: convex ? { name: convex.name } : null,
       expo: expo ? { name: expo.name } : null,
       posthog: posthog?.accountId ? { name: posthog.name } : null,
+      autumn: autumn ? { name: autumn.name } : null,
       posthogPending: !!posthog && !posthog.accountId,
       ready: missing.length === 0,
       missing,
@@ -73,6 +76,7 @@ export const status = internalQuery({
           !!env.CONVEX_OAUTH_CLIENT_SECRET,
         expo: encrypted,
         posthog: encrypted,
+        autumn: encrypted,
       },
       githubInstallUrl: env.GITHUB_APP_SLUG
         ? `https://github.com/apps/${encodeURIComponent(env.GITHUB_APP_SLUG)}/installations/new`

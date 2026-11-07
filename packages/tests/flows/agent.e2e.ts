@@ -1,0 +1,453 @@
+import { test, expect } from "e2e";
+import { createHash, randomUUID } from "node:crypto";
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { createRequire } from "node:module";
+import { backendUrl, siteUrl, project, root } from "../project.ts";
+
+test(
+  "agent component history isolates owners and preserves worker state",
+  { platforms: ["backend"], tags: ["agent"] },
+  async () => {
+    const adminKey = process.env.E2E_CONVEX_ADMIN_KEY;
+    test.skip(
+      !adminKey,
+      "E2E_CONVEX_ADMIN_KEY is required for isolated fixtures",
+    );
+    test.skip(
+      !project.features.includes("authentication"),
+      "Authentication not selected",
+    );
+    const url = new URL(backendUrl());
+    if (!["127.0.0.1", "localhost", "[::1]"].includes(url.hostname))
+      throw new Error("Admin fixtures require a loopback backend");
+
+    async function call(
+      path: string,
+      args: Record<string, unknown>,
+      options: {
+        token?: string;
+        admin?: boolean;
+        componentPath?: string;
+        mutation?: boolean;
+      } = {},
+    ) {
+      const response = await fetch(
+        `${url.origin}/api/${options.admin ? "function" : options.mutation ? "mutation" : "query"}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(options.admin
+              ? { Authorization: `Convex ${adminKey}` }
+              : options.token
+                ? { Authorization: `Bearer ${options.token}` }
+                : {}),
+          },
+          body: JSON.stringify({
+            path,
+            args,
+            format: "json",
+            ...(options.componentPath
+              ? { componentPath: options.componentPath }
+              : {}),
+          }),
+          signal: AbortSignal.timeout(15_000),
+        },
+      );
+      return response.json();
+    }
+    async function value(
+      path: string,
+      args: Record<string, unknown>,
+      options: Parameters<typeof call>[2] = {},
+    ) {
+      const result = await call(path, args, options);
+      if (result.status !== "success")
+        throw new Error(
+          `${path} failed: ${result.errorMessage ?? result.status}`,
+        );
+      return result.value;
+    }
+    async function user() {
+      const signup = await value(
+        "auth:signUpWithUsernamePassword",
+        {
+          username: `agenttest${randomUUID().replaceAll("-", "")}`,
+          password: `Agent-${randomUUID()}!`,
+        },
+        { mutation: true },
+      );
+      expect(signup.status).toBe("complete");
+      const token = signup.tokens.accessToken as string;
+      const current = await value("users/index:current", {}, { token });
+      return { token, id: current.id as string };
+    }
+    const owner = await user();
+    const other = await user();
+    expect((await call("agent/index:getMessages", {})).status).toBe("error");
+    expect(
+      (await value("agent/index:getMessages", {}, { token: owner.token })).page,
+    ).toEqual([]);
+    expect(
+      (
+        await call(
+          "agent/index:getMessages",
+          { appId: randomUUID() },
+          { token: owner.token },
+        )
+      ).status,
+    ).toBe("error");
+    const appId = randomUUID();
+    const created = await value(
+      "threads:createThread",
+      { userId: owner.id, title: "Agent fixture" },
+      { admin: true, componentPath: "agent" },
+    );
+    const id = created._id as string;
+    function cli(args: string[]) {
+      const result = spawnSync(
+        process.execPath,
+        [
+          join(
+            dirname(
+              createRequire(import.meta.url).resolve("convex/package.json"),
+            ),
+            "bin/main.js",
+          ),
+          ...args,
+          "--url",
+          url.origin,
+          "--admin-key",
+          adminKey!,
+        ],
+        {
+          cwd: join(root, "packages/backend"),
+          encoding: "utf8",
+        },
+      );
+      if (result.status !== 0)
+        throw new Error(
+          `Convex fixture ${args[0]} failed: ${(result.error?.message ?? result.stderr).replaceAll(adminKey!, "[redacted]")}`,
+        );
+      return result.stdout;
+    }
+    const dir = mkdtempSync(join(tmpdir(), "disposabl-agent-e2e-"));
+    try {
+      const file = join(dir, "apps.json");
+      writeFileSync(
+        file,
+        JSON.stringify([
+          {
+            appId,
+            userId: owner.id,
+            name: "Agent fixture",
+            platforms: ["web"],
+            features: ["authentication"],
+            agent: {
+              threadId: id,
+              status: "processing",
+              pending: [],
+              updatedAt: Date.now(),
+            },
+          },
+        ]),
+      );
+      cli(["import", "--append", "--table", "apps", file]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+    const token = randomUUID();
+    let agentBearer =
+      "disposabl_agent_" +
+      randomUUID().replaceAll("-", "") +
+      randomUUID().replaceAll("-", "");
+    const apiOrigin = new URL(siteUrl());
+    if (!["127.0.0.1", "localhost", "[::1]"].includes(apiOrigin.hostname))
+      throw new Error("Agent API fixtures require a loopback site");
+    async function rest(
+      path: string,
+      args: Record<string, unknown>,
+      method = "GET",
+      bearer = agentBearer,
+    ) {
+      const endpoint = new URL(`/api/${path}`, apiOrigin);
+      if (method === "GET")
+        for (const [key, value] of Object.entries(args))
+          endpoint.searchParams.set(key, JSON.stringify(value));
+      return fetch(endpoint, {
+        method,
+        headers: {
+          Authorization: `Bearer ${bearer}`,
+          "Content-Type": "application/json",
+        },
+        ...(method === "POST" ? { body: JSON.stringify(args) } : {}),
+        signal: AbortSignal.timeout(15_000),
+      });
+    }
+    let claimed = false;
+    try {
+      const claim = await value(
+        "agent/state:claim",
+        { id, token },
+        { admin: true },
+      );
+      claimed = true;
+      expect(claim).toMatchObject({
+        appId,
+        threadId: id,
+        status: "processing",
+        lease: { token },
+      });
+      const grant = () =>
+        value(
+          "agent/access:issue",
+          {
+            id,
+            token,
+            hash: createHash("sha256").update(agentBearer).digest("hex"),
+          },
+          { admin: true },
+        );
+      await grant();
+      expect((await rest("apps/get", { appId })).status).toBe(200);
+      function cliStatus(bearer: string, expiresAt = Date.now() + 14_400_000) {
+        const sessionDirectory = mkdtempSync(
+          join(tmpdir(), "disposabl-agent-session-"),
+        );
+        try {
+          writeFileSync(
+            join(
+              sessionDirectory,
+              `${createHash("sha256").update(apiOrigin.origin).digest("hex")}.json`,
+            ),
+            JSON.stringify({
+              tokens: {
+                access_token: bearer,
+                token_type: "Bearer",
+                expires_in: 14_400,
+              },
+              expiresAt,
+            }),
+            { mode: 0o600 },
+          );
+          const login = spawnSync(
+            "bun",
+            [join(root, "packages/cli/index.ts"), "login", "status"],
+            {
+              cwd: root,
+              encoding: "utf8",
+              timeout: 30_000,
+              env: {
+                ...process.env,
+                DISPOSABL_API_ORIGIN: apiOrigin.origin,
+                DISPOSABL_CONFIG_DIR: sessionDirectory,
+                DISPOSABL_API_KEY: "",
+                E2E_TELEMETRY_DISABLED: "1",
+              },
+            },
+          );
+          expect(login.status).toBe(0);
+          expect((login.stdout + login.stderr).includes(bearer)).toBe(false);
+          return JSON.parse(login.stdout).currentUser;
+        } finally {
+          rmSync(sessionDirectory, { recursive: true, force: true });
+        }
+      }
+      expect(cliStatus(agentBearer).id).toBe(owner.id);
+      expect(cliStatus(agentBearer, 0)).toBeNull();
+      expect((await rest("apps/get", { appId: randomUUID() })).status).toBe(
+        403,
+      );
+      expect(
+        (
+          await rest("apps/list", {
+            paginationOpts: { numItems: 10, cursor: null },
+          })
+        ).status,
+      ).toBe(403);
+      expect(
+        (
+          await rest(
+            "agent/sendMessage",
+            { appId, prompt: "Must not recurse" },
+            "POST",
+          )
+        ).status,
+      ).toBe(403);
+      expect(
+        (
+          await rest(
+            "apps/delete",
+            { appId, dangerouslyDeleteApp: true },
+            "POST",
+          )
+        ).status,
+      ).toBe(403);
+      const previousBearer = agentBearer;
+      agentBearer =
+        "disposabl_agent_" +
+        randomUUID().replaceAll("-", "") +
+        randomUUID().replaceAll("-", "");
+      await grant();
+      expect(
+        (await rest("apps/get", { appId }, "GET", previousBearer)).status,
+      ).toBe(401);
+      expect(cliStatus(previousBearer)).toBeNull();
+      expect((await rest("apps/get", { appId })).status).toBe(200);
+      expect(
+        await value(
+          "agent/state:claim",
+          { id, token: randomUUID() },
+          { admin: true },
+        ),
+      ).toBeNull();
+      expect(
+        (
+          await call(
+            "agent/state:append",
+            { id, token: randomUUID(), events: [] },
+            { admin: true },
+          )
+        ).status,
+      ).toBe("error");
+      for (const [index, content] of [
+        "First fixture reply",
+        "Second fixture reply",
+      ].entries()) {
+        await value(
+          "agent/state:append",
+          {
+            id,
+            token,
+            events: [
+              {
+                id: `fixture-${index}`,
+                content,
+                streaming: false,
+                reverted: false,
+              },
+            ],
+            cursor: `cursor-${index}`,
+          },
+          { admin: true },
+        );
+      }
+      const list = await value(
+        "agent/index:getMessages",
+        {},
+        { token: owner.token },
+      );
+      expect(list.page).toMatchObject([
+        { appId, threadId: id, name: "Agent fixture", status: "processing" },
+      ]);
+      expect(
+        (await value("agent/index:getMessages", {}, { token: other.token }))
+          .page,
+      ).toEqual([]);
+      expect(
+        (
+          await call(
+            "agent/index:getMessages",
+            { appId },
+            { token: other.token },
+          )
+        ).status,
+      ).toBe("error");
+      const first = await value(
+        "agent/index:getMessages",
+        { appId, paginationOpts: { numItems: 1, cursor: null } },
+        { token: owner.token },
+      );
+      expect(first.kind).toBe("messages");
+      expect(first.page).toHaveLength(1);
+      expect(first.isDone).toBe(false);
+      const second = await value(
+        "agent/index:getMessages",
+        {
+          appId,
+          paginationOpts: { numItems: 1, cursor: first.continueCursor },
+        },
+        { token: owner.token },
+      );
+      expect(second.page).toHaveLength(1);
+      expect([first.page[0].content, second.page[0].content].sort()).toEqual([
+        "First fixture reply",
+        "Second fixture reply",
+      ]);
+      const apps = JSON.parse(
+        cli(["data", "apps", "--format", "json", "--limit", "1000"]),
+      );
+      const stored = apps.find((app: { appId: string }) => app.appId === appId);
+      expect(stored.agent).toMatchObject({
+        threadId: id,
+        status: "processing",
+        cursor: "cursor-1",
+        lease: { token },
+      });
+      // The held lease keeps the scheduled worker from contacting Boat.
+      const sent = await value(
+        "agent/index:sendMessage",
+        { appId, prompt: "Queued fixture prompt" },
+        { token: owner.token, mutation: true },
+      );
+      expect(sent).toMatchObject({ appId, threadId: id, status: "processing" });
+      expect(
+        (
+          await call(
+            "agent/index:sendMessage",
+            { appId, prompt: "Forbidden" },
+            { token: other.token, mutation: true },
+          )
+        ).status,
+      ).toBe("error");
+      const stopping = await value(
+        "agent/index:abortMessage",
+        { appId },
+        { token: owner.token, mutation: true },
+      );
+      expect(stopping.status).toBe("stopping");
+      expect((await rest("apps/get", { appId })).status).toBe(401);
+      const messages = await value(
+        "agent/index:getMessages",
+        { appId },
+        { token: owner.token },
+      );
+      expect(
+        messages.page.find(
+          (m: { content: string }) => m.content === "Queued fixture prompt",
+        ).status,
+      ).toBe("failed");
+      await value(
+        "agent/state:finish",
+        { id, token, stopped: true },
+        { admin: true },
+      );
+      claimed = false;
+      const aborted = await value(
+        "agent/index:abortMessage",
+        { appId },
+        { token: owner.token, mutation: true },
+      );
+      expect(aborted).toMatchObject({ appId, threadId: id, status: "idle" });
+      expect(
+        (
+          await call(
+            "agent/index:abortMessage",
+            { appId },
+            { token: other.token, mutation: true },
+          )
+        ).status,
+      ).toBe("error");
+    } finally {
+      if (claimed)
+        await value(
+          "agent/state:finish",
+          { id, token, stopped: true },
+          { admin: true },
+        );
+    }
+  },
+);

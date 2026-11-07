@@ -4,16 +4,23 @@ import {
   identityFields,
   internalAction,
 } from "@disposabl/disposabl-kit/server/lib/functions";
+import { resolveFeatures } from "@disposabl/disposabl-kit/feature-options";
+import { validatePlatforms } from "@disposabl/disposabl-kit/platforms";
 import { v } from "convex/values";
 import { internal } from "../../../_generated/api";
 import { credential } from "../../../connections/actions/credentials";
-import { previewIdentity, deployment } from "../../../validator";
+import {
+  previewIdentity,
+  deployment,
+  requestedConfiguration,
+} from "../../../validator";
 import { validateReference } from "../../internal";
 import { ensureDevelopment, productionDeployment } from "./management";
+import { provisionPayments } from "../../../apps/actions/billing";
 import { analyticsConfig } from "../../../connections/validator";
 
 export const create = internalAction({
-  args: { ...identityFields, ...previewIdentity },
+  args: { ...identityFields, ...previewIdentity, ...requestedConfiguration },
   returns: v.object({
     appId: v.string(),
     ...deployment.fields,
@@ -46,15 +53,21 @@ export const create = internalAction({
       },
     );
     try {
-      await ctx.runMutation(internal.previews.internal.create, args);
+      const current = await ctx.runQuery(internal.apps.internal.get, identity);
+      const platforms = validatePlatforms(args.platforms ?? current.platforms);
+      const features = resolveFeatures(args.features ?? current.features ?? []);
+      const preview = { ...identity, reference: args.reference };
+      await ctx.runMutation(internal.previews.internal.create, preview);
       const projectId = await ctx.runAction(internal.apps.actions.setup.setup, {
         userId: args.userId,
         appId: args.appId,
+        platforms,
+        features,
       });
       const token = (await credential(ctx, args.userId, "convex")).token;
       const production = await productionDeployment(token, projectId);
       const app = await ctx.runQuery(internal.apps.internal.get, identity);
-      const posthog = app.features?.includes("analytics")
+      const posthog = features.includes("analytics")
         ? await ctx.runQuery(internal.apps.posthog.project, identity)
         : null;
       if (!app.githubOwner || !app.githubRepo)
@@ -64,9 +77,23 @@ export const create = internalAction({
         projectId,
         args.reference,
       );
+      await provisionPayments(
+        ctx,
+        args.userId,
+        features,
+        token,
+        { ...deployment, deployKey, kind: "dev" },
+        production,
+      );
       await ctx.runMutation(internal.previews.internal.finish, {
-        ...args,
+        ...preview,
         deployment,
+      });
+      await ctx.runMutation(internal.apps.internal.applyConfiguration, {
+        ...identity,
+        platforms,
+        features,
+        until,
       });
       return {
         appId: args.appId,

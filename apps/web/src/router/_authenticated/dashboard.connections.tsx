@@ -1,5 +1,11 @@
+import { AutumnConnection } from "../../components/connections/autumn-connection";
 import { PosthogConnection } from "../../components/connections/posthog-connection";
-import { useEffect, useState } from "react";
+import { useAuthToken } from "@convex-dev/auth/react";
+import {
+  completeConnections,
+  sessionId,
+} from "../../components/connections/flow-state";
+import { useEffect, useRef, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Check, ArrowRight } from "lucide-react";
 import { Button } from "@disposabl/disposabl-kit/client/components/ui/button";
@@ -12,7 +18,18 @@ export const Route = createFileRoute(
   "/_providers/_authenticated/dashboard/connections",
 )({ component: Connections });
 
-function Connections() {
+export function Connections({ onContinue }: { onContinue?: () => void } = {}) {
+  const session = sessionId(useAuthToken());
+  const [showExpo, setShowExpo] = useState(false);
+  const initialized = useRef(false);
+  useEffect(() => {
+    if (initialized.current) return;
+    initialized.current = true;
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("connect") === "expo") {
+      setShowExpo(true);
+    }
+  }, []);
   const setup = useConnectionSetup();
   const {
     status,
@@ -23,23 +40,28 @@ function Connections() {
     disconnect,
     mobile,
     analyticsRequired,
+    paymentsRequired,
+    fromCli,
+    initialized: setupInitialized,
   } = setup;
-  const [showExpo, setShowExpo] = useState(false);
-  useEffect(() => {
-    const url = new URL(window.location.href);
-    if (url.searchParams.get("connect") === "expo") {
-      setShowExpo(true);
-      url.searchParams.delete("connect");
-      window.history.replaceState(window.history.state, "", url);
-    }
-  }, []);
+  const finish = () => {
+    completeConnections(sessionStorage, session);
+    onContinue?.();
+  };
   const completed =
     Number(Boolean(status?.github)) +
     Number(Boolean(status?.convex)) +
     Number(mobile && Boolean(status?.expo)) +
-    Number(analyticsRequired && Boolean(status?.posthog));
-  const required = 2 + Number(mobile) + Number(analyticsRequired);
-  const ready = status?.ready && (!mobile || Boolean(status.expo));
+    Number(analyticsRequired && Boolean(status?.posthog)) +
+    Number(paymentsRequired && Boolean(status?.autumn));
+  const required =
+    2 + Number(mobile) + Number(analyticsRequired) + Number(paymentsRequired);
+  const ready =
+    setupInitialized &&
+    status?.ready &&
+    (!mobile || Boolean(status.expo)) &&
+    !busy &&
+    Boolean(session);
   const providers = [
     {
       id: "convex",
@@ -102,6 +124,16 @@ function Connections() {
       ) : (
         <div className="space-y-3">
           <GithubConnection setup={setup} />
+          <AutumnConnection
+            connected={status.autumn}
+            required={paymentsRequired}
+            available={status.available.autumn}
+            busy={busy}
+            run={run}
+            disconnect={async () => {
+              await disconnect({ provider: "autumn" });
+            }}
+          />
           <PosthogConnection
             connected={status.posthog}
             pending={status.posthogPending}
@@ -170,7 +202,7 @@ function Connections() {
                           ? showExpo
                             ? setShowExpo(false)
                             : window.open(
-                                "/dashboard/connections?connect=expo",
+                                `/dashboard/connections?connect=expo${fromCli ? "&origin=cli" : ""}${mobile ? "&mobile=1" : ""}${analyticsRequired || paymentsRequired ? `&features=${[...(analyticsRequired ? ["analytics"] : []), ...(paymentsRequired ? ["payments"] : [])].join(",")}` : ""}`,
                                 "_blank",
                                 "noopener,noreferrer",
                               )
@@ -213,15 +245,23 @@ function Connections() {
       <div className="mt-8 flex flex-wrap items-center justify-between gap-4 border-t pt-6">
         <p className="text-sm text-muted-foreground">
           {ready
-            ? "Your accounts are connected. Continue here or return to your terminal."
+            ? fromCli
+              ? "Your accounts are connected. Return to your terminal to finish setup."
+              : "Your accounts are connected. Continue to your dashboard."
             : "Complete the required connections to continue."}
         </p>
-        {ready ? (
+        {ready && onContinue && !fromCli ? (
+          <Button className="min-h-11" onClick={finish}>
+            Continue <ArrowRight className="ml-2 size-4" />
+          </Button>
+        ) : ready ? (
           <Link
+            onClick={finish}
             to="/dashboard"
             className="inline-flex min-h-11 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
           >
-            Continue <ArrowRight className="ml-2 size-4" />
+            {fromCli ? "Go to dashboard" : "Continue"}{" "}
+            <ArrowRight className="ml-2 size-4" />
           </Link>
         ) : (
           <Button disabled className="min-h-11">

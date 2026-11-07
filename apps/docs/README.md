@@ -29,9 +29,7 @@ apps/web/dist/client/
 
 The PR and production pipeline template uses that same web build command and
 uploads `apps/web/dist/client` once to Convex static hosting. Docs changes ship
-with the web app. There is no docs dev server or runtime build process.
+with the web app. The web development server builds docs on the first `/docs` visit and serves the result on the same origin.
 
-Run `bun run --cwd apps/docs build` to build only the documentation. Local web
-development does not serve docs; rendered docs are included in the combined
-build and deployment. Adding docs to an app generated without them requires
+Run `bun run --cwd apps/docs build` to build only the documentation. To see documentation edits during local development, rebuild docs with this command and refresh the page. Rendered docs are also included in the combined build and deployment. Adding docs to an app generated without them requires
 restoring the workspace and build hooks, not just changing `disposabl.json`.

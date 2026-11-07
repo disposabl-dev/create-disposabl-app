@@ -30,7 +30,10 @@ function VerifyEmail() {
             If you started in the mobile app, return there and paste this link
             to continue.
           </p>
-          <Link to="/signup" className="block underline">
+          <Link
+            to="/signup"
+            className="block font-medium text-[#2855c5] underline-offset-4 hover:underline"
+          >
             Start again
           </Link>
         </>

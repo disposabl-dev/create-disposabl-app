@@ -1,3 +1,4 @@
+import { authReturnPath } from "../lib/auth-return";
 import {
   useSignInWithUsernamePassword,
   useSignUpWithUsernamePassword,
@@ -8,7 +9,7 @@ import {
 } from "@convex-dev/auth/methods/email-password/react";
 import { useQuery } from "convex/react";
 import { EmailVerification } from "./email-verification";
-import { Link, router } from "expo-router";
+import { Link, router, useLocalSearchParams } from "expo-router";
 import { useRef, useState } from "react";
 import {
   Keyboard,
@@ -19,9 +20,13 @@ import {
 } from "react-native";
 import { api } from "../lib/convex";
 import { authErrorMessage } from "../../lib/auth-errors";
-import { AuthButton, AuthScreen, styles } from "./auth-ui";
+import { AuthButton, AuthScreen, useAuthStyles } from "./auth-ui";
+import { GoogleSignIn } from "./google-sign-in";
+import { BrandMark } from "../design/brand-mark";
 
 export function AuthForm({ mode }: { mode: "login" | "signup" }) {
+  const styles = useAuthStyles();
+  const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
   const { signIn, pending: signingIn } = useSignInWithUsernamePassword(
     api.auth,
   );
@@ -31,19 +36,14 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   const providers = useQuery(api.auth.providers);
   const emailIn = useSignInWithEmailPassword(api.authEmail);
   const emailUp = useSignUpWithEmailPassword(api.authEmail);
-  const [legacy, setLegacy] = useState(false);
   const [sent, setSent] = useState(false);
   const [confirmation, setConfirmation] = useState("");
-  const email = Boolean(
-    providers &&
-    (mode === "signup"
-      ? providers.emailPassword
-      : providers.emailPassword !== legacy),
-  );
+  const email = Boolean(providers?.emailPassword);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const passwordInput = useRef<TextInputInstance>(null);
+  const confirmationInput = useRef<TextInputInstance>(null);
   const submitting = useRef(false);
   const pending = signingIn || signingUp || emailIn.pending || emailUp.pending;
   const isSignup = mode === "signup";
@@ -74,7 +74,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
         setError(authErrorMessage(result.userError));
       } else {
         setPassword("");
-        router.replace("/(authenticated)/account");
+        router.replace(authReturnPath(returnTo));
       }
     } catch {
       setError("Couldn't connect. Please try again.");
@@ -93,122 +93,133 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
 
   return (
     <AuthScreen>
+      <BrandMark />
       <Text style={styles.title}>
         {isSignup ? "Create your account" : "Welcome back"}
       </Text>
       <Text style={styles.body}>
-        {isSignup
-          ? email
-            ? "Choose an email and password."
-            : "Choose a username and password."
-          : "Use the same account as the website."}
+        {providers?.googleOnly
+          ? "Continue with your Google account."
+          : isSignup
+            ? email
+              ? "Choose an email and password."
+              : "Choose a username and password."
+            : "Use the same account as the website."}
       </Text>
-      <View style={styles.field}>
-        <Text style={styles.label}>{email ? "Email" : "Username"}</Text>
-        <TextInput
-          accessibilityLabel={email ? "Email" : "Username"}
-          keyboardType={email ? "email-address" : "default"}
-          style={styles.input}
-          value={username}
-          onChangeText={setUsername}
-          autoCapitalize="none"
-          autoCorrect={false}
-          autoComplete={isSignup ? "username-new" : "username"}
-          textContentType="username"
-          editable={!pending}
-          returnKeyType="next"
-          submitBehavior="submit"
-          onSubmitEditing={() => passwordInput.current?.focus()}
-        />
-      </View>
-      <View style={styles.field}>
-        <Text style={styles.label}>Password</Text>
-        <TextInput
-          ref={passwordInput}
-          accessibilityLabel="Password"
-          style={styles.input}
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          autoCapitalize="none"
-          autoCorrect={false}
-          autoComplete={isSignup ? "new-password" : "current-password"}
-          textContentType={isSignup ? "newPassword" : "password"}
-          editable={!pending}
-          returnKeyType="go"
-          onSubmitEditing={() => void submit()}
-        />
-      </View>
-      {isSignup && (
-        <View style={styles.field}>
-          <Text style={styles.label}>Confirm password</Text>
-          <TextInput
-            accessibilityLabel="Confirm password"
-            style={styles.input}
-            value={confirmation}
-            onChangeText={setConfirmation}
-            secureTextEntry
-            autoCapitalize="none"
-            autoCorrect={false}
-            autoComplete="new-password"
-            editable={!pending}
-          />
-        </View>
-      )}
-      {email && isSignup && providers && !providers.emailDelivery && (
+      {providers?.google && <GoogleSignIn disabled={pending} />}
+      {providers?.googleOnly && !providers.google && (
         <Text style={styles.error}>
-          Email signup is temporarily unavailable.
+          Sign-in is temporarily unavailable. Please try again later.
         </Text>
       )}
-      {error && (
-        <Text accessibilityRole="alert" style={styles.error}>
-          {error}
-        </Text>
+      {!providers?.googleOnly && (
+        <>
+          <View style={styles.field}>
+            <Text style={styles.label}>{email ? "Email" : "Username"}</Text>
+            <TextInput
+              accessibilityLabel={email ? "Email" : "Username"}
+              keyboardType={email ? "email-address" : "default"}
+              style={styles.input}
+              value={username}
+              onChangeText={setUsername}
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete={isSignup ? "username-new" : "username"}
+              textContentType="username"
+              editable={!pending}
+              returnKeyType="next"
+              submitBehavior="submit"
+              onSubmitEditing={() => passwordInput.current?.focus()}
+            />
+          </View>
+          <View style={styles.field}>
+            <Text style={styles.label}>Password</Text>
+            <TextInput
+              ref={passwordInput}
+              accessibilityLabel="Password"
+              style={styles.input}
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete={isSignup ? "new-password" : "current-password"}
+              textContentType={isSignup ? "newPassword" : "password"}
+              editable={!pending}
+              returnKeyType={isSignup ? "next" : "go"}
+              onSubmitEditing={() => {
+                if (isSignup) confirmationInput.current?.focus();
+                else void submit();
+              }}
+            />
+          </View>
+          {isSignup && (
+            <View style={styles.field}>
+              <Text style={styles.label}>Confirm password</Text>
+              <TextInput
+                ref={confirmationInput}
+                accessibilityLabel="Confirm password"
+                style={styles.input}
+                value={confirmation}
+                onChangeText={setConfirmation}
+                secureTextEntry
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="new-password"
+                editable={!pending}
+                returnKeyType="go"
+                onSubmitEditing={() => void submit()}
+              />
+            </View>
+          )}
+          {email && isSignup && providers && !providers.emailDelivery && (
+            <Text style={styles.error}>
+              Email signup is temporarily unavailable.
+            </Text>
+          )}
+          {error && (
+            <Text accessibilityRole="alert" style={styles.error}>
+              {error}
+            </Text>
+          )}
+          <AuthButton
+            title={
+              pending
+                ? "Please wait..."
+                : isSignup
+                  ? "Create account"
+                  : "Log in"
+            }
+            pending={pending}
+            disabled={
+              !providers ||
+              !username ||
+              !password ||
+              (isSignup && email && !providers.emailDelivery)
+            }
+            onPress={() => void submit()}
+          />
+          {providers?.emailDelivery && (
+            <Link href="/(auth)/forgot-password" style={styles.link}>
+              Forgot password?
+            </Link>
+          )}
+          {providers && (
+            <Link
+              replace
+              href={{
+                pathname: isSignup ? "/(auth)/login" : "/(auth)/signup",
+                params: { returnTo },
+              }}
+              style={styles.link}
+            >
+              {isSignup
+                ? "Already have an account? Log in"
+                : "New here? Create an account"}
+            </Link>
+          )}
+        </>
       )}
-      <AuthButton
-        title={
-          pending ? "Please wait..." : isSignup ? "Create account" : "Log in"
-        }
-        pending={pending}
-        disabled={
-          !providers ||
-          !username ||
-          !password ||
-          (isSignup && email && !providers.emailDelivery)
-        }
-        onPress={() => void submit()}
-      />
-      {providers?.emailDelivery && (
-        <Link href="/(auth)/forgot-password" style={styles.link}>
-          Forgot password?
-        </Link>
-      )}
-      {!isSignup && providers && (
-        <Text
-          accessibilityRole="button"
-          style={styles.link}
-          onPress={() => {
-            setLegacy(!legacy);
-            setUsername("");
-          }}
-        >
-          {email ? "Use an existing username" : "Use an existing email"}
-        </Text>
-      )}
-      {!pending && (
-        <Link
-          replace
-          href={isSignup ? "/(auth)/login" : "/(auth)/signup"}
-          style={styles.link}
-        >
-          {isSignup
-            ? "Already have an account? Log in"
-            : "New here? Create an account"}
-        </Link>
-      )}
-      <Link href="/" style={styles.link}>
-        Back to home
-      </Link>
     </AuthScreen>
   );
 }

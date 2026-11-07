@@ -30,11 +30,35 @@ const touched = [
   "packages/backend/package.json",
   "packages/backend/README.md",
   "packages/sdk/src",
-  "packages/cli/README.md",
+  "packages/cli",
   "packages/create-disposabl-app",
   "starter",
   ".github/workflows",
   "apps/web/src/router",
+  "apps/mobile/src/app/index.tsx",
+  "apps/mobile/src/app/_layout.tsx",
+  "apps/mobile/src/app/settings.tsx",
+  "apps/mobile/src/app/(authenticated)/apps",
+  "apps/mobile/src/features/management",
+  "apps/mobile/src/features/studio",
+  "apps/mobile/src/app/(tabs)",
+  "apps/mobile/src/app/compose.tsx",
+  "apps/mobile/src/app/connections.tsx",
+  "apps/mobile/src/app/example.tsx",
+  "apps/mobile/src/app/guide-detail.tsx",
+  "packages/tests/flows/mobile.e2e.ts",
+  "packages/tests/flows/mobile-management.e2e.ts",
+  "packages/tests/flows/connections-onboarding.e2e.ts",
+  "packages/tests/connections-flow.test.ts",
+  "packages/tests/configuration.test.ts",
+  "packages/tests/agent-access.test.ts",
+  "packages/tests/agent-bootstrap.test.ts",
+  "packages/tests/agent-creation.test.ts",
+  "packages/tests/autumn-connections.test.ts",
+  "packages/tests/mobile-connections.test.ts",
+  "packages/tests/components/mobile-connections.test.mjs",
+  "packages/tests/components/mobile-connections-navigation.test.mjs",
+  "packages/tests/platform-connections.test.ts",
   "apps/web/site.json",
   "apps/web/public/og",
   "apps/web/src/components/connections",
@@ -42,20 +66,29 @@ const touched = [
   "packages/tests/flows/agent-onboarding.e2e.ts",
   "packages/tests/flows/github-identity.e2e.ts",
   "bun.lock",
+  "packages/tests/flows/agent.e2e.ts",
   "turbo.json",
 ];
-for (const path of await readdir(root, { recursive: true })) {
-  const normalized = path.replaceAll("\\", "/");
-  if (
-    touched.some(
-      (target) =>
-        normalized === target ||
-        normalized.startsWith(target + "/") ||
-        target.startsWith(normalized + "/"),
-    ) &&
-    (await lstat(join(root, path))).isSymbolicLink()
-  )
-    throw new Error(`Unexpected symlink in staging copy: ${path}`);
+const pending = [""];
+while (pending.length) {
+  const directory = pending.pop()!;
+  for (const entry of await readdir(join(root, directory), {
+    withFileTypes: true,
+  })) {
+    const path = directory ? `${directory}/${entry.name}` : entry.name;
+    if (
+      !touched.some(
+        (target) =>
+          path === target ||
+          path.startsWith(target + "/") ||
+          target.startsWith(path + "/"),
+      )
+    )
+      continue;
+    if (entry.isSymbolicLink())
+      throw new Error(`Unexpected symlink in staging copy: ${path}`);
+    if (entry.isDirectory()) pending.push(path);
+  }
 }
 const json = async (path: string) =>
   JSON.parse(await readFile(join(root, path), "utf8"));
@@ -92,9 +125,9 @@ const keep = new Set([
   "telemetry.ts",
   "auth.config.ts",
   "mcp.ts",
-  "mcpEnterprise",
   "tsconfig.json",
   "users",
+  "files",
 ]);
 for (const entry of keep) await lstat(join(convex, entry));
 for (const path of [
@@ -110,7 +143,20 @@ for (const path of [
 ])
   await readFile(join(root, "starter/backend", path));
 
-await readFile(join(root, "starter/cli/README.md"));
+const starterCopies = [
+  ["starter/web/index.tsx", "apps/web/src/router/index.tsx"],
+  ["starter/cli/README.md", "packages/cli/README.md"],
+  ["starter/cli/commands.ts", "packages/cli/commands.ts"],
+  [
+    "starter/web/dashboard.tsx",
+    "apps/web/src/router/_authenticated/dashboard.tsx",
+  ],
+  ["starter/mobile/index.tsx", "apps/mobile/src/app/index.tsx"],
+  ["starter/mobile/settings.tsx", "apps/mobile/src/app/settings.tsx"],
+  ["starter/mobile/layout.tsx", "apps/mobile/src/app/_layout.tsx"],
+  ["starter/mobile/mobile.e2e.ts", "packages/tests/flows/mobile.e2e.ts"],
+] as const;
+for (const [source] of starterCopies) await readFile(join(root, source));
 
 // Generated apps start with their own origin and copy, never Disposabl's SEO.
 await Bun.write(
@@ -132,21 +178,6 @@ await Bun.write(
 );
 await rm(join(root, "apps/web/public/og"), { recursive: true, force: true });
 
-const dashboardPath = "apps/web/src/router/_authenticated/dashboard.tsx";
-const connectionPath =
-  "apps/web/src/router/_authenticated/dashboard.connections.tsx";
-const dashboard = await readFile(join(root, dashboardPath), "utf8");
-const connectionLink =
-  '        <Link to="/dashboard/connections">Connections</Link>\n';
-if (
-  !dashboard.includes(connectionLink) &&
-  ((await lstat(join(root, connectionPath)).catch(() => null)) ||
-    dashboard.includes("/dashboard/connections"))
-)
-  throw new Error(
-    "Connections navigation changed; update reset.ts before packaging.",
-  );
-
 for (const entry of await readdir(convex)) {
   if (!keep.has(entry))
     await rm(join(convex, entry), { recursive: true, force: true });
@@ -156,27 +187,39 @@ for (const path of [
   "packages/sdk/src/generated",
   "packages/create-disposabl-app",
   ".github/workflows/publish.yml",
-  connectionPath,
+  "apps/web/src/router/_authenticated/dashboard.connections.tsx",
+  "apps/mobile/src/app/(authenticated)/apps",
+  "apps/mobile/src/features/management",
+  "apps/mobile/src/features/studio",
+  "apps/mobile/src/app/(tabs)",
+  "apps/mobile/src/app/compose.tsx",
+  "apps/mobile/src/app/connections.tsx",
+  "apps/mobile/src/app/example.tsx",
+  "apps/mobile/src/app/guide-detail.tsx",
+  "packages/tests/flows/mobile-management.e2e.ts",
+  "packages/tests/flows/connections-onboarding.e2e.ts",
+  "packages/tests/connections-flow.test.ts",
+  "packages/tests/configuration.test.ts",
+  "packages/tests/agent-access.test.ts",
+  "packages/tests/agent-bootstrap.test.ts",
+  "packages/tests/agent-creation.test.ts",
+  "packages/tests/autumn-connections.test.ts",
+  "packages/tests/mobile-connections.test.ts",
+  "packages/tests/components/mobile-connections.test.mjs",
+  "packages/tests/components/mobile-connections-navigation.test.mjs",
+  "packages/tests/platform-connections.test.ts",
   "apps/web/src/components/connections",
   "apps/web/src/components/agent-onboarding",
   "packages/tests/flows/agent-onboarding.e2e.ts",
+  "packages/tests/flows/agent.e2e.ts",
   "packages/tests/flows/github-identity.e2e.ts",
 ])
   await rm(join(root, path), { recursive: true, force: true });
 await cp(join(root, "starter/backend"), join(root, "packages/backend"), {
   recursive: true,
 });
-await cp(
-  join(root, "starter/cli/README.md"),
-  join(root, "packages/cli/README.md"),
-);
-await Bun.write(
-  join(root, dashboardPath),
-  dashboard
-    .replace(connectionLink, "")
-    .replace(/^import \{ AgentOnboarding \} from "[^"]+";\n/m, "")
-    .replace("      <AgentOnboarding />\n", ""),
-);
+for (const [source, destination] of starterCopies)
+  await cp(join(root, source), join(root, destination));
 
 for (const dependency of [
   "@convex-dev/workflow",
@@ -189,9 +232,8 @@ for (const dependency of [
 ])
   delete backend.dependencies[dependency];
 delete backend.devDependencies["@types/node-forge"];
-await rm(join(root, "packages/cli"), { recursive: true, force: true });
-delete lock.workspaces["packages/cli"];
-delete lock.packages["@disposabl/cli"];
+for (const file of ["delete.ts", "preview.ts", "repository.ts"])
+  await rm(join(root, "packages/cli", file));
 delete lock.workspaces["packages/create-disposabl-app"];
 delete lock.packages["create-disposabl-app"];
 lock.workspaces["packages/backend"] = {

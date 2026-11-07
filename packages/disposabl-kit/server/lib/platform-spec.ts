@@ -5,8 +5,9 @@ import {
   type McpServer,
   type ToolCtx,
   type ToolDefinition,
+  type McpUser,
 } from "@convex-dev/mcp";
-import { captureTelemetry } from "./telemetry";
+import { scheduleTelemetry } from "./telemetry";
 import { makeFunctionReference as reference } from "convex/server";
 import {
   v,
@@ -31,6 +32,19 @@ type Operation = {
   type: "query" | "mutation" | "action";
   args: ReturnType<typeof toJsonSchema>;
   returns: ReturnType<typeof toJsonSchema>;
+};
+
+export type ApiPolicy = {
+  authenticate: (
+    ctx: ToolCtx,
+    request: Request,
+    fallback: McpServer["authenticate"],
+  ) => Promise<McpUser | null>;
+  authorize: (
+    user: McpUser,
+    operation: string,
+    input: Record<string, unknown>,
+  ) => boolean;
 };
 
 /** One opt-in produces the shared JSON contract and both transport adapters. */
@@ -87,20 +101,30 @@ export function createPlatforms(
           const startedAt = Date.now();
           try {
             const result = await runOperation(ctx, input, user);
-            await captureTelemetry("mcp_operation", {
-              source: "mcp",
-              operation: id,
-              outcome: "success",
-              duration_ms: Date.now() - startedAt,
-            });
+            await scheduleTelemetry(
+              ctx,
+              "mcp_operation",
+              {
+                source: "mcp",
+                operation: id,
+                outcome: "success",
+                duration_ms: Date.now() - startedAt,
+              },
+              user.userId,
+            );
             return result;
           } catch (error) {
-            await captureTelemetry("mcp_operation", {
-              source: "mcp",
-              operation: id,
-              outcome: "error",
-              duration_ms: Date.now() - startedAt,
-            });
+            await scheduleTelemetry(
+              ctx,
+              "mcp_operation",
+              {
+                source: "mcp",
+                operation: id,
+                outcome: "error",
+                duration_ms: Date.now() - startedAt,
+              },
+              user.userId,
+            );
             throw error;
           }
         },
@@ -115,6 +139,7 @@ export function createPlatforms(
       ctx: ToolCtx,
       request: Request,
       authenticate: McpServer["authenticate"],
+      policy?: ApiPolicy,
     ) {
       const url = new URL(request.url);
       const definition = routes.get(url.pathname);
@@ -131,7 +156,9 @@ export function createPlatforms(
           { status: 405, headers: { Allow: method } },
         );
       try {
-        const user = await authenticate(ctx, request);
+        const user = policy
+          ? await policy.authenticate(ctx, request, authenticate)
+          : await authenticate(ctx, request);
         if (!user)
           return Response.json({ error: "unauthenticated" }, { status: 401 });
         if (definition.scope && !user.scopes.includes(definition.scope))
@@ -149,11 +176,44 @@ export function createPlatforms(
         const input = checkValue(v.object(definition.args ?? {}), raw);
         if (!input.ok)
           return Response.json({ error: input.error }, { status: 400 });
-        const result = await definition.handler(
-          ctx,
-          input.value as Record<string, unknown>,
-          user,
-        );
+        const operation = spec.find((item) => item.path === url.pathname)!;
+        if (
+          policy &&
+          !policy.authorize(
+            user,
+            operation.name,
+            input.value as Record<string, unknown>,
+          )
+        )
+          return Response.json({ error: "forbidden" }, { status: 403 });
+        const startedAt = Date.now();
+        const header = request.headers.get("X-Disposabl-Source");
+        const source = header === "cli" || header === "sdk" ? header : "api";
+        const record = async (outcome: "success" | "error") => {
+          await scheduleTelemetry(
+            ctx,
+            "api_operation",
+            {
+              source,
+              operation: operation.name,
+              outcome,
+              duration_ms: Date.now() - startedAt,
+            },
+            user.userId,
+          );
+        };
+        let result;
+        try {
+          result = await definition.handler(
+            ctx,
+            input.value as Record<string, unknown>,
+            user,
+          );
+          await record("success");
+        } catch (error) {
+          await record("error");
+          throw error;
+        }
         return new Response(
           JSON.stringify(result ?? null, (_, value) =>
             typeof value === "bigint"

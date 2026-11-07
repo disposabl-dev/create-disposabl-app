@@ -232,6 +232,7 @@ jobs:
     runs-on: ${{ needs.changes.outputs.macos_runner }}
     timeout-minutes: 90
     env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
       CONVEX_URL: ${{ needs.web.outputs.convex_url }}
       CONVEX_SITE_URL: ${{ needs.web.outputs.convex_site_url }}
       EXPO_PUBLIC_CONVEX_URL: ${{ needs.web.outputs.convex_url }}
@@ -248,6 +249,18 @@ jobs:
       - *install
       - name: Report build
         run: node .github/scripts/disposabl.mjs report ios building
+      - name: Load Expo environment
+        if: env.EXPO_TOKEN != ''
+        working-directory: apps/mobile
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/mobile.sh" expo-env
+      - name: Verify update channel
+        if: env.EXPO_TOKEN != ''
+        working-directory: apps/mobile
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/mobile.sh" expo-channel
+      - name: Publish compatible iOS preview update
+        if: env.EXPO_TOKEN != ''
+        working-directory: apps/mobile
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/apple.sh" ota
       - name: Xcode toolchain
         run: |
           xcodebuild -version
@@ -300,15 +313,37 @@ jobs:
         if: steps.apple-prerequisites.outputs.ready == 'true'
         working-directory: apps/mobile
         run: bash "$GITHUB_WORKSPACE/.github/scripts/mobile.sh" expo-env
-      - name: Build and submit to TestFlight
+      - name: Verify update channel
         if: steps.apple-prerequisites.outputs.ready == 'true'
+        working-directory: apps/mobile
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/mobile.sh" expo-channel
+      - name: Select iOS update or native build
+        id: ios-plan
+        if: steps.apple-prerequisites.outputs.ready == 'true'
+        working-directory: apps/mobile
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/apple.sh" ota-plan
+      - name: Publish compatible iOS production update
+        if: steps.ios-plan.outputs.action == 'update'
+        working-directory: apps/mobile
+        env:
+          RUNTIME: ${{ steps.ios-plan.outputs.runtime }}
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/apple.sh" ota
+      - name: Build and submit to TestFlight
+        if: steps.ios-plan.outputs.action == 'build'
         working-directory: apps/mobile
         env:
           ASC_APP_ID: ${{ secrets.ASC_APP_ID || vars.ASC_APP_ID }}
         run: bash "$GITHUB_WORKSPACE/.github/scripts/apple.sh" production
+      - name: Reconcile delivery of the compatible native build
+        if: steps.ios-plan.outputs.action == 'update'
+        working-directory: apps/mobile
+        env:
+          BUILD_ID: ${{ steps.ios-plan.outputs.build_id }}
+          ASC_APP_ID: ${{ secrets.ASC_APP_ID || vars.ASC_APP_ID }}
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/apple.sh" deliver
       - name: Report failure
         if: failure() || cancelled()
-        run: node .github/scripts/disposabl.mjs report ios failed 'iOS production build or submission failed; check the workflow log.'
+        run: node .github/scripts/disposabl.mjs report ios failed 'iOS update, native build or submission failed; check the workflow log.'
   desktop:
     needs: web
     permissions: *release-permissions

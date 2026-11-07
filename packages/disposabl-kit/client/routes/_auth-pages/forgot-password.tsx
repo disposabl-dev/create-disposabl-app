@@ -51,6 +51,7 @@ function ForgotPassword() {
           <Field>
             <FieldLabel htmlFor="email">Email</FieldLabel>
             <Input
+              className="h-12 rounded-xl border-[#d9dce3] bg-white px-4"
               id="email"
               type="email"
               autoComplete="email"
@@ -61,16 +62,26 @@ function ForgotPassword() {
             />
           </Field>
           {error && (
-            <p role="alert" className="text-destructive">
+            <p
+              role="alert"
+              className="rounded-lg bg-destructive/5 p-3 text-destructive"
+            >
               {error}
             </p>
           )}
-          <Button type="submit" disabled={pending}>
+          <Button
+            className="h-12 w-full rounded-xl bg-[#161b2e] text-white hover:bg-[#303850]"
+            type="submit"
+            disabled={pending}
+          >
             {pending ? "Sending…" : "Send reset link"}
           </Button>
         </form>
       )}
-      <Link to="/login" className="block underline">
+      <Link
+        to="/login"
+        className="block font-medium text-[#2855c5] underline-offset-4 hover:underline"
+      >
         Back to login
       </Link>
     </PasswordPage>

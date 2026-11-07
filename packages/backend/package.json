@@ -21,22 +21,22 @@
     "@convex-dev/workflow": "^0.4.10",
     "@disposabl/disposabl-kit": "workspace:*",
     "@octokit/rest": "^22.0.1",
-    "@vercel/connect": "^2.5.2",
+    "@vercel/connect": "^2.9.0",
     "convex": "catalog:",
     "libsodium-wrappers": "^0.8.4",
-    "node-forge": "^1.4.2"
+    "node-forge": "^1.4.3"
   },
   "devDependencies": {
     "@convex-dev/eslint-plugin": "^5.0.1",
-    "@eslint/eslintrc": "^3.3.6",
+    "@eslint/eslintrc": "^3.3.7",
     "@eslint/js": "^10.0.1",
-    "@types/node": "^24.13.3",
+    "@types/node": "^26.6.6",
     "@types/node-forge": "^1.3.14",
-    "@typescript-eslint/eslint-plugin": "^8.66.0",
-    "@typescript-eslint/parser": "^8.66.0",
+    "@typescript-eslint/eslint-plugin": "^8.72.1",
+    "@typescript-eslint/parser": "^8.72.1",
     "@typescript/native": "npm:typescript@^7.0.2",
-    "eslint": "^10.8.0",
-    "globals": "^17.9.0",
-    "typescript": "npm:@typescript/typescript6@^6.0.2"
+    "eslint": "^10.14.0",
+    "globals": "^17.14.0",
+    "typescript": "~6.0.3"
   }
 }

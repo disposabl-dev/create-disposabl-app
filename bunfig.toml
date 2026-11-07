@@ -1,3 +1,7 @@
+[install]
+# Keep one native Expo installation across the app and shared kit.
+linker = "hoisted"
+
 [test]
 # Bundled starter copies and native build outputs are not additional test suites.
 pathIgnorePatterns = ["**/dist/**", "**/out/**", "**/.output/**"]

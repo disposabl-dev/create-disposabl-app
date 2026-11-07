@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Application API",
-    "version": "6.0.0"
+    "version": "10.1.0"
   },
   "security": [
     {
@@ -163,6 +163,9 @@
                       "properties": {
                         "kind": {
                           "const": "messages"
+                        },
+                        "stopUnconfirmed": {
+                          "type": "boolean"
                         },
                         "appId": {
                           "type": "string"
@@ -365,6 +368,35 @@
                   },
                   "appId": {
                     "type": "string"
+                  },
+                  "platforms": {
+                    "type": "array",
+                    "items": {
+                      "enum": [
+                        "web",
+                        "android",
+                        "ios",
+                        "macos",
+                        "windows",
+                        "linux",
+                        "api",
+                        "mcp",
+                        "typescript-sdk",
+                        "cli"
+                      ]
+                    }
+                  },
+                  "features": {
+                    "type": "array",
+                    "items": {
+                      "enum": [
+                        "faster-ci",
+                        "docs",
+                        "authentication",
+                        "payments",
+                        "analytics"
+                      ]
+                    }
                   }
                 },
                 "required": ["prompt"],
@@ -450,6 +482,7 @@
                         "faster-ci",
                         "docs",
                         "authentication",
+                        "payments",
                         "analytics"
                       ]
                     }
@@ -499,6 +532,7 @@
                           "faster-ci",
                           "docs",
                           "authentication",
+                          "payments",
                           "analytics"
                         ]
                       }
@@ -640,6 +674,7 @@
                           "faster-ci",
                           "docs",
                           "authentication",
+                          "payments",
                           "analytics"
                         ]
                       }
@@ -772,6 +807,7 @@
                                 "faster-ci",
                                 "docs",
                                 "authentication",
+                                "payments",
                                 "analytics"
                               ]
                             }
@@ -841,6 +877,152 @@
         }
       }
     },
+    "/api/apps/repositoryToken": {
+      "post": {
+        "operationId": "appsRepositoryToken",
+        "x-convex-function": "apps/internal:repositoryToken",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "appId": {
+                    "type": "string"
+                  }
+                },
+                "required": ["appId"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "token": {
+                      "type": "string"
+                    },
+                    "repository": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["token", "repository"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid arguments"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient scope"
+          },
+          "500": {
+            "description": "Internal error"
+          }
+        }
+      }
+    },
+    "/api/apps/requestConfiguration": {
+      "post": {
+        "operationId": "appsRequestConfiguration",
+        "x-convex-function": "apps/internal:requestConfiguration",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "appId": {
+                    "type": "string"
+                  },
+                  "platforms": {
+                    "type": "array",
+                    "items": {
+                      "enum": [
+                        "web",
+                        "android",
+                        "ios",
+                        "macos",
+                        "windows",
+                        "linux",
+                        "api",
+                        "mcp",
+                        "typescript-sdk",
+                        "cli"
+                      ]
+                    }
+                  },
+                  "features": {
+                    "type": "array",
+                    "items": {
+                      "enum": [
+                        "faster-ci",
+                        "docs",
+                        "authentication",
+                        "payments",
+                        "analytics"
+                      ]
+                    }
+                  }
+                },
+                "required": ["appId", "platforms", "features"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "appId": {
+                      "type": "string"
+                    },
+                    "threadId": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "enum": ["idle", "processing", "stopping", "failed"]
+                    }
+                  },
+                  "required": ["appId", "threadId", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid arguments"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient scope"
+          },
+          "500": {
+            "description": "Internal error"
+          }
+        }
+      }
+    },
     "/api/apps/update": {
       "post": {
         "operationId": "appsUpdate",
@@ -879,6 +1061,7 @@
                         "faster-ci",
                         "docs",
                         "authentication",
+                        "payments",
                         "analytics"
                       ]
                     }
@@ -928,6 +1111,7 @@
                           "faster-ci",
                           "docs",
                           "authentication",
+                          "payments",
                           "analytics"
                         ]
                       }
@@ -977,7 +1161,13 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "enum": ["faster-ci", "docs", "authentication", "analytics"]
+                    "enum": [
+                      "faster-ci",
+                      "docs",
+                      "authentication",
+                      "payments",
+                      "analytics"
+                    ]
                   }
                 }
               }
@@ -1063,6 +1253,23 @@
                         }
                       ]
                     },
+                    "autumn": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["name"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
                     "posthogPending": {
                       "type": "boolean"
                     },
@@ -1072,7 +1279,13 @@
                     "missing": {
                       "type": "array",
                       "items": {
-                        "enum": ["github", "convex", "expo", "posthog"]
+                        "enum": [
+                          "github",
+                          "convex",
+                          "expo",
+                          "posthog",
+                          "autumn"
+                        ]
                       }
                     },
                     "connectionsUrl": {
@@ -1092,9 +1305,18 @@
                         },
                         "posthog": {
                           "type": "boolean"
+                        },
+                        "autumn": {
+                          "type": "boolean"
                         }
                       },
-                      "required": ["github", "convex", "expo", "posthog"],
+                      "required": [
+                        "github",
+                        "convex",
+                        "expo",
+                        "posthog",
+                        "autumn"
+                      ],
                       "additionalProperties": false
                     },
                     "githubInstallUrl": {
@@ -1113,6 +1335,7 @@
                     "convex",
                     "expo",
                     "posthog",
+                    "autumn",
                     "posthogPending",
                     "ready",
                     "missing",
@@ -1590,6 +1813,35 @@
                   },
                   "reference": {
                     "type": "string"
+                  },
+                  "platforms": {
+                    "type": "array",
+                    "items": {
+                      "enum": [
+                        "web",
+                        "android",
+                        "ios",
+                        "macos",
+                        "windows",
+                        "linux",
+                        "api",
+                        "mcp",
+                        "typescript-sdk",
+                        "cli"
+                      ]
+                    }
+                  },
+                  "features": {
+                    "type": "array",
+                    "items": {
+                      "enum": [
+                        "faster-ci",
+                        "docs",
+                        "authentication",
+                        "payments",
+                        "analytics"
+                      ]
+                    }
                   }
                 },
                 "required": ["appId", "reference"],

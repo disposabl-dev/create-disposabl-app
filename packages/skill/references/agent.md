@@ -4,17 +4,17 @@ Use this flow when the user asks for remote execution. Local development remains
 
 Each user has one persistent sandbox for all their apps. Each app has its own conversation and directory. Each app can have multiple previews. To compare alternatives or improve results through hill climbing, ask the agent to create a separate branch/worktree and scoped preview backend for each variant. Keep the same app ID, use distinct ports, and compare the actual behavior of the variants. Aborting one app must leave the other conversations running.
 
-Use the connected Disposabl API/MCP tools, or `bunx @disposabl/cli@latest`. Remote work needs a Disposabl login but no local app directory, `disposabl.json`, or generator installation.
+Use the connected Disposabl API/MCP tools, or `bunx --package create-disposabl-app@latest disposabl`. Remote work needs a Disposabl login but no local app directory, `disposabl.json`, or generator installation.
 
 Before sending work, inspect the user's existing apps with `apps list` and their conversations with `agent getMessages`. Match the request to an existing app using its name, repository, and recent messages. Read that app's messages before continuing. Reuse its `appId` across chats. If two apps fit equally well, ask which one; do not guess. If this is a new app, omit `appId`.
 
 ```sh
-bunx @disposabl/cli@latest apps list --paginationOpts '{"numItems":20,"cursor":null}'
-bunx @disposabl/cli@latest agent getMessages
-bunx @disposabl/cli@latest agent getMessages --appId <uuid>
-bunx @disposabl/cli@latest agent sendMessage --prompt "Build a meal planner"
-bunx @disposabl/cli@latest agent sendMessage --appId <uuid> --prompt "Add a weekly grocery list"
-bunx @disposabl/cli@latest agent abortMessage --appId <uuid>
+bunx --package create-disposabl-app@latest disposabl apps list --paginationOpts '{"numItems":20,"cursor":null}'
+bunx --package create-disposabl-app@latest disposabl agent getMessages
+bunx --package create-disposabl-app@latest disposabl agent getMessages --appId <uuid>
+bunx --package create-disposabl-app@latest disposabl agent sendMessage --prompt "Build a meal planner"
+bunx --package create-disposabl-app@latest disposabl agent sendMessage --appId <uuid> --prompt "Add a weekly grocery list"
+bunx --package create-disposabl-app@latest disposabl agent abortMessage --appId <uuid>
 ```
 
 `sendMessage` returns the app ID and its stable thread ID immediately. It saves the prompt before delivery. While the agent is working, another send steers that run. After completion, it resumes the same Boat conversation with Codex. There is no separate steer command.
