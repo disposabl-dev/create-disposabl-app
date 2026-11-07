@@ -1,10 +1,10 @@
 {
   "name": "Disposabl",
-  "title": "Disposabl | Your idea. Your next app.",
-  "description": "Turn your idea into apps for web, mobile, and desktop. Start free on your computer, with your AI and code you own.",
+  "title": "Disposabl | Free app builder for web, mobile & desktop",
+  "description": "Build an app of your own with the AI you choose. Create apps for web, iOS, Android, and desktop. Free on your computer. Your code is yours to keep.",
   "origin": "https://www.disposabl.dev",
   "backendOrigin": "https://vivid-caterpillar-633.convex.site",
-  "image": "/og/disposabl-ecosystem.png",
-  "imageAlt": "Disposabl. Your idea. Your next app. Your AI. Your computer. Your code. Start building free.",
+  "image": "/og/disposabl-build.png",
+  "imageAlt": "Disposabl. Build an app of your own. Free app building for web, phones, and computers. Your AI. Your computer. Your code.",
   "analytics": true
 }

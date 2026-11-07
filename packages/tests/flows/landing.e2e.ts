@@ -3,10 +3,12 @@ import { expect } from "e2e";
 
 // Marketing-only flows are removed from generated apps by reset.ts.
 test(
-  "landing platform choices reveal their stack and preserve dependencies",
+  "dedicated stack page preserves dependencies and carries choices into setup",
   { platforms: ["web"], tags: ["landing"] },
   async ({ app, screen, browser }) => {
-    await app.open("/");
+    await app.open("/stack");
+    await screen.getByRole("button", "Android", { exact: true }).tap();
+    await screen.getByRole("button", "iOS", { exact: true }).tap();
     await screen.getByRole("button", "iOS", { exact: true }).tap();
     await expect(
       browser.locator('[data-stack="mobile"] .selected-targets'),
@@ -38,7 +40,7 @@ test(
       browser.locator('[data-stack="desktop"] .selected-targets'),
     ).toHaveText("Selected: macOS + Windows + Linux");
     await expect(browser.locator('[data-stack="mcp"]')).toBeVisible();
-    await browser.locator("#start").tap();
+    await browser.locator(".guide-end .primary-link").tap();
     await expect(browser.locator(".landing-prompt")).toContainText("macos");
     await screen.getByRole("button", "Run a command").tap();
     await expect(browser.locator(".landing-terminal code")).toContainText(
@@ -143,7 +145,7 @@ test(
     await screen.getByRole("button", "Open menu").tap();
     await screen.getByRole("link", "How it works", { exact: true }).tap();
     await expect(browser.locator("main h1")).toContainText(
-      "From first command",
+      "How to build with Disposabl",
     );
   },
 );
@@ -226,11 +228,11 @@ test(
     }
     await browser.locator("#start").tap();
     await expect(
-      screen.getByRole("dialog", "Let's build your app."),
+      screen.getByRole("dialog", "Continue with your AI."),
     ).toBeVisible();
     await browser.keyboard.press("Escape");
     await expect(
-      screen.getByRole("dialog", "Let's build your app."),
+      screen.getByRole("dialog", "Continue with your AI."),
     ).toHaveCount(0);
     expect(
       await browser.evaluate(() => document.activeElement?.id ?? null),
@@ -258,24 +260,30 @@ test(
       "500 credits",
     );
     for (const [name, text] of [
-      ["Take bookings", "appointment booking"],
-      ["Open your shop", "online shop"],
-      ["Bring your team together", "workspace"],
-      ["Teach what you know", "learning app"],
+      ["A booking app", "book an appointment"],
+      ["A personal planner", "weekly goals"],
+      ["A team workspace", "assign tasks"],
     ]) {
       await screen.getByRole("button", name, { exact: true }).tap();
-      await expect(
-        browser.locator(".start-dialog[open] .landing-prompt"),
-      ).toContainText(text);
+      await expect(browser.locator(".start-dialog[open]")).toHaveCount(0);
+      await browser.locator("#start").tap();
+      await expect(browser.locator(".landing-prompt")).toContainText(text);
       await screen.getByRole("button", "Copy prompt", { exact: true }).tap();
       await expect(screen.getByRole("status")).toHaveText(
         "Copied to clipboard.",
       );
       await browser.keyboard.press("Escape");
     }
+    await browser
+      .locator("#app-idea")
+      .fill("An app to organize my recipes and weekly shopping.");
     await browser.locator("#start").tap();
-    await expect(browser.locator(".landing-prompt")).toHaveText(
-      "Build my app with create-disposabl-app@latest. Ask me what I want to make. Use these platforms: web, android, ios.",
+    await expect(browser.locator(".landing-prompt")).toContainText(
+      "organize my recipes",
+    );
+    await browser.keyboard.press("Escape");
+    await expect(browser.locator("#app-idea")).toHaveValue(
+      "An app to organize my recipes and weekly shopping.",
     );
   },
 );
@@ -351,5 +359,68 @@ test(
         }
       }
     }
+  },
+);
+
+test(
+  "homepage keeps implementation details on the stack page and example controls work",
+  { platforms: ["web"], tags: ["landing"] },
+  async ({ app, browser, screen }) => {
+    await app.open("/");
+    const home = await browser.evaluate(
+      () => document.querySelector("main")?.textContent ?? "",
+    );
+    for (const word of [
+      "TypeScript",
+      "React Native",
+      "Convex",
+      "Turborepo",
+      "Electron",
+      "Big possibilities",
+    ])
+      expect(home).not.toContain(word);
+    await expect(browser.locator(".platform-toggles")).toHaveCount(0);
+    await browser.locator(".walkthrough-step").nth(1).tap();
+    await screen.getByRole("button", "14:00", { exact: true }).tap();
+    await expect(browser.locator(".booking-selected")).toContainText(
+      "14:00 selected",
+    );
+    await browser.locator(".walkthrough-step").nth(2).tap();
+    await screen.getByRole("button", "Use blue accent").tap();
+    await expect(browser.locator(".walkthrough-canvas")).toHaveAttribute(
+      "class",
+      "walkthrough-canvas accent-blue",
+    );
+    await screen.getByRole("button", "Show phone example").tap();
+    await expect(browser.locator(".example-phone")).toBeVisible();
+    await screen.getByRole("button", "Use this idea", { exact: true }).tap();
+    await expect(browser.locator("#app-idea")).toHaveValue(
+      "An app for my business where customers can choose a service, pick a time, and book an appointment.",
+    );
+    await expect(browser.locator(".start-dialog[open]")).toHaveCount(0);
+  },
+);
+
+test(
+  "pricing and build-time links reach the relevant guide sections",
+  { platforms: ["web"], tags: ["landing"] },
+  async ({ app, browser, screen }) => {
+    await app.open("/");
+    await screen.getByRole("link", "Explore Agent Mode", { exact: true }).tap();
+    await expect(browser.locator("#agent-mode[open]")).toBeVisible();
+    await expect(browser.locator("#agent-mode")).toContainText("500 credits");
+    await app.open("/");
+    await screen
+      .getByRole("link", "Build times and publishing guide", { exact: true })
+      .tap();
+    await expect(browser.locator("#build-times")).toBeVisible();
+    expect(
+      await browser.evaluate(() => {
+        const r = document
+          .querySelector("#build-times")!
+          .getBoundingClientRect();
+        return r.top >= 0 && r.top < innerHeight;
+      }),
+    ).toBe(true);
   },
 );

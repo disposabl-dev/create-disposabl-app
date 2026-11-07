@@ -59,7 +59,7 @@ export function BrandIcon({ name }: { name: string }) {
   if (marks[name])
     return (
       <img
-        className="brand-icon"
+        className={`brand-icon${["Android", "Windows", "Linux"].includes(name) ? "" : " brand-monochrome"}`}
         src={marks[name]}
         alt=""
         width={24}

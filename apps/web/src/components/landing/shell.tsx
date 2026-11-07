@@ -71,10 +71,10 @@ export function MarketingShell({
                 setOpen(false);
             }}
           >
-            <a href="/#platforms">Platforms</a>
+            <a href="/build">How it works</a>
             <a href="/why-disposabl">Why Disposabl</a>
             <a href="/#pricing">Pricing</a>
-            <a href="/build">How it works</a>
+            <a href="/stack">Tech stack</a>
             <a
               className="nav-github"
               href={repository}
@@ -85,11 +85,11 @@ export function MarketingShell({
             </a>
             {onStart ? (
               <button className="nav-start" onClick={onStart}>
-                Start building <ArrowUpRight size={15} />
+                Get started <ArrowUpRight size={15} />
               </button>
             ) : (
               <a className="nav-start" href="/#start">
-                Start building <ArrowUpRight size={15} />
+                Get started <ArrowUpRight size={15} />
               </a>
             )}
           </div>
@@ -124,7 +124,6 @@ export function MarketingShell({
           <div className="footer-bottom">
             <span>© {new Date().getFullYear()} Disposabl</span>
             <nav aria-label="Footer navigation">
-              <a href="/stack">Tech stack</a>
               <a href="/build">Build guide</a>
               <a href="/why-disposabl">Why Disposabl</a>
               <a href="/legal/privacy">Privacy</a>

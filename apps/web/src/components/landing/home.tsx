@@ -1,17 +1,31 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowUpRight, Laptop, X } from "lucide-react";
-import { type Platform } from "@disposabl/disposabl-kit/platforms";
+import { ArrowRight, ArrowUpRight, X } from "lucide-react";
+import {
+  platforms,
+  resolvePlatforms,
+  type Platform,
+} from "@disposabl/disposabl-kit/platforms";
 import { AgentOnboarding } from "../agent-onboarding";
 import { MarketingShell, TextLink } from "./shell";
-import { PlatformExplorer } from "./platform-explorer";
 import { Pricing, Questions } from "./sections";
 import { BrandIcon } from "./brand-icon";
-import { PlatformArt } from "./platform-art";
-import { OutcomePicker } from "./outcome-picker";
-import claude from "../agent-onboarding/assets/claude.svg";
-import codex from "../agent-onboarding/assets/codex.png";
-import cursor from "../agent-onboarding/assets/cursor.svg";
+import { AppWalkthrough } from "./walkthrough";
 import "./home.css";
+
+const ideas = [
+  [
+    "A booking app",
+    "An app for my business where customers can choose a service, pick a time, and book an appointment.",
+  ],
+  [
+    "A personal planner",
+    "A personal planner for my tasks, routines, and weekly goals. I want to see what matters today and keep track of my progress.",
+  ],
+  [
+    "A team workspace",
+    "A workspace where my team can organize projects, assign tasks, and share updates. Each person should only see the projects they can access.",
+  ],
+];
 
 export function Home() {
   const [selected, setSelected] = useState<Platform[]>([
@@ -19,10 +33,21 @@ export function Home() {
     "android",
     "ios",
   ]);
-  const dialog = useRef<HTMLDialogElement>(null);
+  const [draft, setDraft] = useState("");
   const [idea, setIdea] = useState("");
+  const dialog = useRef<HTMLDialogElement>(null);
+  const field = useRef<HTMLTextAreaElement>(null);
   useEffect(() => {
     const openFromLink = () => {
+      const requested = new URLSearchParams(window.location.search)
+        .get("platforms")
+        ?.split(",");
+      if (requested?.length) {
+        const valid = requested.filter((id): id is Platform =>
+          platforms.some((p) => p.id === id),
+        );
+        if (valid.length) setSelected(resolvePlatforms(valid));
+      }
       if (window.location.hash === "#start") dialog.current?.showModal();
     };
     openFromLink();
@@ -30,12 +55,13 @@ export function Home() {
     return () => window.removeEventListener("hashchange", openFromLink);
   }, []);
   const start = () => {
-    setIdea("");
+    setIdea(draft.trim());
     dialog.current?.showModal();
   };
-  const startIdea = (value: string) => {
-    setIdea(value);
-    dialog.current?.showModal();
+  const useIdea = (value: string) => {
+    setDraft(value);
+    field.current?.focus();
+    field.current?.scrollIntoView({ behavior: "auto", block: "center" });
   };
   return (
     <MarketingShell onStart={start}>
@@ -44,56 +70,121 @@ export function Home() {
           className="launch-hero launch-container"
           aria-labelledby="hero-title"
         >
-          <div className="hero-copy">
-            <h1 id="hero-title">
-              Your idea.
-              <br />
-              <span>Your next app.</span>
-            </h1>
-            <p className="hero-description">
-              Your AI. Your computer. Your code.
-            </p>
-            <div className="hero-actions">
-              <button id="start" className="primary-link" onClick={start}>
-                <Laptop size={23} />
-                Start building free
-                <ArrowUpRight size={22} />
-              </button>
-              <StoreButtons />
-            </div>
-          </div>
-          <PlatformArt />
-        </section>
-        <OutcomePicker onSelect={startIdea} />
-        <PlatformExplorer selected={selected} onChange={setSelected} />
-        <section
-          className="agent-section launch-container"
-          aria-labelledby="agent-title"
-        >
-          <div className="agent-pair" aria-hidden="true">
-            <div className="agent-choice-icons">
-              {[claude, codex, cursor].map((src, i) => (
-                <img key={i} src={src} alt="" />
-              ))}
-            </div>
-            <span>+</span>
-            <img
-              src="/disposabl-logo.svg"
-              alt=""
-              className="disposabl-pair-icon"
+          <h1 id="hero-title">
+            Build an app
+            <br />
+            of your own<span className="hero-period">.</span>
+          </h1>
+          <p className="hero-description">
+            Free app building for the web,
+            <br />
+            phones, and computers.
+          </p>
+          <form
+            className="idea-composer"
+            onSubmit={(event) => {
+              event.preventDefault();
+              start();
+            }}
+          >
+            <label className="sr-only" htmlFor="app-idea">
+              Describe your app
+            </label>
+            <textarea
+              id="app-idea"
+              ref={field}
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              maxLength={2000}
+              placeholder="What would you like your app to do?"
+              rows={2}
             />
+            <div className="idea-composer-actions">
+              <span>Free on your computer</span>
+              <button id="start" type="submit" className="primary-link">
+                Start with your AI <ArrowRight size={20} />
+              </button>
+            </div>
+          </form>
+          <StoreButtons />
+          <div
+            className="idea-suggestions"
+            role="group"
+            aria-label="Try an app idea"
+          >
+            {ideas.map(([title, prompt]) => (
+              <button type="button" key={title} onClick={() => useIdea(prompt)}>
+                {title}
+                <ArrowUpRight size={16} />
+              </button>
+            ))}
           </div>
-          <div>
-            <h2 id="agent-title">
-              Your whole ecosystem.
+        </section>
+        <AppWalkthrough onUseIdea={useIdea} />
+        <section
+          className="ownership-section launch-container"
+          aria-labelledby="ownership-title"
+        >
+          <div className="ownership-heading">
+            <h2 id="ownership-title">
+              Your AI.
               <br />
-              Already connected.
+              Your computer.
+              <br />
+              Your code.
             </h2>
+            <TextLink href="/why-disposabl">Why build with Disposabl?</TextLink>
+          </div>
+          <div className="ownership-details">
+            <article>
+              <h3>Start with the parts connected.</h3>
+              <p>
+                Sign-in, saved data, tests, and publishing are ready for your AI
+                to build on. Spend your time making the app useful.
+              </p>
+            </article>
+            <article>
+              <h3>Use the AI you choose.</h3>
+              <p>
+                Work with Claude Code, Codex, Cursor, or another coding agent.
+                Disposabl gives it a complete starting point.
+              </p>
+            </article>
+            <article>
+              <h3>Keep what you make.</h3>
+              <p>
+                Your project lives in your own account. Change it, share it, or
+                build a business with it. The code is yours.
+              </p>
+            </article>
+          </div>
+        </section>
+        <section
+          className="devices-section launch-container"
+          aria-labelledby="devices-title"
+        >
+          <div>
+            <h2 id="devices-title">Wherever you need it.</h2>
             <p>
-              Apps, backend, sign-in, tests, and publishing. Give your AI the
-              full picture from the first prompt.
+              Build for a browser, a phone, or a desktop.
+              <br />
+              Choose your platforms when you start.
             </p>
-            <TextLink href="/why-disposabl">Why Disposabl?</TextLink>
+          </div>
+          <div className="device-list">
+            {[
+              ["Web", "Web"],
+              ["Apple", "iPhone & iPad"],
+              ["Android", "Android"],
+              ["macOS", "Mac"],
+              ["Windows", "Windows"],
+              ["Linux", "Linux"],
+            ].map(([icon, label]) => (
+              <span key={label}>
+                <BrandIcon name={icon} />
+                {label}
+              </span>
+            ))}
           </div>
         </section>
         <Pricing onStart={start} />
@@ -101,29 +192,32 @@ export function Home() {
           className="language-section launch-container"
           aria-labelledby="language-title"
         >
+          <h2 id="language-title">
+            85+ languages.
+            <br />
+            Coming soon.
+          </h2>
           <div className="language-art" aria-hidden="true">
             <span>Hello</span>
             <span>こんにちは</span>
             <span>Hola</span>
             <span>नमस्ते</span>
           </div>
-          <div>
-            <h2 id="language-title">
-              85+ languages.
-              <br />
-              Coming soon.
-            </h2>
-          </div>
         </section>
         <Questions />
         <section className="final-section launch-container">
-          <h2>
-            Make your
-            <br />
-            next big thing.
-          </h2>
-          <button className="primary-link" onClick={start}>
-            Start building free <ArrowUpRight size={18} />
+          <h2>What will your app do?</h2>
+          <button
+            className="primary-link"
+            onClick={() => {
+              field.current?.focus();
+              field.current?.scrollIntoView({
+                behavior: "auto",
+                block: "center",
+              });
+            }}
+          >
+            Start with an idea <ArrowRight size={20} />
           </button>
         </section>
       </main>
@@ -136,7 +230,7 @@ export function Home() {
         }}
       >
         <div className="dialog-heading">
-          <h2 id="start-title">Let's build your app.</h2>
+          <h2 id="start-title">Continue with your AI.</h2>
           <button
             autoFocus
             aria-label="Close start dialog"
@@ -145,7 +239,13 @@ export function Home() {
             <X size={22} />
           </button>
         </div>
-        <AgentOnboarding idea={idea} platforms={selected} />
+        <p className="dialog-intro">
+          Paste this into your coding agent to set up your app on your computer.
+        </p>
+        <AgentOnboarding key={idea} idea={idea} platforms={selected} />
+        <a className="dialog-help" href="/build">
+          New to coding agents? See how to start <ArrowUpRight size={18} />
+        </a>
       </dialog>
     </MarketingShell>
   );
@@ -154,6 +254,7 @@ export function Home() {
 function StoreButtons() {
   return (
     <div className="store-group">
+      <span>Mobile app coming soon</span>
       <div className="store-buttons">
         {["App Store", "Google Play"].map((name, index) => (
           <div className="store-control" key={name}>
@@ -170,14 +271,13 @@ function StoreButtons() {
               }
             >
               <BrandIcon name={index === 0 ? "Apple" : "Google Play"} />
-              <span>{name}</span>
             </button>
             <span
               id={`store-tip-${index}`}
               role="tooltip"
               className="store-tooltip"
             >
-              Coming soon. The Disposabl mobile app is on its way.
+              Coming soon. Build from your computer today.
             </span>
           </div>
         ))}

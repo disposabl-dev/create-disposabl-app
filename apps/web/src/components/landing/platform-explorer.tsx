@@ -4,7 +4,6 @@ import {
   resolvePlatforms,
   type Platform,
 } from "@disposabl/disposabl-kit/platforms";
-import { TextLink } from "./shell";
 import { BrandIcon } from "./brand-icon";
 
 export const stackGroups = [
@@ -94,11 +93,14 @@ export function PlatformExplorer({
   return (
     <section
       id="platforms"
-      className="platform-section launch-container"
+      className="platform-section"
       aria-labelledby="platform-title"
     >
       <div className="section-heading">
-        <h2 id="platform-title">Pick your platforms.</h2>
+        <h2 id="platform-title">Choose where your app runs</h2>
+        <p>
+          Web is included. Select more platforms to see the tools each one adds.
+        </p>
       </div>
       <div
         className="platform-toggles"
@@ -124,7 +126,7 @@ export function PlatformExplorer({
         ))}
       </div>
       <div className="stack-results" aria-live="polite" aria-atomic="false">
-        {active.map(({ id, stack, platforms: targets }) => (
+        {active.map(({ id, stack, description, note, platforms: targets }) => (
           <article className="stack-card" key={id} data-stack={id}>
             <h3>
               {platforms
@@ -147,6 +149,7 @@ export function PlatformExplorer({
                 .map((platform) => platform.label)
                 .join(" + ")}
             </p>
+            <p>{description}</p>
             <div className="stack-tags">
               {stack.map((name) => (
                 <span key={name}>
@@ -155,23 +158,9 @@ export function PlatformExplorer({
                 </span>
               ))}
             </div>
+            <p className="stack-note">{note}</p>
           </article>
         ))}
-      </div>
-      <div className="shared-stack">
-        <div>
-          {["TypeScript", "Convex", "Bun", "Turborepo", "GitHub Actions"].map(
-            (name) => (
-              <span key={name} className="stack-brand" title={name}>
-                <BrandIcon name={name} />
-                <span>{name}</span>
-              </span>
-            ),
-          )}
-        </div>
-      </div>
-      <div className="workbench-footer">
-        <TextLink href="/stack">Explore the stack</TextLink>
       </div>
     </section>
   );

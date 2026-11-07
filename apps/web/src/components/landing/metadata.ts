@@ -1,18 +1,18 @@
 export const marketingPages = {
   "/stack": {
-    title: "The stack behind your app | Disposabl",
+    title: "App development tech stack | Disposabl",
     description:
-      "Explore the TypeScript foundation for web, mobile, desktop, API, CLI, SDK, and MCP apps. Know what you own and how the pieces fit.",
+      "Choose platforms and explore the tools, shared backend, and release workflows included in a Disposabl project.",
   },
   "/build": {
-    title: "From first command to a real app | Disposabl",
+    title: "How to build with Disposabl | Disposabl",
     description:
-      "A practical guide to setup, local previews, native builds, tests, publishing, and sandbox Agent Mode. Understand each step and its tradeoffs.",
+      "See how to create a project, work with your coding agent, test a preview, and prepare your app for release.",
   },
   "/why-disposabl": {
-    title: "Your coding agent, with a connected foundation | Disposabl",
+    title: "Why use Disposabl with Claude Code or Codex?",
     description:
-      "Why use Disposabl with Claude Code, Codex, or Cursor? Start with platform setup, a shared backend, tests, and release workflows you can change.",
+      "Explore the connected interfaces, backend, tests, and release workflows Disposabl sets up for your coding agent.",
   },
 };
 
