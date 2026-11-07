@@ -14,9 +14,6 @@
   .nav-github {
     display: none !important;
   }
-  .ownership-section {
-    gap: 50px;
-  }
 }
 @media (max-width: 800px) {
   .launch-nav nav {
@@ -55,21 +52,6 @@
     justify-content: center;
     margin-top: 8px;
   }
-  .ownership-section {
-    padding-block: 78px;
-    grid-template-columns: 1fr;
-    gap: 40px;
-  }
-  .ownership-heading h2 br {
-    display: none;
-  }
-  .ownership-heading h2 {
-    font-size: 44px;
-    max-width: 500px;
-  }
-  .ownership-heading .text-link {
-    margin-top: 22px;
-  }
   .price-card {
     padding: 28px;
   }
@@ -80,15 +62,6 @@
   }
   .faq-section > .text-link {
     grid-column: 1;
-  }
-  .final-section {
-    flex-direction: column;
-    align-items: flex-start;
-    padding-bottom: 78px;
-  }
-  .footer-bottom {
-    flex-direction: column;
-    align-items: flex-start;
   }
 }
 @media (max-width: 540px) {
@@ -143,15 +116,6 @@
     gap: 18px;
     margin-bottom: 24px;
   }
-  .ownership-heading h2 {
-    font-size: 39px;
-  }
-  .ownership-heading h2 br {
-    display: block;
-  }
-  .ownership-details h3 {
-    font-size: 23px;
-  }
   .pricing-section {
     padding-block: 78px;
   }
@@ -165,17 +129,8 @@
   .price-card .price-number {
     font-size: 60px;
   }
-  .language-section {
-    flex-direction: column;
-    align-items: flex-start;
-    padding-block: 48px;
-    gap: 28px;
-  }
   .faq-section h2 {
     font-size: 34px;
-  }
-  .footer-bottom nav {
-    gap: 16px 22px;
   }
   .start-dialog {
     padding: 24px;

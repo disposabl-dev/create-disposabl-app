@@ -72,6 +72,14 @@ test(
       await browser.keyboard.press("Enter");
       expect(new URL(await browser.url()).pathname).toBe("/");
     }
+    await browser.locator(".foundation-card summary").nth(0).tap();
+    await expect(
+      browser.locator(".foundation-card details[open] p"),
+    ).toContainText("saved work");
+    await browser.locator(".foundation-card summary").nth(0).tap();
+    await expect(browser.locator(".foundation-card details[open]")).toHaveCount(
+      0,
+    );
     await expect(browser.locator("#language-title")).toBeVisible();
   },
 );
@@ -143,7 +151,7 @@ test(
       "$5 and includes 500 credits",
     );
     await screen.getByRole("button", "Open menu").tap();
-    await screen.getByRole("link", "How it works", { exact: true }).tap();
+    await browser.locator('#marketing-links a[href="/build"]').tap();
     await expect(browser.locator("main h1")).toContainText(
       "Build your first app.",
     );
@@ -263,6 +271,8 @@ test(
       ["Booking app", "book an appointment"],
       ["Daily planner", "weekly goals"],
       ["Community app", "organize events"],
+      ["Games", "memory matching game"],
+      ["Team operations", "request approvals"],
     ]) {
       await screen.getByRole("button", name, { exact: true }).tap();
       await expect(
@@ -386,6 +396,7 @@ test(
     ])
       expect(home).not.toContain(word);
     await expect(browser.locator(".platform-toggles")).toHaveCount(0);
+    await screen.getByRole("button", "Booking app", { exact: true }).tap();
     await screen.getByRole("button", "Thu 19", { exact: true }).tap();
     await screen.getByRole("button", "14:00", { exact: true }).tap();
     await screen
@@ -504,5 +515,181 @@ test(
     await expect(browser.locator(".share-feedback")).toHaveText(
       new URL("/?idea=community", app.baseUrl).href,
     );
+  },
+);
+
+test(
+  "game matching and operations approval work",
+  { platforms: ["web"], tags: ["landing"] },
+  async ({ app, browser, screen }) => {
+    await app.open("/");
+    await screen.getByRole("button", "Games", { exact: true }).tap();
+    await screen.getByRole("button", "Card 1, face down").tap();
+    await screen.getByRole("button", "Card 6, face down").tap();
+    await expect(browser.locator(".game-score")).toContainText("1 / 6 pairs");
+    await expect(browser.locator(".game-score")).toContainText("1 moves");
+    await expect(screen.getByRole("button", "Card 1, star")).toHaveAttribute(
+      "disabled",
+      "",
+    );
+    await screen.getByRole("button", "Play again").tap();
+    await expect(browser.locator(".game-score")).toContainText("0 / 6 pairs");
+    await expect(browser.locator(".game-score")).toContainText("0 moves");
+    await expect(screen.getByRole("button", "Card 1, face down")).toBeVisible();
+    await screen.getByRole("button", "Team operations", { exact: true }).tap();
+    await screen.getByRole("button", "Approve Design software").tap();
+    await expect(browser.locator(".operations-total")).toContainText("2");
+    await expect(
+      screen.getByRole("button", "Approve Design software"),
+    ).toHaveCount(0);
+    await screen.getByRole("button", "Approved", { exact: true }).tap();
+    await expect(
+      screen.getByRole("button", "Design software approved"),
+    ).toBeVisible();
+    await expect(
+      screen.getByRole("button", "Approve Team offsite"),
+    ).toHaveCount(0);
+    await screen.getByRole("button", "Pending", { exact: true }).tap();
+    await expect(
+      screen.getByRole("button", "Approve Team offsite"),
+    ).toBeVisible();
+  },
+);
+
+test(
+  "new example sharing uses only the selected idea",
+  { platforms: ["web"], tags: ["landing"] },
+  async ({ app, browser, screen }) => {
+    await browser.addInitScript(() =>
+      Object.defineProperty(navigator, "clipboard", {
+        configurable: true,
+        value: {
+          writeText: async (text: string) => {
+            (window as any).__sharedUrl = text;
+          },
+        },
+      }),
+    );
+    await app.open("/");
+    for (const [name, id] of [
+      ["Games", "game"],
+      ["Team operations", "operations"],
+    ]) {
+      await screen.getByRole("button", name, { exact: true }).tap();
+      await screen
+        .getByRole("button", "Share this idea", { exact: true })
+        .tap();
+      await expect(browser.locator(".share-feedback")).toContainText(
+        "Link copied",
+      );
+      const copied = await browser.evaluate(
+        () => (window as any).__sharedUrl as string,
+      );
+      expect(copied).toBe(new URL(`/?idea=${id}`, app.baseUrl).href);
+    }
+  },
+);
+
+test(
+  "navigation, language cloud and hero follow the design",
+  { platforms: ["web"], tags: ["landing"] },
+  async ({ app, browser, screen }) => {
+    await browser.setViewport({ width: 1440, height: 900 });
+    await app.open("/");
+    await expect(browser.locator(".nav-controls")).toBeVisible();
+    const desktop = await browser.evaluate(() => {
+      const links = document
+        .querySelector(".marketing-links")!
+        .getBoundingClientRect();
+      const controls = document
+        .querySelector(".nav-controls")!
+        .getBoundingClientRect();
+      return controls.left - links.right;
+    });
+    expect(desktop >= 0 && desktop <= 24).toBe(true);
+    const heroColors: string[] = [];
+    for (const theme of ["light", "dark"]) {
+      await browser.emulateMedia({ colorScheme: theme as "light" | "dark" });
+      await expect(browser.locator("html")).toHaveAttribute("class", theme);
+      const colors = await browser.evaluate(() => ({
+        hero: getComputedStyle(document.querySelector(".maker-hero")!)
+          .backgroundColor,
+        page: getComputedStyle(document.querySelector(".launch-site")!)
+          .backgroundColor,
+      }));
+      expect(colors.hero).toBe(colors.page);
+      heroColors.push(colors.hero);
+    }
+    expect(heroColors[0]).not.toBe(heroColors[1]);
+    for (const text of [
+      "One idea. Everywhere.",
+      "Free local builds. Your AI. Your code.",
+      "Mobile app coming soon",
+      "A few possibilities. Try these interactive examples, then start an app of your own.",
+    ]) {
+      expect(
+        await browser.evaluate(
+          (copy) =>
+            Array.from(document.querySelectorAll("main *")).some(
+              (el) =>
+                el.children.length === 0 &&
+                el.textContent?.trim() === copy &&
+                (el as HTMLElement).offsetWidth > 0,
+            ),
+          text,
+        ),
+      ).toBe(false);
+    }
+    await browser.locator(".foundation-card summary").nth(0).tap();
+    await expect(
+      browser.locator(".foundation-card details[open] p"),
+    ).toContainText("saved work");
+    await browser.locator(".foundation-card summary").nth(0).tap();
+    await expect(browser.locator(".foundation-card details[open]")).toHaveCount(
+      0,
+    );
+    await expect(browser.locator("#language-title")).toBeVisible();
+    expect(
+      await browser.evaluate(
+        () => document.querySelectorAll(".language-cloud li").length >= 26,
+      ),
+    ).toBe(true);
+    await expect(
+      browser.locator(
+        '.language-cloud[aria-label="Examples of upcoming languages"]',
+      ),
+    ).toBeVisible();
+    await browser.evaluate(() => {
+      (
+        document.querySelector(
+          '[aria-label="Language support is coming soon"]',
+        ) as HTMLElement
+      ).focus();
+      return true;
+    });
+    await expect(browser.locator("#language-coming-soon")).toBeVisible();
+    await expect(browser.locator("#language-coming-soon")).toHaveText(
+      "Coming soon.",
+    );
+    await expect(
+      browser.locator('footer nav[aria-label="Explore Disposabl"] a'),
+    ).toHaveCount(4);
+    await expect(
+      browser.locator('footer nav[aria-label="Footer navigation"] a'),
+    ).toHaveCount(4);
+    await browser.setViewport({ width: 320, height: 568 });
+    const mobile = await browser.evaluate(() => {
+      const theme = document.querySelector(".theme-toggle")!;
+      const menu = document.querySelector(".mobile-menu-button")!;
+      const a = theme.getBoundingClientRect(),
+        b = menu.getBoundingClientRect();
+      return (
+        theme.parentElement === menu.parentElement &&
+        !!theme.parentElement?.classList.contains("nav-controls") &&
+        b.left - a.right >= 0 &&
+        b.left - a.right <= 24
+      );
+    });
+    expect(mobile).toBe(true);
   },
 );

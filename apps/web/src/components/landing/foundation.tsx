@@ -1,83 +1,95 @@
-import {
-  ArrowRight,
-  Check,
-  Fingerprint,
-  Globe,
-  MessageSquare,
-  ShieldCheck,
-  Database,
-} from "lucide-react";
-import { TextLink } from "./shell";
+import { Check, Database, Plus, UserRound } from "lucide-react";
+import "./foundation.css";
 
 export function Foundation() {
   return (
     <section
-      className="foundation-section"
+      className="app-foundation"
       id="how-it-works"
       aria-labelledby="foundation-title"
     >
       <div className="launch-container">
-        <div className="foundation-intro">
-          <h2 id="foundation-title">
-            An idea shouldn’t
-            <br />
-            start from zero.
-          </h2>
-          <p>
-            Getting a screen from AI is a start. An app also needs accounts,
-            saved data, and a way to reach people. Disposabl connects those
-            parts before you begin.
-          </p>
-        </div>
-        <div
-          className="foundation-map"
-          aria-label="Your idea, the included foundations, and your app"
-        >
-          <div className="foundation-input">
-            <MessageSquare size={32} />
-            <p>
-              “I wish there was
-              <br />
-              an app for…”
-            </p>
-          </div>
-          <ArrowRight className="flow-arrow" size={30} aria-hidden="true" />
-          <div className="foundation-engine">
-            <div className="foundation-engine-title">
-              <img src="/disposabl-logo.svg" width={32} height={32} alt="" />
-              <strong>disposabl</strong>
+        <h2 id="foundation-title">The parts your app needs.</h2>
+        <div className="app-foundation-grid">
+          <article className="foundation-card">
+            <details>
+              <summary>
+                Sign-in &amp; saved data <Plus size={22} aria-hidden="true" />
+              </summary>
+              <p>
+                People can sign in and return to their saved work across your
+                selected apps.
+              </p>
+            </details>
+            <div
+              className="foundation-visual foundation-accounts"
+              aria-hidden="true"
+            >
+              <div>
+                <UserRound size={22} />
+                <span>Account</span>
+                <Check size={20} />
+              </div>
+              <div>
+                <Database size={22} />
+                <span>Saved data</span>
+                <Check size={20} />
+              </div>
             </div>
-            <div>
-              {[
-                { Icon: Fingerprint, label: "People can sign in" },
-                { Icon: Database, label: "Their work is saved" },
-                { Icon: ShieldCheck, label: "Starter tests included" },
-                { Icon: Globe, label: "A path to publishing" },
-              ].map(({ Icon, label }) => (
-                <span key={label}>
-                  <Icon size={22} />
-                  {label}
-                  <Check size={18} />
-                </span>
-              ))}
+          </article>
+          <article className="foundation-card">
+            <details>
+              <summary>
+                Optional analytics <Plus size={22} aria-hidden="true" />
+              </summary>
+              <p>
+                Connect your own analytics account to understand how people use
+                your published app.
+              </p>
+            </details>
+            <div
+              className="foundation-visual foundation-chart"
+              aria-hidden="true"
+            >
+              <span />
+              <span />
+              <span />
+              <span />
+              <span />
+              <span />
             </div>
-          </div>
-          <ArrowRight className="flow-arrow" size={30} aria-hidden="true" />
-          <div className="foundation-output">
-            <span className="app-monogram">a</span>
-            <p>
-              Your app.
-              <br />
-              Built with your AI.
-            </p>
-          </div>
-        </div>
-        <div className="foundation-bottom">
-          <p>
-            You describe the features. Your AI builds them. You try the app and
-            decide what to change.
-          </p>
-          <TextLink href="/build">See how to start</TextLink>
+          </article>
+          <article className="foundation-card">
+            <details>
+              <summary>
+                Build. Test. Improve. <Plus size={22} aria-hidden="true" />
+              </summary>
+              <p>
+                Starter checks help your AI test changes. Try ideas, compare
+                results, and keep improving.
+              </p>
+            </details>
+            <div
+              className="foundation-visual foundation-cycle"
+              aria-hidden="true"
+            >
+              <svg viewBox="0 0 300 170" fill="none">
+                <path
+                  d="M80 40H225Q265 40 265 80Q265 130 210 130H75Q35 130 35 90Q35 40 80 40"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                />
+                <path
+                  d="m177 35 8 5-8 5M120 125l-8 5 8 5"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                />
+              </svg>
+              <span>Build</span>
+              <span>Test</span>
+              <span>Improve</span>
+            </div>
+          </article>
         </div>
       </div>
     </section>

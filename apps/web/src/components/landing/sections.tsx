@@ -86,6 +86,10 @@ export const faqs = [
     "Yes. Choose the devices you want to support. Your AI builds the screens for each one, with shared accounts and saved data. You still need to try the app on each device before publishing.",
   ],
   [
+    "Can I make games too?",
+    "Yes. Start with a small game for web, iOS, or Android: a puzzle, quiz, memory game, or turn-based game. Your AI can add touch controls, scores, and saved progress. Try the playable example above, then describe your own rules. Test the controls and performance on every device you plan to support.",
+  ],
+  [
     "How long will my app take to build?",
     "It depends on what you are making. A small first version is a useful place to start. Connecting accounts, building features, testing, and publishing each take time. Our build guide shows measured build times and explains what they include.",
   ],

@@ -1,17 +1,18 @@
 import { useHydrated } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight, ArrowUpRight, X } from "lucide-react";
+import { ArrowUpRight, X } from "lucide-react";
 import {
   platforms,
   resolvePlatforms,
   type Platform,
 } from "@disposabl/disposabl-kit/platforms";
 import { AgentOnboarding } from "../agent-onboarding";
-import { MarketingShell, TextLink } from "./shell";
+import { MarketingShell } from "./shell";
 import { Pricing, Questions } from "./sections";
 import { BrandIcon } from "./brand-icon";
 import { AppPlayground, appIdeas } from "./playground";
 import { Foundation } from "./foundation";
+import { LanguageCloud } from "./languages";
 import "./home.css";
 
 export function Home() {
@@ -60,77 +61,64 @@ export function Home() {
     <MarketingShell onStart={start}>
       <main id="main" className="launch-home">
         <section className="maker-hero" aria-labelledby="hero-title">
-          <div className="launch-container maker-hero-grid">
-            <div className="maker-statement">
-              <h1 id="hero-title">
-                Make your
-                <br />
-                own app.
-                <br />
-                <em>For free.</em>
-              </h1>
-              <p>Build with your AI, on your computer. Keep the code.</p>
-            </div>
-            <div className="maker-entry">
-              <h2>Your idea starts here.</h2>
-              <p>
-                Get a starting prompt for your AI.
-                <br />
-                Make the app you have in mind.
-              </p>
-              <form
-                className="idea-composer"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  start();
-                }}
-              >
-                <label className="sr-only" htmlFor="app-idea">
-                  Describe your app
-                </label>
-                <textarea
-                  disabled={!hydrated}
-                  id="app-idea"
-                  ref={field}
-                  value={draft}
-                  onChange={(event) => setDraft(event.target.value)}
-                  maxLength={2000}
-                  placeholder="I want an app that…"
-                  rows={3}
-                />
+          <div className="launch-container hero-studio">
+            <h1 id="hero-title">
+              Make your app.
+              <br />
+              <em>For free.</em>
+            </h1>
+            <form
+              className="idea-composer"
+              onSubmit={(event) => {
+                event.preventDefault();
+                start();
+              }}
+            >
+              <label className="sr-only" htmlFor="app-idea">
+                Describe your app
+              </label>
+              <textarea
+                disabled={!hydrated}
+                id="app-idea"
+                ref={field}
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                maxLength={2000}
+                placeholder="What do you want to make?"
+                rows={2}
+              />
+              <div className="hero-composer-actions">
                 <button
                   id="start"
                   disabled={!hydrated}
                   type="submit"
                   className="primary-link"
                 >
-                  Get started free <ArrowUpRight size={22} />
+                  Start free <ArrowUpRight size={22} />
                 </button>
-              </form>
-              <div className="hero-local">
-                <span className="local-dot" />
-                Free local builds. Your AI. Your code.
               </div>
-              <StoreButtons />
-            </div>
-          </div>
-          <div
-            className="hero-platforms launch-container"
-            aria-label="Build for these platforms"
-          >
-            <span>One idea. Everywhere.</span>
-            <div>
+            </form>
+            <StoreButtons />
+            <div
+              className="hero-platforms"
+              aria-label="Build for these platforms"
+            >
               {[
                 ["Web", "Web"],
-                ["Apple", "iOS"],
+                ["Apple", "iPhone, iPad & Mac"],
                 ["Android", "Android"],
-                ["macOS", "macOS"],
                 ["Windows", "Windows"],
                 ["Linux", "Linux"],
               ].map(([icon, label]) => (
-                <span key={label}>
+                <span
+                  key={label}
+                  className="hero-platform"
+                  role="img"
+                  aria-label={label}
+                  tabIndex={0}
+                >
                   <BrandIcon name={icon} />
-                  {label}
+                  <span role="tooltip">{label}</span>
                 </span>
               ))}
             </div>
@@ -138,73 +126,9 @@ export function Home() {
         </section>
         <AppPlayground onUseIdea={useIdea} />
         <Foundation />
-        <section
-          className="ownership-section launch-container"
-          aria-labelledby="ownership-title"
-        >
-          <div className="ownership-heading">
-            <h2 id="ownership-title">
-              Your AI.
-              <br />
-              Your computer.
-              <br />
-              <span>Your code.</span>
-            </h2>
-            <TextLink href="/why-disposabl">Why build with Disposabl?</TextLink>
-          </div>
-          <div className="ownership-details">
-            <article>
-              <h3>Already paying for AI? Use it.</h3>
-              <p>
-                Bring Claude Code, Codex, Cursor, or another coding agent. Local
-                mode adds no Disposabl subscription or credit meter.
-              </p>
-            </article>
-            <article>
-              <h3>Make one app. Or a hundred.</h3>
-              <p>
-                A tool for yourself, a home for your community, a product to
-                sell. Every supported platform is included.
-              </p>
-            </article>
-            <article>
-              <h3>You can take it with you.</h3>
-              <p>
-                Your source lives in your own repository. Keep building, switch
-                agents, hire a team. You choose what happens next.
-              </p>
-            </article>
-          </div>
-        </section>
         <Pricing onStart={start} disabled={!hydrated} />
-        <section
-          className="language-section launch-container"
-          aria-labelledby="language-title"
-        >
-          <h2 id="language-title">
-            85+ languages.
-            <br />
-            Coming soon.
-          </h2>
-          <p>More people should get to make software in their own words.</p>
-        </section>
+        <LanguageCloud />
         <Questions />
-        <section className="final-section launch-container">
-          <h2>You know what’s missing. Make it.</h2>
-          <button
-            className="primary-link"
-            disabled={!hydrated}
-            onClick={() => {
-              field.current?.focus();
-              field.current?.scrollIntoView({
-                behavior: "auto",
-                block: "center",
-              });
-            }}
-          >
-            Make your app <ArrowRight size={20} />
-          </button>
-        </section>
       </main>
       <dialog
         className="start-dialog"
@@ -239,7 +163,6 @@ export function Home() {
 function StoreButtons() {
   return (
     <div className="store-group">
-      <span>Mobile app coming soon</span>
       <div className="store-buttons">
         {["App Store", "Google Play"].map((name, index) => (
           <div className="store-control" key={name}>
@@ -256,13 +179,14 @@ function StoreButtons() {
               }
             >
               <BrandIcon name={index === 0 ? "Apple" : "Google Play"} />
+              <span>{name}</span>
             </button>
             <span
               id={`store-tip-${index}`}
               role="tooltip"
               className="store-tooltip"
             >
-              Coming soon. Build from your computer today.
+              Coming soon.
             </span>
           </div>
         ))}
