@@ -4,6 +4,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      recovery_version:
+        description: Existing release version to recover (for example 0.12.0)
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -23,10 +28,24 @@ jobs:
       group: npm-publish
       cancel-in-progress: false
     steps:
+      - name: Validate recovery version
+        if: inputs.recovery_version != ''
+        env:
+          VERSION: ${{ inputs.recovery_version }}
+        run: |
+          [[ "$VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || { echo "Invalid recovery version"; exit 1; }
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           persist-credentials: false
+      - name: Verify recovery tag
+        if: inputs.recovery_version != ''
+        env:
+          VERSION: ${{ inputs.recovery_version }}
+        run: |
+          git rev-parse --verify "refs/tags/v${VERSION}^{commit}" >/dev/null
+          git merge-base --is-ancestor "refs/tags/v${VERSION}^{commit}" HEAD
+          git checkout --detach "refs/tags/v${VERSION}^{commit}"
       - uses: actions/setup-node@v6
         with:
           node-version: "24"
@@ -48,7 +67,39 @@ jobs:
       # semantic-release sets the package version, builds, tags this commit, and publishes.
       # Recovery after a publish failure: check npm and GitHub for the tagged version first.
       # A tagged version is skipped on rerun; restore missing artifacts from that exact commit/version.
+      - name: Recover tagged release
+        if: inputs.recovery_version != ''
+        env:
+          VERSION: ${{ inputs.recovery_version }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          npm_config_workspaces_update: "false"
+        run: |
+          set -euo pipefail
+          tag="v${VERSION}"
+          # Only a 404 proves the exact version is absent; all other errors stop recovery.
+          status=$(curl -sS -o "$RUNNER_TEMP/npm-version.json" -w "%{http_code}" "https://registry.npmjs.org/create-disposabl-app/${VERSION}")
+          if [[ "$status" == 404 ]]; then
+            latest=$(npm view create-disposabl-app dist-tags.latest --prefer-online)
+            node -e 'const [a,b]=process.argv.slice(1).map(v=>v.split(".").map(Number)); if(a.length!==3 || a.some(Number.isNaN) || a.some((n,i)=>n!==b[i] && a.slice(0,i).every((x,j)=>x===b[j]) && n>b[i])) process.exit(1)' "$latest" "$VERSION"
+            npm version "$VERSION" --no-git-tag-version --workspaces=false
+            bun run build
+            npm publish --provenance --access public --tag latest
+          elif [[ "$status" == 200 ]]; then
+            node -e 'const p=require(process.argv[1]); if(p.name!=="create-disposabl-app" || p.version!==process.argv[2]) process.exit(1)' "$RUNNER_TEMP/npm-version.json" "$VERSION"
+            echo "npm version already exists; leaving it untouched."
+          else
+            echo "Registry lookup failed with HTTP $status"; exit 1
+          fi
+          if gh release view "$tag" >/dev/null 2>"$RUNNER_TEMP/release-error"; then
+            echo "GitHub release already exists; leaving it untouched."
+          elif grep -q "release not found" "$RUNNER_TEMP/release-error"; then
+            gh release create "$tag" --verify-tag --title "$tag" --generate-notes
+          else
+            cat "$RUNNER_TEMP/release-error" >&2; exit 1
+          fi
       - run: bun run semantic-release
+        if: inputs.recovery_version == ''
         env:
           GITHUB_TOKEN: ${{ github.token }}
           # Bun owns dependency installation; npm only versions and publishes this package.
