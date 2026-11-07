@@ -100,7 +100,7 @@ test(
     const origin = new URL(backendUrl());
     test.skip(
       !["localhost", "127.0.0.1", "[::1]"].includes(origin.hostname) ||
-        origin.port !== "3310",
+        !process.env.E2E_CONVEX_URL,
       "Provider fixtures require the isolated loopback backend",
     );
     const key = process.env.E2E_CONVEX_ADMIN_KEY;
@@ -110,6 +110,7 @@ test(
     async function seed(path: string, args: object) {
       const result = await fetch(`${origin.origin}/api/mutation`, {
         method: "POST",
+        signal: AbortSignal.timeout(15_000),
         headers: {
           "Content-Type": "application/json",
           Authorization: `Convex ${key}`,
