@@ -11,7 +11,11 @@ import { useTheme } from "../../../../../packages/disposabl-kit/mobile/design/us
 export const MessageBubble = memo(function MessageBubble({
   message,
 }: {
-  message: { role: string; text: string };
+  message: {
+    role: string;
+    text: string;
+    attachments?: { id: string; filename: string; mediaType: string }[];
+  };
 }) {
   const c = useTheme();
   const reducedMotion = useReducedMotion();
@@ -110,6 +114,33 @@ export const MessageBubble = memo(function MessageBubble({
             }}
           />
         ))}
+      {!!message.attachments?.length && (
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+          {message.attachments.map((attachment) => (
+            <View
+              key={attachment.id}
+              accessibilityLabel={`Attachment: ${attachment.filename}`}
+              style={{
+                borderRadius: 16,
+                borderWidth: 1,
+                borderColor: user ? c.background : c.border,
+                paddingHorizontal: 12,
+                paddingVertical: 8,
+              }}
+            >
+              <Text
+                numberOfLines={1}
+                style={{
+                  color: user ? c.background : c.foreground,
+                  maxWidth: 200,
+                }}
+              >
+                {attachment.filename}
+              </Text>
+            </View>
+          ))}
+        </View>
+      )}
     </View>
   );
 });

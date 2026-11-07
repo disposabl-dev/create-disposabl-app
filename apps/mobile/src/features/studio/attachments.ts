@@ -7,6 +7,7 @@ import { Alert } from "react-native";
 import { api } from "../../../../../packages/backend/convex/_generated/api";
 import type { Id } from "../../../../../packages/backend/convex/_generated/dataModel";
 import { MAX_ATTACHMENTS } from "./attachment-policy";
+import { useAttachmentLifecycle } from "./attachment-lifecycle";
 
 export type Attachment = {
   key: string;
@@ -26,16 +27,22 @@ export function useAttachments() {
   const nextKey = useRef(0);
   const upload = useAction(api.files.index.upload);
   const removeFile = useAction(api.files.index.remove);
-  async function uploadOne(attachment: Attachment) {
+  const lifecycle = useAttachmentLifecycle<Id<"files">>((id) =>
+    removeFile({ id }),
+  );
+  async function uploadOne(attachment: Attachment, token: number) {
     try {
       const file = new File(attachment.uri);
       if (!file.size || file.size > MAX_BYTES)
         throw new Error("File must be nonempty and at most 5 MiB.");
+      const bytes = await file.arrayBuffer();
+      if (!lifecycle.active(token)) return;
       const id = await upload({
         filename: attachment.name,
         mediaType: attachment.mediaType,
-        bytes: await file.arrayBuffer(),
+        bytes,
       });
+      if (!lifecycle.uploaded(id, token)) return;
       setAttachments((items) =>
         items.map((item) =>
           item.key === attachment.key
@@ -44,6 +51,7 @@ export function useAttachments() {
         ),
       );
     } catch (error) {
+      if (!lifecycle.active(token)) return;
       const message = error instanceof Error ? error.message : "Upload failed.";
       setAttachments((items) =>
         items.map((item) =>
@@ -54,33 +62,41 @@ export function useAttachments() {
   }
   async function retry(attachment: Attachment) {
     if (picking.current) return;
+    const token = lifecycle.generation();
+    if (!lifecycle.active(token)) return;
     picking.current = true;
     setBusy(true);
     try {
-      await uploadOne(attachment);
+      await uploadOne(attachment, token);
     } finally {
       picking.current = false;
-      setBusy(false);
+      if (lifecycle.active(token)) setBusy(false);
     }
   }
   async function remove(attachment: Attachment) {
     if (picking.current) return;
+    const token = lifecycle.generation();
+    if (!lifecycle.active(token)) return;
     picking.current = true;
     setBusy(true);
     try {
-      if (attachment.id) await removeFile({ id: attachment.id });
+      if (attachment.id) await lifecycle.discard(attachment.id);
+      if (!lifecycle.active(token)) return;
       setAttachments((items) =>
         items.filter((item) => item.key !== attachment.key),
       );
     } catch {
-      Alert.alert("Could not remove attachment", "Please try again.");
+      if (lifecycle.active(token))
+        Alert.alert("Could not remove attachment", "Please try again.");
     } finally {
       picking.current = false;
-      setBusy(false);
+      if (lifecycle.active(token)) setBusy(false);
     }
   }
   async function pick(source: AttachmentSource) {
     if (picking.current) return;
+    const token = lifecycle.generation();
+    if (!lifecycle.active(token)) return;
     if (attachments.length >= MAX_ATTACHMENTS) {
       Alert.alert("Attachment limit", "Attach no more than 10 files.");
       return;
@@ -94,22 +110,23 @@ export function useAttachments() {
           multiple: true,
           copyToCacheDirectory: true,
         });
-        if (result.canceled) return;
+        if (!lifecycle.active(token) || result.canceled) return;
         selected = result.assets.map((asset) => ({
           uri: asset.uri,
           name: asset.name,
           mediaType: asset.mimeType ?? "application/octet-stream",
         }));
       } else {
-        if (
-          source === "camera" &&
-          !(await ImagePicker.requestCameraPermissionsAsync()).granted
-        ) {
-          Alert.alert(
-            "Camera access",
-            "Allow camera access in Settings to take a photo.",
-          );
-          return;
+        if (source === "camera") {
+          const permission = await ImagePicker.requestCameraPermissionsAsync();
+          if (!lifecycle.active(token)) return;
+          if (!permission.granted) {
+            Alert.alert(
+              "Camera access",
+              "Allow camera access in Settings to take a photo.",
+            );
+            return;
+          }
         }
         const result =
           source === "camera"
@@ -118,7 +135,7 @@ export function useAttachments() {
                 mediaTypes: ["images"],
                 allowsMultipleSelection: true,
               });
-        if (result.canceled) return;
+        if (!lifecycle.active(token) || result.canceled) return;
         selected = result.assets.map((asset) => ({
           uri: asset.uri,
           name: asset.fileName ?? "Photo.jpg",
@@ -134,16 +151,35 @@ export function useAttachments() {
         key: String(nextKey.current++),
       }));
       setAttachments((items) => [...items, ...added]);
-      for (const item of added) await uploadOne(item);
+      for (const item of added) {
+        if (!lifecycle.active(token)) break;
+        await uploadOne(item, token);
+      }
     } catch {
+      if (!lifecycle.active(token)) return;
       Alert.alert(
         "Attachment unavailable",
         "This device could not open the picker. Please try again.",
       );
     } finally {
       picking.current = false;
-      setBusy(false);
+      if (lifecycle.active(token)) setBusy(false);
     }
   }
-  return { attachments, setAttachments, pick, retry, remove, busy };
+  function markSent(ids: Id<"files">[]) {
+    lifecycle.finishSend(ids, true);
+    if (lifecycle.active(lifecycle.generation())) setAttachments([]);
+  }
+  return {
+    attachments,
+    pick,
+    retry,
+    remove,
+    busy,
+    beginSend: lifecycle.beginSend,
+    markSent,
+    sendFailed: (ids: Id<"files">[], rejected: boolean) =>
+      lifecycle.finishSend(ids, false, rejected),
+    isActive: () => lifecycle.active(lifecycle.generation()),
+  };
 }

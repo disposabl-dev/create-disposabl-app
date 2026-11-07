@@ -6,6 +6,7 @@ import { MessageComposer } from "../studio/message-composer";
 import { useAttachments } from "../studio/attachments";
 import { attachmentIds } from "../studio/attachment-policy";
 import { useMutation, useQuery } from "convex/react";
+import { ConvexError } from "convex/values";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useRef, useState } from "react";
 import {
@@ -85,7 +86,10 @@ export function AppDetailsScreen() {
 function Chat({ appId }: { appId: string }) {
   const {
     attachments,
-    setAttachments,
+    beginSend,
+    markSent,
+    sendFailed,
+    isActive,
     pick,
     retry,
     remove,
@@ -111,6 +115,7 @@ function Chat({ appId }: { appId: string }) {
   async function submit(text: string) {
     const fileIds = attachmentIds(attachments);
     if (!text.trim() || busy || attachmentsBusy || !fileIds) return;
+    if (!beginSend(fileIds)) return;
     setBusy(true);
     setError("");
     try {
@@ -122,15 +127,18 @@ function Chat({ appId }: { appId: string }) {
         prompt: submitted.trim(),
         ...(fileIds.length ? { fileIds } : {}),
       });
-      setAttachments([]);
+      markSent(fileIds);
+      if (!isActive()) return;
       setPrompt((current) =>
         current === submitted || current === originalPrompt ? "" : current,
       );
       setCursors([null]);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not send message.");
+      sendFailed(fileIds, e instanceof ConvexError);
+      if (isActive())
+        setError(e instanceof Error ? e.message : "Could not send message.");
     } finally {
-      setBusy(false);
+      if (isActive()) setBusy(false);
     }
   }
   async function stop() {
@@ -227,7 +235,19 @@ function Chat({ appId }: { appId: string }) {
         }
         renderItem={({ item }) => (
           <MessageBubble
-            message={{ role: item.role, text: item.content || "Working…" }}
+            message={{
+              role: item.role,
+              text: item.content || (item.role === "user" ? "" : "Working…"),
+              attachments: (
+                item as typeof item & {
+                  attachments?: {
+                    id: string;
+                    filename: string;
+                    mediaType: string;
+                  }[];
+                }
+              ).attachments,
+            }}
           />
         )}
         ListFooterComponent={

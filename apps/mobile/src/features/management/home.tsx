@@ -1,4 +1,5 @@
 import { useConvexAuth, useMutation } from "convex/react";
+import { ConvexError } from "convex/values";
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { ActivityIndicator, Text, View } from "react-native";
@@ -67,7 +68,10 @@ function ComposeEntry() {
 function Composer() {
   const {
     attachments,
-    setAttachments,
+    beginSend,
+    markSent,
+    sendFailed,
+    isActive,
     pick,
     retry,
     remove,
@@ -86,6 +90,7 @@ function Composer() {
   async function submit(text: string) {
     const fileIds = attachmentIds(attachments);
     if (!text.trim() || busy || attachmentsBusy || !fileIds) return;
+    if (!beginSend(fileIds)) return;
     setBusy(true);
     setError("");
     try {
@@ -95,15 +100,18 @@ function Composer() {
         platforms: resolvePlatforms(selected),
         features: ["authentication"],
       });
-      setAttachments([]);
+      markSent(fileIds);
+      if (!isActive()) return;
       router.replace({
         pathname: "/(authenticated)/apps/[appId]",
         params: { appId: result.appId },
       });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not send your idea.");
+      sendFailed(fileIds, e instanceof ConvexError);
+      if (isActive())
+        setError(e instanceof Error ? e.message : "Could not send your idea.");
     } finally {
-      setBusy(false);
+      if (isActive()) setBusy(false);
     }
   }
   return (
