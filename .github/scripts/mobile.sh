@@ -95,14 +95,17 @@ bun -e '
 artifact=android.apk
 mkdir -p dist/release
 gh release download "$TAG" --pattern "$artifact" --dir dist/release
-echo "$SHA  dist/release/$artifact" | sha256sum --check
+echo "$SHA  dist/release/$artifact" | sha256sum -c -
 cd apps/mobile
 MANIFEST=$(manifest)
 bun x --no-install expo export --platform android --output-dir dist/update
 test "$(bun x --no-install expo-updates runtimeversion:resolve --platform android --workflow managed | jq -er .runtimeVersion)" = "$RUNTIME"
 test "$(gh api "repos/$GH_REPO/$SOURCE_PATH" --jq 'if has("head") then (if .state == "open" then .head.sha else "closed" end) else .object.sha end')" = "$SOURCE"
 bun x "$EAS_CLI" update --platform android --channel "$CHANNEL" --environment "$EAS_ENVIRONMENT" --skip-bundler --input-dir dist/update --message "$SOURCE" --non-interactive
-jq --arg sha "$SHA" '. + {sha256: $sha, action: "update"}' <<< "$MANIFEST" > ../../dist/release/android.json
+jq --arg sha "$SHA" --arg tag "$TAG" '. + {sha256: $sha, action: "update", sourceTag: $tag}' <<< "$MANIFEST" > ../../dist/release/android.json
+# The trusted publisher retrieves this verified binary from its existing release.
+# Actions only needs the new OTA metadata, not another copy of the same APK.
+rm "../../dist/release/$artifact"
     ;;
   android-build)
 bash ../../.github/scripts/android-runner.sh check

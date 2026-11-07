@@ -49,6 +49,30 @@ for platform in android linux windows; do
   directory="artifacts/release-$platform"
   test -d "$directory" || continue
   check_source
+  if [[ "$platform" == android && ! -f "$directory/android.apk" ]]; then
+    source_tag=$(jq -er 'select(.action == "update") | .sourceTag | strings | select(length > 0)' "$directory/android.json")
+    base="app-$CHANNEL-android"
+    if [[ "$source_tag" != "$base" ]]; then
+      [[ "$CHANNEL" == production && "$source_tag" == "$base-"* && "${source_tag#"$base-"}" =~ ^[0-9]+-[0-9]+$ ]] || { echo 'Invalid Android source release'; exit 1; }
+    fi
+    gh api "repos/$GH_REPO/releases/tags/$source_tag" > "$RUNNER_TEMP/android-source.json"
+    ANDROID_MANIFEST="$directory/android.json" node --input-type=module -e '
+      import {readFileSync} from "node:fs";
+      const wanted = JSON.parse(readFileSync(process.env.ANDROID_MANIFEST, "utf8"));
+      const release = JSON.parse(readFileSync(`${process.env.RUNNER_TEMP}/android-source.json`, "utf8"));
+      const prior = JSON.parse(/<!-- android (\{[^\n]+\}) -->/.exec(release.body || "")?.[1] || "null");
+      const fields = ["channel", "projectId", "applicationId", "runtimeVersion", "sha256"];
+      if (release.draft !== false || !prior || wanted.channel !== process.env.CHANNEL
+        || !/^[a-f0-9]{40,64}$/.test(wanted.runtimeVersion || "") || !/^[a-f0-9]{64}$/.test(wanted.sha256 || "")
+        || !fields.every(k => typeof wanted[k] === "string" && wanted[k].trim() && prior[k] === wanted[k])
+        || !release.assets?.some(a => a.name === "android.apk" && a.state === "uploaded" && a.size > 0 && a.digest === `sha256:${wanted.sha256}`)) {
+        throw new Error("Android source release does not match the OTA manifest.");
+      }
+    '
+    gh release download "$source_tag" --pattern android.apk --dir "$directory"
+    printf '%s  %s\n' "$(jq -er .sha256 "$directory/android.json")" "$directory/android.apk" | sha256sum -c -
+    check_source
+  fi
   tag="app-$CHANNEL-$platform"
   if [[ "$CHANNEL" == production ]]; then tag+="-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"; fi
   printf 'Platform: %s\nSource: %s\n' "$platform" "$SOURCE" > "$RUNNER_TEMP/release-notes.md"
@@ -78,7 +102,12 @@ check_source() { test "$(gh api "repos/$GH_REPO/$SOURCE_PATH" --jq 'if has("head
 check_source
 for file in dist/release/*; do test -f "$file"; test -s "$file"; done
 case "$PLATFORM" in
-  android) artifact=android.apk; test -s "dist/release/$artifact"; test -s dist/release/android.json ;;
+  android)
+    test -s dist/release/android.json
+    if [[ ! -s dist/release/android.apk ]]; then
+      jq -e '(.action == "update") and (.sourceTag | type == "string" and length > 0)' dist/release/android.json > /dev/null
+    fi
+    ;;
   ios) test -s dist/release/ios.ipa; test -s dist/release/ios.json ;;
   linux) compgen -G 'dist/release/*.deb' > /dev/null; compgen -G 'dist/release/*.rpm' > /dev/null ;;
   windows) compgen -G 'dist/release/*.exe' > /dev/null; compgen -G 'dist/release/*.nupkg' > /dev/null; test -s dist/release/RELEASES ;;
