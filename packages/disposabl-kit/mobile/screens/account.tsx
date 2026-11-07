@@ -17,9 +17,11 @@ import {
 } from "../design/preferences";
 import { ThemedText } from "../design/themed-text";
 import { api } from "../lib/convex";
-import { authenticationEnabled, paymentsEnabled } from "../../features";
+import * as features from "../../features";
+// payments:start
 import { AccountBilling } from "../billing/account-billing";
 import { billingSession } from "../billing/session";
+// payments:end
 
 type AccountScreenProps = {
   accountRows?: ReactNode;
@@ -37,7 +39,7 @@ async function copyEmail(email: string) {
 
 /** Preferences are public. Only account content requires an authenticated provider. */
 export function AccountScreen(props: AccountScreenProps) {
-  return authenticationEnabled ? (
+  return features.authenticationEnabled ? (
     <SessionSettings {...props} />
   ) : (
     <GuestSettings {...props} />
@@ -60,7 +62,7 @@ function GuestSettings({
 }: AccountScreenProps & { loading?: boolean }) {
   return (
     <SettingsPage>
-      {authenticationEnabled && (
+      {features.authenticationEnabled && (
         <PreferenceSection title="Account">
           <PreferenceRow
             icon={{ ios: "person.crop.circle", android: "account_circle" }}
@@ -97,18 +99,24 @@ function SignedInSettings({
   const { signOut } = useAuthActions();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // payments:start
   const [billingEpoch, setBillingEpoch] = useState(0);
+  // payments:end
 
   async function logOut() {
     if (pending) return;
+    // payments:start
     billingSession.select(null);
+    // payments:end
     setPending(true);
     setError(null);
     try {
       await signOut();
       router.dismissTo("/");
     } catch {
+      // payments:start
       setBillingEpoch((value) => value + 1);
+      // payments:end
       setError("Couldn't clear your session. Please try logging out again.");
     } finally {
       setPending(false);
@@ -146,7 +154,8 @@ function SignedInSettings({
           />
         </PreferenceSection>
       )}
-      {isAuthenticated && user && paymentsEnabled && !pending && (
+      {/* payments:start */}
+      {isAuthenticated && user && features.paymentsEnabled && !pending && (
         <PreferenceSection title="Billing">
           <View style={{ padding: 20 }}>
             <AccountBilling
@@ -156,6 +165,7 @@ function SignedInSettings({
           </View>
         </PreferenceSection>
       )}
+      {/* payments:end */}
       <View className="mt-7">
         <PreferenceCard>
           <PreferenceRow

@@ -10,6 +10,7 @@ import {
 import { existsSync } from "node:fs";
 import { basename, join } from "node:path";
 import { randomUUID } from "node:crypto";
+import { omitMobilePayments } from "./mobile-payments";
 import {
   selectedFolders,
   selectFeatures,
@@ -114,6 +115,8 @@ export const Route = createFileRoute("/_providers/_authenticated/dashboard")({
         );
       }
     }
+    if (!config.features.includes("payments"))
+      await omitMobilePayments(destination);
     if (!config.features.includes("docs")) {
       const webPackage = join(destination, "apps/web/package.json");
       const web = JSON.parse(await readFile(webPackage, "utf8"));

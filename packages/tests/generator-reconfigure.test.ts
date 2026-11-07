@@ -21,6 +21,61 @@ if (!existsSync(template)) {
 const version = "test-version";
 const read = (dir: string, path: string) => readFile(join(dir, path), "utf8");
 
+test("native payments selection adds and removes the SDK without replacing custom dependencies", async () => {
+  const temp = await mkdtemp(join(tmpdir(), "payments-selection-"));
+  const app = join(temp, "app");
+  const manifestPath = "apps/mobile/package.json";
+  const billingPath =
+    "packages/disposabl-kit/mobile/billing/account-billing.tsx";
+  try {
+    await createApp(template, app, "billing-example", {
+      version,
+      platforms: ["web", "android"],
+      features: ["authentication"],
+    });
+    let manifest = JSON.parse(await read(app, manifestPath));
+    assert.equal(manifest.dependencies["react-native-purchases"], undefined);
+    assert.equal(existsSync(join(app, billingPath)), false);
+    assert.doesNotMatch(
+      await read(app, "packages/disposabl-kit/mobile/screens/account.tsx"),
+      /billingSession|AccountBilling/,
+    );
+    manifest.dependencies["custom-example"] = "1.2.3";
+    await writeFile(
+      join(app, manifestPath),
+      JSON.stringify(manifest, null, 2) + "\n",
+    );
+    for (const features of ["payments", "authentication", "payments"]) {
+      await reconfigureApp(template, app, version, { features });
+      manifest = JSON.parse(await read(app, manifestPath));
+      assert.equal(manifest.dependencies["custom-example"], "1.2.3");
+      assert.equal(
+        !!manifest.dependencies["react-native-purchases"],
+        features === "payments",
+      );
+      assert.equal(existsSync(join(app, billingPath)), features === "payments");
+    }
+    const config = await read(app, "disposabl.json");
+    const manifestBefore = await read(app, manifestPath);
+    await writeFile(
+      join(app, billingPath),
+      "// Custom billing implementation\n",
+    );
+    await assert.rejects(
+      reconfigureApp(template, app, version, { features: "authentication" }),
+      /customized/,
+    );
+    assert.equal(await read(app, "disposabl.json"), config);
+    assert.equal(await read(app, manifestPath), manifestBefore);
+    assert.equal(
+      await read(app, billingPath),
+      "// Custom billing implementation\n",
+    );
+  } finally {
+    await rm(temp, { recursive: true, force: true });
+  }
+});
+
 test(
   "reconfigures a generated app without losing user files",
   { timeout: 30000 },

@@ -10,6 +10,8 @@ The app calls Autumn API 2.6.0 `customers.get_or_create`, `billing.attach`, and 
 
 ## Native subscriptions and synchronization
 
+Generated apps include RevenueCat and the native billing example only when payments is selected. Reconfiguring payments adds or removes that SDK and its unchanged example files; unrelated dependencies are preserved. Customized billing files must be reconciled before disabling payments. Run installation after reconfiguration and build a new native binary when the SDK selection changes.
+
 The account screen supports monthly subscriptions and restore through RevenueCat. Use Autumn's managed RevenueCat integration as the sole sync path, with the same authenticated user ID as RevenueCat `appUserID` and Autumn `customer_id`. Request beta access, connect a RevenueCat project and V2 read-only key in Autumn, map store-level subscription products to `credits_monthly`, and configure separate test and live webhooks using Autumn's provided URL and authorization. Block duplicate web/native subscriptions based on the provider customer state. Mobile purchases use RevenueCat, never Autumn attach. Await Autumn webhook synchronization before treating the Autumn balance as available.
 
 Set public build-time variables `EXPO_PUBLIC_REVENUECAT_IOS_API_KEY` and `EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY`, plus `EXPO_PUBLIC_REVENUECAT_IOS_MONTHLY_PRODUCT` and `EXPO_PUBLIC_REVENUECAT_ANDROID_MONTHLY_PRODUCT` to the exact store product identifiers. Configure each as a $5 monthly product with no unverified offers. The app displays the store's localized price. Build a new native binary after adding the SDK; Expo Go is insufficient. Android uses `singleTop` when payments is selected so external bank verification can return to the purchase.
