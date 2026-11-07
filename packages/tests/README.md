@@ -52,6 +52,8 @@ When supplying an isolated backend through Metro's shell environment, also set `
 
 ## CI
 
+Desktop navigation can be checked locally with `E2E_DESKTOP_NAVIGATION=1 bun run e2e run desktop-navigation.e2e.ts --target backend --retries 0`. This opt-in flow requires the desktop workspace, installed Electron binary, and a graphical session. It launches an isolated Electron instance against local fixture pages, intercepts browser launches, and checks the application's navigation and OAuth callback handling. No backend or provider calls are made. This is separate from real Google sign-in, installed protocol registration, and two-version native update verification.
+
 The same commands work in CI without model credentials. On Linux, install Chromium's system dependencies with `bun run --cwd packages/tests setup:browser`. Provision an isolated backend and deploy the current functions before testing. Set its URLs, then run `bun run test --target web,backend` and include `,api` when `disposabl.json` enables it.
 
 Run Android separately on a runner with an emulator and iOS on macOS with Xcode and a simulator. Build/install the test artifact before its E2E run. Gate publication on the required target results; native E2E cannot run before an app exists to install. This setup does not replace or automatically gate the repository's existing deployment workflows.

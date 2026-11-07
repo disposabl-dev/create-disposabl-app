@@ -7,6 +7,13 @@ import {
 import { api } from "../../../backend/convex/_generated/api";
 import { Button } from "./ui/button";
 import googleLogo from "../../lib/google-logo.png";
+import { desktopAuthPath } from "../../lib/desktop-auth";
+
+declare global {
+  interface Window {
+    disposablDesktop?: { authentication: boolean };
+  }
+}
 
 export function GoogleSignIn() {
   const providers = useQuery(api.auth.providers);
@@ -47,7 +54,11 @@ export function GoogleSignIn() {
         onClick={async () => {
           setStartError(null);
           setPending(true);
-          const result = await signIn({ redirectTo: window.location.href });
+          const redirectTo = window.disposablDesktop?.authentication
+            ? new URL(desktopAuthPath, import.meta.env.VITE_CONVEX_SITE_URL)
+                .href
+            : window.location.href;
+          const result = await signIn({ redirectTo });
           if (result.status === "error") {
             setPending(false);
             setStartError("Couldn't start Google sign-in. Please try again.");
@@ -61,6 +72,16 @@ export function GoogleSignIn() {
         />
         {pending ? "Opening Google…" : "Sign in with Google"}
       </Button>
+      {pending && window.disposablDesktop?.authentication && (
+        <Button
+          type="button"
+          variant="ghost"
+          className="w-full"
+          onClick={() => window.location.reload()}
+        >
+          Back to sign-in
+        </Button>
+      )}
       {error && (
         <p role="alert" className="text-sm text-destructive">
           {error}

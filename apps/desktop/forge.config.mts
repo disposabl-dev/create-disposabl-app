@@ -9,14 +9,20 @@ import { MakerRpm } from '@electron-forge/maker-rpm';
 import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
+import { desktopAuthScheme } from '../../packages/disposabl-kit/lib/desktop-auth';
 
 const executableName = manifest.name.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+const authScheme = desktopAuthScheme(
+  'disposablDesktopId' in manifest ? manifest.disposablDesktopId : null,
+);
+const mimeType = authScheme ? [`x-scheme-handler/${authScheme}`] : [];
 
 // specTemplate is supported by electron-installer-redhat but absent from Forge's types.
 const rpmOptions = {
   name: executableName,
   bin: executableName,
   specTemplate: resolve('rpm.spec.ejs'),
+  mimeType,
 };
 
 const signedRelease =
@@ -33,6 +39,9 @@ const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
     executableName,
+    ...(authScheme
+      ? { protocols: [{ name: manifest.productName, schemes: [authScheme] }] }
+      : {}),
     icon: 'src/assets/icon',
     appBundleId:
       process.env.MACOS_BUNDLE_ID ||
@@ -85,7 +94,9 @@ const config: ForgeConfig = {
     new MakerZIP({}, ['darwin']),
     new MakerDMG({ format: 'ULFO' }),
     new MakerRpm({ options: rpmOptions }),
-    new MakerDeb({ options: { name: executableName, bin: executableName } }),
+    new MakerDeb({
+      options: { name: executableName, bin: executableName, mimeType },
+    }),
   ],
   plugins: [
     new VitePlugin({

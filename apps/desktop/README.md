@@ -49,6 +49,14 @@ Windows and Linux installers are unsigned. macOS uses ad hoc signing and provide
 
 The desktop window uses `http://localhost:3000` during development and the deployed `CONVEX_SITE_URL` in packaged builds. It shares the website and authentication flow; if the site is unavailable, it shows the bundled starter page.
 
+## Browser and sign-in handoff
+
+External HTTPS links open in the system browser. Connection flows can create a temporary blank window while requesting their provider URL; it closes after opening that URL in the browser. Other native protocols and credential-bearing URLs are rejected. App pages remain sandboxed, with context isolation enabled and Node integration disabled.
+
+Google sign-in returns through `/oauth/desktop` to the installed app's unique `disposabl-desktop-<desktopId>` protocol. The return contains only Convex's one-time ticket. The initiating app retains the flow state and redeems the ticket through the existing auth client. Keep `desktopId` unchanged between builds. macOS packaging declares the protocol; Windows registers it when the installed app starts, and Linux packages declare its MIME handler. Development builds do not register an OS protocol. Use an installed build for real browser-return verification. Other external provider pages may require their own browser session.
+
+Run `E2E_DESKTOP_NAVIGATION=1 bun run e2e run desktop-navigation.e2e.ts --target backend --retries 0` on a machine with Electron installed and a graphical session. It compiles the actual main/preload, checks navigation and callback delivery using local fixture pages, and intercepts system-browser launches. It makes no provider requests and does not prove a Google transaction, OS protocol association, or native binary update. Test those separately on each supported OS.
+
 ## Native updates
 
 The website is loaded from `CONVEX_SITE_URL`; refreshing it receives deployed web changes independently of a native update. The app menu's **Check for updates** checks the installed native binary on macOS and Windows, downloads an available update, and asks before restarting. A downloaded update may also install at the next launch. Development builds and builds without a feed report that updates are not configured. Linux uses the system package manager; the menu explains this and does not claim to check for an update. The existing DEB/RPM artifacts do not configure an apt or RPM repository, so operators must provide one for package-manager updates.
