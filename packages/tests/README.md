@@ -48,6 +48,8 @@ The config evaluates `apps/mobile/app.config.js` to use the same bundle IDs and 
 
 For a development client with several Metro servers running, set `E2E_MOBILE_DEV_URL` to this app's Metro URL and `E2E_MOBILE_DEV_SCHEME` to its unique installed URL scheme. The mobile flows explicitly connect after launch and restart. This prevents accidentally testing another server or backend. Release builds omit both variables.
 
+When supplying an isolated backend through Metro's shell environment, also set `EXPO_NO_DOTENV=1` and `EXPO_PUBLIC_E2E=true`. The Metro configuration excludes dotenv files in this mode: SDK 58's development environment module otherwise reloads `.env.local` after shell values. Set both `EXPO_PUBLIC_CONVEX_URL` and `EXPO_PUBLIC_CONVEX_SITE_URL` to the test backend, using the emulator's reachable host address. The test runner's `E2E_CONVEX_URL` and `E2E_CONVEX_SITE_URL` must address that same deployment from the host.
+
 ## CI
 
 The same commands work in CI without model credentials. On Linux, install Chromium's system dependencies with `bun run --cwd packages/tests setup:browser`. Provision an isolated backend and deploy the current functions before testing. Set its URLs, then run `bun run test --target web,backend` and include `,api` when `disposabl.json` enables it.

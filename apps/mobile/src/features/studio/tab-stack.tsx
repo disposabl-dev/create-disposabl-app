@@ -46,12 +46,9 @@ export function TabStack() {
           unstable_headerLeftItems: () => [
             { type: "custom", element: title, hidesSharedBackground: true },
           ],
-          headerTransparent: process.env.EXPO_OS === "ios",
+          headerTransparent: false,
           headerShadowVisible: false,
-          headerStyle: {
-            backgroundColor:
-              process.env.EXPO_OS === "ios" ? "transparent" : c.background,
-          },
+          headerStyle: { backgroundColor: c.background },
           headerTintColor: c.foreground,
           contentStyle: { backgroundColor: c.background },
           headerRight: () => <HeaderActions />,

@@ -46,6 +46,24 @@ test(
 );
 
 test(
+  "mobile creation can be dismissed before submitting",
+  { platforms: ["ios", "android"] },
+  async ({ app, screen, device }) => {
+    await openMobile({ app, device, screen });
+    await screen.getByRole("button", "Create app", { exact: true }).tap();
+    const close = screen.getByRole("button", "Close create app", {
+      exact: true,
+    });
+    await expect(close).toBeVisible();
+    await close.tap();
+    await expect(close).toHaveCount(0);
+    await expect(
+      screen.getByRole("button", "Create app", { exact: true }),
+    ).toBeVisible();
+  },
+);
+
+test(
   "mobile username login survives restart and signs out",
   { platforms: ["ios"] },
   async ({ app, screen, device }) => {
