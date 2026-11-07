@@ -39,6 +39,8 @@ export async function billingRequest(
 ): Promise<Record<string, unknown>> {
   const response = await fetcher(`https://api.useautumn.com/v1/${method}`, {
     method: "POST",
+    redirect: "error",
+    signal: AbortSignal.timeout(15000),
     headers: {
       Authorization: `Bearer ${key}`,
       "Content-Type": "application/json",
