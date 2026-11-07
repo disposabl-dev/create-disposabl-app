@@ -277,7 +277,9 @@ test(
         // The heading changes in the same subscription update as the appended
         // message, so the assertion cannot pass against the previous snapshot.
         await expect(
-          screen.getByRole("heading", "Conversation refreshed", { exact: true }),
+          screen.getByRole("heading", "Conversation refreshed", {
+            exact: true,
+          }),
         ).toBeVisible();
         await expect(
           screen.getByText("While reading earlier content.", { exact: true }),
