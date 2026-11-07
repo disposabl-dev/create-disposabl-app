@@ -6,3 +6,8 @@
 
 @import "./studio.css";
 @import "./languages.css";
+
+@import "./workshop.css";
+@import "./hero-preview.css";
+@import "./agent-workspace.css";
+@import "./start-actions.css";

@@ -4,8 +4,8 @@ import { type Platform } from "@disposabl/disposabl-kit/platforms";
 import { AgentLogos } from "./logos";
 import "./style.css";
 
-const prompt =
-  "Build my app with create-disposabl-app@latest. Ask me what I want to make.";
+export const setupPrompt =
+  "Help me build an app with Disposabl. Read https://github.com/disposabl-dev/create-disposabl-app, then ask me what I want to make and where it should run.";
 const commands = {
   Bun: "bunx create-disposabl-app@latest",
   npm: "npx create-disposabl-app@latest",
@@ -60,7 +60,7 @@ export function AgentOnboarding({
     : "";
   const appPrompt = idea
     ? `Build my app with create-disposabl-app@latest. ${idea}${platformNote} Ask me the questions you need before building.`
-    : `${prompt}${platformNote}`;
+    : `${setupPrompt}${platformNote}`;
   const [mode, setMode] = useState<"prompt" | "terminal">("prompt");
   const [manager, setManager] = useState<keyof typeof commands>("Bun");
   const command = `${commands[manager]}${platforms?.length ? ` --platforms ${platforms.join(",")}` : ""}`;

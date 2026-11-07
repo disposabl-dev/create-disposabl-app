@@ -58,13 +58,12 @@ test(
       "Download on the App Store",
       "Get it on Google Play",
     ].entries()) {
-      await expect(screen.getByRole("button", name)).toHaveAttribute(
-        "aria-disabled",
-        "true",
-      );
+      await expect(
+        browser.locator(`.maker-hero .store-button`).nth(index),
+      ).toHaveAttribute("aria-disabled", "true");
       await browser.evaluate((i) => {
         document
-          .querySelectorAll<HTMLButtonElement>(".store-button")
+          .querySelectorAll<HTMLButtonElement>(".maker-hero .store-button")
           [i].focus();
         return true;
       }, index);
@@ -99,13 +98,21 @@ test(
       });
     });
     await app.open("/");
+    await browser.locator(".maker-hero .command-start").tap();
+    await expect(browser.locator(".maker-hero .copy-fallback")).toContainText(
+      "npx create-disposabl-app@latest",
+    );
     await browser.locator("#start").tap();
-    await screen.getByRole("button", "Copy prompt", { exact: true }).tap();
+    await expect(browser.locator(".maker-hero .copy-fallback")).toContainText(
+      "Help me build an app with Disposabl. Read https://github.com/disposabl-dev/create-disposabl-app, then ask me what I want to make and where it should run.",
+    );
+    await browser.locator(".maker-hero .setup-help").tap();
+    await browser.locator(".start-dialog .landing-copy-button").tap();
     await expect(browser.locator(".start-dialog [role=status]")).toHaveText(
       "Select the text to copy it manually.",
     );
     await expect(browser.locator(".landing-prompt")).toContainText(
-      "create-disposabl-app@latest",
+      "https://github.com/disposabl-dev/create-disposabl-app",
     );
     await screen.getByRole("button", "Run a command").tap();
     for (const [name, command] of [
@@ -143,6 +150,18 @@ test(
         () => document.activeElement?.getAttribute("aria-label") ?? null,
       ),
     ).toBe("Open menu");
+    await browser.setViewport({ width: 844, height: 390 });
+    await screen.getByRole("button", "Open menu").tap();
+    await expect(screen.getByRole("button", "Close menu")).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+    await browser.keyboard.press("Escape");
+    await expect(screen.getByRole("button", "Open menu")).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+    await browser.setViewport({ width: 390, height: 844 });
     await browser
       .locator("#faq summary")
       .getByText("Is Disposabl really free?", { exact: true })
@@ -189,6 +208,14 @@ test(
       if ([320, 390, 768, 1440].includes(width))
         await app.screenshot(`landing-${width}`);
     }
+    await browser.setViewport({ width: 844, height: 390 });
+    await app.open("/");
+    await expect(browser.locator("#hero-title")).toBeVisible();
+    expect(
+      await browser.evaluate(
+        () => document.documentElement.scrollWidth === innerWidth,
+      ),
+    ).toBe(true);
     for (const path of ["/stack", "/build", "/why-disposabl"]) {
       await browser.setViewport({ width: 320, height: 800 });
       await app.open(path);
@@ -217,12 +244,17 @@ test(
       [320, 568],
       [375, 667],
       [390, 844],
+      [844, 390],
       [1440, 900],
     ]) {
       await browser.setViewport({ width, height });
       await app.open("/");
       const visible = await browser.evaluate(() =>
-        [...document.querySelectorAll("#start,.store-button")].every((el) => {
+        [
+          ...document.querySelectorAll(
+            ".maker-hero #start,.maker-hero .store-button,.maker-hero .command-start",
+          ),
+        ].every((el) => {
           const r = el.getBoundingClientRect();
           return (
             r.top >= 0 &&
@@ -234,7 +266,7 @@ test(
       );
       expect(visible).toBe(true);
     }
-    await browser.locator("#start").tap();
+    await browser.locator(".maker-hero .setup-help").tap();
     await expect(
       screen.getByRole("dialog", "Continue with your AI."),
     ).toBeVisible();
@@ -243,8 +275,10 @@ test(
       screen.getByRole("dialog", "Continue with your AI."),
     ).toHaveCount(0);
     expect(
-      await browser.evaluate(() => document.activeElement?.id ?? null),
-    ).toBe("start");
+      await browser.evaluate(
+        () => document.activeElement?.getAttribute("aria-label") ?? null,
+      ),
+    ).toBe("View setup instructions");
     await browser.locator("#pricing .primary-link").tap();
     await expect(browser.locator(".start-dialog[open]")).toBeVisible();
     await browser.keyboard.press("Escape");
@@ -279,28 +313,11 @@ test(
         screen.getByRole("button", name, { exact: true }),
       ).toHaveAttribute("aria-pressed", "true");
       await screen.getByRole("button", "Build this app", { exact: true }).tap();
-      expect(
-        await browser.evaluate(
-          () =>
-            (document.querySelector("#app-idea") as HTMLTextAreaElement).value,
-        ),
-      ).toContain(text);
-      await expect(browser.locator(".start-dialog[open]")).toHaveCount(0);
-      await browser.locator("#start").tap();
+      await expect(browser.locator(".start-dialog[open]")).toBeVisible();
       await expect(browser.locator(".landing-prompt")).toContainText(text);
       await browser.keyboard.press("Escape");
     }
-    await browser
-      .locator("#app-idea")
-      .fill("An app to organize my recipes and weekly shopping.");
-    await browser.locator("#start").tap();
-    await expect(browser.locator(".landing-prompt")).toContainText(
-      "organize my recipes",
-    );
-    await browser.keyboard.press("Escape");
-    await expect(browser.locator("#app-idea")).toHaveValue(
-      "An app to organize my recipes and weekly shopping.",
-    );
+    await expect(browser.locator(".maker-hero textarea")).toHaveCount(0);
   },
 );
 
@@ -330,7 +347,7 @@ test(
           await expect(browser.locator("html")).toHaveAttribute("class", theme);
           await expect(browser.locator("main h1")).toBeVisible();
           for (const dialog of path === "/" ? [false, true] : [false]) {
-            if (dialog) await browser.locator("#start").tap();
+            if (dialog) await browser.locator(".maker-hero .setup-help").tap();
             const undersized = await browser.evaluate(() => {
               const root = document.querySelector(".launch-site")!;
               const walker = document.createTreeWalker(
@@ -470,7 +487,7 @@ test(
       });
     });
     await app.open("/");
-    await browser.locator("#app-idea").fill("private custom draft");
+    await expect(browser.locator(".maker-hero textarea")).toHaveCount(0);
     await screen.getByRole("button", "Daily planner", { exact: true }).tap();
     await screen.getByRole("button", "Share this idea", { exact: true }).tap();
     await expect(browser.locator(".share-feedback")).toContainText(
@@ -483,12 +500,9 @@ test(
     expect(url.origin).toBe(new URL(await browser.url()).origin);
     expect(url.pathname).toBe("/");
     expect(url.search).toBe("?idea=planner");
-    expect(url.hash).toBe("");
+    expect(url.hash).toBe("#examples");
     await app.open("/?idea=planner");
-    await expect(browser.locator("#app-idea")).toHaveValue(
-      "A personal planner for my tasks, routines, and weekly goals. I want to see what matters today and keep track of my progress.",
-    );
-    await browser.locator("#start").tap();
+    await browser.locator(".maker-hero .setup-help").tap();
     await expect(browser.locator(".landing-prompt")).toContainText(
       "weekly goals",
     );
@@ -513,7 +527,7 @@ test(
     await screen.getByRole("button", "Community app", { exact: true }).tap();
     await screen.getByRole("button", "Share this idea", { exact: true }).tap();
     await expect(browser.locator(".share-feedback")).toHaveText(
-      new URL("/?idea=community", app.baseUrl).href,
+      new URL("/?idea=community#examples", app.baseUrl).href,
     );
   },
 );
@@ -585,7 +599,7 @@ test(
       const copied = await browser.evaluate(
         () => (window as any).__sharedUrl as string,
       );
-      expect(copied).toBe(new URL(`/?idea=${id}`, app.baseUrl).href);
+      expect(copied).toBe(new URL(`/?idea=${id}#examples`, app.baseUrl).href);
     }
   },
 );
@@ -691,5 +705,128 @@ test(
       );
     });
     expect(mobile).toBe(true);
+  },
+);
+
+test(
+  "direct start actions copy their actual text and provide fallbacks",
+  { platforms: ["web"], tags: ["landing"] },
+  async ({ app, browser, screen }) => {
+    await browser.addInitScript(() =>
+      Object.defineProperty(navigator, "clipboard", {
+        configurable: true,
+        value: {
+          writeText: async (text: string) => {
+            (window as any).__copied = text;
+          },
+        },
+      }),
+    );
+    await app.open("/");
+    await browser.locator(".maker-hero #start").tap();
+    expect(
+      await browser.evaluate(() => (window as any).__copied as string),
+    ).toBe(
+      "Help me build an app with Disposabl. Read https://github.com/disposabl-dev/create-disposabl-app, then ask me what I want to make and where it should run.",
+    );
+    await expect(browser.locator(".maker-hero .copy-start")).toContainText(
+      "Copied",
+    );
+    await browser.locator(".maker-hero .command-start").tap();
+    expect(
+      await browser.evaluate(() => (window as any).__copied as string),
+    ).toBe("npx create-disposabl-app@latest");
+    await browser.locator(".closing-start .copy-start").tap();
+    await expect(browser.locator(".closing-start .copy-start")).toContainText(
+      "Copied",
+    );
+    await browser.locator(".closing-start .command-start").tap();
+    expect(
+      await browser.evaluate(() => (window as any).__copied as string),
+    ).toBe("npx create-disposabl-app@latest");
+    await browser.locator(".closing-start .setup-help").tap();
+    await expect(browser.locator(".start-dialog[open]")).toBeVisible();
+  },
+);
+
+test(
+  "hero example and Agent Mode controls work",
+  { platforms: ["web"], tags: ["landing"] },
+  async ({ app, browser, screen }) => {
+    await app.open("/");
+    await screen.getByRole("button", "Join example walk").tap();
+    await expect(
+      screen.getByRole("button", "Leave example walk"),
+    ).toBeVisible();
+    await screen.getByRole("button", "Leave example walk").tap();
+    await expect(screen.getByRole("button", "Join example walk")).toBeVisible();
+    for (const [label, text] of [
+      ["Keep improving", "test it, then refine it"],
+      ["Compare approaches", "separate previews"],
+      ["Work in parallel", "separate conversations"],
+    ]) {
+      await screen.getByRole("button", label, { exact: true }).tap();
+      await expect(
+        screen.getByRole("button", label, { exact: true }),
+      ).toHaveAttribute("aria-pressed", "true");
+      await expect(browser.locator(".agent-mode-controls p")).toContainText(
+        text,
+      );
+    }
+  },
+);
+
+test(
+  "stack exposes interfaces and optional plugin guidance",
+  { platforms: ["web"], tags: ["landing"] },
+  async ({ app, browser }) => {
+    await app.open("/");
+    await expect(browser.locator("main")).not.toContainText("plugins");
+    await app.open("/stack");
+    await expect(browser.locator(".interface-directory a")).toHaveCount(4);
+    for (const name of ["MCP", "API", "CLI", "SDK"])
+      await expect(browser.locator(".interface-directory")).toContainText(name);
+    await expect(browser.locator(".plugin-details[open]")).toHaveCount(0);
+    await browser.locator(".plugin-details summary").tap();
+    await expect(browser.locator(".plugin-details[open]")).toBeVisible();
+    await expect(browser.locator(".plugin-details")).toContainText(
+      "Use Disposabl in your agent.",
+    );
+    await expect(browser.locator(".plugin-details")).toContainText(
+      "Build a plugin for your app.",
+    );
+    await browser.locator(".plugin-details summary").tap();
+    await expect(browser.locator(".plugin-details[open]")).toHaveCount(0);
+  },
+);
+
+test(
+  "direct example links select and reveal the requested demo",
+  { platforms: ["web"], tags: ["landing"] },
+  async ({ app, browser, screen }) => {
+    await app.open("/?idea=game#examples");
+    await expect(
+      screen.getByRole("button", "Games", { exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
+    await expect(browser.locator(".example-game .game-app")).toBeVisible();
+    expect(
+      await browser.evaluate(() => {
+        const rect = document
+          .querySelector(".example-game")!
+          .getBoundingClientRect();
+        return rect.bottom > 0 && rect.top < innerHeight;
+      }),
+    ).toBe(true);
+    await screen.getByRole("button", "Build this app", { exact: true }).tap();
+    await expect(
+      browser.locator(".start-dialog[open] .landing-prompt"),
+    ).toContainText("memory matching game");
+    await app.open("/?idea=invalid#examples");
+    await expect(
+      screen.getByRole("button", "Daily planner", { exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
+    await expect(
+      browser.locator(".example-planner .planner-app"),
+    ).toBeVisible();
   },
 );

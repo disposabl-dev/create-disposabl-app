@@ -6,7 +6,7 @@ test(
   { platforms: ["web"] },
   async ({ app, screen, browser }) => {
     await app.open("/");
-    await browser.locator("#start").tap();
+    await browser.locator(".maker-hero .setup-help").tap();
     await expect(
       browser.locator('[data-testid="agent-onboarding"]'),
     ).toHaveCount(1);
@@ -14,7 +14,7 @@ test(
       screen.getByRole("group", "Coding agents and assistants"),
     ).toBeVisible();
     await expect(browser.locator(".agent-logo img")).toHaveCount(8);
-    await screen.getByRole("button", "Copy prompt").tap();
+    await browser.locator(".start-dialog .landing-copy-button").tap();
     await expect(screen.getByRole("status")).toHaveText("Copied to clipboard.");
     await screen.getByRole("button", "Run a command").tap();
     await expect(

@@ -48,7 +48,6 @@ export function MarketingShell({
       >
         <nav className="launch-container" aria-label="Website navigation">
           <a className="wordmark" href="/" aria-label="Disposabl home">
-            <img src="/disposabl-logo.svg" alt="" width={34} height={34} />
             <span>
               disposabl<span className="brand-period">.</span>
             </span>

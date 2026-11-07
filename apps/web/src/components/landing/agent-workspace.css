@@ -1,0 +1,327 @@
+.agent-workspace {
+  padding-block: 90px 110px;
+  border-top: 1px solid var(--line);
+}
+.agent-section-heading {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 70px;
+  align-items: center;
+}
+.agent-section-heading h2 {
+  font-size: clamp(48px, 6vw, 80px);
+}
+.agent-section-heading h3 {
+  font-size: 30px;
+}
+.agent-section-heading p {
+  max-width: 440px;
+  margin-top: 16px;
+  color: var(--muted);
+  font-size: 20px;
+  line-height: 1.5;
+}
+.agent-section-heading .text-link {
+  margin-top: 20px;
+}
+.agent-workspace-body {
+  display: grid;
+  grid-template-columns: 0.85fr 1.15fr;
+  gap: 50px;
+  margin-top: 60px;
+}
+.agent-mode-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+}
+.agent-mode-controls button {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border: 0;
+  border-top: 1px solid var(--line);
+  padding: 22px 0;
+  text-align: left;
+  background: transparent;
+  color: var(--muted);
+  font-size: 21px;
+}
+.agent-mode-controls button > svg:last-child {
+  margin-left: auto;
+}
+.agent-mode-controls button[aria-pressed="true"] {
+  color: var(--text);
+  font-weight: 600;
+}
+.agent-mode-controls button[aria-pressed="true"] > svg:first-child {
+  color: var(--accent-text);
+}
+.agent-mode-controls p {
+  color: var(--muted);
+  margin-top: 18px;
+  min-height: 90px;
+  max-width: 420px;
+}
+@keyframes window-enter {
+  from {
+    translate: 0 8px;
+  }
+  to {
+    translate: 0 0;
+  }
+}
+@media (max-width: 1000px) {
+  .agent-section-heading {
+    gap: 35px;
+  }
+  .agent-workspace-body {
+    grid-template-columns: 1fr;
+    gap: 25px;
+  }
+  .agent-mode-controls {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+  .agent-mode-controls button {
+    font-size: 17px;
+    gap: 10px;
+    padding: 18px 0;
+  }
+  .agent-mode-controls button > svg:last-child {
+    display: none;
+  }
+  .agent-mode-controls p {
+    grid-column: 1/-1;
+    max-width: 580px;
+    min-height: 55px;
+  }
+}
+@media (max-width: 760px) {
+  .agent-workspace {
+    padding-block: 60px 75px;
+  }
+  .agent-section-heading {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+  .agent-section-heading h2 {
+    font-size: 58px;
+  }
+  .agent-section-heading h3 {
+    font-size: 27px;
+  }
+  .agent-section-heading p {
+    font-size: 18px;
+  }
+  .agent-workspace-body {
+    margin-top: 35px;
+  }
+  .agent-mode-controls {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  .agent-mode-controls button {
+    font-size: 19px;
+    padding: 19px 0;
+  }
+  .agent-mode-controls button > svg:last-child {
+    display: block;
+  }
+  .agent-mode-controls p {
+    min-height: 100px;
+  }
+}
+@media (max-width: 400px) {
+  .agent-section-heading h2 {
+    font-size: 51px;
+  }
+}
+.remote-example {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 0 28px;
+  background: var(--raised);
+  min-width: 0;
+}
+.remote-top {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding-block: 20px;
+  border-bottom: 1px solid var(--line);
+  font-size: 16px;
+}
+.remote-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent-text);
+  flex: none;
+}
+.remote-top > span:last-child {
+  margin-left: auto;
+  color: var(--muted);
+}
+.remote-task {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-top: 25px;
+}
+.remote-task h3 {
+  font-size: 26px;
+}
+.remote-work-list {
+  margin-block: 22px;
+  display: grid;
+  gap: 16px;
+}
+.remote-work-list > div {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  font-size: 17px;
+  animation: window-enter 0.4s both;
+}
+.task-done {
+  color: var(--text);
+}
+.task-current {
+  color: var(--accent-text);
+}
+.task-current,
+.task-done {
+  display: flex;
+}
+.preview-symbol,
+.task-line {
+  margin-left: auto;
+  color: var(--muted);
+}
+.task-line {
+  height: 3px;
+  width: 45px;
+  background: var(--accent);
+}
+.remote-preview {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.remote-preview-nav {
+  display: flex;
+  gap: 5px;
+  padding: 10px;
+  border-bottom: 1px solid var(--line);
+}
+.remote-preview-nav span {
+  height: 5px;
+  width: 5px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+.remote-preview-content {
+  padding: 18px;
+}
+.remote-preview-content > div:first-child {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+.preview-date {
+  padding: 10px;
+  border-radius: 8px;
+  background: #dce8c9;
+  color: #294737;
+  font-size: 13px;
+  text-align: center;
+}
+.preview-date strong {
+  font: 650 27px var(--display);
+}
+.remote-preview-content > div > div {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.remote-preview-content > div > div > strong {
+  font-size: 20px;
+  font-family: var(--display);
+}
+.remote-preview-content > div > div > span {
+  font-size: 15px;
+  color: var(--muted);
+}
+.preview-time-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+.preview-time-row span {
+  flex: 1;
+  text-align: center;
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  font-size: 16px;
+}
+.preview-time-row span:nth-child(2) {
+  background: var(--text);
+  color: var(--surface);
+  border-color: var(--text);
+}
+.remote-bottom {
+  display: flex;
+  justify-content: space-between;
+  gap: 15px;
+  padding-block: 20px;
+  color: var(--muted);
+  font-size: 16px;
+}
+.remote-bottom span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+@media (max-width: 760px) {
+  .remote-example {
+    padding-inline: 20px;
+  }
+  .remote-task h3 {
+    font-size: 24px;
+  }
+  .remote-bottom {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+}
+@media (max-width: 400px) {
+  .remote-example {
+    padding-inline: 16px;
+  }
+  .remote-work-list > div {
+    font-size: 16px;
+  }
+  .remote-top {
+    font-size: 16px;
+    gap: 6px;
+  }
+  .remote-task h3 {
+    font-size: 22px;
+  }
+  .remote-preview-content {
+    padding: 12px;
+  }
+  .remote-preview-content > div:first-child {
+    gap: 12px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .remote-work-list > div {
+    animation: none;
+  }
+}

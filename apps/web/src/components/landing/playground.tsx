@@ -1,5 +1,5 @@
 import { useHydrated } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowUpRight,
   Copy,
@@ -62,9 +62,15 @@ export function AppPlayground({
   const [active, setActive] = useState(0);
   const [shared, setShared] = useState("");
   const idea = appIdeas[active] ?? appIdeas[0];
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("idea");
+    const index = appIdeas.findIndex((item) => item.id === id);
+    if (index >= 0) setActive(index);
+  }, []);
   async function share() {
     const url = new URL("/", window.location.origin);
     url.searchParams.set("idea", idea.id);
+    url.hash = "examples";
     try {
       await navigator.clipboard.writeText(url.href);
       setShared("Link copied. Send it to someone you’d build with.");
@@ -74,6 +80,7 @@ export function AppPlayground({
   }
   return (
     <section
+      id="examples"
       className="playground-section launch-container"
       aria-labelledby="playground-title"
     >

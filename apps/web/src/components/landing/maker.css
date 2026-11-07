@@ -1,20 +1,3 @@
-/* The maker identity: cobalt, ink, paper, and generous editorial type. */
-.launch-site {
-  --accent: #2445ff;
-  --accent-text: #2445ff;
-  --line: #d7d9df;
-  --raised: #f1f2f5;
-  --button: #2445ff;
-  --button-text: #fff;
-}
-.dark .launch-site {
-  --accent: #9eaeff;
-  --accent-text: #a9b6ff;
-  --line: #393c46;
-  --raised: #20232c;
-  --button: #b6c1ff;
-  --button-text: #131722;
-}
 .launch-container {
   max-width: 1440px;
   padding-inline: 64px;

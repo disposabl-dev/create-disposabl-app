@@ -20,6 +20,7 @@ import { MarketingShell, repository } from "./shell";
 import { PlatformExplorer } from "./platform-explorer";
 import { BrandIcon } from "./brand-icon";
 import { BuildEvidence } from "./build-evidence";
+import { Ecosystem } from "./ecosystem";
 import "./home.css";
 
 const steps = [
@@ -159,6 +160,7 @@ function StackPage() {
           ))}
         </div>
       </section>
+      <Ecosystem />
       <EndCard
         href={`/?platforms=${selected.join(",")}#start`}
         label="Continue with these platforms"
