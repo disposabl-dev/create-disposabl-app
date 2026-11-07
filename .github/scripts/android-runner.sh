@@ -7,7 +7,10 @@ case "${1:?operation required}" in
     # Only disposable GitHub-hosted Linux runners. Keep Android, Java, Node,
     # the checkout and dependency caches intact; these toolchains are unused.
     if [[ "${GITHUB_ACTIONS:-}" == true && "${RUNNER_ENVIRONMENT:-}" == github-hosted && "${RUNNER_OS:-}" == Linux ]]; then
-      sudo rm -rf -- /usr/share/dotnet /usr/local/.ghcup /opt/ghc /opt/hostedtoolcache/CodeQL
+      unused=(/usr/share/dotnet /usr/local/.ghcup /opt/ghc /opt/hostedtoolcache/CodeQL
+        /usr/share/swift /usr/share/miniconda /opt/microsoft/powershell /usr/local/share/powershell)
+      du -sh -- "${unused[@]}" 2>/dev/null || true
+      sudo rm -rf -- "${unused[@]}"
     fi
     df -h .
     ;;
