@@ -90,7 +90,7 @@ const details = [
     features: ["Team access", "Approvals and activity", "Connected workspaces"],
     platforms: ["Web", "Windows", "Apple", "Linux"],
   },
-];
+] as const;
 export function AppPlayground({
   onUseIdea,
 }: {
@@ -100,8 +100,8 @@ export function AppPlayground({
   const [active, setActive] = useState(0);
   const [shared, setShared] = useState("");
   const [playing, setPlaying] = useState(false);
-  const idea = appIdeas[active];
-  const detail = details[active];
+  const idea = appIdeas[active] ?? appIdeas[0];
+  const detail = details[active] ?? details[0];
   useEffect(() => {
     const id = new URLSearchParams(location.search).get("idea");
     const i = appIdeas.findIndex((x) => x.id === id);

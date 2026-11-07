@@ -20,11 +20,13 @@ export function HeroPreview() {
         role="group"
         aria-label="Preview an app on different platforms"
       >
-        {[
-          ["Desktop", "Windows"],
-          ["Mobile", "Apple"],
-          ["Web", "Web"],
-        ].map(([name, icon]) => (
+        {(
+          [
+            ["Desktop", "Windows"],
+            ["Mobile", "Apple"],
+            ["Web", "Web"],
+          ] as const
+        ).map(([name, icon]) => (
           <button
             key={name}
             aria-pressed={view === name}
@@ -62,7 +64,7 @@ export function HeroPreview() {
         </div>
         <div className="trip-content">
           <div className="trip-heading">
-            <h3>Your itinerary</h3>
+            <strong className="itinerary-title">Your itinerary</strong>
             <CalendarDays size={22} />
           </div>
           <div className="trip-item">

@@ -749,3 +749,11 @@ body:has(.start-dialog[open]) {
 .photo-credit a {
   text-decoration: underline;
 }
+
+.launch-site :is(a, button, summary, input) {
+  scroll-margin-block: 104px 24px;
+}
+.launch-site .trip-window,
+.launch-site .showcase-window {
+  --accent: #1a4be0;
+}

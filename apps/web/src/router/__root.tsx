@@ -60,6 +60,10 @@ export const Route = createRootRoute({
         pathname === "/"
           ? [
               {
+                children:
+                  "document.documentElement.classList.add('m-enter');setTimeout(()=>document.documentElement.classList.add('m-enter-done'),700)",
+              },
+              {
                 type: "application/ld+json",
                 children: JSON.stringify({
                   "@context": "https://schema.org",

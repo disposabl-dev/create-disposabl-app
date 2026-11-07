@@ -127,7 +127,8 @@
   align-items: center;
   justify-content: space-between;
 }
-.launch-site .trip-heading h3 {
+.launch-site .trip-heading .itinerary-title {
+  font-weight: 500;
   font-size: 18px;
   color: #202b2c;
 }
