@@ -191,6 +191,8 @@ jobs:
       EXPO_PUBLIC_CONVEX_SITE_URL: ${{ needs.web.outputs.convex_site_url }}
     steps:
       - *checkout
+      - name: Prepare Android disk space
+        run: bash .github/scripts/android-runner.sh prepare
       - *node
       - *bun
       - *cache

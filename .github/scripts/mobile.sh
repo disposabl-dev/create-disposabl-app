@@ -105,6 +105,7 @@ bun x "$EAS_CLI" update --platform android --channel "$CHANNEL" --environment "$
 jq --arg sha "$SHA" '. + {sha256: $sha, action: "update"}' <<< "$MANIFEST" > ../../dist/release/android.json
     ;;
   android-build)
+bash ../../.github/scripts/android-runner.sh check
 MANIFEST=$(manifest)
 test "$(gh api "repos/$GH_REPO/$SOURCE_PATH" --jq 'if has("head") then (if .state == "open" then .head.sha else "closed" end) else .object.sha end')" = "$SOURCE"
 if [[ "$CHANNEL" == production ]]; then
