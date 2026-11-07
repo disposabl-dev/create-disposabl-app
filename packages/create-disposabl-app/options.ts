@@ -21,6 +21,7 @@ export {
 export const requiredFeatures: readonly Feature[] = [];
 export type DisposablConfig = {
   appId?: string;
+  desktopId?: string;
   version: string;
   platforms: Platform[];
   features: Feature[];

@@ -8,6 +8,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { randomUUID } from "node:crypto";
 import { dirname, join, resolve, sep } from "node:path";
 import {
   selectFeatures,
@@ -74,6 +75,7 @@ export async function reconfigureApp(
   const oldFeatures = selectFeatures(existing.features.join(",") || "none");
   const config = {
     ...existing,
+    desktopId: existing.desktopId ?? randomUUID().replaceAll("-", ""),
     platforms:
       options.platforms === undefined
         ? oldPlatforms
@@ -105,6 +107,7 @@ export async function reconfigureApp(
     const after = join(temp, "after");
     await createApp(template, before, name, {
       ...existing,
+      desktopId: config.desktopId,
       platforms: oldPlatforms,
       features: oldFeatures,
     });

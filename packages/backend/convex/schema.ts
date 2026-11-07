@@ -11,6 +11,27 @@ import {
 } from "./connections/validator";
 
 export default defineSchema({
+  desktopUpdates: defineTable({
+    app: v.string(),
+    channel: v.string(),
+    platform: v.string(),
+    arch: v.string(),
+    version: v.string(),
+    build: v.number(),
+    filename: v.string(),
+    storageId: v.id("_storage"),
+    sha256: v.string(),
+    sha1: v.string(),
+    size: v.number(),
+  })
+    .index("by_feed_build", ["app", "channel", "platform", "arch", "build"])
+    .index("by_feed_filename", [
+      "app",
+      "channel",
+      "platform",
+      "arch",
+      "filename",
+    ]),
   files: defineTable({
     owner: v.string(),
     filename: v.string(),

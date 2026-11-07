@@ -103,7 +103,7 @@ jobs:
           key: bun-${{ github.job == 'desktop' && 'desktop-' || '' }}${{ runner.os }}-${{ runner.arch }}-${{ env.BUN_VERSION }}-${{ hashFiles('bun.lock') }}
           restore-keys: bun-${{ github.job == 'desktop' && 'desktop-' || '' }}${{ runner.os }}-${{ runner.arch }}-${{ env.BUN_VERSION }}-
       - &install
-        run: bun install --frozen-lockfile ${{ github.job == 'desktop' && '--filter desktop' || (github.job == 'android' || startsWith(github.job, 'ios-')) && '--filter @disposabl/mobile' || '' }}
+        run: bun install --frozen-lockfile ${{ github.job == 'desktop' && '--filter "*desktop*" --filter @disposabl/backend' || (github.job == 'android' || startsWith(github.job, 'ios-')) && '--filter @disposabl/mobile' || '' }}
       - name: Report build start
         run: |
           node .github/scripts/disposabl.mjs report web,api,mcp building
@@ -358,7 +358,6 @@ jobs:
     env:
       PLATFORM: ${{ matrix.platform }}
       DISPOSABL_DESKTOP_PLATFORM: ${{ matrix.platform }}
-      DISPOSABL_DESKTOP_UPDATE_URL: ${{ vars.DISPOSABL_DESKTOP_UPDATE_URL }}
       DISPOSABL_DESKTOP_UPDATE_CHANNEL: ${{ env.CHANNEL }}
       CONVEX_SITE_URL: ${{ needs.web.outputs.convex_site_url }}
       electron_config_cache: ${{ github.workspace }}/.cache/electron
@@ -378,9 +377,24 @@ jobs:
       - name: Packages
         if: matrix.platform == 'linux'
         run: command -v fakeroot && command -v rpmbuild && command -v dpkg-deb || { sudo apt-get update && sudo apt-get install -y fakeroot dpkg rpm; }
+      - name: Configure desktop update identity
+        shell: bash
+        run: |
+          id=$(node -p "require('./disposabl.json').desktopId || ''")
+          if [[ ! "$id" =~ ^[a-f0-9]{32}$ ]]; then echo 'Desktop identity missing; regenerate this app before its first installation.' >&2; exit 1; fi
+          echo "DISPOSABL_DESKTOP_ID=$id" >> "$GITHUB_ENV"
+          echo "DISPOSABL_DESKTOP_UPDATE_URL=${CONVEX_SITE_URL}/desktop/updates/$id" >> "$GITHUB_ENV"
       - name: Build
         run: bun run --cwd apps/desktop preview
       - *publish
+      - name: Publish desktop update feed
+        if: matrix.platform == 'windows' || (matrix.platform == 'macos' && env.MACOS_NOTARIZE == 'true')
+        shell: bash
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
+        run: |
+          test "$(gh api "repos/$GH_REPO/git/ref/heads/main" --jq .object.sha)" = "$SOURCE"
+          node apps/desktop/publish-update.mjs
       - name: Upload desktop release artifacts
         if: matrix.platform != 'macos'
         uses: actions/upload-artifact@v4

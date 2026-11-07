@@ -1,7 +1,11 @@
 import { defineConfig } from 'vite';
+import manifest from './package.json' with { type: 'json' };
 
 export default defineConfig({
   define: {
+    DISPOSABL_DESKTOP_ID: JSON.stringify(
+      'disposablDesktopId' in manifest ? manifest.disposablDesktopId : '',
+    ),
     DISPOSABL_UPDATE_URL: JSON.stringify(
       process.env.DISPOSABL_DESKTOP_UPDATE_URL || '',
     ),

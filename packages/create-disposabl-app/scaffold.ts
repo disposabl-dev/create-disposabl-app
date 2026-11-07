@@ -9,6 +9,7 @@ import {
 } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { basename, join } from "node:path";
+import { randomUUID } from "node:crypto";
 import {
   selectedFolders,
   selectFeatures,
@@ -25,6 +26,7 @@ export async function createApp(
 ) {
   config = {
     ...config,
+    desktopId: config.desktopId ?? randomUUID().replaceAll("-", ""),
     platforms: selectPlatforms(config.platforms.join(",")),
     features: selectFeatures(config.features.join(",") || "none"),
   };
@@ -212,9 +214,25 @@ main().catch((error) => {
     if (folders.includes("apps/desktop")) {
       const desktopPath = join(destination, "apps/desktop/package.json");
       const desktop = JSON.parse(await readFile(desktopPath, "utf8"));
+      if (!/^[a-f0-9]{32}$/.test(config.desktopId!))
+        throw new Error("Invalid desktop identity.");
+      desktop.name = `disposabl-desktop-${config.desktopId}`;
+      desktop.disposablDesktopId = config.desktopId;
       desktop.productName = name;
       desktop.description = `${name} desktop app`;
       await writeFile(desktopPath, JSON.stringify(desktop, null, 2) + "\n");
+      const lockPath = join(destination, "bun.lock");
+      let lock = await readFile(lockPath, "utf8");
+      lock = lock
+        .replace(
+          '"apps/desktop": {\n      "name": "desktop"',
+          `"apps/desktop": {\n      "name": "${desktop.name}"`,
+        )
+        .replace(
+          '"desktop": ["desktop@workspace:apps/desktop"]',
+          `"${desktop.name}": ["${desktop.name}@workspace:apps/desktop"]`,
+        );
+      await writeFile(lockPath, lock);
     }
     if (folders.includes("apps/mobile")) {
       const appConfigPath = join(destination, "apps/mobile/app.json");

@@ -186,3 +186,93 @@ test(
     }
   },
 );
+
+test(
+  "desktop identities are unique and survive reconfiguration",
+  { timeout: 30000 },
+  async () => {
+    const temp = await mkdtemp(join(tmpdir(), "desktop-identity-"));
+    try {
+      const a = join(temp, "a"),
+        b = join(temp, "b");
+      const config = {
+        version,
+        platforms: ["web", "windows", "macos"] as const,
+        features: [],
+      };
+      await createApp(template, a, "same-name", {
+        ...config,
+        platforms: [...config.platforms],
+      });
+      await createApp(template, b, "same-name", {
+        ...config,
+        platforms: [...config.platforms],
+      });
+      const first = JSON.parse(await read(a, "disposabl.json"));
+      const second = JSON.parse(await read(b, "disposabl.json"));
+      const desktop = JSON.parse(await read(a, "apps/desktop/package.json"));
+      assert.match(first.desktopId, /^[a-f0-9]{32}$/);
+      assert.notEqual(first.desktopId, second.desktopId);
+      assert.equal(desktop.disposablDesktopId, first.desktopId);
+      assert.notEqual(
+        desktop.name,
+        JSON.parse(await read(b, "apps/desktop/package.json")).name,
+      );
+      assert.match(
+        await read(a, "bun.lock"),
+        new RegExp(`${desktop.name}@workspace:apps/desktop`),
+      );
+      await reconfigureApp(template, a, version, {
+        features: "authentication",
+      });
+      assert.equal(
+        JSON.parse(await read(a, "disposabl.json")).desktopId,
+        first.desktopId,
+      );
+      assert.equal(
+        JSON.parse(await read(a, "apps/desktop/package.json")).name,
+        desktop.name,
+      );
+      execFileSync(
+        "bun",
+        ["install", "--frozen-lockfile", "--filter", desktop.name],
+        { cwd: a, stdio: "pipe", timeout: 30000 },
+      );
+    } finally {
+      await rm(temp, { recursive: true, force: true });
+    }
+  },
+);
+
+test(
+  "enabling desktop later uses the original app identity",
+  { timeout: 30000 },
+  async () => {
+    const temp = await mkdtemp(join(tmpdir(), "desktop-later-"));
+    const app = join(temp, "app");
+    try {
+      await createApp(template, app, "later", {
+        version,
+        platforms: ["web"],
+        features: [],
+      });
+      const id = JSON.parse(await read(app, "disposabl.json")).desktopId;
+      await reconfigureApp(template, app, version, {
+        platforms: "web,windows",
+      });
+      const desktop = JSON.parse(await read(app, "apps/desktop/package.json"));
+      assert.equal(desktop.disposablDesktopId, id);
+      assert.match(
+        await read(app, "bun.lock"),
+        new RegExp(`${desktop.name}@workspace:apps/desktop`),
+      );
+      execFileSync(
+        "bun",
+        ["install", "--frozen-lockfile", "--filter", desktop.name],
+        { cwd: app, stdio: "pipe", timeout: 30000 },
+      );
+    } finally {
+      await rm(temp, { recursive: true, force: true });
+    }
+  },
+);

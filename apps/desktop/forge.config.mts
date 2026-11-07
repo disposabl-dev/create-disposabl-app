@@ -10,9 +10,7 @@ import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
 
-const executableName = manifest.productName
-  .toLowerCase()
-  .replace(/[^a-z0-9-]/g, '-');
+const executableName = manifest.name.toLowerCase().replace(/[^a-z0-9-]/g, '-');
 
 // specTemplate is supported by electron-installer-redhat but absent from Forge's types.
 const rpmOptions = {
@@ -36,7 +34,11 @@ const config: ForgeConfig = {
     asar: true,
     executableName,
     icon: 'src/assets/icon',
-    appBundleId: process.env.MACOS_BUNDLE_ID || 'dev.disposabl.starter.desktop',
+    appBundleId:
+      process.env.MACOS_BUNDLE_ID ||
+      ('disposablDesktopId' in manifest
+        ? `dev.disposabl.app.d${manifest.disposablDesktopId}`
+        : 'dev.disposabl.starter.desktop'),
     ...(process.platform === 'darwin'
       ? {
           osxSign: signedRelease

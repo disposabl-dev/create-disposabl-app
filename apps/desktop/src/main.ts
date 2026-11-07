@@ -3,6 +3,12 @@ import { createUpdateController, feedUrl, type UpdateState } from './updates';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 
+if (DISPOSABL_DESKTOP_ID)
+  app.setPath(
+    'userData',
+    path.join(app.getPath('appData'), `disposabl-${DISPOSABL_DESKTOP_ID}`),
+  );
+
 if (started) app.quit();
 
 async function createWindow() {
