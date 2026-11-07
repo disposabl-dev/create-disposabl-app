@@ -92,10 +92,12 @@ function Routes({ isAuthenticated = false }: { isAuthenticated?: boolean }) {
 
 export function AuthLayout() {
   const colors = useTheme();
+  const dark = useResolvedColorScheme() === "dark";
   if (!authenticationEnabled) return <Redirect href="/" />;
   return (
     <Stack
       screenOptions={{
+        statusBarStyle: dark ? "light" : "dark",
         headerTintColor: colors.foreground,
         headerStyle: { backgroundColor: colors.background },
         contentStyle: { backgroundColor: colors.background },
@@ -155,9 +157,11 @@ function SessionLayout() {
 
 function AccountRoutes() {
   const colors = useTheme();
+  const dark = useResolvedColorScheme() === "dark";
   return (
     <Stack
       screenOptions={{
+        statusBarStyle: dark ? "light" : "dark",
         headerTintColor: colors.foreground,
         headerStyle: { backgroundColor: colors.background },
         contentStyle: { backgroundColor: colors.background },
