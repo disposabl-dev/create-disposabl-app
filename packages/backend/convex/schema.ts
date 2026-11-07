@@ -41,7 +41,14 @@ export default defineSchema({
   users: defineTable({
     profile: v.optional(profile),
     connectionState: v.optional(connectionState),
-  }),
+    browserHandoff: v.optional(
+      v.object({
+        hash: v.string(),
+        sessionId: v.string(),
+        expiresAt: v.number(),
+      }),
+    ),
+  }).index("by_browserHandoffHash", ["browserHandoff.hash"]),
   connections: defineTable({
     userId: v.string(),
     provider: tokenProvider,

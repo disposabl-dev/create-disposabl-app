@@ -85,6 +85,13 @@ export function registerPageRoutes(http: HttpRouter) {
             ? "no-cache"
             : "public, max-age=3600",
         "X-Content-Type-Options": "nosniff",
+        ...(path.replace(/\/$/, "") === "/mobile-login"
+          ? {
+              "Content-Security-Policy": "frame-ancestors 'none'",
+              "X-Frame-Options": "DENY",
+              "Cache-Control": "no-store",
+            }
+          : {}),
         ...(page?.authenticated || isAccountPage(path)
           ? { "X-Robots-Tag": "noindex" }
           : {}),

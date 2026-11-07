@@ -1,3 +1,4 @@
+import { mobileAuthReturnUrl } from "../../../../../packages/disposabl-kit/lib/mobile-auth";
 import { AutumnConnection } from "../../components/connections/autumn-connection";
 import { PosthogConnection } from "../../components/connections/posthog-connection";
 import { useAuthToken } from "@convex-dev/auth/react";
@@ -42,6 +43,7 @@ export function Connections({ onContinue }: { onContinue?: () => void } = {}) {
     analyticsRequired,
     paymentsRequired,
     fromCli,
+    fromMobile,
     initialized: setupInitialized,
   } = setup;
   const finish = () => {
@@ -198,15 +200,7 @@ export function Connections({ onContinue }: { onContinue?: () => void } = {}) {
                       className="min-h-11"
                       disabled={busy || !status.available[id]}
                       onClick={() =>
-                        id === "expo"
-                          ? showExpo
-                            ? setShowExpo(false)
-                            : window.open(
-                                `/dashboard/connections?connect=expo${fromCli ? "&origin=cli" : ""}${mobile ? "&mobile=1" : ""}${analyticsRequired || paymentsRequired ? `&features=${[...(analyticsRequired ? ["analytics"] : []), ...(paymentsRequired ? ["payments"] : [])].join(",")}` : ""}`,
-                                "_blank",
-                                "noopener,noreferrer",
-                              )
-                          : connect(id)
+                        id === "expo" ? setShowExpo(!showExpo) : connect(id)
                       }
                     >
                       {id === "expo" && showExpo ? "Cancel" : `Connect ${name}`}
@@ -247,10 +241,20 @@ export function Connections({ onContinue }: { onContinue?: () => void } = {}) {
           {ready
             ? fromCli
               ? "Your accounts are connected. Return to your terminal to finish setup."
-              : "Your accounts are connected. Continue to your dashboard."
+              : fromMobile
+                ? "Your accounts are connected. Return to the app to start creating."
+                : "Your accounts are connected. Continue to your dashboard."
             : "Complete the required connections to continue."}
         </p>
-        {ready && onContinue && !fromCli ? (
+        {ready && fromMobile ? (
+          <a
+            href={mobileAuthReturnUrl.replace("://login", "://connections")}
+            onClick={finish}
+            className="inline-flex min-h-11 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground"
+          >
+            Return to Disposabl <ArrowRight className="ml-2 size-4" />
+          </a>
+        ) : ready && onContinue && !fromCli ? (
           <Button className="min-h-11" onClick={finish}>
             Continue <ArrowRight className="ml-2 size-4" />
           </Button>

@@ -1,13 +1,13 @@
 export { sessionId } from "../../../../../packages/disposabl-kit/lib/auth-session";
 
 const completedKey = "disposabl.connectionsSession";
-const cliKey = "disposabl.cliSetup";
+const originKey = "disposabl.setupOrigin";
 export function connectionsSeen(storage: Storage, session: string | null) {
   return Boolean(session && storage.getItem(completedKey) === session);
 }
 export function completeConnections(storage: Storage, session: string | null) {
   if (session) storage.setItem(completedKey, session);
-  storage.removeItem(cliKey);
+  storage.removeItem(originKey);
   storage.removeItem("disposabl.setupAnalytics");
   storage.removeItem("disposabl.setupMobile");
   storage.removeItem("disposabl.setupPayments");
@@ -17,7 +17,12 @@ export function completeConnections(storage: Storage, session: string | null) {
 export function setupContext(storage: Storage, url: URL) {
   const query = url.searchParams;
   if (["origin", "features", "mobile"].some((key) => query.has(key))) {
-    storage.setItem(cliKey, query.get("origin") === "cli" ? "1" : "0");
+    storage.setItem(
+      originKey,
+      ["cli", "mobile"].includes(query.get("origin") ?? "")
+        ? query.get("origin")!
+        : "web",
+    );
     storage.setItem(
       "disposabl.setupAnalytics",
       query.get("features")?.split(",").includes("analytics") ? "1" : "0",
@@ -32,7 +37,8 @@ export function setupContext(storage: Storage, url: URL) {
     );
   }
   return {
-    fromCli: storage.getItem(cliKey) === "1",
+    fromCli: storage.getItem(originKey) === "cli",
+    fromMobile: storage.getItem(originKey) === "mobile",
     payments: storage.getItem("disposabl.setupPayments") === "1",
     analytics: storage.getItem("disposabl.setupAnalytics") === "1",
     mobile: storage.getItem("disposabl.setupMobile") === "1",

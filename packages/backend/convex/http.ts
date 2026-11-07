@@ -5,15 +5,10 @@ import {
 import { download } from "./downloads/http";
 import { token, report } from "./github/actions/http";
 import createHttpRouter from "@disposabl/disposabl-kit/server/http";
-import { posthogMetadata, connectionCallback } from "./connections/http";
+import { posthogMetadata } from "./connections/http";
 import { agentApiPolicy } from "./agent/api_policy";
 
 const http = createHttpRouter(agentApiPolicy);
-http.route({
-  path: "/dashboard/connections",
-  method: "GET",
-  handler: connectionCallback,
-});
 http.route({ path: "/telemetry/page", method: "POST", handler: telemetryPage });
 http.route({
   path: "/telemetry/page",

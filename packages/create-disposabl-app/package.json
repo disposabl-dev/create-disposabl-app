@@ -42,12 +42,12 @@
     "@eslint/js": "10.0.1",
     "@semantic-release/exec": "7.1.0",
     "@types/bun": "1.4.4",
-    "conventional-changelog-conventionalcommits": "10.4.1",
     "eslint": "10.14.0",
     "jiti": "2.7.0",
     "semantic-release": "25.0.9",
     "typescript": "~6.0.3",
-    "typescript-eslint": "8.72.1"
+    "typescript-eslint": "8.72.1",
+    "conventional-changelog-conventionalcommits": "9.3.1"
   },
   "release": {
     "branches": [
@@ -57,7 +57,6 @@
       [
         "@semantic-release/commit-analyzer",
         {
-          "preset": "conventionalcommits",
           "releaseRules": [
             {
               "breaking": true,
@@ -70,7 +69,8 @@
             {
               "release": "patch"
             }
-          ]
+          ],
+          "preset": "conventionalcommits"
         }
       ],
       [

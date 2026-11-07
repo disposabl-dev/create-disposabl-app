@@ -30,7 +30,6 @@ export const status = query({
 export const start = action({
   args: {
     provider: oauthProvider,
-    mobile: v.optional(v.boolean()),
     install: v.optional(v.boolean()),
     region: v.optional(posthogRegion),
   },

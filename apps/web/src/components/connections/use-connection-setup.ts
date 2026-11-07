@@ -19,6 +19,7 @@ const isProvider = (value: string | null): value is Provider =>
 export function useConnectionSetup() {
   const { isAuthenticated } = useConvexAuth();
   const [fromCli, setFromCli] = useState(false);
+  const [fromMobile, setFromMobile] = useState(false);
   const [analyticsRequired, setAnalyticsRequired] = useState(false);
   const [paymentsRequired, setPaymentsRequired] = useState(false);
   const [initialized, setInitialized] = useState(false);
@@ -61,6 +62,7 @@ export function useConnectionSetup() {
     const url = new URL(window.location.href);
     const context = setupContext(sessionStorage, url);
     setFromCli(context.fromCli);
+    setFromMobile(context.fromMobile);
     setAnalyticsRequired(context.analytics);
     setPaymentsRequired(context.payments);
     setMobile(context.mobile);
@@ -264,6 +266,7 @@ export function useConnectionSetup() {
     analyticsRequired,
     paymentsRequired,
     fromCli,
+    fromMobile,
     initialized,
   };
 }

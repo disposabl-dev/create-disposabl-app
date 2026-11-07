@@ -23,14 +23,13 @@ export const start = internalAction({
   args: {
     ...identityFields,
     provider: oauthProvider,
-    mobile: v.optional(v.boolean()),
     install: v.optional(v.boolean()),
     region: v.optional(posthogRegion),
   },
   returns: v.string(),
   handler: async (
     ctx,
-    { userId, provider, install, region = "us", mobile = false },
+    { userId, provider, install, region = "us" },
   ): Promise<string> => {
     const status = await ctx.runQuery(internal.connections.internal.status, {
       userId,
@@ -39,7 +38,7 @@ export const start = internalAction({
       throw new ConvexError(
         `${provider === "github" ? "GitHub" : provider === "posthog" ? "PostHog" : "Convex"} connections are not configured yet.`,
       );
-    const state = `${mobile ? "mobile_" : ""}${randomBytes(32).toString("base64url")}`;
+    const state = randomBytes(32).toString("base64url");
     const verifier = randomBytes(32).toString("base64url");
     await ctx.runMutation(internal.connections.internal.begin, {
       userId,
@@ -184,7 +183,6 @@ export const resumeGithubInstall = internalAction({
     return ctx.runAction(internal.connections.actions.oauth.start, {
       userId,
       provider: "github",
-      mobile: state.startsWith("mobile_"),
     });
   },
 });

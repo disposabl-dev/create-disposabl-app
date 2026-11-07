@@ -52,6 +52,7 @@ describe("connection presentation", () => {
       );
     const expected = {
       fromCli: true,
+      fromMobile: false,
       analytics: true,
       mobile: true,
       payments: true,
@@ -65,6 +66,7 @@ describe("connection presentation", () => {
     completeConnections(store, "session-1");
     assert.deepEqual(read(), {
       fromCli: false,
+      fromMobile: false,
       analytics: false,
       payments: false,
       mobile: false,
@@ -82,10 +84,34 @@ describe("connection presentation", () => {
       setupContext(store, new URL("https://example.com?mobile=1")),
       {
         fromCli: false,
+        fromMobile: false,
         analytics: false,
         payments: false,
         mobile: true,
       },
     );
   });
+});
+
+test("mobile handoff origin survives provider callbacks and is cleared on completion", () => {
+  const store = storage();
+  setupContext(
+    store,
+    new URL("https://example.com/dashboard/connections?origin=mobile"),
+  );
+  assert.equal(
+    setupContext(
+      store,
+      new URL(
+        "https://example.com/dashboard/connections?code=fixture&state=fixture",
+      ),
+    ).fromMobile,
+    true,
+  );
+  completeConnections(store, "session");
+  assert.equal(
+    setupContext(store, new URL("https://example.com/dashboard/connections"))
+      .fromMobile,
+    false,
+  );
 });
