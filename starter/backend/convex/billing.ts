@@ -1,4 +1,5 @@
 export {
+  setup,
   snapshot,
   checkout,
   portal,

@@ -1,8 +1,9 @@
 import type { Auth } from "convex/server";
-import { getSessionUserId } from "./lib/functions";
+import { getSessionUserId, internalAction } from "./lib/functions";
 import { v } from "convex/values";
 import { action } from "../../backend/convex/_generated/server";
 import { paymentsEnabled } from "../features";
+import { setupBilling } from "./billing-setup";
 import {
   balanceFromCustomer,
   monthlyPlanFromCustomer,
@@ -10,6 +11,16 @@ import {
   billingRequest,
   purchaseRequest,
 } from "./billing";
+
+export const setup = internalAction({
+  args: {},
+  returns: v.object({
+    enabled: v.boolean(),
+    created: v.array(v.string()),
+    preserved: v.array(v.string()),
+  }),
+  handler: async () => setupBilling(paymentsEnabled, process.env),
+});
 
 async function context(ctx: { auth: Auth }) {
   return billingContext(paymentsEnabled, process.env, () =>

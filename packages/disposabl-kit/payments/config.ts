@@ -6,7 +6,7 @@ export type Pricing = {
   topup: { planId: string; price: number };
 };
 
-/** Editable starter example. Apply matching changes to Autumn before accepting purchases. */
+/** Setup creates missing entries. Apply matching changes to existing Autumn plans manually. */
 export const pricing: Pricing = {
   currency: "USD",
   creditsPerDollar: 100,
