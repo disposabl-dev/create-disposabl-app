@@ -1,0 +1,250 @@
+/* Front-view proportions follow Apple's iPhone 18 Pro Max specifications. */
+.phone-preview {
+  width: min(100%, 360px);
+  aspect-ratio: 78 / 163.4;
+  padding: 7px;
+  margin-inline: auto;
+  position: relative;
+  border: 2px solid #777b7f;
+  border-radius: clamp(38px, 4vw, 52px);
+  background: #17191c;
+  box-shadow:
+    0 0 0 1px #25282c,
+    inset 0 0 0 2px #41454b,
+    0 24px 44px #14212724;
+  --phone-surface: #fbfaf7;
+}
+.phone-game {
+  --phone-surface: #f5d765;
+}
+.phone-preview::before,
+.phone-preview::after {
+  content: "";
+  position: absolute;
+  width: 3px;
+  background: #62666b;
+  border-radius: 2px;
+}
+.phone-preview::before {
+  left: -5px;
+  top: 110px;
+  height: 34px;
+  box-shadow: 0 48px #62666b;
+}
+.phone-preview::after {
+  right: -5px;
+  top: 156px;
+  height: 60px;
+}
+.phone-glass {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  border-radius: inherit;
+  overflow: hidden;
+  background: var(--phone-surface);
+  color: #242522;
+}
+.phone-status {
+  display: grid;
+  grid-template-columns: 1fr 80px 1fr;
+  align-items: center;
+  gap: 8px;
+  height: 52px;
+  padding: 8px 20px 0;
+  flex: none;
+  font-size: 16px;
+  font-weight: 600;
+}
+.phone-status > div {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 3px;
+}
+.phone-island {
+  display: block;
+  height: 24px;
+  border-radius: 20px;
+  background: #101114;
+}
+.phone-app-screen {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #a4ada4 transparent;
+}
+.phone-home {
+  display: grid;
+  place-items: center;
+  flex: none;
+  height: 22px;
+}
+.phone-home i {
+  width: 100px;
+  height: 4px;
+  border-radius: 4px;
+  background: #17191c;
+}
+.example-planner .showcase-window,
+.example-game .showcase-window {
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  overflow: visible;
+}
+.example-planner .playground-demo,
+.example-game .playground-demo {
+  padding: 40px 32px;
+}
+.phone-preview .planner-main {
+  padding: 16px 22px 24px;
+}
+.phone-preview .planner-main header {
+  color: #344d3b;
+  align-items: center;
+}
+.phone-preview .planner-main header strong {
+  font-size: 20px;
+  font-weight: 600;
+}
+.phone-preview .planner-main h4 {
+  font-size: 34px;
+  margin-top: 24px;
+}
+.phone-preview .planner-main > p {
+  font-size: 16px;
+  margin: 8px 0 20px;
+}
+.phone-preview .planner-progress {
+  padding: 16px;
+  background: #e8eee4;
+  border-radius: 14px;
+  color: #405447;
+}
+.phone-preview .planner-progress > div {
+  background: #ced9cb;
+  margin-top: 12px;
+}
+.phone-preview .planner-progress i {
+  background: #52775a;
+}
+.phone-preview .planner-tasks button {
+  padding-block: 16px;
+  min-height: 56px;
+}
+.phone-preview .planner-add {
+  margin-top: 20px;
+  border-radius: 12px;
+}
+.phone-preview .planner-add button {
+  min-width: 44px;
+  min-height: 48px;
+  justify-content: center;
+}
+.phone-preview .planner-schedule {
+  padding: 16px;
+  background: #edf0e8;
+  border-radius: 14px;
+  margin-top: 24px;
+}
+.phone-preview .planner-schedule div {
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 16px;
+}
+.phone-preview .special-game {
+  min-height: 470px;
+  height: 100%;
+  padding: 16px 20px;
+}
+.phone-preview .special-game-header {
+  padding-bottom: 16px;
+}
+.phone-preview .special-game-intro {
+  display: block;
+  padding: 20px 0;
+}
+.phone-preview .special-game h4 {
+  font-size: 30px;
+  margin: 0 0 14px;
+}
+.phone-preview .special-game .game-score {
+  flex-direction: row;
+  justify-content: space-between;
+  font-size: 16px;
+}
+.phone-preview .special-game .game-board {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(4, minmax(44px, 1fr));
+  gap: 8px;
+}
+.phone-preview .special-game .game-board button {
+  padding: 6px;
+  min-height: 44px;
+}
+.phone-preview .special-game .game-board button > span {
+  width: 34px;
+  height: 34px;
+  font-size: 24px;
+}
+.phone-preview .special-game-footer {
+  padding-top: 16px;
+  justify-content: flex-end;
+}
+.phone-preview .special-game-footer > span {
+  display: none;
+}
+.phone-preview .special-game .game-reset {
+  min-height: 44px;
+}
+@media (max-width: 760px) {
+  .example-planner .playground-demo,
+  .example-game .playground-demo {
+    padding: 24px 14px;
+  }
+}
+@media (max-width: 380px) {
+  .phone-status {
+    padding-inline: 12px;
+    grid-template-columns: 1fr 72px 1fr;
+    gap: 4px;
+  }
+  .phone-status > div {
+    gap: 1px;
+  }
+  .phone-preview .planner-main {
+    padding-inline: 14px;
+  }
+  .phone-preview .planner-main h4 {
+    font-size: 28px;
+    margin-top: 16px;
+  }
+  .phone-preview .special-game {
+    padding-inline: 14px;
+  }
+  .phone-preview .special-game h4 {
+    font-size: 28px;
+  }
+}
+@media (max-width: 380px) {
+  .phone-preview .special-game {
+    min-height: 0;
+    padding-block: 12px;
+  }
+  .phone-preview .special-game-header {
+    padding-bottom: 12px;
+  }
+  .phone-preview .special-game-intro {
+    padding: 12px 0;
+  }
+  .phone-preview .special-game h4 {
+    font-size: 26px;
+    margin-bottom: 10px;
+  }
+  .phone-preview .special-game-footer {
+    padding-top: 8px;
+  }
+}

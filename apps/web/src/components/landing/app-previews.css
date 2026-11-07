@@ -139,39 +139,7 @@
   color: white;
 }
 .preview-planner {
-  display: grid;
-  grid-template-columns: 155px 1fr;
   background: #fbfaf7;
-}
-.planner-nav {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  padding: 26px 14px;
-  background: #e9ece5;
-  color: #566158;
-}
-.planner-nav strong {
-  margin: 0 5px 22px;
-  color: #293c30;
-  font-size: 19px;
-}
-.planner-nav strong span {
-  color: #67856c;
-}
-.planner-nav > div {
-  padding: 9px 10px;
-  border-radius: 7px;
-}
-.planner-nav-active {
-  background: #d7e2d4;
-  color: #294b35;
-}
-.planner-nav footer {
-  margin: auto 8px 0;
-  font-family: Georgia, serif;
-  font-size: 18px;
-  line-height: 1.3;
 }
 .planner-main {
   min-width: 0;
@@ -419,12 +387,6 @@
   }
   .booking-picker {
     padding: 16px;
-  }
-  .preview-planner {
-    grid-template-columns: 1fr;
-  }
-  .planner-nav {
-    display: none;
   }
   .planner-main {
     padding: 22px;

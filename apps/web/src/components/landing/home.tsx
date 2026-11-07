@@ -11,6 +11,7 @@ import { MarketingShell } from "./shell";
 import { Pricing, Questions } from "./sections";
 import { BrandIcon } from "./brand-icon";
 import { StartActions } from "./start-actions";
+import { StoreDownloads } from "./store-downloads";
 import { HeroPreview } from "./hero-preview";
 import { AgentWorkspace } from "./agent-workspace";
 import { AppPlayground, appIdeas } from "./playground";
@@ -120,9 +121,12 @@ export function Home() {
           Paste this into your coding agent to set up your app on your computer.
         </p>
         <AgentOnboarding key={idea} idea={idea} platforms={selected} />
-        <a className="dialog-help" href="/build">
-          New to coding agents? See how to start <ArrowUpRight size={18} />
-        </a>
+        <div className="dialog-bottom">
+          <a className="dialog-help" href="/build">
+            New to coding agents? See how to start <ArrowUpRight size={18} />
+          </a>
+          <StoreDownloads />
+        </div>
       </dialog>
     </MarketingShell>
   );

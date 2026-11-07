@@ -850,3 +850,86 @@ test(
     ).toHaveAttribute("aria-pressed", "false");
   },
 );
+
+test(
+  "phone examples and dialog store badges work at mobile and desktop sizes",
+  { platforms: ["web"], tags: ["landing"] },
+  async ({ app, browser, screen }) => {
+    for (const width of [320, 390, 1440]) {
+      await browser.setViewport({ width, height: 900 });
+      await app.open("/");
+      await expect(
+        screen.getByRole("group", "Daily planner on iPhone 18 Pro Max"),
+      ).toBeVisible();
+      await expect(
+        browser.locator(".phone-planner .phone-app-screen .planner-app"),
+      ).toBeVisible();
+      await screen.getByRole("button", "Finish the thing I started").tap();
+      await expect(browser.locator(".planner-progress")).toContainText(
+        "2 of 3 done",
+      );
+      await browser
+        .locator('[aria-label="Add a demo task"]')
+        .fill("Pack a bag");
+      await screen.getByRole("button", "Add task", { exact: true }).tap();
+      await expect(screen.getByRole("button", "Pack a bag")).toBeVisible();
+      await screen.getByRole("button", "Games", { exact: true }).tap();
+      await expect(
+        screen.getByRole("group", "Memory game on iPhone 18 Pro Max"),
+      ).toBeVisible();
+      await expect(
+        browser.locator(".phone-game .phone-app-screen .game-app"),
+      ).toBeVisible();
+      await screen.getByRole("button", "Card 1, face down").tap();
+      await screen.getByRole("button", "Card 6, face down").tap();
+      await expect(browser.locator(".game-score")).toContainText("1 / 6 pairs");
+      await screen.getByRole("button", "Play again").tap();
+      await expect(browser.locator(".game-score")).toContainText("0 / 6 pairs");
+      await browser.locator(".maker-hero .setup-help").tap();
+      await expect(browser.locator(".start-dialog .store-button")).toHaveCount(
+        2,
+      );
+      for (const index of [0, 1]) {
+        await expect(
+          browser.locator(".start-dialog .store-button").nth(index),
+        ).toHaveAttribute("aria-disabled", "true");
+        await browser.evaluate((i) => {
+          document
+            .querySelectorAll<HTMLButtonElement>(".start-dialog .store-button")
+            [i]!.focus();
+          return true;
+        }, index);
+        await expect(
+          browser.locator(".start-dialog .store-tooltip").nth(index),
+        ).toBeVisible();
+      }
+      const layout = await browser.evaluate(() => {
+        const dialog = document
+          .querySelector(".start-dialog")!
+          .getBoundingClientRect();
+        const images = [
+          ...document.querySelectorAll(".start-dialog .store-button img"),
+        ].map((el) => el.getBoundingClientRect());
+        return {
+          viewport: innerWidth,
+          scroll: document.documentElement.scrollWidth,
+          dialogLeft: dialog.left,
+          dialogRight: dialog.right,
+          heights: images.map((r) => r.height),
+          inside: images.every(
+            (r) => r.left >= dialog.left && r.right <= dialog.right,
+          ),
+        };
+      });
+      expect(layout.scroll).toBe(layout.viewport);
+      expect(
+        layout.dialogLeft >= 0 && layout.dialogRight <= width && layout.inside,
+      ).toBe(true);
+      expect(layout.heights).toEqual([
+        width <= 600 ? 48 : 56,
+        width <= 600 ? 48 : 56,
+      ]);
+      await browser.keyboard.press("Escape");
+    }
+  },
+);

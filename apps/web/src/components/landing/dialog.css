@@ -2,7 +2,7 @@
   position: fixed;
   inset: 0;
   margin: auto;
-  width: min(660px, calc(100% - 32px));
+  width: min(900px, calc(100% - 32px));
   max-height: calc(100dvh - 32px);
   overflow: auto;
   overscroll-behavior: contain;
@@ -123,7 +123,6 @@
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  margin-top: 28px;
   font-size: 16px;
   text-decoration: underline;
   text-underline-offset: 4px;
@@ -177,5 +176,34 @@
   }
   .start-dialog .agent-logo-stack {
     gap: 6px;
+  }
+}
+
+.dialog-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin-top: 28px;
+}
+.dialog-bottom .dialog-help {
+  max-width: 260px;
+}
+.dialog-bottom .dialog-help svg {
+  flex: none;
+}
+.dialog-bottom .store-buttons {
+  flex: none;
+}
+@media (max-width: 800px) {
+  .dialog-bottom {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .dialog-bottom .dialog-help {
+    max-width: none;
+  }
+  .dialog-bottom .store-buttons {
+    max-width: 100%;
   }
 }

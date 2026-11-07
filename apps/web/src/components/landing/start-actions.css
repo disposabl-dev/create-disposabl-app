@@ -81,7 +81,7 @@
   display: flex;
   align-items: center;
   width: auto;
-  height: 48px;
+  height: 64px;
   padding: 0;
   border: 0;
   border-radius: 6px;
@@ -89,7 +89,7 @@
 }
 .store-button img {
   display: block;
-  height: 40px;
+  height: 56px;
   width: auto;
 }
 .footer-invitation .store-buttons {
@@ -196,5 +196,30 @@
   }
   .command-start > svg:first-child {
     display: none;
+  }
+}
+
+@media (max-width: 600px) {
+  .store-button {
+    height: 56px;
+  }
+  .store-button img {
+    height: 48px;
+  }
+  .store-buttons {
+    gap: 12px;
+  }
+}
+@media (max-width: 380px) {
+  .store-buttons {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+}
+@media (max-width: 1000px) {
+  .footer-invitation {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }

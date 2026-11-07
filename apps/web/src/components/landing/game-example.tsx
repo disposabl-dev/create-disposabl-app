@@ -10,6 +10,7 @@ import {
   Gamepad2,
 } from "lucide-react";
 import "./specialist-previews.css";
+import { PhonePreview } from "./phone-preview";
 
 const symbols = {
   star: Star,
@@ -58,67 +59,69 @@ export function GameDemo({ disabled }: { disabled: boolean }) {
     setOpen([...open, index]);
   }
   return (
-    <div className="special-game game-app">
-      <header className="special-game-header">
-        <div className="special-game-logo">
-          <Gamepad2 size={20} /> flip club
+    <PhonePreview app="Memory game" variant="game">
+      <div className="special-game game-app">
+        <header className="special-game-header">
+          <div className="special-game-logo">
+            <Gamepad2 size={20} /> flip club
+          </div>
+        </header>
+        <div className="special-game-intro">
+          <div>
+            <h4>
+              {matched.length === cards.length
+                ? "Nicely matched!"
+                : "Find your pairs."}
+            </h4>
+          </div>
+          <div className="game-score" aria-live="polite">
+            <span>{matched.length / 2} / 6 pairs</span>
+            <span>{moves} moves</span>
+          </div>
         </div>
-      </header>
-      <div className="special-game-intro">
-        <div>
-          <h4>
-            {matched.length === cards.length
-              ? "Nicely matched!"
-              : "Find your pairs."}
-          </h4>
-        </div>
-        <div className="game-score" aria-live="polite">
-          <span>{matched.length / 2} / 6 pairs</span>
-          <span>{moves} moves</span>
-        </div>
-      </div>
-      <div
-        className="game-board"
-        role="group"
-        aria-label="Memory matching game"
-      >
-        {cards.map((name, index) => {
-          const Icon = symbols[name];
-          const faceUp = open.includes(index) || matched.includes(index);
-          return (
-            <button
-              type="button"
-              key={index}
-              disabled={disabled || matched.includes(index)}
-              className={faceUp ? "is-revealed" : ""}
-              aria-label={`Card ${index + 1}, ${faceUp ? name : "face down"}`}
-              aria-pressed={faceUp}
-              onClick={() => reveal(index)}
-            >
-              {faceUp ? (
-                <Icon size={30} strokeWidth={2.2} />
-              ) : (
-                <span aria-hidden="true">✦</span>
-              )}
-            </button>
-          );
-        })}
-      </div>
-      <footer className="special-game-footer">
-        <span>Take your time. Enjoy the game.</span>
-        <button
-          className="game-reset"
-          disabled={disabled}
-          onClick={() => {
-            setOpen([]);
-            setMatched([]);
-            setMoves(0);
-          }}
+        <div
+          className="game-board"
+          role="group"
+          aria-label="Memory matching game"
         >
-          <RotateCcw size={18} />
-          Play again
-        </button>
-      </footer>
-    </div>
+          {cards.map((name, index) => {
+            const Icon = symbols[name];
+            const faceUp = open.includes(index) || matched.includes(index);
+            return (
+              <button
+                type="button"
+                key={index}
+                disabled={disabled || matched.includes(index)}
+                className={faceUp ? "is-revealed" : ""}
+                aria-label={`Card ${index + 1}, ${faceUp ? name : "face down"}`}
+                aria-pressed={faceUp}
+                onClick={() => reveal(index)}
+              >
+                {faceUp ? (
+                  <Icon size={30} strokeWidth={2.2} />
+                ) : (
+                  <span aria-hidden="true">✦</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+        <footer className="special-game-footer">
+          <span>Take your time. Enjoy the game.</span>
+          <button
+            className="game-reset"
+            disabled={disabled}
+            onClick={() => {
+              setOpen([]);
+              setMatched([]);
+              setMoves(0);
+            }}
+          >
+            <RotateCcw size={18} />
+            Play again
+          </button>
+        </footer>
+      </div>
+    </PhonePreview>
   );
 }
