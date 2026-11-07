@@ -148,7 +148,7 @@ function PlatformStates({ states }: { states: States }) {
     try {
       await Linking.openURL(url);
     } catch {
-      setError("Could not open this release. Please try again.");
+      setError("Could not open this link. Please try again.");
     }
   }
   const styles = useStyles();
@@ -171,6 +171,23 @@ function PlatformStates({ states }: { states: States }) {
                   title={`Open ${name}`}
                   onPress={() => void open(state.url!)}
                 />
+              )}
+            {state.latest &&
+              /^https:\/\/github\.com\/[^/]+\/[^/]+\/actions\/runs\/\d+(?:\/attempts\/\d+)?$/.test(
+                state.latest.run.url,
+              ) && (
+                <Pressable
+                  accessibilityRole="link"
+                  accessibilityLabel={`View ${name} build logs`}
+                  onPress={() => void open(state.latest!.run.url)}
+                  style={{ minHeight: 44, justifyContent: "center" }}
+                >
+                  <Text
+                    style={[styles.text, { textDecorationLine: "underline" }]}
+                  >
+                    View build logs
+                  </Text>
+                </Pressable>
               )}
           </View>
         ))}

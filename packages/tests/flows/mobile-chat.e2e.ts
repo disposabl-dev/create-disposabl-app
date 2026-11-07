@@ -131,7 +131,18 @@ test(
             appId: ids[0],
             reference: "preview/chat-proof",
             stage: "building",
-            releases: {},
+            releases: {
+              web: {
+                status: "failed",
+                run: {
+                  id: 42422781201,
+                  attempt: 1,
+                  number: 1,
+                  commitSha: "0".repeat(40),
+                  url: "https://github.com/disposabl-dev/create-disposabl-app/actions/runs/42422781201",
+                },
+              },
+            },
             updatedAt: Date.now(),
           },
         ]),
@@ -333,6 +344,13 @@ test(
           screen.getByRole("button", "Send message", { exact: true }),
         ).toBeVisible();
         await app.screenshot("chat-completed");
+        await screen.getByRole("button", "Chat options", { exact: true }).tap();
+        await screen.getByText("App settings", { exact: true }).tap();
+        await screen.scrollUntilVisible(
+          screen.getByText("View build logs", { exact: true }),
+        );
+        await app.screenshot("chat-build-logs");
+        await screen.getByRole("button", "Navigate up", { exact: true }).tap();
         await screen.getByRole("button", "Back", { exact: true }).tap();
         await screen
           .getByRole("button", "Open Chat unconfirmed", { exact: true })
