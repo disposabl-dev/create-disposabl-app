@@ -158,6 +158,7 @@ test(
         );
       const activeId = threads[0]._id as string;
       const failedId = threads[1]._id as string;
+      const markdown = `${"A useful markdown paragraph with **bold** and a [link](https://example.com).\n\n".repeat(24)}\n\nEnd of response.`;
       const claims = new Set<string>();
       try {
         for (const id of [activeId, failedId]) {
@@ -171,7 +172,7 @@ test(
               events: [
                 {
                   id: `message-${id}`,
-                  content: `# Conversation proof\n\n${"A useful markdown paragraph with **bold** and a [link](https://example.com).\n\n".repeat(24)}\n\nEnd of response.`,
+                  content: `# Conversation proof\n\n${markdown}`,
                   streaming: false,
                   reverted: false,
                 },
@@ -258,6 +259,12 @@ test(
             token,
             events: [
               {
+                id: `message-${activeId}`,
+                content: `# Conversation refreshed\n\n${markdown}`,
+                streaming: false,
+                reverted: false,
+              },
+              {
                 id: "while-reading",
                 content: "While reading earlier content.",
                 streaming: false,
@@ -267,9 +274,14 @@ test(
           },
           { admin: true },
         );
+        // The heading changes in the same subscription update as the appended
+        // message, so the assertion cannot pass against the previous snapshot.
         await expect(
-          screen.getByRole("heading", "Conversation proof", { exact: true }),
+          screen.getByRole("heading", "Conversation refreshed", { exact: true }),
         ).toBeVisible();
+        await expect(
+          screen.getByText("While reading earlier content.", { exact: true }),
+        ).not.toBeVisible();
         await screen.scrollUntilVisible(
           screen.getByText("While reading earlier content.", { exact: true }),
         );
