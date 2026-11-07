@@ -65,8 +65,8 @@ test(
 
 test(
   "mobile username login survives restart and signs out",
-  { platforms: ["ios"] },
-  async ({ app, screen, device }) => {
+  { platforms: ["ios", "android"] },
+  async ({ app, screen, device, platform }) => {
     test.skip(
       !config.features.includes("authentication"),
       "Requires authentication",
@@ -90,7 +90,7 @@ test(
       response.value?.emailPassword || response.value?.googleOnly,
       "Requires username authentication",
     );
-    const username = `mobile${crypto.randomUUID().replaceAll("-", "")}`;
+    const username = `mobile${crypto.randomUUID().replaceAll("-", "").slice(0, 16)}`;
     const password = `Mobile-${crypto.randomUUID()}!`;
     const signup = await fetch(`${url}/api/mutation`, {
       method: "POST",
@@ -105,14 +105,19 @@ test(
     await openMobile({ app, device, screen });
     await openGuestSettings(screen);
     await screen.getByRole("button", "Sign in", { exact: true }).tap();
-    await screen
-      .getByRole("textbox", "Username", { exact: true })
-      .fill(username);
-    await screen.getByText("next", { exact: true }).tap();
+    const usernameInput = screen.getByRole("textbox", "Username", {
+      exact: true,
+    });
+    await expect(usernameInput).toBeVisible();
+    if (platform === "android") await usernameInput.tap();
+    await usernameInput.fill(username);
+    if (platform === "ios")
+      await screen.getByText("next", { exact: true }).tap();
     await screen
       .getByRole("textbox", "Password", { exact: true })
       .fill(password);
-    await screen.getByText("go", { exact: true }).tap();
+    if (platform === "ios") await screen.getByText("go", { exact: true }).tap();
+    else await screen.getByRole("button", "Log in", { exact: true }).tap();
     const savePassword = screen.getByRole("button", "Not Now", { exact: true });
     await expect(
       screen.getByText(username, { exact: true }).first().or(savePassword),
@@ -152,11 +157,29 @@ test(
     ).toBeVisible();
     await screen.getByRole("button", "Appearance: Dark").tap();
     await screen.getByText("System", { exact: true }).tap();
+    await expect(
+      screen.getByRole("button", "Appearance: System"),
+    ).toBeVisible();
     await screen.getByRole("button", "Accent color: Green").tap();
     await screen.getByText("Blue", { exact: true }).tap();
+    await expect(
+      screen.getByRole("button", "Accent color: Blue"),
+    ).toBeVisible();
+    await openMobile({ app, device, screen }, true);
+    await screen.getByRole("button", "Settings", { exact: true }).tap();
+    await expect(
+      screen.getByRole("button", "Appearance: System"),
+    ).toBeVisible();
+    await expect(
+      screen.getByRole("button", "Accent color: Blue"),
+    ).toBeVisible();
     await screen.getByRole("button", "Log out").tap();
     await expect(
       screen.getByRole("button", "Create app", { exact: true }),
+    ).toBeVisible();
+    await screen.getByRole("button", "Settings", { exact: true }).tap();
+    await expect(
+      screen.getByRole("button", "Sign in", { exact: true }),
     ).toBeVisible();
   },
 );
