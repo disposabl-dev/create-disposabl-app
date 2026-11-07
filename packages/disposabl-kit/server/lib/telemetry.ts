@@ -2,7 +2,13 @@ import config from "../../../../disposabl.json";
 import { makeFunctionReference } from "convex/server";
 
 export type TelemetryEvent =
-  "api_operation" | "mcp_operation" | "page_view" | "screen_view" | "app_setup";
+  | "api_operation"
+  | "mcp_operation"
+  | "page_view"
+  | "screen_view"
+  | "app_setup"
+  | "app_created"
+  | "platform_deployment";
 export type TelemetryProperties = {
   source?: "api" | "cli" | "sdk" | "mcp";
   operation?: string;
@@ -16,6 +22,18 @@ export type TelemetryProperties = {
     | "account"
     | "other";
   duration_ms?: number;
+  platform?:
+    | "web"
+    | "android"
+    | "ios"
+    | "macos"
+    | "windows"
+    | "linux"
+    | "api"
+    | "mcp"
+    | "typescript-sdk"
+    | "cli";
+  channel?: "production" | "preview";
 };
 
 type AnalyticsConfig = {
@@ -88,9 +106,24 @@ export async function captureTelemetry(
       "account",
       "other",
     ].includes(properties.page ?? "") && { page: properties.page }),
+    ...([
+      "web",
+      "android",
+      "ios",
+      "macos",
+      "windows",
+      "linux",
+      "api",
+      "mcp",
+      "typescript-sdk",
+      "cli",
+    ].includes(properties.platform ?? "") && { platform: properties.platform }),
+    ...(["production", "preview"].includes(properties.channel ?? "") && {
+      channel: properties.channel,
+    }),
     ...(Number.isFinite(properties.duration_ms) &&
       properties.duration_ms! >= 0 &&
-      properties.duration_ms! <= 3600000 && {
+      properties.duration_ms! <= Number.MAX_SAFE_INTEGER && {
         duration_ms: Math.round(properties.duration_ms!),
       }),
   };
