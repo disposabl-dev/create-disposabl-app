@@ -88,7 +88,25 @@ test(
     }
     const owner = await user();
     const other = await user();
-    expect((await call("agent/index:getMessages", {})).status).toBe("error");
+    expect(await value("agent/index:getMessages", {})).toBe(null);
+    expect(
+      (
+        await call(
+          "agent/index:sendMessage",
+          { prompt: "fixture" },
+          { mutation: true },
+        )
+      ).status,
+    ).toBe("error");
+    expect(
+      (
+        await call(
+          "agent/index:abortMessage",
+          { appId: randomUUID() },
+          { mutation: true },
+        )
+      ).status,
+    ).toBe("error");
     expect(
       (await value("agent/index:getMessages", {}, { token: owner.token })).page,
     ).toEqual([]);
