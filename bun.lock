@@ -190,7 +190,7 @@
         "@semantic-release/exec": "7.1.0",
         "@types/bun": "1.4.4",
         "@types/proper-lockfile": "4.1.4",
-        "conventional-changelog-conventionalcommits": "10.4.1",
+        "conventional-changelog-conventionalcommits": "9.3.1",
         "semantic-release": "25.0.9",
         "typescript": "~6.0.3",
       },
@@ -214,7 +214,7 @@
         "@eslint/js": "10.0.1",
         "@semantic-release/exec": "7.1.0",
         "@types/bun": "1.4.4",
-        "conventional-changelog-conventionalcommits": "10.4.1",
+        "conventional-changelog-conventionalcommits": "9.3.1",
         "eslint": "10.14.0",
         "jiti": "2.7.0",
         "semantic-release": "25.0.9",
@@ -251,7 +251,7 @@
         "@types/node": "^26.6.6",
         "@types/react": "^19.3.0",
         "@types/react-dom": "^19.3.0",
-        "conventional-changelog-conventionalcommits": "10.4.1",
+        "conventional-changelog-conventionalcommits": "9.3.1",
         "eslint": "^10.14.0",
         "tailwindcss": "^4.3.5",
         "typescript": "~6.0.3",
@@ -293,7 +293,7 @@
         "@hey-api/openapi-ts": "0.99.0",
         "@semantic-release/exec": "7.1.0",
         "@types/bun": "1.4.4",
-        "conventional-changelog-conventionalcommits": "10.4.1",
+        "conventional-changelog-conventionalcommits": "9.3.1",
         "semantic-release": "25.0.9",
         "typescript": "~6.0.3",
       },
@@ -510,8 +510,6 @@
     "@clack/prompts": ["@clack/prompts@1.8.1", "", { "dependencies": { "@clack/core": "1.5.1", "fast-string-width": "^3.0.2", "fast-wrap-ansi": "^0.2.0", "sisteransi": "^1.0.5" } }, "sha512-dlT1m5e/0yUL0kRNcQn7yGLVThkgbB0Ga/1AmfDDC/8ik6AIiSf2QLQO2zPYvefsHP0aFgxO93cVLCCfDp7kzQ=="],
 
     "@colors/colors": ["@colors/colors@1.5.0", "", {}, "sha512-ooWCrlZP11i8GImSjTHYHLkvFDP48nS4+204nGb1RiX/WXYHmJA2III9/e2DWVabCESdW7hBAEzHRqUn9OUVvQ=="],
-
-    "@conventional-changelog/template": ["@conventional-changelog/template@1.4.1", "", {}, "sha512-mHyyEL0eIEqJ6+aF24+AdZRo4bu4W5GdUiCiCx5X7kfDY51ye8GQJ264uOINObrRSKxtSRCOWPpl9hbOy4UzxQ=="],
 
     "@convex-dev/agent": ["@convex-dev/agent@0.7.9", "", { "optionalDependencies": { "@ungap/structured-clone": "^1.4.0" }, "peerDependencies": { "@ai-sdk/provider": "^4.0.0", "@ai-sdk/provider-utils": "^5.0.0", "ai": "^7.0.129", "convex": "^1.46.0", "convex-helpers": "^0.1.127", "react": "^18.3.1 || ^19.0.0" }, "optionalPeers": ["react"] }, "sha512-/P7IU6CyzopR3olJmqQsLmy0sb9bTvubeuLTInsgqqQBgr7S7Z/N6L22AIer9dGcYTnW1sb7Lzacw61H2ptqbw=="],
 
@@ -1927,7 +1925,7 @@
 
     "conventional-changelog-angular": ["conventional-changelog-angular@8.3.1", "", { "dependencies": { "compare-func": "^2.0.0" } }, "sha512-6gfI3otXK5Ph5DfCOI1dblr+kN3FAm5a97hYoQkqNZxOaYa5WKfXH+AnpsmS+iUH2mgVC2Cg2Qw9m5OKcmNrIg=="],
 
-    "conventional-changelog-conventionalcommits": ["conventional-changelog-conventionalcommits@10.4.1", "", { "dependencies": { "@conventional-changelog/template": "^1.4.0" } }, "sha512-jS1LRFSbRoAr6JbhhRy1JYfNNUj5LM3+v49hRE03CgccsiYqgdVj/RTmrw4J1rylrqijHwdOlJWiJa61JHOgHg=="],
+    "conventional-changelog-conventionalcommits": ["conventional-changelog-conventionalcommits@9.3.1", "", { "dependencies": { "compare-func": "^2.0.0" } }, "sha512-dTYtpIacRpcZgrvBYvBfArMmK2xvIpv2TaxM0/ZI5CBtNUzvF2x0t15HsbRABWprS6UPmvj+PzHVjSx4qAVKyw=="],
 
     "conventional-changelog-writer": ["conventional-changelog-writer@8.4.0", "", { "dependencies": { "@simple-libs/stream-utils": "^1.2.0", "conventional-commits-filter": "^5.0.0", "handlebars": "^4.7.7", "meow": "^13.0.0", "semver": "^7.5.2" }, "bin": { "conventional-changelog-writer": "dist/cli/index.js" } }, "sha512-HHBFkk1EECxxmCi4CTu091iuDpQv5/OavuCUAuZmrkWpmYfyD816nom1CvtfXJ/uYfAAjavgHvXHX291tSLK8g=="],
 
