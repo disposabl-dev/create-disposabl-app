@@ -1,3 +1,4 @@
+import { desktopUpdate } from "./desktopUpdates";
 import { page, options as telemetryOptions } from "./telemetry";
 import createHttpRouter from "@disposabl/disposabl-kit/server/http";
 
@@ -7,5 +8,10 @@ http.route({
   path: "/telemetry/page",
   method: "OPTIONS",
   handler: telemetryOptions,
+});
+http.route({
+  pathPrefix: "/desktop/updates/",
+  method: "GET",
+  handler: desktopUpdate,
 });
 export default http;

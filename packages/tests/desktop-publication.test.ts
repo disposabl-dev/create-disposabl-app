@@ -1,4 +1,4 @@
-import { test } from "bun:test";
+import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   publish,
@@ -12,9 +12,10 @@ const original = {
   channel: "production",
   platform: "win32",
   arch: "x64",
-  version: "1.0.2",
+  version: "1.2.1",
   build: 2,
-  filename: "app-1.0.2-full.nupkg",
+  attempt: 1,
+  filename: "app-1.2.1-full.nupkg",
   storageId: "file2",
   sha256: "b".repeat(64),
   sha1: "C".repeat(40),
@@ -45,7 +46,9 @@ test("publication validates blobs and keeps immutable monotonic feeds isolated",
           return {
             order: () => ({
               first: async () =>
-                matching().sort((a, b) => b.build - a.build)[0] ?? null,
+                matching().sort(
+                  (a, b) => b.build - a.build || b.attempt - a.attempt,
+                )[0] ?? null,
             }),
             unique: async () => matching()[0] ?? null,
           };
@@ -60,8 +63,8 @@ test("publication validates blobs and keeps immutable monotonic feeds isolated",
     call({
       ...original,
       build: 1,
-      version: "1.0.1",
-      filename: "app-1.0.1-full.nupkg",
+      version: "1.1.1",
+      filename: "app-1.1.1-full.nupkg",
     }),
     /not newer/,
   );
@@ -76,8 +79,8 @@ test("publication validates blobs and keeps immutable monotonic feeds isolated",
     call({
       ...original,
       build: 3,
-      version: "1.0.3",
-      filename: "app-1.0.3-full.nupkg",
+      version: "1.3.1",
+      filename: "app-1.3.1-full.nupkg",
     }),
     /does not match/,
   );
@@ -87,21 +90,21 @@ test("publication validates blobs and keeps immutable monotonic feeds isolated",
     ...original,
     channel: "preview",
     build: 1,
-    version: "1.0.1",
-    filename: "app-1.0.1-full.nupkg",
+    version: "1.1.1",
+    filename: "app-1.1.1-full.nupkg",
   });
   await call({
     ...original,
     build: 3,
-    version: "1.0.3",
-    filename: "app-1.0.3-full.nupkg",
+    version: "1.3.1",
+    filename: "app-1.3.1-full.nupkg",
     storageId: "file3",
   });
   const get = (args: any) => (resolve as any)._handler(ctx, args);
   assert.equal(
     (await get({ app, channel: "production", platform: "win32", arch: "x64" }))
       .version,
-    "1.0.3",
+    "1.3.1",
   );
   assert.equal(
     (
@@ -127,14 +130,14 @@ test("publication validates blobs and keeps immutable monotonic feeds isolated",
   assert.equal(
     (await get({ app, channel: "preview", platform: "win32", arch: "x64" }))
       .version,
-    "1.0.1",
+    "1.1.1",
   );
 });
 
 test("feed pointers are fresh and package requests redirect to storage", async () => {
   const url = `https://app.convex.site/desktop/updates/${app}/production/win32/x64/`;
   const row = {
-    version: "1.0.2",
+    version: "1.2.1",
     filename: original.filename,
     sha1: original.sha1,
     size: 7,
@@ -155,13 +158,13 @@ test("feed pointers are fresh and package requests redirect to storage", async (
   assert.equal(binary.status, 302);
   assert.equal(binary.headers.get("location"), row.url);
   const macUrl = `https://app.convex.site/desktop/updates/${app}/production/darwin/arm64/RELEASES.json`;
-  const macRow = { ...row, filename: "app-darwin-arm64-1.0.2.zip" };
+  const macRow = { ...row, filename: "app-darwin-arm64-1.2.1.zip" };
   const mac = await (desktopUpdate as any)._handler(
     { runQuery: async () => macRow },
     new Request(macUrl),
   );
   const manifestJson = await mac.json();
-  assert.equal(manifestJson.currentRelease, "1.0.2");
+  assert.equal(manifestJson.currentRelease, "1.2.1");
   assert.equal(
     manifestJson.releases[0].updateTo.url,
     macUrl.replace("RELEASES.json", macRow.filename),
@@ -203,7 +206,7 @@ test("publisher uploads bytes before invoking the internal publication", async (
     const fakeBun = join(root, "bin/bun");
     await writeFile(
       fakeBun,
-      '#!/bin/sh\nif [ "$8" = "desktopUpdates:uploadUrl" ]; then printf \'"%s"\\n\' "$TEST_UPLOAD_URL"; else printf \'%s\' "$9" > "$TEST_RESULT"; fi\n',
+      '#!/bin/sh\nif [ "$8" = "desktopUpdates:uploadUrl" ]; then printf \'"%s"\\n\' "$TEST_UPLOAD_URL"; elif [ "$8" = "desktopUpdates:publish" ]; then printf \'%s\' "$9" > "$TEST_RESULT"; fi\n',
     );
     await chmod(fakeBun, 0o755);
     const address = server.address();
@@ -213,7 +216,7 @@ test("publisher uploads bytes before invoking the internal publication", async (
       PATH: `${join(root, "bin")}:${process.env.PATH}`,
       DISPOSABL_DESKTOP_ID: app,
       DISPOSABL_DESKTOP_PLATFORM: "windows",
-      DISPOSABL_RELEASE_VERSION: "1.0.2",
+      DISPOSABL_RELEASE_VERSION: "1.2.1",
       DISPOSABL_DESKTOP_UPDATE_CHANNEL: "production",
       TEST_UPLOAD_URL: `http://127.0.0.1:${address.port}/`,
       TEST_RESULT: join(root, "result.json"),

@@ -32,7 +32,9 @@ export const publish = internalMutation({
       !validFeed(a) ||
       !Number.isSafeInteger(a.build) ||
       a.build < 1 ||
-      a.version !== `1.0.${a.build}` ||
+      !Number.isSafeInteger(a.attempt) ||
+      a.attempt < 1 ||
+      a.version !== `1.${a.build}.${a.attempt}` ||
       !/^[a-zA-Z0-9._-]+$/.test(a.filename) ||
       !/^[a-f0-9]{64}$/.test(a.sha256) ||
       !/^[A-Fa-f0-9]{40}$/.test(a.sha1) ||
@@ -44,7 +46,18 @@ export const publish = internalMutation({
     )
       throw new Error("Invalid update metadata");
     const metadata = await ctx.db.system.get("_storage", a.storageId);
-    if (!metadata || metadata.size !== a.size || metadata.sha256 !== a.sha256)
+    // Compare the digest across the documented hex and backend base64 encodings.
+    const digest = metadata?.sha256;
+    const expectedBase64 = btoa(
+      String.fromCharCode(
+        ...a.sha256.match(/../g)!.map((byte) => parseInt(byte, 16)),
+      ),
+    );
+    if (
+      !metadata ||
+      metadata.size !== a.size ||
+      (digest !== a.sha256 && digest !== expectedBase64)
+    )
       throw new Error("Uploaded file does not match metadata");
     const latest = await ctx.db
       .query("desktopUpdates")
@@ -71,13 +84,20 @@ export const publish = internalMutation({
     if (
       existing &&
       latest?.build === a.build &&
+      latest.attempt === a.attempt &&
       existing.build === a.build &&
+      existing.attempt === a.attempt &&
       existing.sha256 === a.sha256 &&
       existing.sha1 === a.sha1 &&
       existing.size === a.size
     )
       return null;
-    if (existing || (latest && a.build <= latest.build))
+    if (
+      existing ||
+      (latest &&
+        (a.build < latest.build ||
+          (a.build === latest.build && a.attempt <= latest.attempt)))
+    )
       throw new Error("Update is not newer or filename already exists");
     await ctx.db.insert("desktopUpdates", a);
     return null;
@@ -179,4 +199,18 @@ export const desktopUpdate = httpAction(async (ctx, request) => {
       "Cache-Control": "no-store",
     },
   });
+});
+
+// Only discard a newly uploaded blob when no published feed references it.
+export const discardUpload = internalMutation({
+  args: { storageId: v.id("_storage") },
+  returns: v.null(),
+  handler: async (ctx, { storageId }) => {
+    const published = await ctx.db
+      .query("desktopUpdates")
+      .withIndex("by_storageId", (q) => q.eq("storageId", storageId))
+      .first();
+    if (!published) await ctx.storage.delete(storageId);
+    return null;
+  },
 });

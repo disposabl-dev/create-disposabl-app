@@ -128,6 +128,8 @@ const keep = new Set([
   "tsconfig.json",
   "users",
   "files",
+  "desktopUpdates",
+  "desktopUpdates.ts",
 ]);
 for (const entry of keep) await lstat(join(convex, entry));
 for (const path of [

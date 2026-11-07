@@ -49,6 +49,8 @@ import type * as connections_index from "../connections/index.js";
 import type * as connections_internal from "../connections/internal.js";
 import type * as connections_posthog from "../connections/posthog.js";
 import type * as connections_validator from "../connections/validator.js";
+import type * as desktopUpdates from "../desktopUpdates.js";
+import type * as desktopUpdates_validator from "../desktopUpdates/validator.js";
 import type * as downloads_action from "../downloads/action.js";
 import type * as downloads_http from "../downloads/http.js";
 import type * as downloads_internal from "../downloads/internal.js";
@@ -127,6 +129,8 @@ declare const fullApi: ApiFromModules<{
   "connections/internal": typeof connections_internal;
   "connections/posthog": typeof connections_posthog;
   "connections/validator": typeof connections_validator;
+  desktopUpdates: typeof desktopUpdates;
+  "desktopUpdates/validator": typeof desktopUpdates_validator;
   "downloads/action": typeof downloads_action;
   "downloads/http": typeof downloads_http;
   "downloads/internal": typeof downloads_internal;

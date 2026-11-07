@@ -1,8 +1,10 @@
+import { desktopUpdateTable } from "./desktopUpdates/validator";
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 import { profile } from "./users/validator";
 
 export default defineSchema({
+  desktopUpdates: desktopUpdateTable,
   files: defineTable({
     owner: v.string(),
     filename: v.string(),

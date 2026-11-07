@@ -72,6 +72,13 @@ export async function reconfigureApp(
   if (!Array.isArray(existing.platforms) || !Array.isArray(existing.features))
     throw new Error("Invalid selections in disposabl.json.");
   const oldPlatforms = selectPlatforms(existing.platforms.join(","));
+  if (
+    !existing.desktopId &&
+    oldPlatforms.some((p) => ["macos", "windows", "linux"].includes(p))
+  )
+    throw new Error(
+      "This desktop project has no native identity. Create a fresh starter before its first installation.",
+    );
   const oldFeatures = selectFeatures(existing.features.join(",") || "none");
   const config = {
     ...existing,

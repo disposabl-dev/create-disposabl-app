@@ -357,6 +357,7 @@ jobs:
     timeout-minutes: 30
     env:
       PLATFORM: ${{ matrix.platform }}
+      DISPOSABL_RELEASE_VERSION: 1.${{ github.run_number }}.${{ github.run_attempt }}
       DISPOSABL_DESKTOP_PLATFORM: ${{ matrix.platform }}
       DISPOSABL_DESKTOP_UPDATE_CHANNEL: ${{ env.CHANNEL }}
       CONVEX_SITE_URL: ${{ needs.web.outputs.convex_site_url }}

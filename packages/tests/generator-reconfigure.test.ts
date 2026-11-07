@@ -214,6 +214,26 @@ test(
       assert.match(first.desktopId, /^[a-f0-9]{32}$/);
       assert.notEqual(first.desktopId, second.desktopId);
       assert.equal(desktop.disposablDesktopId, first.desktopId);
+      assert.ok(
+        existsSync(join(a, "packages/backend/convex/desktopUpdates.ts")),
+      );
+      assert.match(
+        await read(a, "packages/backend/convex/schema.ts"),
+        /desktopUpdates: desktopUpdateTable/,
+      );
+      assert.match(
+        await read(a, "packages/backend/convex/http.ts"),
+        /desktopUpdate/,
+      );
+      const before = await read(b, "apps/desktop/package.json");
+      delete second.desktopId;
+      await writeFile(join(b, "disposabl.json"), JSON.stringify(second));
+      await assert.rejects(
+        reconfigureApp(template, b, version, { features: "authentication" }),
+        /no native identity/,
+      );
+      assert.equal(await read(b, "apps/desktop/package.json"), before);
+
       assert.notEqual(
         desktop.name,
         JSON.parse(await read(b, "apps/desktop/package.json")).name,

@@ -16,7 +16,7 @@ if (target === 'macos' && process.env.MACOS_NOTARIZE !== 'true')
   process.exit(0);
 if (
   !/^[a-f0-9]{32}$/.test(app ?? '') ||
-  !/^1\.0\.[1-9]\d*$/.test(version ?? '')
+  !/^1\.[1-9]\d*\.[1-9]\d*$/.test(version ?? '')
 )
   throw new Error('Invalid update identity or version');
 const [platform, arch] = targets[target];
@@ -72,17 +72,22 @@ const response = await fetch(uploadUrl, {
 });
 if (!response.ok) throw new Error(`Update upload failed: ${response.status}`);
 const { storageId } = await response.json();
-run('desktopUpdates:publish', {
-  app,
-  channel,
-  platform,
-  arch,
-  version,
-  build: Number(version.split('.')[2]),
-  filename,
-  storageId,
-  sha256: hash,
-  sha1: squirrelHash,
-  size,
-});
-console.log(`Published ${platform}/${arch} ${version} to ${channel}`);
+try {
+  run('desktopUpdates:publish', {
+    app,
+    channel,
+    platform,
+    arch,
+    version,
+    build: Number(version.split('.')[1]),
+    attempt: Number(version.split('.')[2]),
+    filename,
+    storageId,
+    sha256: hash,
+    sha1: squirrelHash,
+    size,
+  });
+  console.log(`Published ${platform}/${arch} ${version} to ${channel}`);
+} finally {
+  run('desktopUpdates:discardUpload', { storageId });
+}
