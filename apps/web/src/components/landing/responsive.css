@@ -1,0 +1,678 @@
+@media (min-width: 1500px) {
+  .launch-hero {
+    padding-top: 80px;
+    padding-bottom: 80px;
+  }
+}
+@media (max-width: 1100px) {
+  .launch-container {
+    padding-inline: 32px;
+  }
+  .marketing-links {
+    gap: 18px;
+  }
+  .nav-github {
+    display: none !important;
+  }
+  .launch-hero {
+    gap: 30px;
+  }
+  .hero-copy h1 {
+    font-size: 80px;
+  }
+  .hero-art {
+    margin-top: 40px;
+  }
+  .illustration-title {
+    font-size: 43px;
+  }
+  .art-phone {
+    width: 170px;
+    top: 293px;
+  }
+  .art-code {
+    top: 470px;
+    font-size: 8px;
+  }
+  .ownership-grid {
+    gap: 20px;
+  }
+  .agent-story-grid,
+  .language-section {
+    gap: 55px;
+  }
+  .foundation-grid {
+    gap: 28px;
+  }
+  .footer-bottom > span:last-child {
+    display: none;
+  }
+}
+@media (max-width: 860px) {
+  .launch-nav nav {
+    min-height: 72px;
+  }
+  .mobile-menu-button {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .marketing-links {
+    display: none;
+    position: absolute;
+    top: 71px;
+    left: 0;
+    right: 0;
+    background: var(--paper);
+    padding: 20px 32px 28px;
+    border-bottom: 1px solid var(--line);
+    box-shadow: 0 14px 20px #20211f10;
+  }
+  .marketing-links.is-open {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px 24px;
+  }
+  .marketing-links .nav-github {
+    display: flex !important;
+  }
+  .launch-hero {
+    padding-top: 45px;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+  .hero-copy h1 {
+    font-size: 65px;
+  }
+  .hero-copy .hero-description {
+    font-size: 17px;
+  }
+  .hero-copy .hero-detail {
+    font-size: 13px;
+  }
+  .launch-site .agent-logos {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .launch-site .landing-composer-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .launch-site .landing-copy-button {
+    width: 100%;
+  }
+  .store-button {
+    padding-inline: 9px;
+    gap: 6px;
+    font-size: 12px;
+  }
+  .store-lock {
+    display: none;
+  }
+  .hero-art {
+    margin-top: 90px;
+  }
+  .art-caption {
+    font-size: 8px;
+  }
+  .art-window {
+    top: 110px;
+  }
+  .illustration-title {
+    font-size: 35px;
+    margin-block: 32px;
+  }
+  .app-illustration {
+    padding: 18px;
+  }
+  .illustration-top > span:last-child {
+    display: none;
+  }
+  .art-phone {
+    top: 280px;
+    width: 158px;
+  }
+  .art-phone > p {
+    font-size: 20px;
+  }
+  .ownership-stamp {
+    top: 58px;
+    width: 85px;
+    height: 85px;
+    right: 0;
+    font-size: 17px;
+  }
+  .art-code {
+    top: 430px;
+    left: -5px;
+    font-size: 7px;
+  }
+  .ownership-grid {
+    grid-template-columns: 1fr 1.1fr 1fr;
+  }
+  .ownership-grid h2 {
+    font-size: 21px;
+  }
+  .ownership-grid p {
+    font-size: 11px;
+  }
+  .band-scroll {
+    display: none;
+  }
+  .platform-section,
+  .foundation-section,
+  .journey-section,
+  .language-section,
+  .faq-section {
+    padding-block: 75px;
+  }
+  .section-heading-split {
+    gap: 40px;
+  }
+  .section-heading-split > p:last-child {
+    max-width: 280px;
+    font-size: 13px;
+  }
+  .foundation-grid {
+    gap: 22px;
+  }
+  .foundation-grid h3 {
+    font-size: 18px;
+  }
+  .agent-story-grid {
+    gap: 40px;
+  }
+  .agent-story-grid h2 {
+    font-size: 38px;
+  }
+  .agent-recipe > div {
+    font-size: 18px;
+  }
+  .journey-steps {
+    grid-template-columns: 1fr 1fr;
+    gap: 30px;
+  }
+  .language-section {
+    gap: 35px;
+  }
+  .language-art > span {
+    font-size: 34px;
+  }
+  .price-card {
+    padding: 24px;
+  }
+  .price-kicker {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .price-card h3 {
+    margin-top: 25px;
+  }
+  .faq-section {
+    grid-template-columns: 0.6fr 1.4fr;
+    gap: 35px;
+  }
+  .footer-top {
+    flex-wrap: wrap;
+    gap: 20px;
+  }
+  .footer-top .text-link {
+    width: 100%;
+  }
+  .footer-bottom {
+    flex-wrap: wrap;
+  }
+}
+@media (max-width: 760px) {
+  .launch-container {
+    padding-inline: 22px;
+  }
+  .launch-site :is(section, [id]) {
+    scroll-margin-top: 90px;
+  }
+  .wordmark {
+    font-size: 23px;
+  }
+  .wordmark img {
+    width: 30px;
+    height: 30px;
+  }
+  .launch-nav nav {
+    min-height: 68px;
+  }
+  .marketing-links {
+    top: 67px;
+    padding-inline: 22px;
+  }
+  .launch-hero {
+    grid-template-columns: 1fr;
+    padding-top: 34px;
+    padding-bottom: 42px;
+    gap: 20px;
+  }
+  .launch-site .eyebrow {
+    font-size: 9px;
+    letter-spacing: 0.05em;
+  }
+  .hero-copy h1 {
+    font-size: clamp(60px, 14.7vw, 90px);
+    margin-top: 20px;
+  }
+  .hero-copy .hero-description {
+    font-size: 19px;
+    margin-top: 22px;
+  }
+  .hero-copy .hero-detail {
+    max-width: 380px;
+  }
+  .hero-start {
+    max-width: none;
+    margin-top: 25px;
+  }
+  .launch-site .agent-logos {
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+  }
+  .launch-site .agent-logos > span {
+    font-size: 9px;
+  }
+  .launch-site .agent-logo {
+    width: 26px;
+    height: 26px;
+  }
+  .launch-site .agent-logo img {
+    width: 16px;
+    height: 16px;
+  }
+  .launch-site .landing-composer-footer {
+    flex-direction: row;
+    align-items: center;
+  }
+  .launch-site .landing-composer {
+    padding: 16px;
+  }
+  .launch-site .landing-copy-button {
+    padding-inline: 12px;
+  }
+  .store-button {
+    padding: 9px 14px;
+    font-size: 14px;
+    min-width: 144px;
+  }
+  .store-buttons {
+    gap: 10px;
+  }
+  .store-group {
+    margin-top: 22px;
+  }
+  .store-tooltip {
+    width: 170px;
+  }
+  .store-control:last-child .store-tooltip {
+    left: auto;
+    right: 0;
+  }
+  .hero-art {
+    margin-top: 24px;
+    min-height: 540px;
+    width: 100%;
+    max-width: 470px;
+    justify-self: center;
+  }
+  .art-window {
+    top: 90px;
+    left: 8px;
+    right: 15px;
+  }
+  .app-illustration {
+    padding: 20px;
+  }
+  .illustration-title {
+    font-size: clamp(36px, 9vw, 48px);
+  }
+  .art-caption {
+    font-size: 9px;
+  }
+  .ownership-stamp {
+    top: 35px;
+    right: 14px;
+    width: 88px;
+    height: 88px;
+  }
+  .art-phone {
+    top: 266px;
+    right: 12px;
+    width: 166px;
+  }
+  .phone-star {
+    font-size: 50px;
+    margin-top: 15px;
+  }
+  .phone-items {
+    margin-top: 18px;
+    gap: 10px;
+  }
+  .phone-bottom {
+    margin-top: 20px;
+  }
+  .art-code {
+    top: 409px;
+    left: 10px;
+    font-size: 8px;
+  }
+  .hero-art .art-footnote {
+    font-size: 10px;
+  }
+  .art-footnote > span {
+    font-size: 8px;
+  }
+  .ownership-grid {
+    grid-template-columns: 1fr;
+    padding-block: 12px;
+    gap: 0;
+  }
+  .ownership-grid > div {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: center;
+    gap: 20px;
+    padding: 24px 0 24px 26px;
+    border-bottom: 1px solid var(--line);
+  }
+  .ownership-grid > div:last-of-type {
+    border-bottom: 0;
+  }
+  .ownership-grid > div > span {
+    top: 31px;
+  }
+  .ownership-grid h2 {
+    font-size: 23px;
+  }
+  .ownership-grid p {
+    margin: 0;
+    font-size: 10px;
+  }
+  .platform-section,
+  .foundation-section,
+  .journey-section,
+  .language-section,
+  .faq-section {
+    padding-block: 64px;
+  }
+  .launch-site h2 {
+    font-size: 39px;
+  }
+  .section-heading-split {
+    display: block;
+  }
+  .section-heading-split > p:last-child {
+    max-width: 390px;
+    margin-top: 20px;
+  }
+  .section-heading > .eyebrow,
+  .section-heading > div > .eyebrow {
+    margin-bottom: 16px;
+  }
+  .platform-workbench {
+    margin-top: 30px;
+  }
+  .workbench-toolbar {
+    padding: 16px;
+    font-size: 8px;
+  }
+  .platform-toggles {
+    padding: 18px 15px 12px;
+    gap: 7px;
+  }
+  .platform-toggle {
+    padding: 10px;
+    font-size: 11px;
+    gap: 6px;
+  }
+  .platform-workbench .platform-help {
+    padding-inline: 16px;
+    font-size: 10px;
+  }
+  .stack-results {
+    grid-template-columns: 1fr;
+  }
+  .stack-card {
+    padding: 24px 20px;
+  }
+  .stack-card:nth-child(odd) {
+    border-right: 0;
+  }
+  .stack-card h3 {
+    margin-top: 20px;
+  }
+  .shared-stack {
+    padding: 20px;
+    gap: 12px 16px;
+    font-size: 10px;
+  }
+  .shared-stack-title {
+    width: 100%;
+  }
+  .workbench-footer {
+    padding: 16px 20px;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .quiet-cta {
+    font-size: 11px;
+  }
+  .foundation-grid {
+    grid-template-columns: 1fr;
+    gap: 28px;
+    margin-top: 30px;
+  }
+  .foundation-grid article {
+    border-top: 1px solid var(--line);
+    padding-top: 24px;
+  }
+  .foundation-grid h3 {
+    font-size: 23px;
+    margin-top: 12px;
+  }
+  .foundation-grid p {
+    max-width: 400px;
+  }
+  .agent-story {
+    padding-block: 62px;
+  }
+  .agent-story-grid {
+    grid-template-columns: 1fr;
+    gap: 35px;
+  }
+  .agent-story-grid h2 {
+    font-size: 40px;
+  }
+  .agent-story .story-answer {
+    font-size: 23px;
+  }
+  .agent-recipe > div {
+    padding-block: 20px;
+    font-size: 22px;
+  }
+  .journey-steps {
+    margin-top: 32px;
+    gap: 30px 20px;
+  }
+  .journey-steps h3 {
+    font-size: 17px;
+    margin-top: 17px;
+  }
+  .journey-steps p {
+    font-size: 11px;
+  }
+  .step-time {
+    font-size: 10px;
+  }
+  .journey-note {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .language-section {
+    grid-template-columns: 1fr;
+    gap: 38px;
+  }
+  .language-art {
+    min-height: 260px;
+    margin-inline: 8px;
+  }
+  .language-art > span {
+    font-size: 34px;
+  }
+  .language-globe {
+    left: 42%;
+  }
+  .pricing-section {
+    padding-block: 64px;
+  }
+  .pricing-section h2 {
+    font-size: 36px;
+  }
+  .pricing-grid {
+    grid-template-columns: 1fr;
+    margin-top: 30px;
+    gap: 16px;
+  }
+  .price-kicker {
+    flex-direction: row;
+  }
+  .price-card {
+    padding: 26px 24px;
+  }
+  .price-card .price-number {
+    font-size: 72px;
+  }
+  .pricing-bottom {
+    flex-direction: column;
+    gap: 12px;
+  }
+  .faq-section {
+    grid-template-columns: 1fr;
+    gap: 30px;
+  }
+  .faq-section > div > p:not(.eyebrow) {
+    margin-top: 18px;
+  }
+  .faq-section h2 br {
+    display: none;
+  }
+  .faq-section h2 > span::before {
+    content: " ";
+  }
+  .faq-list summary {
+    font-size: 14px;
+    min-height: 72px;
+  }
+  .final-section {
+    padding-block: 64px;
+  }
+  .final-section h2 {
+    font-size: 54px;
+    margin-block: 24px;
+  }
+  .footer-top {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    padding-block: 30px;
+  }
+  .footer-bottom {
+    align-items: flex-start;
+    gap: 12px;
+    padding-block: 20px;
+  }
+  .footer-bottom nav {
+    gap: 8px 18px;
+  }
+  .guide-hero {
+    padding-block: 50px !important;
+  }
+  .guide-hero h1 {
+    font-size: 50px !important;
+  }
+  .guide-layout {
+    grid-template-columns: 1fr !important;
+    gap: 30px !important;
+  }
+  .guide-index {
+    position: static !important;
+  }
+  .guide-article h2 {
+    font-size: 32px !important;
+  }
+  .guide-compare {
+    grid-template-columns: 1fr !important;
+  }
+}
+@media (max-width: 360px) {
+  .launch-container {
+    padding-inline: 18px;
+  }
+  .hero-copy h1 {
+    font-size: 53px;
+  }
+  .launch-site .agent-logos {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .store-button {
+    min-width: 0;
+    padding-inline: 11px;
+    font-size: 13px;
+  }
+  .store-control {
+    flex: 1;
+  }
+  .ownership-grid {
+    gap: 0;
+  }
+  .ownership-grid > div {
+    gap: 12px;
+  }
+  .ownership-grid h2 {
+    font-size: 20px;
+  }
+  .launch-site .landing-composer-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .art-code {
+    font-size: 7px;
+    left: 0;
+  }
+  .price-kicker {
+    font-size: 8px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .launch-site *,
+  .launch-site *::before,
+  .launch-site *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .evidence-grid {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+  .evidence-item {
+    border-top: 1px solid var(--line);
+    padding-top: 16px;
+  }
+}

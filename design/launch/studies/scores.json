@@ -1,0 +1,1413 @@
+{
+  "method": "Subjective coordinator selection rubric from all 100 desktop contact-sheet previews. Family judgments plus explicit composition tradeoffs. Not measured conversion, engagement, accessibility or user preference. No claim of 100 independent reviews.",
+  "weights": {
+    "distinctiveness": 0.2,
+    "brand_fit": 0.15,
+    "typography": 0.15,
+    "action_clarity": 0.25,
+    "engagement_potential": 0.15,
+    "credibility": 0.1
+  },
+  "versions": [
+    {
+      "id": "001",
+      "family": "Launch Sheet",
+      "composition": "Front Page",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 7,
+        "brand_fit": 8,
+        "typography": 8,
+        "action_clarity": 8,
+        "engagement_potential": 7,
+        "credibility": 8
+      },
+      "weighted_selection_score": 7.65
+    },
+    {
+      "id": "002",
+      "family": "Launch Sheet",
+      "composition": "Split Desk",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 7,
+        "brand_fit": 8.2,
+        "typography": 8.1,
+        "action_clarity": 8.4,
+        "engagement_potential": 7.2,
+        "credibility": 8.1
+      },
+      "weighted_selection_score": 7.84
+    },
+    {
+      "id": "003",
+      "family": "Launch Sheet",
+      "composition": "Platform First",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 7.2,
+        "brand_fit": 8,
+        "typography": 8,
+        "action_clarity": 7.5,
+        "engagement_potential": 7.3,
+        "credibility": 8
+      },
+      "weighted_selection_score": 7.61
+    },
+    {
+      "id": "004",
+      "family": "Launch Sheet",
+      "composition": "Command Stage",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 7.2,
+        "brand_fit": 8,
+        "typography": 7.9,
+        "action_clarity": 7.8,
+        "engagement_potential": 7.1,
+        "credibility": 8
+      },
+      "weighted_selection_score": 7.64
+    },
+    {
+      "id": "005",
+      "family": "Launch Sheet",
+      "composition": "Editorial Rail",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 7.1,
+        "brand_fit": 8.1,
+        "typography": 8.1,
+        "action_clarity": 7.6,
+        "engagement_potential": 6.8,
+        "credibility": 8
+      },
+      "weighted_selection_score": 7.57
+    },
+    {
+      "id": "006",
+      "family": "Studio Desk",
+      "composition": "Front Page",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 8,
+        "brand_fit": 8,
+        "typography": 8,
+        "action_clarity": 7,
+        "engagement_potential": 8,
+        "credibility": 7
+      },
+      "weighted_selection_score": 7.65
+    },
+    {
+      "id": "007",
+      "family": "Studio Desk",
+      "composition": "Split Desk",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 8,
+        "brand_fit": 8.2,
+        "typography": 8.1,
+        "action_clarity": 7.4,
+        "engagement_potential": 8.2,
+        "credibility": 7.1
+      },
+      "weighted_selection_score": 7.83
+    },
+    {
+      "id": "008",
+      "family": "Studio Desk",
+      "composition": "Platform First",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 8.2,
+        "brand_fit": 8,
+        "typography": 8,
+        "action_clarity": 6.5,
+        "engagement_potential": 8.3,
+        "credibility": 7
+      },
+      "weighted_selection_score": 7.61
+    },
+    {
+      "id": "009",
+      "family": "Studio Desk",
+      "composition": "Command Stage",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 8.2,
+        "brand_fit": 8,
+        "typography": 7.9,
+        "action_clarity": 6.8,
+        "engagement_potential": 8.1,
+        "credibility": 7
+      },
+      "weighted_selection_score": 7.64
+    },
+    {
+      "id": "010",
+      "family": "Studio Desk",
+      "composition": "Editorial Rail",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 8.1,
+        "brand_fit": 8.1,
+        "typography": 8.1,
+        "action_clarity": 6.6,
+        "engagement_potential": 7.8,
+        "credibility": 7
+      },
+      "weighted_selection_score": 7.57
+    },
+    {
+      "id": "011",
+      "family": "Command Monument",
+      "composition": "Front Page",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 7,
+        "brand_fit": 7,
+        "typography": 6,
+        "action_clarity": 7,
+        "engagement_potential": 6,
+        "credibility": 8
+      },
+      "weighted_selection_score": 6.8
+    },
+    {
+      "id": "012",
+      "family": "Command Monument",
+      "composition": "Split Desk",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 7,
+        "brand_fit": 7.2,
+        "typography": 6.1,
+        "action_clarity": 7.4,
+        "engagement_potential": 6.2,
+        "credibility": 8.1
+      },
+      "weighted_selection_score": 6.99
+    },
+    {
+      "id": "013",
+      "family": "Command Monument",
+      "composition": "Platform First",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 7.2,
+        "brand_fit": 7,
+        "typography": 6,
+        "action_clarity": 6.5,
+        "engagement_potential": 6.3,
+        "credibility": 8
+      },
+      "weighted_selection_score": 6.76
+    },
+    {
+      "id": "014",
+      "family": "Command Monument",
+      "composition": "Command Stage",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 7.2,
+        "brand_fit": 7,
+        "typography": 5.9,
+        "action_clarity": 6.8,
+        "engagement_potential": 6.1,
+        "credibility": 8
+      },
+      "weighted_selection_score": 6.79
+    },
+    {
+      "id": "015",
+      "family": "Command Monument",
+      "composition": "Editorial Rail",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 7.1,
+        "brand_fit": 7.1,
+        "typography": 6.1,
+        "action_clarity": 6.6,
+        "engagement_potential": 5.8,
+        "credibility": 8
+      },
+      "weighted_selection_score": 6.72
+    },
+    {
+      "id": "016",
+      "family": "Prism",
+      "composition": "Front Page",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 8,
+        "brand_fit": 7,
+        "typography": 7,
+        "action_clarity": 7,
+        "engagement_potential": 8,
+        "credibility": 7
+      },
+      "weighted_selection_score": 7.35
+    },
+    {
+      "id": "017",
+      "family": "Prism",
+      "composition": "Split Desk",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 8,
+        "brand_fit": 7.2,
+        "typography": 7.1,
+        "action_clarity": 7.4,
+        "engagement_potential": 8.2,
+        "credibility": 7.1
+      },
+      "weighted_selection_score": 7.54
+    },
+    {
+      "id": "018",
+      "family": "Prism",
+      "composition": "Platform First",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 8.2,
+        "brand_fit": 7,
+        "typography": 7,
+        "action_clarity": 6.5,
+        "engagement_potential": 8.3,
+        "credibility": 7
+      },
+      "weighted_selection_score": 7.31
+    },
+    {
+      "id": "019",
+      "family": "Prism",
+      "composition": "Command Stage",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 8.2,
+        "brand_fit": 7,
+        "typography": 6.9,
+        "action_clarity": 6.8,
+        "engagement_potential": 8.1,
+        "credibility": 7
+      },
+      "weighted_selection_score": 7.34
+    },
+    {
+      "id": "020",
+      "family": "Prism",
+      "composition": "Editorial Rail",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 8.1,
+        "brand_fit": 7.1,
+        "typography": 7.1,
+        "action_clarity": 6.6,
+        "engagement_potential": 7.8,
+        "credibility": 7
+      },
+      "weighted_selection_score": 7.27
+    },
+    {
+      "id": "021",
+      "family": "Blueprint",
+      "composition": "Front Page",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 7,
+        "brand_fit": 7,
+        "typography": 6,
+        "action_clarity": 7,
+        "engagement_potential": 7,
+        "credibility": 8
+      },
+      "weighted_selection_score": 6.95
+    },
+    {
+      "id": "022",
+      "family": "Blueprint",
+      "composition": "Split Desk",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 7,
+        "brand_fit": 7.2,
+        "typography": 6.1,
+        "action_clarity": 7.4,
+        "engagement_potential": 7.2,
+        "credibility": 8.1
+      },
+      "weighted_selection_score": 7.14
+    },
+    {
+      "id": "023",
+      "family": "Blueprint",
+      "composition": "Platform First",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 7.2,
+        "brand_fit": 7,
+        "typography": 6,
+        "action_clarity": 6.5,
+        "engagement_potential": 7.3,
+        "credibility": 8
+      },
+      "weighted_selection_score": 6.91
+    },
+    {
+      "id": "024",
+      "family": "Blueprint",
+      "composition": "Command Stage",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 7.2,
+        "brand_fit": 7,
+        "typography": 5.9,
+        "action_clarity": 6.8,
+        "engagement_potential": 7.1,
+        "credibility": 8
+      },
+      "weighted_selection_score": 6.94
+    },
+    {
+      "id": "025",
+      "family": "Blueprint",
+      "composition": "Editorial Rail",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 7.1,
+        "brand_fit": 7.1,
+        "typography": 6.1,
+        "action_clarity": 6.6,
+        "engagement_potential": 6.8,
+        "credibility": 8
+      },
+      "weighted_selection_score": 6.87
+    },
+    {
+      "id": "026",
+      "family": "Operating Manual",
+      "composition": "Front Page",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 6,
+        "brand_fit": 7,
+        "typography": 8,
+        "action_clarity": 8,
+        "engagement_potential": 6,
+        "credibility": 8
+      },
+      "weighted_selection_score": 7.15
+    },
+    {
+      "id": "027",
+      "family": "Operating Manual",
+      "composition": "Split Desk",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 6,
+        "brand_fit": 7.2,
+        "typography": 8.1,
+        "action_clarity": 8.4,
+        "engagement_potential": 6.2,
+        "credibility": 8.1
+      },
+      "weighted_selection_score": 7.34
+    },
+    {
+      "id": "028",
+      "family": "Operating Manual",
+      "composition": "Platform First",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 6.2,
+        "brand_fit": 7,
+        "typography": 8,
+        "action_clarity": 7.5,
+        "engagement_potential": 6.3,
+        "credibility": 8
+      },
+      "weighted_selection_score": 7.11
+    },
+    {
+      "id": "029",
+      "family": "Operating Manual",
+      "composition": "Command Stage",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 6.2,
+        "brand_fit": 7,
+        "typography": 7.9,
+        "action_clarity": 7.8,
+        "engagement_potential": 6.1,
+        "credibility": 8
+      },
+      "weighted_selection_score": 7.14
+    },
+    {
+      "id": "030",
+      "family": "Operating Manual",
+      "composition": "Editorial Rail",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 6.1,
+        "brand_fit": 7.1,
+        "typography": 8.1,
+        "action_clarity": 7.6,
+        "engagement_potential": 5.8,
+        "credibility": 8
+      },
+      "weighted_selection_score": 7.07
+    },
+    {
+      "id": "031",
+      "family": "The Conveyor",
+      "composition": "Front Page",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 7,
+        "brand_fit": 7,
+        "typography": 7,
+        "action_clarity": 7,
+        "engagement_potential": 7,
+        "credibility": 7
+      },
+      "weighted_selection_score": 7.0
+    },
+    {
+      "id": "032",
+      "family": "The Conveyor",
+      "composition": "Split Desk",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 7,
+        "brand_fit": 7.2,
+        "typography": 7.1,
+        "action_clarity": 7.4,
+        "engagement_potential": 7.2,
+        "credibility": 7.1
+      },
+      "weighted_selection_score": 7.19
+    },
+    {
+      "id": "033",
+      "family": "The Conveyor",
+      "composition": "Platform First",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 7.2,
+        "brand_fit": 7,
+        "typography": 7,
+        "action_clarity": 6.5,
+        "engagement_potential": 7.3,
+        "credibility": 7
+      },
+      "weighted_selection_score": 6.96
+    },
+    {
+      "id": "034",
+      "family": "The Conveyor",
+      "composition": "Command Stage",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 7.2,
+        "brand_fit": 7,
+        "typography": 6.9,
+        "action_clarity": 6.8,
+        "engagement_potential": 7.1,
+        "credibility": 7
+      },
+      "weighted_selection_score": 6.99
+    },
+    {
+      "id": "035",
+      "family": "The Conveyor",
+      "composition": "Editorial Rail",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 7.1,
+        "brand_fit": 7.1,
+        "typography": 7.1,
+        "action_clarity": 6.6,
+        "engagement_potential": 6.8,
+        "credibility": 7
+      },
+      "weighted_selection_score": 6.92
+    },
+    {
+      "id": "036",
+      "family": "Orbital System",
+      "composition": "Front Page",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 8,
+        "brand_fit": 7,
+        "typography": 7,
+        "action_clarity": 6,
+        "engagement_potential": 8,
+        "credibility": 6
+      },
+      "weighted_selection_score": 7.0
+    },
+    {
+      "id": "037",
+      "family": "Orbital System",
+      "composition": "Split Desk",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 8,
+        "brand_fit": 7.2,
+        "typography": 7.1,
+        "action_clarity": 6.4,
+        "engagement_potential": 8.2,
+        "credibility": 6.1
+      },
+      "weighted_selection_score": 7.19
+    },
+    {
+      "id": "038",
+      "family": "Orbital System",
+      "composition": "Platform First",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 8.2,
+        "brand_fit": 7,
+        "typography": 7,
+        "action_clarity": 5.5,
+        "engagement_potential": 8.3,
+        "credibility": 6
+      },
+      "weighted_selection_score": 6.96
+    },
+    {
+      "id": "039",
+      "family": "Orbital System",
+      "composition": "Command Stage",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 8.2,
+        "brand_fit": 7,
+        "typography": 6.9,
+        "action_clarity": 5.8,
+        "engagement_potential": 8.1,
+        "credibility": 6
+      },
+      "weighted_selection_score": 6.99
+    },
+    {
+      "id": "040",
+      "family": "Orbital System",
+      "composition": "Editorial Rail",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 8.1,
+        "brand_fit": 7.1,
+        "typography": 7.1,
+        "action_clarity": 5.6,
+        "engagement_potential": 7.8,
+        "credibility": 6
+      },
+      "weighted_selection_score": 6.92
+    },
+    {
+      "id": "041",
+      "family": "App Gallery",
+      "composition": "Front Page",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 7,
+        "brand_fit": 8,
+        "typography": 8,
+        "action_clarity": 7,
+        "engagement_potential": 8,
+        "credibility": 7
+      },
+      "weighted_selection_score": 7.45
+    },
+    {
+      "id": "042",
+      "family": "App Gallery",
+      "composition": "Split Desk",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 7,
+        "brand_fit": 8.2,
+        "typography": 8.1,
+        "action_clarity": 7.4,
+        "engagement_potential": 8.2,
+        "credibility": 7.1
+      },
+      "weighted_selection_score": 7.63
+    },
+    {
+      "id": "043",
+      "family": "App Gallery",
+      "composition": "Platform First",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 7.2,
+        "brand_fit": 8,
+        "typography": 8,
+        "action_clarity": 6.5,
+        "engagement_potential": 8.3,
+        "credibility": 7
+      },
+      "weighted_selection_score": 7.41
+    },
+    {
+      "id": "044",
+      "family": "App Gallery",
+      "composition": "Command Stage",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 7.2,
+        "brand_fit": 8,
+        "typography": 7.9,
+        "action_clarity": 6.8,
+        "engagement_potential": 8.1,
+        "credibility": 7
+      },
+      "weighted_selection_score": 7.44
+    },
+    {
+      "id": "045",
+      "family": "App Gallery",
+      "composition": "Editorial Rail",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 7.1,
+        "brand_fit": 8.1,
+        "typography": 8.1,
+        "action_clarity": 6.6,
+        "engagement_potential": 7.8,
+        "credibility": 7
+      },
+      "weighted_selection_score": 7.37
+    },
+    {
+      "id": "046",
+      "family": "Type Sculpture",
+      "composition": "Front Page",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 8,
+        "brand_fit": 6,
+        "typography": 7,
+        "action_clarity": 6,
+        "engagement_potential": 7,
+        "credibility": 6
+      },
+      "weighted_selection_score": 6.7
+    },
+    {
+      "id": "047",
+      "family": "Type Sculpture",
+      "composition": "Split Desk",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 8,
+        "brand_fit": 6.2,
+        "typography": 7.1,
+        "action_clarity": 6.4,
+        "engagement_potential": 7.2,
+        "credibility": 6.1
+      },
+      "weighted_selection_score": 6.89
+    },
+    {
+      "id": "048",
+      "family": "Type Sculpture",
+      "composition": "Platform First",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 8.2,
+        "brand_fit": 6,
+        "typography": 7,
+        "action_clarity": 5.5,
+        "engagement_potential": 7.3,
+        "credibility": 6
+      },
+      "weighted_selection_score": 6.66
+    },
+    {
+      "id": "049",
+      "family": "Type Sculpture",
+      "composition": "Command Stage",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 8.2,
+        "brand_fit": 6,
+        "typography": 6.9,
+        "action_clarity": 5.8,
+        "engagement_potential": 7.1,
+        "credibility": 6
+      },
+      "weighted_selection_score": 6.69
+    },
+    {
+      "id": "050",
+      "family": "Type Sculpture",
+      "composition": "Editorial Rail",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 8.1,
+        "brand_fit": 6.1,
+        "typography": 7.1,
+        "action_clarity": 5.6,
+        "engagement_potential": 6.8,
+        "credibility": 6
+      },
+      "weighted_selection_score": 6.62
+    },
+    {
+      "id": "051",
+      "family": "Receipt",
+      "composition": "Front Page",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 7,
+        "brand_fit": 6,
+        "typography": 6,
+        "action_clarity": 8,
+        "engagement_potential": 6,
+        "credibility": 8
+      },
+      "weighted_selection_score": 6.9
+    },
+    {
+      "id": "052",
+      "family": "Receipt",
+      "composition": "Split Desk",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 7,
+        "brand_fit": 6.2,
+        "typography": 6.1,
+        "action_clarity": 8.4,
+        "engagement_potential": 6.2,
+        "credibility": 8.1
+      },
+      "weighted_selection_score": 7.09
+    },
+    {
+      "id": "053",
+      "family": "Receipt",
+      "composition": "Platform First",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 7.2,
+        "brand_fit": 6,
+        "typography": 6,
+        "action_clarity": 7.5,
+        "engagement_potential": 6.3,
+        "credibility": 8
+      },
+      "weighted_selection_score": 6.86
+    },
+    {
+      "id": "054",
+      "family": "Receipt",
+      "composition": "Command Stage",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 7.2,
+        "brand_fit": 6,
+        "typography": 5.9,
+        "action_clarity": 7.8,
+        "engagement_potential": 6.1,
+        "credibility": 8
+      },
+      "weighted_selection_score": 6.89
+    },
+    {
+      "id": "055",
+      "family": "Receipt",
+      "composition": "Editorial Rail",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 7.1,
+        "brand_fit": 6.1,
+        "typography": 6.1,
+        "action_clarity": 7.6,
+        "engagement_potential": 5.8,
+        "credibility": 8
+      },
+      "weighted_selection_score": 6.82
+    },
+    {
+      "id": "056",
+      "family": "Switchboard",
+      "composition": "Front Page",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 8,
+        "brand_fit": 8,
+        "typography": 7,
+        "action_clarity": 8,
+        "engagement_potential": 8,
+        "credibility": 8
+      },
+      "weighted_selection_score": 7.85
+    },
+    {
+      "id": "057",
+      "family": "Switchboard",
+      "composition": "Split Desk",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 8,
+        "brand_fit": 8.2,
+        "typography": 7.1,
+        "action_clarity": 8.4,
+        "engagement_potential": 8.2,
+        "credibility": 8.1
+      },
+      "weighted_selection_score": 8.04
+    },
+    {
+      "id": "058",
+      "family": "Switchboard",
+      "composition": "Platform First",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 8.2,
+        "brand_fit": 8,
+        "typography": 7,
+        "action_clarity": 7.5,
+        "engagement_potential": 8.3,
+        "credibility": 8
+      },
+      "weighted_selection_score": 7.81
+    },
+    {
+      "id": "059",
+      "family": "Switchboard",
+      "composition": "Command Stage",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 8.2,
+        "brand_fit": 8,
+        "typography": 6.9,
+        "action_clarity": 7.8,
+        "engagement_potential": 8.1,
+        "credibility": 8
+      },
+      "weighted_selection_score": 7.84
+    },
+    {
+      "id": "060",
+      "family": "Switchboard",
+      "composition": "Editorial Rail",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 8.1,
+        "brand_fit": 8.1,
+        "typography": 7.1,
+        "action_clarity": 7.6,
+        "engagement_potential": 7.8,
+        "credibility": 8
+      },
+      "weighted_selection_score": 7.77
+    },
+    {
+      "id": "061",
+      "family": "Open Frame",
+      "composition": "Front Page",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 6,
+        "brand_fit": 7,
+        "typography": 7,
+        "action_clarity": 7,
+        "engagement_potential": 6,
+        "credibility": 7
+      },
+      "weighted_selection_score": 6.65
+    },
+    {
+      "id": "062",
+      "family": "Open Frame",
+      "composition": "Split Desk",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 6,
+        "brand_fit": 7.2,
+        "typography": 7.1,
+        "action_clarity": 7.4,
+        "engagement_potential": 6.2,
+        "credibility": 7.1
+      },
+      "weighted_selection_score": 6.83
+    },
+    {
+      "id": "063",
+      "family": "Open Frame",
+      "composition": "Platform First",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 6.2,
+        "brand_fit": 7,
+        "typography": 7,
+        "action_clarity": 6.5,
+        "engagement_potential": 6.3,
+        "credibility": 7
+      },
+      "weighted_selection_score": 6.61
+    },
+    {
+      "id": "064",
+      "family": "Open Frame",
+      "composition": "Command Stage",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 6.2,
+        "brand_fit": 7,
+        "typography": 6.9,
+        "action_clarity": 6.8,
+        "engagement_potential": 6.1,
+        "credibility": 7
+      },
+      "weighted_selection_score": 6.64
+    },
+    {
+      "id": "065",
+      "family": "Open Frame",
+      "composition": "Editorial Rail",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 6.1,
+        "brand_fit": 7.1,
+        "typography": 7.1,
+        "action_clarity": 6.6,
+        "engagement_potential": 5.8,
+        "credibility": 7
+      },
+      "weighted_selection_score": 6.57
+    },
+    {
+      "id": "066",
+      "family": "Stack of Cards",
+      "composition": "Front Page",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 7,
+        "brand_fit": 8,
+        "typography": 7,
+        "action_clarity": 7,
+        "engagement_potential": 8,
+        "credibility": 7
+      },
+      "weighted_selection_score": 7.3
+    },
+    {
+      "id": "067",
+      "family": "Stack of Cards",
+      "composition": "Split Desk",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 7,
+        "brand_fit": 8.2,
+        "typography": 7.1,
+        "action_clarity": 7.4,
+        "engagement_potential": 8.2,
+        "credibility": 7.1
+      },
+      "weighted_selection_score": 7.48
+    },
+    {
+      "id": "068",
+      "family": "Stack of Cards",
+      "composition": "Platform First",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 7.2,
+        "brand_fit": 8,
+        "typography": 7,
+        "action_clarity": 6.5,
+        "engagement_potential": 8.3,
+        "credibility": 7
+      },
+      "weighted_selection_score": 7.26
+    },
+    {
+      "id": "069",
+      "family": "Stack of Cards",
+      "composition": "Command Stage",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 7.2,
+        "brand_fit": 8,
+        "typography": 6.9,
+        "action_clarity": 6.8,
+        "engagement_potential": 8.1,
+        "credibility": 7
+      },
+      "weighted_selection_score": 7.29
+    },
+    {
+      "id": "070",
+      "family": "Stack of Cards",
+      "composition": "Editorial Rail",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 7.1,
+        "brand_fit": 8.1,
+        "typography": 7.1,
+        "action_clarity": 6.6,
+        "engagement_potential": 7.8,
+        "credibility": 7
+      },
+      "weighted_selection_score": 7.22
+    },
+    {
+      "id": "071",
+      "family": "Kinetic Marquee",
+      "composition": "Front Page",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 8,
+        "brand_fit": 5,
+        "typography": 6,
+        "action_clarity": 6,
+        "engagement_potential": 6,
+        "credibility": 5
+      },
+      "weighted_selection_score": 6.15
+    },
+    {
+      "id": "072",
+      "family": "Kinetic Marquee",
+      "composition": "Split Desk",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 8,
+        "brand_fit": 5.2,
+        "typography": 6.1,
+        "action_clarity": 6.4,
+        "engagement_potential": 6.2,
+        "credibility": 5.1
+      },
+      "weighted_selection_score": 6.33
+    },
+    {
+      "id": "073",
+      "family": "Kinetic Marquee",
+      "composition": "Platform First",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 8.2,
+        "brand_fit": 5,
+        "typography": 6,
+        "action_clarity": 5.5,
+        "engagement_potential": 6.3,
+        "credibility": 5
+      },
+      "weighted_selection_score": 6.11
+    },
+    {
+      "id": "074",
+      "family": "Kinetic Marquee",
+      "composition": "Command Stage",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 8.2,
+        "brand_fit": 5,
+        "typography": 5.9,
+        "action_clarity": 5.8,
+        "engagement_potential": 6.1,
+        "credibility": 5
+      },
+      "weighted_selection_score": 6.14
+    },
+    {
+      "id": "075",
+      "family": "Kinetic Marquee",
+      "composition": "Editorial Rail",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 8.1,
+        "brand_fit": 5.1,
+        "typography": 6.1,
+        "action_clarity": 5.6,
+        "engagement_potential": 5.8,
+        "credibility": 5
+      },
+      "weighted_selection_score": 6.07
+    },
+    {
+      "id": "076",
+      "family": "Split Reality",
+      "composition": "Front Page",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 7,
+        "brand_fit": 8,
+        "typography": 7,
+        "action_clarity": 8,
+        "engagement_potential": 7,
+        "credibility": 8
+      },
+      "weighted_selection_score": 7.5
+    },
+    {
+      "id": "077",
+      "family": "Split Reality",
+      "composition": "Split Desk",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 7,
+        "brand_fit": 8.2,
+        "typography": 7.1,
+        "action_clarity": 8.4,
+        "engagement_potential": 7.2,
+        "credibility": 8.1
+      },
+      "weighted_selection_score": 7.69
+    },
+    {
+      "id": "078",
+      "family": "Split Reality",
+      "composition": "Platform First",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 7.2,
+        "brand_fit": 8,
+        "typography": 7,
+        "action_clarity": 7.5,
+        "engagement_potential": 7.3,
+        "credibility": 8
+      },
+      "weighted_selection_score": 7.46
+    },
+    {
+      "id": "079",
+      "family": "Split Reality",
+      "composition": "Command Stage",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 7.2,
+        "brand_fit": 8,
+        "typography": 6.9,
+        "action_clarity": 7.8,
+        "engagement_potential": 7.1,
+        "credibility": 8
+      },
+      "weighted_selection_score": 7.49
+    },
+    {
+      "id": "080",
+      "family": "Split Reality",
+      "composition": "Editorial Rail",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 7.1,
+        "brand_fit": 8.1,
+        "typography": 7.1,
+        "action_clarity": 7.6,
+        "engagement_potential": 6.8,
+        "credibility": 8
+      },
+      "weighted_selection_score": 7.42
+    },
+    {
+      "id": "081",
+      "family": "Index of Possibilities",
+      "composition": "Front Page",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 6,
+        "brand_fit": 7,
+        "typography": 8,
+        "action_clarity": 7,
+        "engagement_potential": 6,
+        "credibility": 8
+      },
+      "weighted_selection_score": 6.9
+    },
+    {
+      "id": "082",
+      "family": "Index of Possibilities",
+      "composition": "Split Desk",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 6,
+        "brand_fit": 7.2,
+        "typography": 8.1,
+        "action_clarity": 7.4,
+        "engagement_potential": 6.2,
+        "credibility": 8.1
+      },
+      "weighted_selection_score": 7.09
+    },
+    {
+      "id": "083",
+      "family": "Index of Possibilities",
+      "composition": "Platform First",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 6.2,
+        "brand_fit": 7,
+        "typography": 8,
+        "action_clarity": 6.5,
+        "engagement_potential": 6.3,
+        "credibility": 8
+      },
+      "weighted_selection_score": 6.86
+    },
+    {
+      "id": "084",
+      "family": "Index of Possibilities",
+      "composition": "Command Stage",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 6.2,
+        "brand_fit": 7,
+        "typography": 7.9,
+        "action_clarity": 6.8,
+        "engagement_potential": 6.1,
+        "credibility": 8
+      },
+      "weighted_selection_score": 6.89
+    },
+    {
+      "id": "085",
+      "family": "Index of Possibilities",
+      "composition": "Editorial Rail",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 6.1,
+        "brand_fit": 7.1,
+        "typography": 8.1,
+        "action_clarity": 6.6,
+        "engagement_potential": 5.8,
+        "credibility": 8
+      },
+      "weighted_selection_score": 6.82
+    },
+    {
+      "id": "086",
+      "family": "Workshop Window",
+      "composition": "Front Page",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 7,
+        "brand_fit": 7,
+        "typography": 6,
+        "action_clarity": 7,
+        "engagement_potential": 7,
+        "credibility": 8
+      },
+      "weighted_selection_score": 6.95
+    },
+    {
+      "id": "087",
+      "family": "Workshop Window",
+      "composition": "Split Desk",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 7,
+        "brand_fit": 7.2,
+        "typography": 6.1,
+        "action_clarity": 7.4,
+        "engagement_potential": 7.2,
+        "credibility": 8.1
+      },
+      "weighted_selection_score": 7.14
+    },
+    {
+      "id": "088",
+      "family": "Workshop Window",
+      "composition": "Platform First",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 7.2,
+        "brand_fit": 7,
+        "typography": 6,
+        "action_clarity": 6.5,
+        "engagement_potential": 7.3,
+        "credibility": 8
+      },
+      "weighted_selection_score": 6.91
+    },
+    {
+      "id": "089",
+      "family": "Workshop Window",
+      "composition": "Command Stage",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 7.2,
+        "brand_fit": 7,
+        "typography": 5.9,
+        "action_clarity": 6.8,
+        "engagement_potential": 7.1,
+        "credibility": 8
+      },
+      "weighted_selection_score": 6.94
+    },
+    {
+      "id": "090",
+      "family": "Workshop Window",
+      "composition": "Editorial Rail",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 7.1,
+        "brand_fit": 7.1,
+        "typography": 6.1,
+        "action_clarity": 6.6,
+        "engagement_potential": 6.8,
+        "credibility": 8
+      },
+      "weighted_selection_score": 6.87
+    },
+    {
+      "id": "091",
+      "family": "Signal Field",
+      "composition": "Front Page",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 8,
+        "brand_fit": 6,
+        "typography": 7,
+        "action_clarity": 6,
+        "engagement_potential": 7,
+        "credibility": 6
+      },
+      "weighted_selection_score": 6.7
+    },
+    {
+      "id": "092",
+      "family": "Signal Field",
+      "composition": "Split Desk",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 8,
+        "brand_fit": 6.2,
+        "typography": 7.1,
+        "action_clarity": 6.4,
+        "engagement_potential": 7.2,
+        "credibility": 6.1
+      },
+      "weighted_selection_score": 6.89
+    },
+    {
+      "id": "093",
+      "family": "Signal Field",
+      "composition": "Platform First",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 8.2,
+        "brand_fit": 6,
+        "typography": 7,
+        "action_clarity": 5.5,
+        "engagement_potential": 7.3,
+        "credibility": 6
+      },
+      "weighted_selection_score": 6.66
+    },
+    {
+      "id": "094",
+      "family": "Signal Field",
+      "composition": "Command Stage",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 8.2,
+        "brand_fit": 6,
+        "typography": 6.9,
+        "action_clarity": 5.8,
+        "engagement_potential": 7.1,
+        "credibility": 6
+      },
+      "weighted_selection_score": 6.69
+    },
+    {
+      "id": "095",
+      "family": "Signal Field",
+      "composition": "Editorial Rail",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 8.1,
+        "brand_fit": 6.1,
+        "typography": 7.1,
+        "action_clarity": 5.6,
+        "engagement_potential": 6.8,
+        "credibility": 6
+      },
+      "weighted_selection_score": 6.62
+    },
+    {
+      "id": "096",
+      "family": "Manifesto",
+      "composition": "Front Page",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 7,
+        "brand_fit": 8,
+        "typography": 8,
+        "action_clarity": 7,
+        "engagement_potential": 7,
+        "credibility": 7
+      },
+      "weighted_selection_score": 7.3
+    },
+    {
+      "id": "097",
+      "family": "Manifesto",
+      "composition": "Split Desk",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 7,
+        "brand_fit": 8.2,
+        "typography": 8.1,
+        "action_clarity": 7.4,
+        "engagement_potential": 7.2,
+        "credibility": 7.1
+      },
+      "weighted_selection_score": 7.49
+    },
+    {
+      "id": "098",
+      "family": "Manifesto",
+      "composition": "Platform First",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 7.2,
+        "brand_fit": 8,
+        "typography": 8,
+        "action_clarity": 6.5,
+        "engagement_potential": 7.3,
+        "credibility": 7
+      },
+      "weighted_selection_score": 7.26
+    },
+    {
+      "id": "099",
+      "family": "Manifesto",
+      "composition": "Command Stage",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 7.2,
+        "brand_fit": 8,
+        "typography": 7.9,
+        "action_clarity": 6.8,
+        "engagement_potential": 7.1,
+        "credibility": 7
+      },
+      "weighted_selection_score": 7.29
+    },
+    {
+      "id": "100",
+      "family": "Manifesto",
+      "composition": "Editorial Rail",
+      "subjective_scores_out_of_10": {
+        "distinctiveness": 7.1,
+        "brand_fit": 8.1,
+        "typography": 8.1,
+        "action_clarity": 6.6,
+        "engagement_potential": 6.8,
+        "credibility": 7
+      },
+      "weighted_selection_score": 7.22
+    }
+  ]
+}

@@ -55,6 +55,7 @@ const config = defineConfig(({ mode }) => {
     throw new Error("VITE_PUBLIC_SITE_URL must be an HTTP(S) origin");
   const siteUrl = publicUrl.origin;
   const indexable = isProductionSite(mode, url.origin, site);
+  const prerenderFilter = createPrerenderFilter();
 
   return {
     define: {
@@ -89,7 +90,14 @@ const config = defineConfig(({ mode }) => {
           autoStaticPathsDiscovery: true,
           crawlLinks: true,
           failOnError: true,
-          filter: createPrerenderFilter(),
+          filter: (page) => {
+            // Section links are useful navigation, not separate indexed pages.
+            if (new URL(page.path, siteUrl).hash) {
+              page.sitemap = { ...page.sitemap, exclude: true };
+              return false;
+            }
+            return prerenderFilter(page);
+          },
         },
         sitemap: { enabled: true, host: siteUrl },
       }),

@@ -4,6 +4,10 @@
     "authenticated": false
   },
   {
+    "path": "/build",
+    "authenticated": false
+  },
+  {
     "path": "/consent",
     "authenticated": false
   },
@@ -28,7 +32,15 @@
     "authenticated": false
   },
   {
+    "path": "/stack",
+    "authenticated": false
+  },
+  {
     "path": "/verify-email",
+    "authenticated": false
+  },
+  {
+    "path": "/why-disposabl",
     "authenticated": false
   },
   {

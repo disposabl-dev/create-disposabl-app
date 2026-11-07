@@ -1,10 +1,10 @@
 {
   "name": "Disposabl",
-  "title": "Disposabl | Your app, everywhere",
-  "description": "Build web, mobile, and desktop apps with your favorite coding agent. One open-source project, every platform. Start with Disposabl.",
+  "title": "Disposabl | Your AI. Your computer. Your code.",
+  "description": "Build web, mobile, and desktop apps with your favorite coding agent. Free local development. Open-source code you own. No Disposabl subscription.",
   "origin": "https://www.disposabl.dev",
   "backendOrigin": "https://vivid-caterpillar-633.convex.site",
-  "image": "/og/disposabl-v1.png?v=20261105",
-  "imageAlt": "Disposabl. Your app, everywhere. Web, mobile, desktop, API, CLI and MCP.",
+  "image": "/og/disposabl-launch.png",
+  "imageAlt": "Disposabl. Your app. Everywhere. Your AI. Your computer. Your code. Free to build locally.",
   "analytics": true
 }

@@ -40,6 +40,11 @@ const touched = [
   "apps/web/src/components/connections",
   "apps/web/src/components/agent-onboarding",
   "packages/tests/flows/agent-onboarding.e2e.ts",
+  "apps/web/src/router/build.tsx",
+  "apps/web/src/router/stack.tsx",
+  "apps/web/src/router/why-disposabl.tsx",
+  "apps/web/src/routeTree.gen.ts",
+  "packages/tests/flows/landing.e2e.ts",
   "packages/tests/flows/github-identity.e2e.ts",
   "bun.lock",
   "turbo.json",
@@ -160,6 +165,11 @@ for (const path of [
   "apps/web/src/components/connections",
   "apps/web/src/components/agent-onboarding",
   "packages/tests/flows/agent-onboarding.e2e.ts",
+  "apps/web/src/router/build.tsx",
+  "apps/web/src/router/stack.tsx",
+  "apps/web/src/router/why-disposabl.tsx",
+  "apps/web/src/routeTree.gen.ts",
+  "packages/tests/flows/landing.e2e.ts",
   "packages/tests/flows/github-identity.e2e.ts",
 ])
   await rm(join(root, path), { recursive: true, force: true });
