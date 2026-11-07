@@ -91,6 +91,12 @@ if (args[0] === "api" && args[1].includes("/releases/tags/")) {
   if (f.fault === "download") process.exit(1);
   writeFileSync(join(args[args.indexOf("--dir") + 1], "android.apk"), f.fault === "corrupt" ? "corrupt" : f.binary);
   writeFileSync("downloaded", "yes");
+} else if (args[1] === "upload" && f.fault === "upload-once" && !existsSync("upload-failed")) {
+  // gh --clobber removes the existing asset before an upload can fail.
+  if (args.some(a => a.endsWith("/android.apk"))) f.release.assets = [];
+  writeFileSync(process.env.FIXTURE, JSON.stringify(f));
+  writeFileSync("upload-failed", "yes");
+  process.exit(1);
 }
 `,
       { mode: 0o755 },
@@ -99,23 +105,31 @@ if (args[0] === "api" && args[1].includes("/releases/tags/")) {
       join(cwd, ".github/scripts/disposabl.mjs"),
       'import {writeFileSync} from "node:fs"; writeFileSync("reported", process.argv.slice(2).join(" "));',
     );
-    const result = spawnSync("bash", [script, "release-publish"], {
-      cwd,
-      encoding: "utf8",
-      env: {
-        ...process.env,
-        PATH: `${join(cwd, "bin")}:${process.env.PATH}`,
-        FIXTURE: join(cwd, "fixture.json"),
-        RUNNER_TEMP: cwd,
-        GH_REPO: "fixture/app",
-        SOURCE: source,
-        CHANNEL: channel,
-        PR: "1",
-        PRERELEASE: String(!options.production),
-        GITHUB_RUN_ID: "9",
-        GITHUB_RUN_ATTEMPT: "1",
-      },
-    });
+    const run = () =>
+      spawnSync("bash", [script, "release-publish"], {
+        cwd,
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          PATH: `${join(cwd, "bin")}:${process.env.PATH}`,
+          FIXTURE: join(cwd, "fixture.json"),
+          RUNNER_TEMP: cwd,
+          GH_REPO: "fixture/app",
+          SOURCE: source,
+          CHANNEL: channel,
+          PR: "1",
+          PRERELEASE: String(!options.production),
+          GITHUB_RUN_ID: "9",
+          GITHUB_RUN_ATTEMPT: "1",
+        },
+      });
+    let result = run();
+    if (options.fault === "upload-once") {
+      assert.notEqual(result.status, 0, "first upload must fail");
+      // A fresh publisher starts with only the metadata Actions artifact.
+      rmSync(join(cwd, "artifacts/release-android/android.apk"));
+      result = run();
+    }
     const commands: string[][] = readFileSync(
       join(cwd, "commands.jsonl"),
       "utf8",
@@ -144,7 +158,10 @@ test("metadata-only OTA restores the verified APK for PR and production publicat
     const published = result.commands.find(
       (args) => args[1] === (production ? "create" : "upload"),
     )!;
-    assert.ok(published.includes("artifacts/release-android/android.apk"));
+    assert.equal(
+      published.includes("artifacts/release-android/android.apk"),
+      production,
+    );
     assert.equal(
       published[2],
       production ? "app-production-android-9-1" : "app-pr-1-android",
@@ -154,6 +171,31 @@ test("metadata-only OTA restores the verified APK for PR and production publicat
       false,
     );
   }
+});
+
+test("same-tag metadata upload failure preserves the source APK for a fresh retry", () => {
+  const result = publish({ fault: "upload-once" });
+  assert.equal(result.status, 0, result.output);
+  assert.equal(
+    result.commands.filter((args) => args[1] === "download").length,
+    2,
+  );
+  assert.equal(
+    result.commands.filter((args) => args[1] === "upload").length,
+    2,
+  );
+  assert.equal(
+    result.commands.some(
+      (args) =>
+        args[1] === "upload" &&
+        args.includes("artifacts/release-android/android.apk"),
+    ),
+    false,
+  );
+  assert.equal(
+    result.commands.some((args) => args[1] === "delete-asset"),
+    false,
+  );
 });
 
 test("OTA reuse rejects mismatched, missing, corrupt and stale inputs before publication", () => {

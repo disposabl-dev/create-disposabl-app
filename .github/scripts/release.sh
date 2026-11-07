@@ -49,6 +49,9 @@ for platform in android linux windows; do
   directory="artifacts/release-$platform"
   test -d "$directory" || continue
   check_source
+  tag="app-$CHANNEL-$platform"
+  if [[ "$CHANNEL" == production ]]; then tag+="-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"; fi
+  preserve_apk=false
   if [[ "$platform" == android && ! -f "$directory/android.apk" ]]; then
     source_tag=$(jq -er 'select(.action == "update") | .sourceTag | strings | select(length > 0)' "$directory/android.json")
     base="app-$CHANNEL-android"
@@ -72,13 +75,16 @@ for platform in android linux windows; do
     gh release download "$source_tag" --pattern android.apk --dir "$directory"
     printf '%s  %s\n' "$(jq -er .sha256 "$directory/android.json")" "$directory/android.apk" | sha256sum -c -
     check_source
+    if [[ "$source_tag" == "$tag" ]]; then preserve_apk=true; fi
   fi
-  tag="app-$CHANNEL-$platform"
-  if [[ "$CHANNEL" == production ]]; then tag+="-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"; fi
   printf 'Platform: %s\nSource: %s\n' "$platform" "$SOURCE" > "$RUNNER_TEMP/release-notes.md"
   if [[ -f "$directory/android.json" ]]; then printf '<!-- android %s -->\n' "$(jq -c . "$directory/android.json")" >> "$RUNNER_TEMP/release-notes.md"; fi
   if gh release view "$tag" --json assets,isDraft > "$RUNNER_TEMP/previous-release.json"; then
-    gh release upload "$tag" "$directory/"* --clobber
+    # --clobber deletes before uploading. Keep the verified source APK intact so
+    # a failed metadata upload can retry without losing its only stored binary.
+    assets=("$directory/"*)
+    if [[ "$preserve_apk" == true ]]; then assets=("$directory/android.json"); fi
+    gh release upload "$tag" "${assets[@]}" --clobber
     while IFS= read -r asset; do
       if [[ ! -f "$directory/$asset" ]]; then check_source; gh release delete-asset "$tag" "$asset" --yes; fi
     done < <(jq -r '.assets[].name' "$RUNNER_TEMP/previous-release.json")
