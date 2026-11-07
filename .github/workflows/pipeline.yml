@@ -224,9 +224,19 @@ jobs:
         run: bash "$GITHUB_WORKSPACE/.github/scripts/mobile.sh" android-build
       - *publish
       - *artifacts
-      - name: Report Android failure
-        if: failure() || cancelled()
-        run: node .github/scripts/disposabl.mjs report android failed
+  android-failure:
+    name: Report Android failure
+    needs: android
+    if: failure() && needs.android.result == 'failure'
+    permissions:
+      contents: read
+      id-token: write
+    runs-on: *linux-runner
+    timeout-minutes: 5
+    steps:
+      - *checkout
+      - *node
+      - run: node .github/scripts/disposabl.mjs report android failed
   ios-preview:
     name: iOS simulator preview
     needs: [changes, web]
