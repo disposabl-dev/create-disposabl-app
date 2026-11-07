@@ -1,7 +1,9 @@
 import {
   Check,
   FileText,
-  RefreshCw,
+  BarChart3,
+  Languages,
+  CreditCard,
   Database,
   ArrowUpRight,
 } from "lucide-react";
@@ -95,12 +97,23 @@ export function Foundation() {
           </article>
           <article className="foundation-feature foundation-feature-extra">
             <div>
-              <RefreshCw size={24} aria-hidden="true" />
-              <h3>More ways to grow.</h3>
-              <p>
-                Choose optional analytics and payments. Support for 85+
-                languages is coming soon.
-              </p>
+              <BarChart3 size={28} aria-hidden="true" />
+              <h3>Analytics</h3>
+              <p>See how people use your app. Turn analytics on or off.</p>
+            </div>
+          </article>
+          <article className="foundation-feature foundation-feature-extra">
+            <div>
+              <Languages size={28} aria-hidden="true" />
+              <h3>85+ languages</h3>
+              <p>Let people use your app in their language. Coming soon.</p>
+            </div>
+          </article>
+          <article className="foundation-feature foundation-feature-extra">
+            <div>
+              <CreditCard size={28} aria-hidden="true" />
+              <h3>Payments</h3>
+              <p>Connect a payment provider to accept payments in your app.</p>
             </div>
           </article>
         </div>

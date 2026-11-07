@@ -69,29 +69,31 @@
 }
 .store-buttons {
   display: flex;
-  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
 }
 .store-control {
   position: relative;
-  flex: 1;
+  flex: none;
 }
 .store-button {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 10px;
-  width: 100%;
+  width: auto;
   height: 48px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--surface);
-  color: var(--text);
-  font-size: 16px;
-  white-space: nowrap;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
 }
-.store-button .brand-icon {
-  width: 24px;
-  height: 24px;
+.store-button img {
+  display: block;
+  height: 40px;
+  width: auto;
+}
+.footer-invitation .store-buttons {
+  flex-shrink: 0;
 }
 .store-tooltip {
   position: absolute;
@@ -185,12 +187,6 @@
   }
   .start-agent-logos {
     display: none;
-  }
-  .store-buttons {
-    gap: 8px;
-  }
-  .store-button {
-    padding-inline: 8px;
   }
   .command-start {
     gap: 8px;

@@ -1,0 +1,442 @@
+.preview-booking,
+.preview-planner,
+.preview-community {
+  width: 100%;
+  min-width: 0;
+  min-height: 480px;
+  color: #242522;
+  font-size: 16px;
+  line-height: 1.4;
+}
+.preview-booking button,
+.preview-planner button,
+.preview-community button {
+  font: inherit;
+  cursor: pointer;
+}
+.preview-booking button:focus-visible,
+.preview-planner button:focus-visible,
+.preview-community button:focus-visible,
+.preview-planner input:focus-visible {
+  outline: 3px solid #5478ec;
+  outline-offset: 2px;
+}
+.preview-booking {
+  background: #f4f0e9;
+}
+.preview-booking header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 28px;
+  border-bottom: 1px solid #ded9d0;
+  font-size: 16px;
+}
+.preview-booking header strong span {
+  font-size: 25px;
+  vertical-align: middle;
+  margin-right: 8px;
+}
+.booking-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  padding: 32px 28px;
+}
+.booking-intro > span {
+  font-size: 16px;
+  letter-spacing: 0.1em;
+  color: #695e54;
+}
+.preview-booking h4 {
+  margin: 8px 0;
+  font-family: Georgia, serif;
+  font-size: 32px;
+  font-weight: 400;
+  line-height: 1.1;
+}
+.preview-booking p {
+  margin: 10px 0 20px;
+  color: #695e54;
+}
+.booking-service {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 13px 0;
+  border-top: 1px solid #d9d2c8;
+}
+.booking-service strong {
+  font-weight: 500;
+}
+.booking-service span {
+  color: #695e54;
+  font-size: 16px;
+}
+.booking-picker {
+  padding: 22px;
+  background: #fffdfa;
+  border: 1px solid #e1dad0;
+  border-radius: 12px;
+}
+.booking-picker h4 {
+  font-size: 25px;
+}
+.booking-picker p {
+  font-size: 16px;
+}
+.preview-days,
+.preview-times {
+  display: flex;
+  gap: 6px;
+}
+.preview-days button {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 9px 2px;
+  background: none;
+  border: 1px solid #e0dbd3;
+  border-radius: 7px;
+  color: #403b36;
+}
+.preview-days button span {
+  font-size: 16px;
+}
+.preview-days button[aria-pressed="true"],
+.preview-times button[aria-pressed="true"] {
+  background: #514d40;
+  border-color: #514d40;
+  color: white;
+}
+.preview-times {
+  margin-top: 16px;
+}
+.preview-times button {
+  flex: 1;
+  padding: 8px 2px;
+  border: 1px solid #e0dbd3;
+  border-radius: 6px;
+  background: none;
+  color: #403b36;
+}
+.booking-submit,
+.preview-community button {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin-top: 18px;
+  padding: 12px;
+  border: 0;
+  border-radius: 7px;
+  background: #514d40;
+  color: white;
+}
+.preview-planner {
+  display: grid;
+  grid-template-columns: 155px 1fr;
+  background: #fbfaf7;
+}
+.planner-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 26px 14px;
+  background: #e9ece5;
+  color: #566158;
+}
+.planner-nav strong {
+  margin: 0 5px 22px;
+  color: #293c30;
+  font-size: 19px;
+}
+.planner-nav strong span {
+  color: #67856c;
+}
+.planner-nav > div {
+  padding: 9px 10px;
+  border-radius: 7px;
+}
+.planner-nav-active {
+  background: #d7e2d4;
+  color: #294b35;
+}
+.planner-nav footer {
+  margin: auto 8px 0;
+  font-family: Georgia, serif;
+  font-size: 18px;
+  line-height: 1.3;
+}
+.planner-main {
+  min-width: 0;
+  padding: 25px 30px;
+}
+.planner-main header {
+  display: flex;
+  justify-content: space-between;
+  color: #626d63;
+  font-size: 16px;
+}
+.planner-main h4 {
+  margin: 16px 0 0;
+  font:
+    400 32px Georgia,
+    serif;
+}
+.planner-main > p {
+  margin: 4px 0 15px;
+  color: #626d63;
+}
+.preview-planner .planner-progress {
+  color: #69766d;
+  font-size: 16px;
+}
+.preview-planner .planner-progress > div {
+  height: 5px;
+  margin-top: 8px;
+  background: #e5eae4;
+  border-radius: 5px;
+}
+.preview-planner .planner-progress i {
+  display: block;
+  height: 100%;
+  background: #6d9775;
+  border-radius: 5px;
+}
+.planner-section-title {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 24px;
+}
+.planner-section-title strong {
+  font-weight: 500;
+}
+.planner-section-title span {
+  color: #626d63;
+  font-size: 16px;
+}
+.preview-planner .planner-tasks {
+  margin-top: 7px;
+}
+.preview-planner .planner-tasks button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 11px 0;
+  border: 0;
+  border-bottom: 1px solid #e9ece7;
+  background: none;
+  color: #344039;
+  text-align: left;
+}
+.preview-planner .task-check {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border: 1px solid #9eaaa0;
+  border-radius: 50%;
+}
+.preview-planner button[aria-pressed="true"] .task-check {
+  background: #719579;
+  color: white;
+  border-color: #719579;
+}
+.preview-planner .planner-add {
+  display: flex;
+  margin-top: 12px;
+  border: 1px solid #dce3dc;
+  border-radius: 7px;
+  background: #fff;
+}
+.preview-planner .planner-add input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  padding: 10px;
+  background: transparent;
+  color: #283a2d;
+  font: inherit;
+}
+.preview-planner .planner-add button {
+  display: flex;
+  align-items: center;
+  border: 0;
+  padding: 0 12px;
+  background: none;
+  color: #52745a;
+}
+.planner-schedule {
+  margin-top: 20px;
+}
+.planner-schedule > strong {
+  font-weight: 500;
+}
+.planner-schedule div {
+  display: flex;
+  gap: 12px;
+  padding-top: 10px;
+  color: #516057;
+}
+.planner-schedule div span:first-child {
+  color: #626d63;
+}
+.planner-schedule div span:last-child {
+  margin-left: auto;
+}
+.preview-community {
+  background: #f8f6ef;
+}
+.preview-community header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 24px;
+  border-bottom: 1px solid #deded4;
+  font-size: 16px;
+}
+.preview-community header strong span {
+  margin-left: 8px;
+  color: #e57045;
+  font-size: 23px;
+}
+.community-cover {
+  height: 175px;
+  position: relative;
+  overflow: hidden;
+  background: #718371;
+  color: white;
+}
+.community-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.community-cover > div {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: end;
+  padding: 20px 26px;
+  background: linear-gradient(transparent, #17251dbb);
+}
+.community-cover span {
+  font-size: 16px;
+  letter-spacing: 0.1em;
+}
+.community-cover strong {
+  margin-top: 5px;
+  font:
+    400 30px/1.05 Georgia,
+    serif;
+}
+.community-content {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: 24px;
+  padding: 24px 26px;
+}
+.community-event > span {
+  color: #b55c3e;
+  font-size: 16px;
+  letter-spacing: 0.08em;
+}
+.preview-community h4 {
+  margin: 10px 0;
+  font:
+    400 28px/1.1 Georgia,
+    serif;
+}
+.community-event p {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0;
+  color: #687067;
+}
+.preview-community button {
+  justify-content: space-between;
+  background: #284d3c;
+  text-align: left;
+}
+.community-content aside {
+  border-left: 1px solid #deded4;
+  padding-left: 20px;
+}
+.community-content aside strong {
+  font:
+    400 21px Georgia,
+    serif;
+}
+.community-content aside p,
+.community-content aside > span {
+  color: #687067;
+}
+.community-avatars {
+  display: flex;
+  margin: 20px 0 8px;
+}
+.community-avatars span {
+  display: grid;
+  place-items: center;
+  width: 31px;
+  height: 31px;
+  margin-right: -4px;
+  border: 2px solid #f8f6ef;
+  border-radius: 50%;
+  background: #d7a987;
+  color: #493c31;
+}
+.community-avatars span:nth-child(2) {
+  background: #b6c8b1;
+}
+.community-avatars span:nth-child(3) {
+  background: #e9cf8d;
+}
+@media (max-width: 600px) {
+  .booking-layout {
+    grid-template-columns: 1fr;
+    padding: 20px;
+  }
+  .booking-intro > span,
+  .booking-intro > p,
+  .booking-service {
+    display: none;
+  }
+  .preview-booking header {
+    padding: 16px 20px;
+  }
+  .booking-picker {
+    padding: 16px;
+  }
+  .preview-planner {
+    grid-template-columns: 1fr;
+  }
+  .planner-nav {
+    display: none;
+  }
+  .planner-main {
+    padding: 22px;
+  }
+  .community-content {
+    grid-template-columns: 1fr;
+    padding: 20px;
+  }
+  .community-content aside {
+    display: none;
+  }
+  .preview-community header div {
+    display: none;
+  }
+}

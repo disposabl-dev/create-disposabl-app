@@ -51,10 +51,10 @@ export function HeroPreview() {
         </div>
         <div className="trip-cover">
           <img
-            src="/landing/lake.jpg"
-            alt="A mountain lake surrounded by pine forest"
-            width={500}
-            height={333}
+            src="/landing/coast.jpg"
+            alt="A coastal path above turquoise water"
+            width={1200}
+            height={800}
             fetchPriority="high"
           />
           <div>
@@ -72,7 +72,7 @@ export function HeroPreview() {
             <div>
               <strong>Take the scenic route</strong>
               <span>
-                <MapPin size={16} /> Lakeside trail
+                <MapPin size={16} /> Coastal trail
               </span>
             </div>
             <ChevronRight size={20} />

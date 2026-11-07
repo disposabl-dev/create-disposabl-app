@@ -1,3 +1,4 @@
+import { StoreDownloads } from "./store-downloads";
 import { useHydrated } from "@tanstack/react-router";
 import { useState, useRef, useEffect, type ReactNode } from "react";
 import { ArrowUpRight, Menu, X, Sun, Moon } from "lucide-react";
@@ -167,24 +168,9 @@ export function MarketingShell({
         <div className="launch-container">
           <div className="footer-invitation">
             <h2>Yours to make.</h2>
-            {onStart ? (
-              <button
-                disabled={!hydrated}
-                onClick={onStart}
-                aria-label="Start making your app"
-              >
-                <ArrowUpRight size={54} />
-              </button>
-            ) : (
-              <a href="/#start" aria-label="Start making your app">
-                <ArrowUpRight size={54} />
-              </a>
-            )}
+            <StoreDownloads />
           </div>
           <div className="footer-directory">
-            <h3 className="footer-belief" data-moment="word-highlight">
-              Build with your AI, on your computer, with code you can keep.
-            </h3>
             <nav aria-label="Explore Disposabl">
               <a href="/build">How it works</a>
               <a href="/stack">Tech stack</a>
@@ -211,20 +197,6 @@ export function MarketingShell({
           </a>
           <div className="footer-colophon">
             <span>© {new Date().getFullYear()} Disposabl</span>
-            <details className="photo-credit">
-              <summary>Image credit</summary>
-              <p>
-                Lake photograph by{" "}
-                <a href="https://commons.wikimedia.org/wiki/File:Ergaki,_Artists%27_Lake_and_pine_forest,_Sayan_Mountains,_Russia.jpg">
-                  Vyacheslav Argenberg, Wikimedia Commons
-                </a>
-                ,{" "}
-                <a href="https://creativecommons.org/licenses/by/4.0/">
-                  CC BY 4.0
-                </a>
-                . Cropped for the example app.
-              </p>
-            </details>
             <a href="#main">Back to top ↑</a>
           </div>
         </div>

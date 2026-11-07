@@ -9,9 +9,6 @@ import {
   Play,
   Pause,
   Check,
-  CalendarDays,
-  LayoutGrid,
-  Search,
 } from "lucide-react";
 import { BookingDemo, PlannerDemo, CommunityDemo } from "./app-examples";
 import { GameDemo } from "./game-example";
@@ -52,7 +49,7 @@ export const appIdeas = [
     label: "Team operations",
     title: "A workspace for your whole team.",
     prompt:
-      "A team operations app with individual sign-in, role-based access, request approvals, an activity history, and an optional analytics dashboard. Help me design and test the access rules before publishing.",
+      "A team operations app with individual sign-in, role-based access, request approvals, an activity history, and an analytics dashboard. Help me design and test the access rules before publishing.",
   },
 ] as const;
 
@@ -142,6 +139,18 @@ export function AppPlayground({
       <div className="playground-heading">
         <h2 id="playground-title">See what you can make.</h2>
         <div className="showcase-controls">
+          <div className="demo-disclosure">
+            <button
+              aria-label="About this interactive example"
+              aria-describedby={`demo-info-${idea.id}`}
+            >
+              <Info size={18} />
+            </button>
+            <span id={`demo-info-${idea.id}`} role="tooltip">
+              Interactive example. Nothing is booked, saved, or sent.
+            </span>
+          </div>
+
           <button
             aria-label="Previous app example"
             onClick={() => choose(active - 1)}
@@ -222,59 +231,18 @@ export function AppPlayground({
         </div>
         <div className="playground-demo">
           <div className="showcase-window">
-            <div className="showcase-chrome">
-              <LayoutGrid size={20} />
-              <span>{idea.label}</span>
-              <div className="demo-disclosure">
-                <button
-                  aria-label="About this interactive example"
-                  aria-describedby={`demo-info-${idea.id}`}
-                >
-                  <Info size={18} />
-                </button>
-                <span id={`demo-info-${idea.id}`} role="tooltip">
-                  Interactive example. Nothing is booked, saved, or sent.
-                </span>
-              </div>
-            </div>
-            <div className="showcase-body">
-              <aside className="showcase-sidebar" aria-hidden="true">
-                <CalendarDays size={24} />
-                <strong>
-                  {idea.id === "planner"
-                    ? "Your week"
-                    : idea.id === "game"
-                      ? "Play again"
-                      : idea.id === "operations"
-                        ? "Your team"
-                        : "Your space"}
-                </strong>
-                <span>Overview</span>
-                <span>Saved</span>
-                <span>Settings</span>
-                <div className="showcase-month">
-                  {"MTWTFSS".split("").map((d, i) => (
-                    <span key={i}>{d}</span>
-                  ))}
-                  {Array.from({ length: 28 }, (_, i) => (
-                    <i key={i}>{i + 1}</i>
-                  ))}
-                </div>
-                <Search size={20} />
-              </aside>
-              <div className="showcase-screen" key={idea.id}>
-                {idea.id === "booking" ? (
-                  <BookingDemo disabled={!hydrated} />
-                ) : idea.id === "planner" ? (
-                  <PlannerDemo disabled={!hydrated} />
-                ) : idea.id === "game" ? (
-                  <GameDemo disabled={!hydrated} />
-                ) : idea.id === "community" ? (
-                  <CommunityDemo disabled={!hydrated} />
-                ) : (
-                  <OperationsDemo disabled={!hydrated} />
-                )}
-              </div>
+            <div className="showcase-screen" key={idea.id}>
+              {idea.id === "booking" ? (
+                <BookingDemo disabled={!hydrated} />
+              ) : idea.id === "planner" ? (
+                <PlannerDemo disabled={!hydrated} />
+              ) : idea.id === "game" ? (
+                <GameDemo disabled={!hydrated} />
+              ) : idea.id === "community" ? (
+                <CommunityDemo disabled={!hydrated} />
+              ) : (
+                <OperationsDemo disabled={!hydrated} />
+              )}
             </div>
           </div>
         </div>

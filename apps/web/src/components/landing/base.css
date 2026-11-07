@@ -413,19 +413,6 @@ body:has(.start-dialog[open]) {
 .faq-section > .text-link {
   grid-column: 2;
 }
-.closing-start {
-  padding-block: 112px;
-  display: grid;
-  grid-template-columns: 5fr 6fr;
-  gap: 96px;
-  align-items: start;
-}
-.closing-start h2 {
-  font-size: clamp(40px, 4.6vw, 64px);
-}
-.closing-start .start-actions {
-  margin-top: 0;
-}
 .launch-footer {
   background: var(--raised);
   padding-block: 64px 24px;
@@ -443,27 +430,11 @@ body:has(.start-dialog[open]) {
   font-weight: 400;
   letter-spacing: -0.055em;
 }
-.footer-invitation > :is(a, button) {
-  display: grid;
-  place-items: center;
-  width: 80px;
-  height: 80px;
-  border: 1px solid var(--line);
-  border-radius: 50%;
-  background: var(--text);
-  color: var(--surface);
-  flex: none;
-}
 .footer-directory {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr;
+  grid-template-columns: 1fr 1fr;
   gap: 40px;
   padding: 56px 0;
-}
-.launch-site .footer-directory > .footer-belief {
-  font-size: 24px;
-  line-height: 1.5;
-  letter-spacing: -0.025em;
 }
 .footer-directory nav {
   display: flex;
@@ -574,8 +545,7 @@ body:has(.start-dialog[open]) {
   .platform-ribbon > div {
     gap: 16px;
   }
-  .faq-section,
-  .closing-start {
+  .faq-section {
     gap: 48px;
   }
   .price-card {
@@ -618,15 +588,13 @@ body:has(.start-dialog[open]) {
     font-size: 16px;
   }
   .pricing-section,
-  .faq-section,
-  .closing-start {
+  .faq-section {
     padding-block: 72px;
   }
   .pricing-grid {
     grid-template-columns: 1fr;
   }
-  .faq-section,
-  .closing-start {
+  .faq-section {
     grid-template-columns: 1fr;
     gap: 32px;
   }
@@ -640,18 +608,10 @@ body:has(.start-dialog[open]) {
     grid-template-columns: 1fr 1fr;
     gap: 32px;
   }
-  .footer-directory > .footer-belief {
-    grid-column: 1/-1;
-  }
   .footer-invitation {
+    align-items: flex-start;
+    flex-direction: column;
     padding-bottom: 40px;
-  }
-  .footer-invitation > :is(a, button) {
-    width: 56px;
-    height: 56px;
-  }
-  .footer-invitation svg {
-    width: 32px;
   }
   .launch-footer {
     padding-top: 48px;
@@ -732,22 +692,6 @@ body:has(.start-dialog[open]) {
   --bg: var(--raised);
   --ink: var(--text);
   --t-h2: 24px;
-}
-.photo-credit {
-  font-size: 16px;
-}
-.photo-credit summary {
-  cursor: pointer;
-  min-height: 44px;
-  display: flex;
-  align-items: center;
-}
-.photo-credit p {
-  max-width: 600px;
-  font-size: 16px;
-}
-.photo-credit a {
-  text-decoration: underline;
 }
 
 .launch-site :is(a, button, summary, input) {

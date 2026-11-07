@@ -64,9 +64,9 @@ export function Home() {
           <div className="launch-container workshop-hero">
             <div className="hero-message">
               <h1 id="hero-title">
-                Free app builder.
+                Make your own
                 <br />
-                Every platform.
+                app. For free.
               </h1>
               <StartActions onDetails={start} />
             </div>
@@ -97,19 +97,6 @@ export function Home() {
         <Pricing onStart={start} disabled={!hydrated} />
 
         <Questions />
-        <section
-          className="closing-start launch-container"
-          aria-labelledby="closing-title"
-        >
-          <h2 id="closing-title">
-            Your next app
-            <br />
-            starts here.
-          </h2>
-          <div>
-            <StartActions onDetails={start} closing />
-          </div>
-        </section>
       </main>
       <dialog
         className="start-dialog"

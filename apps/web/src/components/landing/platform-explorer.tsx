@@ -99,10 +99,7 @@ export function PlatformExplorer({
       aria-labelledby="platform-title"
     >
       <div className="section-heading">
-        <h2 id="platform-title">Choose where your app runs</h2>
-        <p>
-          Web is included. Select more platforms to see the tools each one adds.
-        </p>
+        <h1 id="platform-title">Choose where your app runs</h1>
       </div>
       <div
         className="platform-toggles"

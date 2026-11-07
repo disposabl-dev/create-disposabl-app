@@ -111,11 +111,7 @@ export function AgentOnboarding({
           </div>
         )}
         <div className="landing-composer-footer">
-          <p>
-            {mode === "prompt"
-              ? "Paste into your coding agent."
-              : "Run in your terminal. Requires Bun."}
-          </p>
+          {mode === "prompt" && <p>Paste into your coding agent.</p>}
           <CopyButton
             key={text}
             text={text}

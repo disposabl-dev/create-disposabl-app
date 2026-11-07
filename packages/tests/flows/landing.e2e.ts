@@ -7,6 +7,10 @@ test(
   { platforms: ["web"], tags: ["landing"] },
   async ({ app, screen, browser }) => {
     await app.open("/stack");
+    await expect(browser.locator("main h1")).toHaveCount(1);
+    await expect(browser.locator("main h1")).toHaveText(
+      "Choose where your app runs",
+    );
     await screen.getByRole("button", "Android", { exact: true }).tap();
     await screen.getByRole("button", "iOS", { exact: true }).tap();
     await screen.getByRole("button", "iOS", { exact: true }).tap();
@@ -40,7 +44,7 @@ test(
       browser.locator('[data-stack="desktop"] .selected-targets'),
     ).toHaveText("Selected: macOS + Windows + Linux");
     await expect(browser.locator('[data-stack="mcp"]')).toBeVisible();
-    await browser.locator(".guide-end .primary-link").tap();
+    await screen.getByRole("link", "Continue with these platforms").tap();
     await expect(browser.locator(".landing-prompt")).toContainText("macos");
     await screen.getByRole("button", "Run a command").tap();
     await expect(browser.locator(".landing-terminal code")).toContainText(
@@ -67,7 +71,9 @@ test(
           [i].focus();
         return true;
       }, index);
-      await expect(browser.locator(`#store-tip-${index}`)).toBeVisible();
+      await expect(
+        browser.locator(".maker-hero .store-tooltip").nth(index),
+      ).toBeVisible();
       await browser.keyboard.press("Enter");
       expect(new URL(await browser.url()).pathname).toBe("/");
     }
@@ -233,6 +239,9 @@ test(
   async ({ app, browser, screen }) => {
     await browser.setViewport({ width: 390, height: 844 });
     await app.open("/");
+    await expect(browser.locator("#hero-title")).toHaveText(
+      "Make your own app. For free.",
+    );
     await expect(browser.locator(".maker-hero .setup-prompt-text")).toHaveText(
       "Help me build an app with Disposabl. Read https://github.com/disposabl-dev/create-disposabl-app, then ask me what I want to make and where it should run.",
     );
@@ -647,9 +656,18 @@ test(
         ),
       ).toBe(false);
     }
-    await expect(browser.locator(".app-foundation")).toContainText("85+");
+    await expect(
+      browser
+        .locator(".app-foundation h3")
+        .getByText("Analytics", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      browser
+        .locator(".app-foundation h3")
+        .getByText("85+ languages", { exact: true }),
+    ).toBeVisible();
     await expect(browser.locator(".app-foundation")).toContainText(
-      "languages is coming soon",
+      "Let people use your app in their language. Coming soon.",
     );
     await expect(browser.locator(".app-foundation")).toContainText(
       "documentation site",
@@ -706,16 +724,16 @@ test(
     expect(
       await browser.evaluate(() => (window as any).__copied as string),
     ).toBe("npx create-disposabl-app@latest");
-    await browser.locator(".closing-start .copy-start").tap();
-    await expect(browser.locator(".closing-start .copy-start")).toContainText(
-      "Copied",
+    await expect(browser.locator("footer .store-button")).toHaveCount(2);
+    await expect(
+      browser.locator("footer .store-button").nth(0),
+    ).toHaveAttribute("aria-disabled", "true");
+    await expect(
+      browser.locator("footer .store-button").nth(1),
+    ).toHaveAttribute("aria-disabled", "true");
+    await expect(browser.locator("footer .footer-invitation")).toContainText(
+      "Yours to make.",
     );
-    await browser.locator(".closing-start .command-start").tap();
-    expect(
-      await browser.evaluate(() => (window as any).__copied as string),
-    ).toBe("npx create-disposabl-app@latest");
-    await browser.locator(".closing-start .setup-help").tap();
-    await expect(browser.locator(".start-dialog[open]")).toBeVisible();
   },
 );
 

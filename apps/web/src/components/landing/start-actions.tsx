@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Check, Copy, ArrowUpRight, Terminal } from "lucide-react";
 import { useHydrated } from "@tanstack/react-router";
-import { BrandIcon } from "./brand-icon";
+import { StoreDownloads } from "./store-downloads";
 import { setupPrompt } from "../agent-onboarding";
 import codex from "../agent-onboarding/assets/codex.png";
 import claude from "../agent-onboarding/assets/claude.svg";
@@ -9,13 +9,7 @@ import cursor from "../agent-onboarding/assets/cursor.svg";
 
 export const setupCommand = "npx create-disposabl-app@latest";
 
-export function StartActions({
-  onDetails,
-  closing = false,
-}: {
-  onDetails: () => void;
-  closing?: boolean;
-}) {
+export function StartActions({ onDetails }: { onDetails: () => void }) {
   const hydrated = useHydrated();
   const [failed, setFailed] = useState<string | null>(null);
   const [copied, setCopied] = useState<"prompt" | "command" | null>(null);
@@ -31,12 +25,12 @@ export function StartActions({
     }
   }
   return (
-    <div className={`start-actions${closing ? " closing-actions" : ""}`}>
+    <div className="start-actions">
       <div className="visible-prompt">
         <p className="setup-prompt-text">{setupPrompt}</p>
         <div className="agent-start-row">
           <button
-            id={closing ? undefined : "start"}
+            id="start"
             disabled={!hydrated}
             className="copy-start"
             onClick={() => void copy("prompt")}
@@ -69,36 +63,7 @@ export function StartActions({
           </button>
         </div>
       </div>
-      <div className="store-group">
-        <div className="store-buttons">
-          {["App Store", "Google Play"].map((name, index) => (
-            <div className="store-control" key={name}>
-              <button
-                type="button"
-                aria-disabled="true"
-                aria-describedby={`store-tip-${closing ? "end-" : ""}${index}`}
-                className="store-button"
-                onClick={(event) => event.currentTarget.focus()}
-                aria-label={
-                  index === 0
-                    ? "Download on the App Store"
-                    : "Get it on Google Play"
-                }
-              >
-                <BrandIcon name={index === 0 ? "Apple" : "Google Play"} />
-                <span>{name}</span>
-              </button>
-              <span
-                id={`store-tip-${closing ? "end-" : ""}${index}`}
-                role="tooltip"
-                className="store-tooltip"
-              >
-                Coming soon.
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
+      <StoreDownloads />
       <button
         className="command-start"
         disabled={!hydrated}

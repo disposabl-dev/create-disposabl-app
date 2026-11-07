@@ -16,7 +16,7 @@ import {
   resolvePlatforms,
   type Platform,
 } from "@disposabl/disposabl-kit/platforms";
-import { MarketingShell, repository } from "./shell";
+import { MarketingShell } from "./shell";
 import { PlatformExplorer } from "./platform-explorer";
 import { BrandIcon } from "./brand-icon";
 import { BuildEvidence } from "./build-evidence";
@@ -86,41 +86,19 @@ function GuideHero({ title, intro }: { title: string; intro: string }) {
     </header>
   );
 }
-function EndCard({
-  href = "/#start",
-  label = "Create your project",
-}: {
-  href?: string;
-  label?: string;
-}) {
-  return (
-    <aside className="guide-end">
-      <div>
-        <h2>Make something useful.</h2>
-        <p>Create a project and make it your own.</p>
-      </div>
-      <div className="guide-end-links">
-        <a className="primary-link" href={href}>
-          {label} <ArrowUpRight size={18} />
-        </a>
-        <a className="text-link" href={`${repository}#readme`}>
-          Read the source <ArrowUpRight size={18} />
-        </a>
-      </div>
-    </aside>
-  );
-}
 function StackPage() {
   const [selected, setSelected] = useState<Platform[]>(() =>
     resolvePlatforms(["web"]),
   );
   return (
     <>
-      <GuideHero
-        title="Choose your app’s platforms"
-        intro="Choose where your app will run and see the tools that support each platform."
-      />
       <PlatformExplorer selected={selected} onChange={setSelected} />
+      <a
+        className="primary-link stack-continue"
+        href={`/?platforms=${selected.join(",")}#start`}
+      >
+        Continue with these platforms <ArrowUpRight size={18} />
+      </a>
       <section className="guide-section shared-architecture">
         <div>
           <h2>Connected where it counts</h2>
@@ -161,10 +139,6 @@ function StackPage() {
         </div>
       </section>
       <Ecosystem />
-      <EndCard
-        href={`/?platforms=${selected.join(",")}#start`}
-        label="Continue with these platforms"
-      />
     </>
   );
 }
@@ -252,7 +226,6 @@ function BuildPage() {
         </div>
         <BuildEvidence />
       </section>
-      <EndCard />
     </>
   );
 }
@@ -332,7 +305,6 @@ function WhyPage() {
           </p>
         </div>
       </section>
-      <EndCard />
     </>
   );
 }
