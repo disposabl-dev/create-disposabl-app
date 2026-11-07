@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -28,6 +28,13 @@ test("reset welcome reflects selected platforms and hides disabled docs", async 
       assert.equal(
         existsSync(join(app, "apps/mobile/src/features/studio")),
         false,
+      );
+      const mobile = JSON.parse(
+        await readFile(join(app, "apps/mobile/package.json"), "utf8"),
+      );
+      assert.equal(
+        mobile.dependencies["react-native-enriched-markdown"],
+        undefined,
       );
       assert.equal(
         existsSync(join(app, "apps/mobile/src/app/settings.tsx")),

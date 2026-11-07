@@ -271,22 +271,23 @@ lock.workspaces["packages/backend"] = {
   devDependencies: backend.devDependencies,
 };
 delete turbo.tasks["create-disposabl-app#build"];
-// Chat capture belongs to the Disposabl product, not every generated mobile app.
+// Chat capture and rendering belong to the Disposabl product.
 const mobile = await json("apps/mobile/package.json");
 const mobileConfig = await json("apps/mobile/app.json");
 const kit = await json("packages/disposabl-kit/package.json");
-const capturePackages = [
+const chatPackages = [
   "expo-image-picker",
   "expo-document-picker",
   "expo-file-system",
   "expo-speech-recognition",
+  "react-native-enriched-markdown",
 ];
-for (const name of capturePackages) delete mobile.dependencies[name];
+for (const name of chatPackages) delete mobile.dependencies[name];
 delete kit.peerDependencies["expo-speech-recognition"];
 delete kit.peerDependenciesMeta["expo-speech-recognition"];
 mobileConfig.expo.plugins = mobileConfig.expo.plugins.filter(
   (plugin: string | [string, unknown]) =>
-    !capturePackages.includes(typeof plugin === "string" ? plugin : plugin[0]),
+    !chatPackages.includes(typeof plugin === "string" ? plugin : plugin[0]),
 );
 for (const [path, value] of [
   ["apps/mobile/package.json", mobile],
