@@ -1,84 +1,43 @@
-# Test an iPhone preview with Xcode
+# Test on a physical iPhone
 
-Use this procedure for a physical iPhone preview built on GitHub. It does not
-publish to the App Store or TestFlight, and does not require AltStore or another
-installer. Compilation happens on GitHub-hosted macOS runners. Signing happens on the
-owner's Mac with Xcode and their Apple Account.
+Use this guide when the user requests a physical iPhone build. Check the current
+workflow before promising an artifact: the starter's iOS preview job produces
+`ios-simulator.zip`, containing a simulator `.app`. It cannot run on an iPhone
+and cannot be converted into a device build by signing it. Production uses EAS
+Build and TestFlight when configured. The starter does not produce unsigned
+physical-device IPAs. If iOS builds are disabled, neither CI path runs.
 
-## Choose the correct account flow
+## Build and provision with Xcode
 
-Ask only if the account type is unknown. A free Personal Team uses Xcode's
-connected-device provisioning; Expo's browser-based device registration and ad
-hoc distribution require a paid Apple Developer Program membership. Do not open
-an Expo registration page and imply that it enables free provisioning.
+Prefer the app's native Xcode project for local device testing. Check for full
+Xcode with `xcodebuild -version`, install the app's dependencies, and generate its
+native project with Expo prebuild if needed. Prebuild generates files; it does
+not compile or install the app. Use the project's configured backend and channel.
 
-For a paid developer account requesting Expo ad hoc distribution, use
-`bunx eas-cli@27.2.0 device:create` and open the URL returned by that command on
-the intended iPhone. Do not invent an enrollment URL. After registration, refresh
-the matching ad hoc profile before building/signing. Device registration alone
-is not a profile or an installable build. The default unsigned-preview pipeline
-does not configure ad hoc distribution automatically.
+Open the generated workspace on the owner's Mac. In Xcode, select the connected
+iPhone and the correct Apple team, enable automatic signing, and resolve the
+capability or provisioning issues Xcode reports. Let the user complete Apple
+Account, Trust and Developer Mode prompts when required. A simulator identifier
+is not a physical phone's provisioning UDID.
 
-## Free Personal Team setup on the owner's Mac
+A free Personal Team uses Xcode's connected-device provisioning. Expo device
+registration and ad hoc distribution require a paid Apple Developer membership.
+For an explicitly requested Expo ad hoc build, use the URL returned by
+`bunx eas-cli@27.2.0 device:create`, then obtain a matching profile and build.
+Registration alone does not make an app installable. Surface unsupported
+capabilities rather than silently removing them.
 
-1. Check for full Xcode with `xcodebuild -version`. Command Line Tools alone are
-   insufficient. Use the connected target Mac, not an unrelated developer's Mac.
-2. Open Xcode and its Apple Account settings when setup is needed. Let the user
-   sign in directly. Connect the iPhone by USB, accept Trust on the phone, and
-   enable Developer Mode when required. Use Xcode's Devices and Simulators to
-   pair it and obtain its provisioning UDID. A simulator ID is not that UDID.
-3. Inspect the downloaded preview's `Payload/<app>.app/Info.plist` for the exact
-   bundle ID; preview IDs can differ from the production ID. Configure automatic
-   signing for that ID and the required capabilities in Xcode, select the user's
-   Personal Team and connected iPhone, and resolve the signing issues Xcode shows.
-   Open the generated native project if available. Creating native project files
-   with Expo prebuild is not native compilation.
-4. Obtain the matching Xcode-managed development profile and the certificate
-   identity from this Mac. Xcode manages these under its signing settings; recent
-   versions store profiles under `~/Library/Developer/Xcode/UserData/Provisioning Profiles`,
-   older versions under `~/Library/MobileDevice/Provisioning Profiles`.
-   Inspect metadata with `security cms -D -i <profile>` without dumping it into
-   chat. Confirm the exact bundle ID, phone UDID, allowed capabilities and expiry.
-   List available identity fingerprints with `security find-identity -v -p codesigning`.
+## When an unsigned device IPA is already available
 
-If there is no matching profile, explain that Xcode can provision it using a tiny
-local iOS project. Create that project outside the generated app, with the exact
-preview bundle ID, required capabilities, automatic signing, and the user's
-Personal Team. Build only that project for the connected phone:
+Use the signing helper only with an actual iPhone IPA from a verified source
+revision. Do not invent a workflow artifact name or substitute a simulator build.
+Inspect `Payload/<app>.app/Info.plist` for the exact bundle ID and confirm the
+local development profile matches that ID, phone, signing identity, capabilities
+and expiry. Xcode must provision the profile first; the helper does not create it.
 
 ```sh
-xcodebuild -project Provisioning.xcodeproj -scheme Provisioning \
-  -configuration Debug -destination 'id=IPHONE_UDID' \
-  -derivedDataPath ./provisioning-build \
-  -allowProvisioningUpdates -allowProvisioningDeviceRegistration build
-```
-
-This compiles the tiny provisioning project, not the React Native app. Do not
-install the placeholder. Inspect the generated profile for the exact app ID,
-phone, certificate, capabilities and expiry before signing the downloaded IPA.
-This route was verified with Xcode 27.2 and a free Personal Team; account prompts
-and unsupported capabilities can still require user action. The signing helper
-does not create this project or renew profiles automatically.
-
-Do not upload Apple passwords, private keys, signing certificates or personal
-profiles to GitHub. The unsigned build does not need them. Some capabilities are
-unavailable to free teams; surface that limitation rather than silently removing
-features. Extensions and Watch apps need separate profiles and are not supported
-by this single-app signing helper.
-
-## Download, sign and install
-
-The workflow builds unsigned iPhone IPAs for PR previews and main.
-Download the `ios-native-<channel>` artifact from the exact successful GitHub run.
-It contains `ios-unsigned.ipa`, this guide, the signing helper, and verified build
-metadata. Check the SHA/run and artifact digest before executing downloaded code.
-The IPA is not directly installable until it has been signed.
-
-Run the included helper on the owner's Mac, substituting inspected values:
-
-```sh
-python3 sign-iphone.py \
-  --ipa ios-unsigned.ipa \
+python3 packages/skill/scripts/sign-iphone.py \
+  --ipa /absolute/path/to/device.ipa \
   --profile /absolute/path/to/profile.mobileprovision \
   --identity CERTIFICATE_SHA1 \
   --device IPHONE_PROVISIONING_UDID \
@@ -86,29 +45,21 @@ python3 sign-iphone.py \
   --install
 ```
 
-In a generated app, the helper also lives at
-`packages/skill/scripts/sign-iphone.py`. The helper validates the local identity,
-profile, expiry, device, app ID and capabilities; signs embedded frameworks and
-the app; verifies the signature; and optionally installs with Xcode's
-`devicectl`. It does not create or renew profiles and does not compile the app.
-An existing output directory is preserved; use a new path on each run.
+The helper signs frameworks and the app, verifies the signature, and can install
+with Xcode's `devicectl`. It preserves existing output directories, so choose a
+new output path. Extensions and Watch apps require separate profiles and are
+outside this helper's scope. Keep Apple passwords, private keys and personal
+profiles off GitHub and out of logs.
 
-Free profiles expire after seven days. Renew through Xcode, then re-sign and
-reinstall the same compatible downloaded binary; changing a native dependency
-requires a new GitHub build. Apple limits free accounts to three installed apps
-per device and limits App IDs/devices as documented below.
+## Verify the installed app
 
-Use the session's supported device tools for discovery, opening, launch and
-visible verification. Keep the phone under one owner. Installation success is
-not completion: launch the app, exercise the requested feature, check the
-preview backend and authentication, relaunch, and verify saved state. If the
-phone or matching profile is unavailable, report exactly that; do not call the
-preview installed or verified. A device panel may list simulators only even when
-Xcode sees the physical phone. Respect the host's control restrictions; after a
-permitted installation, ask the user to open and test the app if physical-device
-UI automation is unavailable. Report that as user verification, not automation.
+Use the session's supported device tools and keep the phone under one owner.
+Launch the app, exercise the requested feature, verify its backend and login,
+then relaunch and check saved state. Installation alone is not delivery. If the
+phone cannot be automated, ask the user to verify it and distinguish that evidence
+from automated checks. Follow tool retry limits instead of switching to an
+unsupported control path. Renew expired profiles through Xcode when necessary.
 
-References: [Apple Personal Team limits](https://developer.apple.com/help/account/basics/about-your-developer-account/),
+References: [Apple account capabilities and limits](https://developer.apple.com/help/account/basics/about-your-developer-account/),
 [run on a device](https://help.apple.com/xcode/mac/current/en.lproj/dev5a825a1ca.html),
-[Apple signing workflow](https://help.apple.com/xcode/mac/current/en.lproj/dev60b6fbbc7.html),
-[Expo device registration](https://docs.expo.dev/build/internal-distribution/).
+[Expo internal distribution](https://docs.expo.dev/build/internal-distribution/).
