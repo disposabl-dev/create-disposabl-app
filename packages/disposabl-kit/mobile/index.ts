@@ -6,6 +6,7 @@ export {
 } from "./layout";
 export { HomeScreen, PublicHomeScreen } from "./screens/home";
 export { AccountScreen } from "./screens/account";
+export { SettingsPage, ScreenCloseButton } from "./components/settings-page";
 export { LoginScreen } from "./screens/login";
 export { SignupScreen } from "./screens/signup";
 export { ChangePasswordScreen } from "./screens/change-password";

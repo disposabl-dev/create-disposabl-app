@@ -1,8 +1,49 @@
 import { router, Stack } from "expo-router";
 import type { ReactNode } from "react";
-import { ScrollView } from "react-native";
+import { Pressable, ScrollView, Text } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { usePreferenceColors } from "../design/preferences";
+
+export function ScreenCloseButton({
+  label,
+  onPress,
+}: {
+  label: string;
+  onPress: () => void;
+}) {
+  const colors = usePreferenceColors();
+  return process.env.EXPO_OS === "ios" ? (
+    <Stack.Toolbar placement="right">
+      <Stack.Toolbar.Button accessibilityLabel={label} onPress={onPress}>
+        Done
+      </Stack.Toolbar.Button>
+    </Stack.Toolbar>
+  ) : (
+    <Stack.Screen
+      options={{
+        headerRight: () => (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={label}
+            hitSlop={12}
+            onPress={onPress}
+          >
+            <Text
+              style={{
+                color: colors.text,
+                fontSize: 16,
+                fontWeight: "600",
+                padding: 8,
+              }}
+            >
+              Done
+            </Text>
+          </Pressable>
+        ),
+      }}
+    />
+  );
+}
 
 /** Native navigation owns the header and safe-area placement on every screen size. */
 export function SettingsPage({
@@ -31,14 +72,7 @@ export function SettingsPage({
           contentStyle: { backgroundColor: colors.background },
         }}
       />
-      <Stack.Toolbar placement="right">
-        <Stack.Toolbar.Button
-          accessibilityLabel="Close settings"
-          onPress={onClose}
-        >
-          Done
-        </Stack.Toolbar.Button>
-      </Stack.Toolbar>
+      <ScreenCloseButton label="Close settings" onPress={onClose} />
       <ScrollView
         style={{ flex: 1, backgroundColor: colors.background }}
         contentInsetAdjustmentBehavior="automatic"
