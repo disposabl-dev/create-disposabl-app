@@ -1,1 +1,415 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Disposabl design lab</title><style>body{font:15px system-ui;margin:0;background:#e9e8e4;color:#151515}header{padding:18px 24px;background:#171717;color:white;display:flex;align-items:center;gap:18px;flex-wrap:wrap}h1{font-size:18px;margin:0}label{display:flex;gap:8px;align-items:center}select,button{font:inherit;padding:8px}main{padding:24px;overflow:auto}.frame{background:white;margin:auto;transition:width .2s;max-width:100%;box-shadow:0 5px 30px #0002}.frame.mobile{width:390px}.frame.desktop{width:1440px}iframe{border:0;width:100%;height:900px;display:block}.caption{padding:0 24px}a{color:inherit}</style></head><body><header><h1>Disposabl / Design lab</h1><label>Concept <select id="pick"><option value="versions/001.html">001 — Launch Sheet / Front Page</option><option value="versions/002.html">002 — Launch Sheet / Split Desk</option><option value="versions/003.html">003 — Launch Sheet / Platform First</option><option value="versions/004.html">004 — Launch Sheet / Command Stage</option><option value="versions/005.html">005 — Launch Sheet / Editorial Rail</option><option value="versions/006.html">006 — Studio Desk / Front Page</option><option value="versions/007.html">007 — Studio Desk / Split Desk</option><option value="versions/008.html">008 — Studio Desk / Platform First</option><option value="versions/009.html">009 — Studio Desk / Command Stage</option><option value="versions/010.html">010 — Studio Desk / Editorial Rail</option><option value="versions/011.html">011 — Command Monument / Front Page</option><option value="versions/012.html">012 — Command Monument / Split Desk</option><option value="versions/013.html">013 — Command Monument / Platform First</option><option value="versions/014.html">014 — Command Monument / Command Stage</option><option value="versions/015.html">015 — Command Monument / Editorial Rail</option><option value="versions/016.html">016 — Prism / Front Page</option><option value="versions/017.html">017 — Prism / Split Desk</option><option value="versions/018.html">018 — Prism / Platform First</option><option value="versions/019.html">019 — Prism / Command Stage</option><option value="versions/020.html">020 — Prism / Editorial Rail</option><option value="versions/021.html">021 — Blueprint / Front Page</option><option value="versions/022.html">022 — Blueprint / Split Desk</option><option value="versions/023.html">023 — Blueprint / Platform First</option><option value="versions/024.html">024 — Blueprint / Command Stage</option><option value="versions/025.html">025 — Blueprint / Editorial Rail</option><option value="versions/026.html">026 — Operating Manual / Front Page</option><option value="versions/027.html">027 — Operating Manual / Split Desk</option><option value="versions/028.html">028 — Operating Manual / Platform First</option><option value="versions/029.html">029 — Operating Manual / Command Stage</option><option value="versions/030.html">030 — Operating Manual / Editorial Rail</option><option value="versions/031.html">031 — The Conveyor / Front Page</option><option value="versions/032.html">032 — The Conveyor / Split Desk</option><option value="versions/033.html">033 — The Conveyor / Platform First</option><option value="versions/034.html">034 — The Conveyor / Command Stage</option><option value="versions/035.html">035 — The Conveyor / Editorial Rail</option><option value="versions/036.html">036 — Orbital System / Front Page</option><option value="versions/037.html">037 — Orbital System / Split Desk</option><option value="versions/038.html">038 — Orbital System / Platform First</option><option value="versions/039.html">039 — Orbital System / Command Stage</option><option value="versions/040.html">040 — Orbital System / Editorial Rail</option><option value="versions/041.html">041 — App Gallery / Front Page</option><option value="versions/042.html">042 — App Gallery / Split Desk</option><option value="versions/043.html">043 — App Gallery / Platform First</option><option value="versions/044.html">044 — App Gallery / Command Stage</option><option value="versions/045.html">045 — App Gallery / Editorial Rail</option><option value="versions/046.html">046 — Type Sculpture / Front Page</option><option value="versions/047.html">047 — Type Sculpture / Split Desk</option><option value="versions/048.html">048 — Type Sculpture / Platform First</option><option value="versions/049.html">049 — Type Sculpture / Command Stage</option><option value="versions/050.html">050 — Type Sculpture / Editorial Rail</option><option value="versions/051.html">051 — Receipt / Front Page</option><option value="versions/052.html">052 — Receipt / Split Desk</option><option value="versions/053.html">053 — Receipt / Platform First</option><option value="versions/054.html">054 — Receipt / Command Stage</option><option value="versions/055.html">055 — Receipt / Editorial Rail</option><option value="versions/056.html">056 — Switchboard / Front Page</option><option value="versions/057.html">057 — Switchboard / Split Desk</option><option value="versions/058.html">058 — Switchboard / Platform First</option><option value="versions/059.html">059 — Switchboard / Command Stage</option><option value="versions/060.html">060 — Switchboard / Editorial Rail</option><option value="versions/061.html">061 — Open Frame / Front Page</option><option value="versions/062.html">062 — Open Frame / Split Desk</option><option value="versions/063.html">063 — Open Frame / Platform First</option><option value="versions/064.html">064 — Open Frame / Command Stage</option><option value="versions/065.html">065 — Open Frame / Editorial Rail</option><option value="versions/066.html">066 — Stack of Cards / Front Page</option><option value="versions/067.html">067 — Stack of Cards / Split Desk</option><option value="versions/068.html">068 — Stack of Cards / Platform First</option><option value="versions/069.html">069 — Stack of Cards / Command Stage</option><option value="versions/070.html">070 — Stack of Cards / Editorial Rail</option><option value="versions/071.html">071 — Kinetic Marquee / Front Page</option><option value="versions/072.html">072 — Kinetic Marquee / Split Desk</option><option value="versions/073.html">073 — Kinetic Marquee / Platform First</option><option value="versions/074.html">074 — Kinetic Marquee / Command Stage</option><option value="versions/075.html">075 — Kinetic Marquee / Editorial Rail</option><option value="versions/076.html">076 — Split Reality / Front Page</option><option value="versions/077.html">077 — Split Reality / Split Desk</option><option value="versions/078.html">078 — Split Reality / Platform First</option><option value="versions/079.html">079 — Split Reality / Command Stage</option><option value="versions/080.html">080 — Split Reality / Editorial Rail</option><option value="versions/081.html">081 — Index of Possibilities / Front Page</option><option value="versions/082.html">082 — Index of Possibilities / Split Desk</option><option value="versions/083.html">083 — Index of Possibilities / Platform First</option><option value="versions/084.html">084 — Index of Possibilities / Command Stage</option><option value="versions/085.html">085 — Index of Possibilities / Editorial Rail</option><option value="versions/086.html">086 — Workshop Window / Front Page</option><option value="versions/087.html">087 — Workshop Window / Split Desk</option><option value="versions/088.html">088 — Workshop Window / Platform First</option><option value="versions/089.html">089 — Workshop Window / Command Stage</option><option value="versions/090.html">090 — Workshop Window / Editorial Rail</option><option value="versions/091.html">091 — Signal Field / Front Page</option><option value="versions/092.html">092 — Signal Field / Split Desk</option><option value="versions/093.html">093 — Signal Field / Platform First</option><option value="versions/094.html">094 — Signal Field / Command Stage</option><option value="versions/095.html">095 — Signal Field / Editorial Rail</option><option value="versions/096.html">096 — Manifesto / Front Page</option><option value="versions/097.html">097 — Manifesto / Split Desk</option><option value="versions/098.html">098 — Manifesto / Platform First</option><option value="versions/099.html">099 — Manifesto / Command Stage</option><option value="versions/100.html">100 — Manifesto / Editorial Rail</option></select></label><button id="prev" type="button">Previous</button><button id="next" type="button">Next</button><label>Viewport <select id="size"><option value="desktop">Desktop</option><option value="mobile">Mobile · 390px</option></select></label><a href="review.md">Review notes</a></header><p class="caption">100 exploratory concepts. All previews are illustrative; select a version and viewport to compare.</p><main><div class="frame desktop" id="frame"><iframe id="preview" title="Selected landing page concept" src="versions/001.html"></iframe></div></main><script>const pick=document.querySelector('#pick'),frame=document.querySelector('#frame'),preview=document.querySelector('#preview');function show(){preview.src=pick.value}pick.addEventListener('change',show);document.querySelector('#size').addEventListener('change',e=>frame.className='frame '+e.target.value);document.querySelector('#prev').onclick=()=>{pick.selectedIndex=Math.max(0,pick.selectedIndex-1);show()};document.querySelector('#next').onclick=()=>{pick.selectedIndex=Math.min(pick.options.length-1,pick.selectedIndex+1);show()};</script></body></html>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Disposabl design lab</title>
+    <style>
+      body {
+        font: 15px system-ui;
+        margin: 0;
+        background: #e9e8e4;
+        color: #151515;
+      }
+      header {
+        padding: 18px 24px;
+        background: #171717;
+        color: white;
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        flex-wrap: wrap;
+      }
+      h1 {
+        font-size: 18px;
+        margin: 0;
+      }
+      label {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      select,
+      button {
+        font: inherit;
+        padding: 8px;
+      }
+      main {
+        padding: 24px;
+        overflow: auto;
+      }
+      .frame {
+        background: white;
+        margin: auto;
+        transition: width 0.2s;
+        max-width: 100%;
+        box-shadow: 0 5px 30px #0002;
+      }
+      .frame.mobile {
+        width: 390px;
+      }
+      .frame.desktop {
+        width: 1440px;
+      }
+      iframe {
+        border: 0;
+        width: 100%;
+        height: 900px;
+        display: block;
+      }
+      .caption {
+        padding: 0 24px;
+      }
+      a {
+        color: inherit;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Disposabl / Design lab</h1>
+      <label
+        >Concept
+        <select id="pick">
+          <option value="versions/001.html">
+            001 — Launch Sheet / Front Page
+          </option>
+          <option value="versions/002.html">
+            002 — Launch Sheet / Split Desk
+          </option>
+          <option value="versions/003.html">
+            003 — Launch Sheet / Platform First
+          </option>
+          <option value="versions/004.html">
+            004 — Launch Sheet / Command Stage
+          </option>
+          <option value="versions/005.html">
+            005 — Launch Sheet / Editorial Rail
+          </option>
+          <option value="versions/006.html">
+            006 — Studio Desk / Front Page
+          </option>
+          <option value="versions/007.html">
+            007 — Studio Desk / Split Desk
+          </option>
+          <option value="versions/008.html">
+            008 — Studio Desk / Platform First
+          </option>
+          <option value="versions/009.html">
+            009 — Studio Desk / Command Stage
+          </option>
+          <option value="versions/010.html">
+            010 — Studio Desk / Editorial Rail
+          </option>
+          <option value="versions/011.html">
+            011 — Command Monument / Front Page
+          </option>
+          <option value="versions/012.html">
+            012 — Command Monument / Split Desk
+          </option>
+          <option value="versions/013.html">
+            013 — Command Monument / Platform First
+          </option>
+          <option value="versions/014.html">
+            014 — Command Monument / Command Stage
+          </option>
+          <option value="versions/015.html">
+            015 — Command Monument / Editorial Rail
+          </option>
+          <option value="versions/016.html">016 — Prism / Front Page</option>
+          <option value="versions/017.html">017 — Prism / Split Desk</option>
+          <option value="versions/018.html">
+            018 — Prism / Platform First
+          </option>
+          <option value="versions/019.html">019 — Prism / Command Stage</option>
+          <option value="versions/020.html">
+            020 — Prism / Editorial Rail
+          </option>
+          <option value="versions/021.html">
+            021 — Blueprint / Front Page
+          </option>
+          <option value="versions/022.html">
+            022 — Blueprint / Split Desk
+          </option>
+          <option value="versions/023.html">
+            023 — Blueprint / Platform First
+          </option>
+          <option value="versions/024.html">
+            024 — Blueprint / Command Stage
+          </option>
+          <option value="versions/025.html">
+            025 — Blueprint / Editorial Rail
+          </option>
+          <option value="versions/026.html">
+            026 — Operating Manual / Front Page
+          </option>
+          <option value="versions/027.html">
+            027 — Operating Manual / Split Desk
+          </option>
+          <option value="versions/028.html">
+            028 — Operating Manual / Platform First
+          </option>
+          <option value="versions/029.html">
+            029 — Operating Manual / Command Stage
+          </option>
+          <option value="versions/030.html">
+            030 — Operating Manual / Editorial Rail
+          </option>
+          <option value="versions/031.html">
+            031 — The Conveyor / Front Page
+          </option>
+          <option value="versions/032.html">
+            032 — The Conveyor / Split Desk
+          </option>
+          <option value="versions/033.html">
+            033 — The Conveyor / Platform First
+          </option>
+          <option value="versions/034.html">
+            034 — The Conveyor / Command Stage
+          </option>
+          <option value="versions/035.html">
+            035 — The Conveyor / Editorial Rail
+          </option>
+          <option value="versions/036.html">
+            036 — Orbital System / Front Page
+          </option>
+          <option value="versions/037.html">
+            037 — Orbital System / Split Desk
+          </option>
+          <option value="versions/038.html">
+            038 — Orbital System / Platform First
+          </option>
+          <option value="versions/039.html">
+            039 — Orbital System / Command Stage
+          </option>
+          <option value="versions/040.html">
+            040 — Orbital System / Editorial Rail
+          </option>
+          <option value="versions/041.html">
+            041 — App Gallery / Front Page
+          </option>
+          <option value="versions/042.html">
+            042 — App Gallery / Split Desk
+          </option>
+          <option value="versions/043.html">
+            043 — App Gallery / Platform First
+          </option>
+          <option value="versions/044.html">
+            044 — App Gallery / Command Stage
+          </option>
+          <option value="versions/045.html">
+            045 — App Gallery / Editorial Rail
+          </option>
+          <option value="versions/046.html">
+            046 — Type Sculpture / Front Page
+          </option>
+          <option value="versions/047.html">
+            047 — Type Sculpture / Split Desk
+          </option>
+          <option value="versions/048.html">
+            048 — Type Sculpture / Platform First
+          </option>
+          <option value="versions/049.html">
+            049 — Type Sculpture / Command Stage
+          </option>
+          <option value="versions/050.html">
+            050 — Type Sculpture / Editorial Rail
+          </option>
+          <option value="versions/051.html">051 — Receipt / Front Page</option>
+          <option value="versions/052.html">052 — Receipt / Split Desk</option>
+          <option value="versions/053.html">
+            053 — Receipt / Platform First
+          </option>
+          <option value="versions/054.html">
+            054 — Receipt / Command Stage
+          </option>
+          <option value="versions/055.html">
+            055 — Receipt / Editorial Rail
+          </option>
+          <option value="versions/056.html">
+            056 — Switchboard / Front Page
+          </option>
+          <option value="versions/057.html">
+            057 — Switchboard / Split Desk
+          </option>
+          <option value="versions/058.html">
+            058 — Switchboard / Platform First
+          </option>
+          <option value="versions/059.html">
+            059 — Switchboard / Command Stage
+          </option>
+          <option value="versions/060.html">
+            060 — Switchboard / Editorial Rail
+          </option>
+          <option value="versions/061.html">
+            061 — Open Frame / Front Page
+          </option>
+          <option value="versions/062.html">
+            062 — Open Frame / Split Desk
+          </option>
+          <option value="versions/063.html">
+            063 — Open Frame / Platform First
+          </option>
+          <option value="versions/064.html">
+            064 — Open Frame / Command Stage
+          </option>
+          <option value="versions/065.html">
+            065 — Open Frame / Editorial Rail
+          </option>
+          <option value="versions/066.html">
+            066 — Stack of Cards / Front Page
+          </option>
+          <option value="versions/067.html">
+            067 — Stack of Cards / Split Desk
+          </option>
+          <option value="versions/068.html">
+            068 — Stack of Cards / Platform First
+          </option>
+          <option value="versions/069.html">
+            069 — Stack of Cards / Command Stage
+          </option>
+          <option value="versions/070.html">
+            070 — Stack of Cards / Editorial Rail
+          </option>
+          <option value="versions/071.html">
+            071 — Kinetic Marquee / Front Page
+          </option>
+          <option value="versions/072.html">
+            072 — Kinetic Marquee / Split Desk
+          </option>
+          <option value="versions/073.html">
+            073 — Kinetic Marquee / Platform First
+          </option>
+          <option value="versions/074.html">
+            074 — Kinetic Marquee / Command Stage
+          </option>
+          <option value="versions/075.html">
+            075 — Kinetic Marquee / Editorial Rail
+          </option>
+          <option value="versions/076.html">
+            076 — Split Reality / Front Page
+          </option>
+          <option value="versions/077.html">
+            077 — Split Reality / Split Desk
+          </option>
+          <option value="versions/078.html">
+            078 — Split Reality / Platform First
+          </option>
+          <option value="versions/079.html">
+            079 — Split Reality / Command Stage
+          </option>
+          <option value="versions/080.html">
+            080 — Split Reality / Editorial Rail
+          </option>
+          <option value="versions/081.html">
+            081 — Index of Possibilities / Front Page
+          </option>
+          <option value="versions/082.html">
+            082 — Index of Possibilities / Split Desk
+          </option>
+          <option value="versions/083.html">
+            083 — Index of Possibilities / Platform First
+          </option>
+          <option value="versions/084.html">
+            084 — Index of Possibilities / Command Stage
+          </option>
+          <option value="versions/085.html">
+            085 — Index of Possibilities / Editorial Rail
+          </option>
+          <option value="versions/086.html">
+            086 — Workshop Window / Front Page
+          </option>
+          <option value="versions/087.html">
+            087 — Workshop Window / Split Desk
+          </option>
+          <option value="versions/088.html">
+            088 — Workshop Window / Platform First
+          </option>
+          <option value="versions/089.html">
+            089 — Workshop Window / Command Stage
+          </option>
+          <option value="versions/090.html">
+            090 — Workshop Window / Editorial Rail
+          </option>
+          <option value="versions/091.html">
+            091 — Signal Field / Front Page
+          </option>
+          <option value="versions/092.html">
+            092 — Signal Field / Split Desk
+          </option>
+          <option value="versions/093.html">
+            093 — Signal Field / Platform First
+          </option>
+          <option value="versions/094.html">
+            094 — Signal Field / Command Stage
+          </option>
+          <option value="versions/095.html">
+            095 — Signal Field / Editorial Rail
+          </option>
+          <option value="versions/096.html">
+            096 — Manifesto / Front Page
+          </option>
+          <option value="versions/097.html">
+            097 — Manifesto / Split Desk
+          </option>
+          <option value="versions/098.html">
+            098 — Manifesto / Platform First
+          </option>
+          <option value="versions/099.html">
+            099 — Manifesto / Command Stage
+          </option>
+          <option value="versions/100.html">
+            100 — Manifesto / Editorial Rail
+          </option>
+        </select></label
+      ><button id="prev" type="button">Previous</button
+      ><button id="next" type="button">Next</button
+      ><label
+        >Viewport
+        <select id="size">
+          <option value="desktop">Desktop</option>
+          <option value="mobile">Mobile · 390px</option>
+        </select></label
+      ><a href="review.md">Review notes</a>
+    </header>
+    <p class="caption">
+      100 exploratory concepts. All previews are illustrative; select a version
+      and viewport to compare.
+    </p>
+    <main>
+      <div class="frame desktop" id="frame">
+        <iframe
+          id="preview"
+          title="Selected landing page concept"
+          src="versions/001.html"
+        ></iframe>
+      </div>
+    </main>
+    <script>
+      const pick = document.querySelector("#pick"),
+        frame = document.querySelector("#frame"),
+        preview = document.querySelector("#preview");
+      function show() {
+        preview.src = pick.value;
+      }
+      pick.addEventListener("change", show);
+      document
+        .querySelector("#size")
+        .addEventListener(
+          "change",
+          (e) => (frame.className = "frame " + e.target.value),
+        );
+      document.querySelector("#prev").onclick = () => {
+        pick.selectedIndex = Math.max(0, pick.selectedIndex - 1);
+        show();
+      };
+      document.querySelector("#next").onclick = () => {
+        pick.selectedIndex = Math.min(
+          pick.options.length - 1,
+          pick.selectedIndex + 1,
+        );
+        show();
+      };
+    </script>
+  </body>
+</html>

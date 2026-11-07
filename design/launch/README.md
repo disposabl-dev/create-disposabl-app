@@ -16,7 +16,7 @@ These are 20 visual families across five composition patterns. They vary hierarc
 
 The study gallery contains exploratory copy, including rejected broad free claims. Only the production site copy represents the intended offer. Its local/provider cost boundaries and planned credit billing are explicit.
 
-The generator (`studies/build.py`) reproduces the initial exploration. Do not treat structural pass results as proof of accessibility, CTA correctness, or good design; the production site receives separate tests.
+The generator (`studies/build.py`) reproduces the initial exploration. Run `bun fmt design/launch/studies` after regenerating to apply repository formatting. Do not treat structural pass results as proof of accessibility, CTA correctness, or good design; the production site receives separate tests.
 
 ## Direction selected
 

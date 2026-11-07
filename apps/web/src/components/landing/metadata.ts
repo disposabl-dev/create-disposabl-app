@@ -1,7 +1,4 @@
-export const marketingPages: Record<
-  string,
-  { title: string; description: string }
-> = {
+export const marketingPages = {
   "/stack": {
     title: "The stack behind your app | Disposabl",
     description:
@@ -19,7 +16,7 @@ export const marketingPages: Record<
   },
 };
 
-export function marketingHead(pathname: string) {
+export function marketingHead(pathname: keyof typeof marketingPages) {
   const { title, description } = marketingPages[pathname];
   return {
     meta: [
