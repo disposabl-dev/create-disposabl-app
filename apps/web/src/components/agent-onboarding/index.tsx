@@ -47,19 +47,12 @@ function CopyButton({ text, label }: { text: string; label: string }) {
   );
 }
 
-export function AgentOnboarding({ guided = false }: { guided?: boolean }) {
+export function AgentOnboarding() {
   const [mode, setMode] = useState<"prompt" | "terminal">("prompt");
   const [manager, setManager] = useState<keyof typeof commands>("Bun");
   const text = mode === "prompt" ? prompt : commands[manager];
   return (
     <div className="landing-start" data-testid="agent-onboarding">
-      {guided && (
-        <p className="onboarding-steps">
-          <span>01</span> Copy{" "}
-          {mode === "prompt" ? "the prompt" : "the command"}.<span>02</span>{" "}
-          {mode === "prompt" ? "Paste into your AI." : "Run in your terminal."}
-        </p>
-      )}
       <AgentLogos />
       <div className="landing-modes" role="group" aria-label="How to start">
         <button

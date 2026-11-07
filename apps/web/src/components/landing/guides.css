@@ -94,8 +94,8 @@
 }
 .guide-article pre {
   margin-top: 28px;
-  background: #25251f;
-  color: #e0efa8;
+  background: #17223a;
+  color: #d4e4ff;
   padding: 24px;
   border-radius: 5px;
   font-size: 12px;
@@ -104,7 +104,7 @@
 }
 .guide-end {
   padding: 32px;
-  background: #eeecf8;
+  background: #f1f5fc;
   border-radius: 5px;
 }
 .guide-end p {

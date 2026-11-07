@@ -14,7 +14,7 @@ type Section = {
 const buildSections: Section[] = [
   {
     id: "setup",
-    title: "01. Set up once. Know what you're connecting.",
+    title: "Set up once. Know what you're connecting.",
     paragraphs: [
       "Install Bun, Git, and Node.js 24.8 or newer. Run the command below, choose a project name, then select the platforms you need. Web and the shared backend are included.",
       "Setup asks you to sign in to Disposabl and connect your GitHub and Convex accounts. Mobile projects also need an Expo account. Your code lives in your GitHub repository. This is local development with connected services, so setup needs internet access.",
@@ -23,7 +23,7 @@ const buildSections: Section[] = [
   },
   {
     id: "preview",
-    title: "02. Get a preview. Build one useful thing.",
+    title: "Get a preview. Build one useful thing.",
     paragraphs: [
       "Open the new project and run its development command. This starts the local website and connects it to your development backend. Replace my-app with the project name you chose.",
       "Ask your coding agent to build a complete, small workflow first. For a meal planner, that could mean adding a meal, seeing it on the calendar, and finding it still there after a reload. Expand after that works.",
@@ -32,7 +32,7 @@ const buildSections: Section[] = [
   },
   {
     id: "build-times",
-    title: "03. Understand the clock.",
+    title: "Understand the clock.",
     paragraphs: [
       "A first setup includes account authorization, downloads, installation, and backend configuration. Your first preview follows that setup. Feature development has its own timeline, determined by scope, model behavior, and the fixes your tests uncover.",
       "A native build compiles and packages code. Cold builds and new dependencies can take longer than cached rebuilds. iOS needs macOS and Xcode; Android needs its SDK. Desktop build and signing requirements depend on the target operating system.",
@@ -47,7 +47,7 @@ const buildSections: Section[] = [
   },
   {
     id: "testing",
-    title: "04. A build is a beginning. Test the behavior.",
+    title: "A build is a beginning. Test the behavior.",
     paragraphs: [
       "Starter checks live in packages/tests, separate from application code. The test command follows the platforms in disposabl.json. Backend checks always apply; API checks apply when API is selected.",
       "Use a development or isolated preview backend. Mobile tests need a locally built app installed on a simulator or emulator. The starter tests are a baseline; ask your agent to add checks for your real workflows, including login, permissions, and persistence.",
@@ -56,7 +56,7 @@ const buildSections: Section[] = [
   },
   {
     id: "publishing",
-    title: "05. Share a preview. Then ship deliberately.",
+    title: "Share a preview. Then ship deliberately.",
     paragraphs: [
       "Your project includes GitHub workflows for previews and releases. Connect the appropriate providers and configure secrets and signing credentials in your own accounts. Hosted build usage can incur provider charges.",
       "Web deployment, an Android installer, an iOS distribution build, and a signed desktop installer are separate outcomes. Verify the app on the target device. Store submission and approval are additional steps, not a promise made by a successful build.",
@@ -131,20 +131,17 @@ export function GuidePage({ kind }: { kind: "build" | "why" | "stack" }) {
   const content =
     kind === "build"
       ? {
-          eyebrow: "A PRACTICAL BUILD GUIDE",
           title: (
             <>
               From first command
               <br />
-              to <span>“look what I made.”</span>
+              to <span>first release.</span>
             </>
           ),
-          intro:
-            "Know what happens between an idea and a working app. No magic stopwatch. Just a clear path.",
+          intro: "Setup, local previews, build times, tests, and publishing.",
         }
       : kind === "why"
         ? {
-            eyebrow: "YOUR AGENT + DISPOSABL",
             title: (
               <>
                 Keep your AI.
@@ -156,12 +153,11 @@ export function GuidePage({ kind }: { kind: "build" | "why" | "stack" }) {
               "A connected starting point for the coding agent you already use. Here's what it gives you, and what stays in your hands.",
           }
         : {
-            eyebrow: "OPEN SOURCE. OPEN THE HOOD.",
             title: (
               <>
-                Good software.
+                Your app.
                 <br />
-                <span>Familiar ingredients.</span>
+                <span>The full stack.</span>
               </>
             ),
             intro:
@@ -174,13 +170,13 @@ export function GuidePage({ kind }: { kind: "build" | "why" | "stack" }) {
           <a className="guide-back" href="/">
             ← Back to Disposabl
           </a>
-          <p className="eyebrow">{content.eyebrow}</p>
+
           <h1>{content.title}</h1>
           <p className="guide-intro">{content.intro}</p>
         </header>
         <div className="guide-layout">
           <nav className="guide-index" aria-label="On this page">
-            <span>ON THIS PAGE</span>
+            <span>On this page</span>
             {sections.map((section) => (
               <a key={section.id} href={`#${section.id}`}>
                 {section.title.replace(/^\d+\. /, "")}

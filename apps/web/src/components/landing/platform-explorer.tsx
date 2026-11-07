@@ -1,25 +1,17 @@
-import {
-  Check,
-  Code2,
-  Globe2,
-  Laptop,
-  Smartphone,
-  Terminal,
-  ArrowUpRight,
-} from "lucide-react";
+import { Check } from "lucide-react";
 import {
   platforms,
   resolvePlatforms,
   type Platform,
 } from "@disposabl/disposabl-kit/platforms";
 import { TextLink } from "./shell";
+import { BrandIcon } from "./brand-icon";
 
 export const stackGroups = [
   {
     id: "web",
-    label: "The web, without the wait.",
+    label: "Web",
     platforms: ["web"],
-    icon: Globe2,
     stack: ["React", "TanStack Start", "Vite", "Tailwind CSS"],
     description:
       "Fast local development, typed routing, and pages that can be prerendered. Your website is the starting point.",
@@ -28,9 +20,8 @@ export const stackGroups = [
   },
   {
     id: "mobile",
-    label: "Made for pockets.",
+    label: "iOS and Android",
     platforms: ["ios", "android"],
-    icon: Smartphone,
     stack: ["React Native", "Expo", "Expo Router"],
     description:
       "React Native projects for your selected mobile platforms, sharing a backend with your website. Build and install real native apps.",
@@ -39,9 +30,8 @@ export const stackGroups = [
   },
   {
     id: "desktop",
-    label: "At home on the desktop.",
+    label: "macOS, Windows, and Linux",
     platforms: ["macos", "windows", "linux"],
-    icon: Laptop,
     stack: ["Electron", "Electron Forge", "React"],
     description:
       "Package your web experience for your selected desktop operating systems, with platform-specific installers.",
@@ -50,9 +40,8 @@ export const stackGroups = [
   },
   {
     id: "api",
-    label: "Let other software in.",
+    label: "HTTP API",
     platforms: ["api"],
-    icon: Code2,
     stack: ["OpenAPI", "Convex HTTP", "TypeScript"],
     description:
       "A documented HTTP API for your backend operations. Connect services and build integrations around your app.",
@@ -61,9 +50,8 @@ export const stackGroups = [
   },
   {
     id: "clients",
-    label: "Useful beyond the screen.",
+    label: "CLI and TypeScript SDK",
     platforms: ["cli", "typescript-sdk"],
-    icon: Terminal,
     stack: ["CLI", "TypeScript SDK", "OpenAPI"],
     description:
       "Add your selected developer clients, built from the API contract: terminal commands for CLI, typed calls for SDK.",
@@ -72,9 +60,8 @@ export const stackGroups = [
   },
   {
     id: "mcp",
-    label: "Give agents a way in.",
+    label: "Model Context Protocol",
     platforms: ["mcp"],
-    icon: Code2,
     stack: ["Model Context Protocol", "Convex"],
     description:
       "Expose your app's operations as tools that compatible AI assistants can call through MCP.",
@@ -110,113 +97,85 @@ export function PlatformExplorer({
       className="platform-section launch-container"
       aria-labelledby="platform-title"
     >
-      <div className="section-heading section-heading-split">
-        <div>
-          <p className="eyebrow">ONE PROJECT. PICK YOUR PLATFORMS.</p>
-          <h2 id="platform-title">
-            Think outside
-            <br />
-            <span>the browser.</span>
-          </h2>
-        </div>
-        <p>
-          A website. An app in your pocket. A tool on your desktop. Choose where
-          your idea belongs and see what goes into it.
-        </p>
+      <div className="section-heading">
+        <h2 id="platform-title">More than a website.</h2>
+        <p>Choose your platforms. See what powers them.</p>
       </div>
-      <div className="platform-workbench">
-        <div className="workbench-toolbar">
-          <span>
-            <span className="live-dot" /> YOUR APP'S BLUEPRINT
-          </span>
-          <span>
-            {selected.length} / {platforms.length} platforms
-          </span>
-        </div>
-        <div
-          className="platform-toggles"
-          role="group"
-          aria-label="Choose platforms"
-        >
-          {platforms.map(({ id, label }) => (
-            <button
-              key={id}
-              type="button"
-              aria-pressed={selected.includes(id)}
-              aria-disabled={id === "web"}
-              onClick={() => toggle(id)}
-              className="platform-toggle"
-            >
-              <span className="toggle-check" aria-hidden="true">
-                {selected.includes(id) && <Check size={12} />}
+      <div
+        className="platform-toggles"
+        role="group"
+        aria-label="Choose platforms"
+      >
+        {platforms.map(({ id, label }) => (
+          <button
+            key={id}
+            type="button"
+            aria-pressed={selected.includes(id)}
+            aria-disabled={id === "web"}
+            onClick={() => toggle(id)}
+            className="platform-toggle"
+          >
+            <BrandIcon name={label} />
+            <span>{label}</span>
+            <span className="toggle-check" aria-hidden="true">
+              {selected.includes(id) && <Check size={11} />}
+            </span>
+            {id === "web" && <span className="sr-only"> included</span>}
+          </button>
+        ))}
+      </div>
+      <div className="stack-results" aria-live="polite" aria-atomic="false">
+        {active.map(({ id, stack, platforms: targets }) => (
+          <article className="stack-card" key={id} data-stack={id}>
+            <h3>
+              {platforms
+                .filter(
+                  (platform) =>
+                    targets.includes(platform.id) &&
+                    selected.includes(platform.id),
+                )
+                .map((platform) => platform.label)
+                .join(" + ")}
+            </h3>
+            <p className="selected-targets sr-only">
+              Selected:{" "}
+              {platforms
+                .filter(
+                  (platform) =>
+                    targets.includes(platform.id) &&
+                    selected.includes(platform.id),
+                )
+                .map((platform) => platform.label)
+                .join(" + ")}
+            </p>
+            <div className="stack-tags">
+              {stack.map((name) => (
+                <span key={name}>
+                  <BrandIcon name={name} />
+                  {name}
+                </span>
+              ))}
+            </div>
+          </article>
+        ))}
+      </div>
+      <div className="shared-stack">
+        <span>In every project</span>
+        <div>
+          {["TypeScript", "Convex", "Bun", "Turborepo", "GitHub Actions"].map(
+            (name) => (
+              <span key={name} className="stack-brand" title={name}>
+                <BrandIcon name={name} />
+                <span>{name}</span>
               </span>
-              {label}
-              {id === "web" && <span className="required-label">included</span>}
-            </button>
-          ))}
-        </div>
-        <p className="platform-help">
-          Web is always included. CLI and SDK include the API. Turning API off
-          also removes those clients.
-        </p>
-        <div className="stack-results" aria-live="polite" aria-atomic="false">
-          {active.map(
-            ({
-              id,
-              icon: Icon,
-              label,
-              stack,
-              description,
-              path,
-              note,
-              platforms: targets,
-            }) => (
-              <article className="stack-card" key={id} data-stack={id}>
-                <div className="stack-card-top">
-                  <Icon size={24} strokeWidth={1.4} />
-                  <span>{path}</span>
-                </div>
-                <h3>{label}</h3>
-                <p className="selected-targets">
-                  Selected:{" "}
-                  {platforms
-                    .filter(
-                      (platform) =>
-                        targets.includes(platform.id) &&
-                        selected.includes(platform.id),
-                    )
-                    .map((platform) => platform.label)
-                    .join(" + ")}
-                </p>
-                <p>{description}</p>
-                <div className="stack-tags">
-                  {stack.map((name) => (
-                    <span key={name}>{name}</span>
-                  ))}
-                </div>
-                <p className="stack-note">{note}</p>
-              </article>
             ),
           )}
         </div>
-        <div className="shared-stack">
-          <span className="shared-stack-title">Under every platform</span>
-          <span>TypeScript</span>
-          <span>Convex</span>
-          <span>Bun + Turborepo</span>
-          <span>TesterArmy E2E</span>
-          <span>GitHub Actions</span>
-        </div>
-        <div className="workbench-footer">
-          <p>
-            This is a stack explorer. Choose your final platforms during setup.
-          </p>
-          <TextLink href="/stack">Take a closer look</TextLink>
-        </div>
       </div>
-      <a className="quiet-cta" href="#start">
-        Found your platforms? Start your project <ArrowUpRight size={16} />
-      </a>
+      <div className="workbench-footer">
+        <p>Web is included. CLI and SDK also enable API.</p>
+        <TextLink href="/stack">Explore the stack</TextLink>
+      </div>
     </section>
   );
 }

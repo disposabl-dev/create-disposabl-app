@@ -1,5 +1,6 @@
 import { useState, useRef, type ReactNode } from "react";
 import { ArrowUpRight, Menu, X } from "lucide-react";
+import { BrandIcon } from "./brand-icon";
 
 export const repository =
   "https://github.com/disposabl-dev/create-disposabl-app";
@@ -19,7 +20,13 @@ export function TextLink({
   );
 }
 
-export function MarketingShell({ children }: { children: ReactNode }) {
+export function MarketingShell({
+  children,
+  onStart,
+}: {
+  children: ReactNode;
+  onStart?: () => void;
+}) {
   const [open, setOpen] = useState(false);
   const menuButton = useRef<HTMLButtonElement>(null);
   return (
@@ -58,19 +65,31 @@ export function MarketingShell({ children }: { children: ReactNode }) {
             id="marketing-links"
             className={`marketing-links${open ? " is-open" : ""}`}
             onClick={(event) => {
-              if ((event.target as HTMLElement).closest("a")) setOpen(false);
+              if ((event.target as HTMLElement).closest("a,button"))
+                setOpen(false);
             }}
           >
             <a href="/#platforms">Platforms</a>
             <a href="/why-disposabl">Why Disposabl</a>
             <a href="/#pricing">Pricing</a>
             <a href="/build">How it works</a>
-            <a className="nav-github" href={repository}>
-              GitHub <ArrowUpRight size={13} />
+            <a
+              className="nav-github"
+              href={repository}
+              aria-label="GitHub"
+              title="GitHub"
+            >
+              <BrandIcon name="GitHub" />
             </a>
-            <a className="nav-start" href="/#start">
-              Start building <ArrowUpRight size={15} />
-            </a>
+            {onStart ? (
+              <button className="nav-start" onClick={onStart}>
+                Start building <ArrowUpRight size={15} />
+              </button>
+            ) : (
+              <a className="nav-start" href="/#start">
+                Start building <ArrowUpRight size={15} />
+              </a>
+            )}
           </div>
         </nav>
       </header>
@@ -81,10 +100,13 @@ export function MarketingShell({ children }: { children: ReactNode }) {
             <a className="wordmark" href="/">
               disposabl<span className="brand-period">.</span>
             </a>
-            <p>Software for the life you actually live.</p>
-            <a className="text-link" href={repository}>
-              Open source. Open possibilities.
-              <ArrowUpRight size={16} />
+            <p>Your AI. Your computer. Your code.</p>
+            <a
+              className="text-link"
+              href={repository}
+              aria-label="Source code on GitHub"
+            >
+              <BrandIcon name="GitHub" />
             </a>
           </div>
           <div className="footer-bottom">
@@ -97,7 +119,6 @@ export function MarketingShell({ children }: { children: ReactNode }) {
               <a href="/legal/terms">Terms</a>
               <a href="/login">Log in</a>
             </nav>
-            <span>Made for makers, everywhere.</span>
           </div>
         </div>
       </footer>

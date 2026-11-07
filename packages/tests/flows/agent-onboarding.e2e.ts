@@ -6,6 +6,7 @@ test(
   { platforms: ["web"] },
   async ({ app, screen, browser }) => {
     await app.open("/");
+    await browser.locator("#start").tap();
     await expect(
       browser.locator('[data-testid="agent-onboarding"]'),
     ).toHaveCount(1);

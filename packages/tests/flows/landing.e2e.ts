@@ -64,11 +64,7 @@ test(
       await browser.keyboard.press("Enter");
       expect(new URL(await browser.url()).pathname).toBe("/");
     }
-    await expect(
-      screen.getByText(
-        "Planned integration. Localization is not available in the starter yet.",
-      ),
-    ).toBeVisible();
+    await expect(browser.locator("#language-title")).toBeVisible();
   },
 );
 
@@ -87,6 +83,7 @@ test(
       });
     });
     await app.open("/");
+    await browser.locator("#start").tap();
     await screen.getByRole("button", "Copy prompt", { exact: true }).tap();
     await expect(screen.getByRole("status")).toHaveText(
       "Select the text to copy it manually.",
@@ -166,6 +163,7 @@ test(
           ),
         ]
           .filter((e) => {
+            if (e.closest('[aria-hidden="true"]')) return false;
             const r = e.getBoundingClientRect();
             return r.left < -1 || r.right > innerWidth + 1;
           })
@@ -192,5 +190,52 @@ test(
         `rel="canonical" href="https://www.disposabl.dev${path}"`,
       );
     }
+  },
+);
+
+test(
+  "both hero actions fit before scrolling and start dialog restores focus",
+  { platforms: ["web"], tags: ["landing"] },
+  async ({ app, browser, screen }) => {
+    for (const [width, height] of [
+      [320, 568],
+      [375, 667],
+      [390, 844],
+      [1440, 900],
+    ]) {
+      await browser.setViewport({ width, height });
+      await app.open("/");
+      const visible = await browser.evaluate(() =>
+        [...document.querySelectorAll("#start,.store-button")].every((el) => {
+          const r = el.getBoundingClientRect();
+          return (
+            r.top >= 0 &&
+            r.bottom <= innerHeight &&
+            r.left >= 0 &&
+            r.right <= innerWidth
+          );
+        }),
+      );
+      expect(visible).toBe(true);
+    }
+    await browser.locator("#start").tap();
+    await expect(
+      screen.getByRole("dialog", "Let's build your app."),
+    ).toBeVisible();
+    await browser.keyboard.press("Escape");
+    await expect(
+      screen.getByRole("dialog", "Let's build your app."),
+    ).toHaveCount(0);
+    expect(
+      await browser.evaluate(() => document.activeElement?.id ?? null),
+    ).toBe("start");
+    await browser.locator("#pricing .primary-link").tap();
+    await expect(browser.locator(".start-dialog[open]")).toBeVisible();
+    await browser.keyboard.press("Escape");
+    await browser.locator(".nav-start").tap();
+    await expect(browser.locator(".start-dialog[open]")).toBeVisible();
+    await browser.keyboard.press("Escape");
+    await app.open("/#start");
+    await expect(browser.locator(".start-dialog[open]")).toBeVisible();
   },
 );

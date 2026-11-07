@@ -1,75 +1,7 @@
 import { ArrowUpRight, Check, Plus } from "lucide-react";
 import { TextLink } from "./shell";
-import { BuildEvidence } from "./build-evidence";
 
-export function BuildJourney() {
-  return (
-    <section
-      className="journey-section launch-container"
-      aria-labelledby="journey-title"
-    >
-      <div className="section-heading section-heading-split">
-        <div>
-          <p className="eyebrow">FROM “WHAT IF” TO “IT WORKS”</p>
-          <h2 id="journey-title">
-            Build time.
-            <br />
-            <span>Less mystery.</span>
-          </h2>
-        </div>
-        <p>
-          Getting a preview and shipping an app are different milestones. Here's
-          what to expect at each step.
-        </p>
-      </div>
-      <ol className="journey-steps">
-        {[
-          [
-            "01",
-            "Set up your project",
-            "One guided setup",
-            "Choose platforms, connect GitHub and Convex, and install dependencies. First-time account setup adds time.",
-          ],
-          [
-            "02",
-            "See your first preview",
-            "Local dev, live feedback",
-            "Start the web app with bun run dev. Your agent builds features and you check them as you go.",
-          ],
-          [
-            "03",
-            "Build for the device",
-            "Native compilation varies",
-            "Mobile and desktop need their toolchains. Cold builds take longer; caches help repeat builds.",
-          ],
-          [
-            "04",
-            "Share it with the world",
-            "Release on your terms",
-            "Deploy web changes or package native apps. Signing, hosted queues, and store review add separate time.",
-          ],
-        ].map(([number, title, time, description]) => (
-          <li key={number}>
-            <span className="step-number">{number}</span>
-            <h3>{title}</h3>
-            <span className="step-time">{time}</span>
-            <p>{description}</p>
-          </li>
-        ))}
-      </ol>
-      <BuildEvidence />
-      <div className="journey-note">
-        <p>
-          No universal stopwatch: scope, hardware, dependencies, and provider
-          queues determine your build time.
-        </p>
-        <TextLink href="/build">Read the practical build guide</TextLink>
-      </div>
-    </section>
-  );
-}
-
-export function Pricing() {
+export function Pricing({ onStart }: { onStart: () => void }) {
   return (
     <section
       id="pricing"
@@ -78,38 +10,21 @@ export function Pricing() {
     >
       <div className="launch-container">
         <div className="section-heading">
-          <p className="eyebrow">MAKE MORE. COMMIT TO LESS.</p>
-          <h2 id="pricing-title">
-            Your ambition.
-            <br />
-            <span>Not another subscription.</span>
-          </h2>
-          <p>
-            Build locally for free. Credit pricing for Agent Mode is coming
-            soon.
-          </p>
+          <h2 id="pricing-title">Build freely.</h2>
+          <p>No subscriptions. No platform upgrade tiers.</p>
         </div>
         <div className="pricing-grid">
           <article className="price-card local-price">
-            <div className="price-kicker">
-              ON YOUR COMPUTER <span>YOURS TO KEEP</span>
-            </div>
-            <h3>Local mode</h3>
+            <h3>On your computer</h3>
             <p className="price-number">
-              $0<span> / forever</span>
+              Free<span>forever</span>
             </p>
-            <p className="price-description">
-              Everything you need to start.
-              <br />
-              No Disposabl usage meter.
-            </p>
+            <p>Your AI. All platforms. All your code.</p>
             <ul>
               {[
-                "All supported platforms",
-                "Your coding agent and your machine",
-                "Full source code under the MIT license",
-                "Starter tests and release workflows",
                 "Unlimited local editing and builds",
+                "MIT-licensed source you can keep",
+                "Tests and release workflows included",
               ].map((text) => (
                 <li key={text}>
                   <Check size={16} />
@@ -117,34 +32,27 @@ export function Pricing() {
                 </li>
               ))}
             </ul>
-            <a className="primary-link" href="#start">
-              Start building free <ArrowUpRight size={18} />
-            </a>
+            <button onClick={onStart} className="primary-link">
+              Start building <ArrowUpRight size={17} />
+            </button>
             <p className="price-footnote">
-              AI, cloud providers, signing, and app store accounts may have
-              their own costs.
+              Your AI and cloud providers may charge separately.
             </p>
           </article>
           <article className="price-card agent-price">
-            <div className="price-kicker">
-              ON A SANDBOX <span>PLANNED PRICING</span>
+            <div className="price-title">
+              <h3>Agent Mode</h3>
+              <span className="planned-label">Planned pricing</span>
             </div>
-            <h3>Agent Mode</h3>
             <p className="price-number">
-              $1<span> = 100 credits</span>
+              $1<span>= 100 credits</span>
             </p>
-            <p className="price-description">
-              Give the heavier work
-              <br />
-              room to run.
-            </p>
+            <p>Remote sandboxes for the bigger jobs.</p>
             <ul>
               {[
-                "Run tasks in a remote sandbox",
-                "Work through complex changes",
-                "Iterate, test, and improve a result",
-                "Explore approaches in parallel previews",
-                "Compare results with your agent",
+                "Work through complex tasks",
+                "Iterate, test, and improve",
+                "Compare approaches in parallel previews",
               ].map((text) => (
                 <li key={text}>
                   <Check size={16} />
@@ -152,19 +60,12 @@ export function Pricing() {
                 </li>
               ))}
             </ul>
-            <TextLink href="/build#agent-mode">Understand Agent Mode</TextLink>
+            <TextLink href="/build#agent-mode">How Agent Mode works</TextLink>
             <p className="price-footnote">
-              Credit billing is coming soon. No subscription planned. Task costs
-              will vary. Parallel previews are agent-directed; a credit is not a
-              fixed number of prompts or apps.
+              Credit billing is coming soon. No subscription planned. Usage
+              varies by task.
             </p>
           </article>
-        </div>
-        <div className="pricing-bottom">
-          <span>No monthly plan. No platform upgrade tiers.</span>
-          <a href="#faq">
-            What does “free” include? <ArrowUpRight size={14} />
-          </a>
         </div>
       </div>
     </section>
@@ -190,7 +91,7 @@ export const faqs = [
   ],
   [
     "How long will my app take to build?",
-    "There is no honest single number for every app. Setup depends on accounts, downloads, and your machine. Feature development depends on scope and your agent. Native compilation, signing, hosted queues, and store review take additional time. Start with one useful workflow, verify it, then expand. Our build guide separates these stages.",
+    "Our November 4 CI run took 1m 40s for web, 29m 22s for Android, and 26m 39s for an iOS simulator build. These are different workloads, not time-to-finished-app estimates. Setup, feature development, queues, and store review add time. See the build guide for the exact runs.",
   ],
   [
     "Is local mode completely offline?",
@@ -221,33 +122,21 @@ export function Questions() {
       className="faq-section launch-container"
       aria-labelledby="faq-title"
     >
-      <div>
-        <p className="eyebrow">GOOD QUESTIONS.</p>
-        <h2 id="faq-title">
-          Straight
-          <br />
-          <span>answers.</span>
-        </h2>
-        <p>
-          The details matter.
-          <br />
-          Especially before you build.
-        </p>
-        <TextLink href="https://github.com/disposabl-dev/create-disposabl-app/issues">
-          Ask us on GitHub
-        </TextLink>
-      </div>
+      <h2 id="faq-title">Good questions.</h2>
       <div className="faq-list">
         {faqs.map(([question, answer]) => (
           <details key={question}>
             <summary>
               {question}
-              <Plus size={18} aria-hidden="true" />
+              <Plus size={19} aria-hidden="true" />
             </summary>
             <p>{answer}</p>
           </details>
         ))}
       </div>
+      <TextLink href="/build#build-times">
+        Build times and publishing guide
+      </TextLink>
     </section>
   );
 }
