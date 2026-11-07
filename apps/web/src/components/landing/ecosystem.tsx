@@ -52,7 +52,7 @@ export function Ecosystem() {
             <img src={codex} alt="" width={28} height={28} />
             <img src={claude} alt="" width={28} height={28} />
           </span>{" "}
-          Codex &amp; Claude Code plugins <span>+</span>
+          Codex &amp; Claude Code plugins <span aria-hidden="true" />
         </summary>
         <div>
           <article>

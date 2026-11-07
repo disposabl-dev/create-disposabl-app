@@ -457,6 +457,12 @@
   margin-left: auto;
   font: 24px var(--display);
 }
+.plugin-details summary > span:last-child::before {
+  content: "+";
+}
+.plugin-details[open] summary > span:last-child::before {
+  content: "−";
+}
 .plugin-logos {
   display: flex;
   gap: 8px;
