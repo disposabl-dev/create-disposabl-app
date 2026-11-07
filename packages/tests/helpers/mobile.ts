@@ -10,8 +10,6 @@ export async function openMobile(
   }: Pick<TestFixtures, "app" | "screen"> & { device: Device },
   restart = false,
 ) {
-  if (restart) await app.restart();
-  else await app.open();
   const origin = process.env.E2E_MOBILE_DEV_URL;
   if (origin) {
     const scheme = process.env.E2E_MOBILE_DEV_SCHEME;
@@ -23,8 +21,12 @@ export async function openMobile(
     url.searchParams.set("url", origin);
     url.searchParams.set("__expo_disable_fab", "1");
     url.searchParams.set("__expo_disable_onboarding", "1");
+    // Launch the selected project once. Opening the saved project first races
+    // native initialization against the development client's redirect/reload.
+    await device.closeApp();
     await device.openLink(url.href);
-  }
+  } else if (restart) await app.restart();
+  else await app.open();
   const settings = screen.getByRole("button", "Settings", { exact: true });
   await expect(settings).toHaveCount(1, { timeout: 30_000 });
   await expect(settings).toBeVisible({ timeout: 30_000 });
