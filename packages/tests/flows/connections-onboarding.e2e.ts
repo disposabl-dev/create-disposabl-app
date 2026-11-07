@@ -92,3 +92,78 @@ test(
     await screen.getByRole("button", "Logout", { exact: true }).tap();
   },
 );
+
+test(
+  "connected accounts continue to the composer and CLI setup stays on its completion page",
+  { platforms: ["web"], tags: ["connections"] },
+  async ({ app, screen, browser }) => {
+    const origin = new URL(backendUrl());
+    test.skip(
+      !["localhost", "127.0.0.1", "[::1]"].includes(origin.hostname) ||
+        origin.port !== "3310",
+      "Provider fixtures require the isolated loopback backend",
+    );
+    const key = process.env.E2E_CONVEX_ADMIN_KEY;
+    test.skip(!key, "E2E_CONVEX_ADMIN_KEY is required for isolated fixtures");
+    const { handoffFixture } = await import("../helpers/browser-handoff.ts");
+    const fixture = await handoffFixture();
+    async function seed(path: string, args: object) {
+      const result = await fetch(`${origin.origin}/api/mutation`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Convex ${key}`,
+        },
+        body: JSON.stringify({ path, args, format: "json" }),
+      }).then((response) => response.json());
+      if (result.status !== "success")
+        throw new Error(`Local fixture failed: ${path}`);
+    }
+    await app.open(fixture.path);
+    await screen
+      .getByRole("button", `Continue as @${fixture.username}`, { exact: true })
+      .tap();
+    await expect(
+      screen.getByRole("heading", "Connect your accounts."),
+    ).toBeVisible();
+    await app.open("/dashboard?origin=web");
+    await expect(
+      screen.getByRole("heading", "Connect your accounts."),
+    ).toBeVisible();
+    await expect(
+      screen.getByRole("button", "Continue", { exact: true }),
+    ).toBeDisabled();
+    await seed("github/internal:connect", {
+      userId: fixture.userId,
+      owner: "fixture",
+      installationId: "12345",
+    });
+    await seed("connections/internal:save", {
+      userId: fixture.userId,
+      provider: "convex",
+      accountId: "fixture",
+      name: "Fixture",
+      token: "fixture",
+    });
+    await expect(
+      screen.getByRole("button", "Continue", { exact: true }),
+    ).toBeVisible();
+    await screen.getByRole("button", "Continue", { exact: true }).tap();
+    await expect(screen.getByTestId("agent-onboarding")).toBeVisible();
+
+    await app.open("/dashboard/connections?origin=cli");
+    await expect(
+      screen.getByRole("link", "Go to dashboard", { exact: true }),
+    ).toBeVisible();
+    await app.open(
+      "/dashboard/connections?error=access_denied&code=discard&state=discard",
+    );
+    await expect(screen.getByRole("alert")).toContainText("cancelled");
+    await expect(browser).toHaveURL("/dashboard/connections");
+    await browser.reload();
+    await expect(
+      screen.getByRole("link", "Go to dashboard", { exact: true }),
+    ).toBeVisible();
+    await expect(screen.getByTestId("agent-onboarding")).not.toBeVisible();
+  },
+);
