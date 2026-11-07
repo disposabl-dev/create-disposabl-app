@@ -1,4 +1,4 @@
-import { createThread, listMessages, saveMessage } from "@convex-dev/agent";
+import { listMessages, saveMessage } from "@convex-dev/agent";
 import {
   identityFields,
   internalMutation,
@@ -6,17 +6,15 @@ import {
 } from "@disposabl/disposabl-kit/server/lib/functions";
 import { ConvexError, v, type Infer } from "convex/values";
 import { components, internal } from "../_generated/api";
-import { env, type QueryCtx } from "../_generated/server";
+import { env } from "../_generated/server";
+import type { Doc } from "../_generated/dataModel";
 import { ownedApp } from "../apps/internal";
 import { assertActive } from "../apps/operations/internal";
 import { history, historyArgs, result, sendArgs } from "./validator";
-
-export async function findThread(ctx: Pick<QueryCtx, "db">, appId: string) {
-  return ctx.db
-    .query("agentThreads")
-    .withIndex("by_appId", (q) => q.eq("appId", appId))
-    .unique();
-}
+import { requireConnections } from "../connections/config";
+import { readThread, patchThread } from "./threads";
+import { resolvePlatforms } from "@disposabl/disposabl-kit/platforms";
+import { resolveFeatures } from "@disposabl/disposabl-kit/feature-options";
 
 export const sendMessage = internalMutation({
   platforms: true,
@@ -24,42 +22,60 @@ export const sendMessage = internalMutation({
   returns: result,
   handler: async (
     ctx,
-    { userId, appId, prompt },
+    { userId, appId, prompt, platforms, features },
   ): Promise<Infer<typeof result>> => {
     prompt = prompt.trim();
     if (!prompt || prompt.length > 32_000)
       throw new ConvexError("Prompt must contain 1–32,000 characters.");
     if (!env.BOAT_API_KEY)
       throw new ConvexError("Remote agents are not configured.");
-    if (appId) assertActive(await ownedApp(ctx, userId, appId));
-    else {
+    let app: Doc<"apps">;
+    if (appId) {
+      if (platforms !== undefined || features !== undefined)
+        throw new ConvexError(
+          "Use the app configuration action to change an existing app's platforms or features.",
+        );
+      app = await ownedApp(ctx, userId, appId);
+      assertActive(app);
+    } else {
+      const selectedPlatforms = resolvePlatforms(platforms ?? ["web"]);
+      const selectedFeatures = resolveFeatures(features ?? ["authentication"]);
+      requireConnections(
+        await ctx.runQuery(internal.connections.internal.status, {
+          userId,
+          features: selectedFeatures,
+        }),
+        selectedPlatforms,
+      );
       appId = crypto.randomUUID();
-      await ctx.db.insert("apps", {
+      const id = await ctx.db.insert("apps", {
         appId,
         userId,
         name: prompt.slice(0, 80),
-        platforms: ["web"],
-        features: ["authentication"],
+        platforms: selectedPlatforms,
+        features: selectedFeatures,
         expoAccountId: null,
       });
+      app = (await ctx.db.get("apps", id))!;
     }
-    let current = await findThread(ctx, appId);
+    let current = readThread(app);
     if (!current) {
-      const threadId = await createThread(ctx, components.agent, {
-        userId,
-        title: prompt.slice(0, 80),
-      });
-      const id = await ctx.db.insert("agentThreads", {
-        userId,
+      const stored = await ctx.runMutation(
+        components.agent.threads.createThread,
+        {
+          userId,
+          title: prompt.slice(0, 80),
+        },
+      );
+      current = {
         appId,
-        threadId,
+        userId,
+        threadId: stored._id,
         status: "idle",
         pending: [],
         updatedAt: Date.now(),
-      });
-      current = (await ctx.db.get("agentThreads", id))!;
+      };
     }
-    if (current.userId !== userId) throw new ConvexError("App not found.");
     if (current.stopUnconfirmed)
       throw new ConvexError(
         "The previous remote run could not be stopped. Retry abortMessage before sending more work.",
@@ -77,14 +93,15 @@ export const sendMessage = internalMutation({
       userId,
       prompt,
     });
-    await ctx.db.patch("agentThreads", current._id, {
+    await patchThread(ctx, current, {
       pending: [...current.pending, messageId],
       status: "processing",
+      ...(current.status !== "processing" ? { access: undefined } : {}),
       error: undefined,
       updatedAt: Date.now(),
     });
     await ctx.scheduler.runAfter(0, internal.agent.actions.run.tick, {
-      id: current._id,
+      id: current.threadId,
     });
     return { appId, threadId: current.threadId, status: "processing" };
   },
@@ -98,8 +115,7 @@ export const abortMessage = internalMutation({
     ctx,
     { userId, appId },
   ): Promise<Infer<typeof result> | null> => {
-    await ownedApp(ctx, userId, appId);
-    const current = await findThread(ctx, appId);
+    const current = readThread(await ownedApp(ctx, userId, appId));
     if (!current) return null;
     for (const messageId of current.pending) {
       if (messageId !== current.delivery)
@@ -110,16 +126,17 @@ export const abortMessage = internalMutation({
     }
     const status =
       current.status === "idle" && !current.lease ? "idle" : "stopping";
-    await ctx.db.patch("agentThreads", current._id, {
+    await patchThread(ctx, current, {
       pending: [],
       status,
+      access: undefined,
       stopFailures: undefined,
       error: undefined,
       updatedAt: Date.now(),
     });
     if (status === "stopping")
       await ctx.scheduler.runAfter(0, internal.agent.actions.run.tick, {
-        id: current._id,
+        id: current.threadId,
       });
     return { appId, threadId: current.threadId, status };
   },
@@ -141,37 +158,27 @@ export const getMessages = internalQuery({
     )
       throw new ConvexError("Page size must be between 1 and 100.");
     if (!appId) {
-      const threads = await ctx.db
-        .query("agentThreads")
-        .withIndex("by_userId_updatedAt", (q) => q.eq("userId", userId))
+      const apps = await ctx.db
+        .query("apps")
+        .withIndex("by_userId_agentUpdatedAt", (q) =>
+          q.eq("userId", userId).gt("agent.updatedAt", undefined),
+        )
         .order("desc")
         .paginate(opts);
-      const page = await Promise.all(
-        threads.page.map(async (t) => {
-          const app = await ctx.db
-            .query("apps")
-            .withIndex("by_appId", (q) => q.eq("appId", t.appId))
-            .unique();
-          return app?.userId === userId
-            ? {
-                appId: t.appId,
-                threadId: t.threadId,
-                status: t.status,
-                updatedAt: t.updatedAt,
-                error: t.error,
-                name: app.name,
-              }
-            : null;
-        }),
-      );
       return {
         kind: "threads",
-        ...threads,
-        page: page.filter((t) => t !== null),
+        ...apps,
+        page: apps.page.map((app) => ({
+          appId: app.appId,
+          threadId: app.agent!.threadId,
+          status: app.agent!.status,
+          updatedAt: app.agent!.updatedAt,
+          error: app.agent!.error,
+          name: app.name,
+        })),
       };
     }
-    await ownedApp(ctx, userId, appId);
-    const current = await findThread(ctx, appId);
+    const current = readThread(await ownedApp(ctx, userId, appId));
     if (!current)
       return {
         kind: "messages",
@@ -192,6 +199,7 @@ export const getMessages = internalQuery({
       threadId: current.threadId,
       status: current.status,
       error: current.error,
+      stopUnconfirmed: current.stopUnconfirmed,
       ...messages,
       page: await Promise.all(
         messages.page.map(async (m) => ({

@@ -30,7 +30,10 @@ function ResetPassword() {
       ) : state.status === "error" ? (
         <>
           <p role="alert">{authErrorMessage(state.userError)}</p>
-          <Link to="/forgot-password" className="block underline">
+          <Link
+            to="/forgot-password"
+            className="block font-medium text-[#2855c5] underline-offset-4 hover:underline"
+          >
             Request another reset link
           </Link>
           {code && (
@@ -64,6 +67,7 @@ function ResetPassword() {
           <Field>
             <FieldLabel htmlFor="new-password">New password</FieldLabel>
             <Input
+              className="h-12 rounded-xl border-[#d9dce3] bg-white px-4"
               id="new-password"
               type="password"
               autoComplete="new-password"
@@ -76,6 +80,7 @@ function ResetPassword() {
           <Field>
             <FieldLabel htmlFor="confirmation">Confirm new password</FieldLabel>
             <Input
+              className="h-12 rounded-xl border-[#d9dce3] bg-white px-4"
               id="confirmation"
               type="password"
               autoComplete="new-password"
@@ -86,11 +91,18 @@ function ResetPassword() {
             />
           </Field>
           {error && (
-            <p role="alert" className="text-destructive">
+            <p
+              role="alert"
+              className="rounded-lg bg-destructive/5 p-3 text-destructive"
+            >
               {error}
             </p>
           )}
-          <Button type="submit" disabled={state.pending}>
+          <Button
+            className="h-12 w-full rounded-xl bg-[#161b2e] text-white hover:bg-[#303850]"
+            type="submit"
+            disabled={state.pending}
+          >
             {state.pending ? "Resetting…" : "Reset password"}
           </Button>
         </form>

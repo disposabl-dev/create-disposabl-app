@@ -44,3 +44,24 @@ test(
     }
   },
 );
+
+test(
+  "selected documentation opens from the site header",
+  { platforms: ["web"] },
+  async ({ app, screen }) => {
+    await app.open("/");
+    const docs = screen.getByRole("link", "Docs", { exact: true });
+    if (!project.features.includes("docs")) {
+      await expect(docs).toHaveCount(0);
+      return;
+    }
+    await docs.click();
+    await expect(
+      screen.getByRole("heading", "Your app handbook", { exact: true }),
+    ).toBeVisible({ timeout: 60_000 });
+    await screen.getByRole("link", "your workspace", { exact: true }).click();
+    await expect(
+      screen.getByRole("heading", "Your workspace", { exact: true }),
+    ).toBeVisible();
+  },
+);

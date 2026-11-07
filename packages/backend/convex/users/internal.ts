@@ -6,7 +6,10 @@ import {
 import { env } from "../_generated/server";
 import { ConvexError, v } from "convex/values";
 import { components } from "../_generated/api";
-import { vGoogleProfile } from "@convex-dev/auth/methods/google/server";
+import {
+  vGoogleProfile,
+  type GoogleProfile,
+} from "@convex-dev/auth/methods/google/server";
 
 export const current = internalQuery({
   platforms: true,
@@ -47,7 +50,7 @@ const authProvider = v.union(
 
 /**
  * Create the user row for a new provider account and return its id. This
- * example keeps no data in the row, but your app can put a profile here.
+ * Display identity comes from the provider's verified claims.
  */
 export const createUser = internalMutation({
   args: {
@@ -62,7 +65,12 @@ export const createUser = internalMutation({
         "New accounts must use verified email and password.",
       );
     }
-    return await ctx.db.insert("users", {});
+    return await ctx.db.insert(
+      "users",
+      provider.name === "google"
+        ? { profile: displayProfile(provider.profile) }
+        : {},
+    );
   },
 });
 
@@ -70,9 +78,23 @@ export const createUser = internalMutation({
 export const onSignIn = internalMutation({
   args: { userId: v.id("users"), provider: authProvider },
   returns: v.null(),
-  handler: async (_ctx, { provider }) => {
+  handler: async (ctx, { userId, provider }) => {
     if (env.AUTH_GOOGLE_ONLY === "true" && provider.name !== "google")
       throw new ConvexError("Use Sign in with Google for this app.");
+    if (provider.name === "google")
+      await ctx.db.patch("users", userId, {
+        profile: displayProfile(provider.profile),
+      });
     return null;
   },
 });
+
+function displayProfile(profile: GoogleProfile) {
+  return {
+    ...(profile.name ? { name: profile.name } : {}),
+    ...(profile.emailVerified && profile.email ? { email: profile.email } : {}),
+    ...(profile.picture?.startsWith("https://")
+      ? { picture: profile.picture }
+      : {}),
+  };
+}

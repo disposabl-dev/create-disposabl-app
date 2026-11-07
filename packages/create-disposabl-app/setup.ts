@@ -70,6 +70,7 @@ export async function setupApp(
     "--features",
     JSON.stringify(config.features),
     "--wait",
+    "--setup-origin",
     ...(config.platforms.some((p: string) => p === "ios" || p === "android")
       ? ["--mobile"]
       : []),
@@ -83,28 +84,7 @@ export async function setupApp(
         basename(directory) +
         ". Your app files and login are saved.",
     );
-  if (config.appId) {
-    const app = (await run(["apps", "get", "--appId", config.appId])) as {
-      platforms: string[];
-      features?: string[];
-    };
-    if (
-      JSON.stringify([...app.platforms].sort()) !==
-        JSON.stringify([...config.platforms].sort()) ||
-      JSON.stringify([...(app.features ?? [])].sort()) !==
-        JSON.stringify([...config.features].sort())
-    )
-      await run([
-        "apps",
-        "update",
-        "--appId",
-        config.appId,
-        "--platforms",
-        JSON.stringify(config.platforms),
-        "--features",
-        JSON.stringify(config.features),
-      ]);
-  } else {
+  if (!config.appId) {
     const app = (await run([
       "apps",
       "create",
@@ -130,6 +110,10 @@ export async function setupApp(
     config.appId,
     "--reference",
     reference,
+    "--platforms",
+    JSON.stringify(config.platforms),
+    "--features",
+    JSON.stringify(config.features),
     "--configure",
     directory,
   ]);

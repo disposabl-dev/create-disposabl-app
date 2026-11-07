@@ -18,7 +18,7 @@
     "prettier": "^3.9.10",
     "prettier-plugin-tailwindcss": "^0.8.1",
     "turbo": "^2.11.10",
-    "typescript": "^6.0.2"
+    "typescript": "~6.0.3"
   },
   "packageManager": "bun@1.4.4",
   "engines": {
@@ -29,16 +29,19 @@
     "packages/*"
   ],
   "catalog": {
-    "@convex-dev/auth": "file:vendor/convex-auth-6c0ebf3f.tgz",
+    "@convex-dev/auth": "file:vendor/convex-auth-437831bd-disposabl.1.tgz",
     "convex": "^1.49.0",
-    "lucide-react": "^1.61.0",
-    "react": "^19.3.1",
-    "react-dom": "^19.3.1",
+    "lucide-react": "^1.70.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
     "@convex-dev/mcp": "0.1.0-alpha.7",
     "@convex-dev/static-hosting": "0.2.1"
   },
   "patchedDependencies": {
     "@convex-dev/static-hosting@0.2.1": "patches/@convex-dev%2Fstatic-hosting@0.2.1.patch",
-    "@convex-dev/auth@vendor/convex-auth-6c0ebf3f.tgz": "patches/@convex-dev%2Fauth@vendor%2Fconvex-auth-6c0ebf3f.tgz.patch"
+    "react-native-css@3.1.0-rc.1": "patches/react-native-css@3.1.0-rc.1.patch"
+  },
+  "overrides": {
+    "lightningcss": "1.30.1"
   }
 }

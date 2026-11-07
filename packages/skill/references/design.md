@@ -10,4 +10,6 @@ Use superscripts, tiny uppercase eyebrows, and decorative labels sparingly. Pref
 
 Make the design distinctive through choices that suit the product, rather than a repeated starter palette or the same hero, card grid, and badges with a new name. For example, a meal planner's recipe imagery and weekly schedule should guide its design; a finance tool's data hierarchy should lead to a different treatment. These examples are directions, not mandatory themes.
 
+Use concise copy and real visuals suited to the product. Prioritize useful task UI over decorative filler; do not impose a fixed palette.
+
 Use the app's real tasks and representative content to evaluate the design. Check the landing page and signed-in experience at desktop and mobile widths in the browser, and inspect native layouts on the requested target device. Verify typography, contrast, hierarchy, focus states, wrapping, empty/error/loading states, and consistency with the chosen brand. Fix visible issues before calling the design complete.

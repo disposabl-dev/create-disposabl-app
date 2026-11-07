@@ -3,15 +3,24 @@ import { LegalFooter } from "../components/legal-page";
 import { LogOut } from "../components/ui/log-out";
 import { useState } from "react";
 import { ThemeProvider } from "../lib/theme";
-import { createFileRoute, Outlet } from "@tanstack/react-router";
-import { ConvexAuthProvider } from "@convex-dev/auth/react";
+import {
+  createFileRoute,
+  Outlet,
+  useRouterState,
+} from "@tanstack/react-router";
+import { ConvexAuthProvider, useAuthToken } from "@convex-dev/auth/react";
 import {
   ConvexProvider,
   ConvexReactClient,
   useConvexAuth,
   useQuery,
 } from "convex/react";
-import { authenticationEnabled } from "../../features";
+import {
+  authenticationEnabled,
+  paymentsEnabled,
+  docsEnabled,
+} from "../../features";
+import { usePageTelemetry } from "../lib/telemetry";
 import { api } from "../../../backend/convex/_generated/api";
 
 export const Route = createFileRoute("/_providers")({
@@ -52,17 +61,17 @@ export function AuthProvider({
   children: React.ReactNode;
 }) {
   if (!enabled) {
-    return <ConvexProvider client={client}>{children}</ConvexProvider>;
+    return (
+      <ConvexProvider client={client}>
+        <PageTelemetry token={null} />
+        {children}
+      </ConvexProvider>
+    );
   }
 
   return (
-    <ConvexAuthProvider
-      client={client}
-      api={{
-        refreshSession: api.auth.refreshSession,
-        signOut: api.auth.signOut,
-      }}
-    >
+    <ConvexAuthProvider client={client} api={api.auth}>
+      <AuthenticatedPageTelemetry />
       {children}
     </ConvexAuthProvider>
   );
@@ -78,7 +87,11 @@ function SiteHeader() {
         <a href="/" aria-label="Disposabl home">
           <Logo />
         </a>
-        {authenticationEnabled && <AuthLinks />}
+        <div className="flex items-center gap-5">
+          {docsEnabled && <a href="/docs/">Docs</a>}
+          {paymentsEnabled && <a href="/pricing">Pricing</a>}
+          {authenticationEnabled && <AuthLinks />}
+        </div>
       </nav>
     </header>
   );
@@ -86,12 +99,12 @@ function SiteHeader() {
 
 function AuthLinks() {
   const { isAuthenticated, isLoading } = useConvexAuth();
-  const providers = useQuery(api.auth.providers);
+  const account = useQuery(api.auth.account, isAuthenticated ? {} : "skip");
   if (isLoading) return null;
   return isAuthenticated ? (
     <div className="flex items-center gap-5">
       <a href="/dashboard">Dashboard</a>
-      {providers && !providers.googleOnly && (
+      {account?.passwordMethod && (
         <a href="/change-password">Change password</a>
       )}
       <LogOut />
@@ -102,4 +115,28 @@ function AuthLinks() {
       <a href="/signup">Sign up</a>
     </div>
   );
+}
+
+function AuthenticatedPageTelemetry() {
+  const token = useAuthToken();
+  const { isLoading, isAuthenticated } = useConvexAuth();
+  return (
+    <PageTelemetry
+      token={token}
+      ready={!isLoading && (!isAuthenticated || !!token)}
+    />
+  );
+}
+function PageTelemetry({
+  token,
+  ready = true,
+}: {
+  token: string | null;
+  ready?: boolean;
+}) {
+  const pathname = useRouterState({
+    select: (state) => state.location.pathname,
+  });
+  usePageTelemetry(pathname, token, ready);
+  return null;
 }

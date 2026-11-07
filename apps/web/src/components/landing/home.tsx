@@ -103,13 +103,15 @@ export function Home() {
               className="hero-platforms"
               aria-label="Build for these platforms"
             >
-              {[
-                ["Web", "Web"],
-                ["Apple", "iPhone, iPad & Mac"],
-                ["Android", "Android"],
-                ["Windows", "Windows"],
-                ["Linux", "Linux"],
-              ].map(([icon, label]) => (
+              {(
+                [
+                  ["Web", "Web"],
+                  ["Apple", "iPhone, iPad & Mac"],
+                  ["Android", "Android"],
+                  ["Windows", "Windows"],
+                  ["Linux", "Linux"],
+                ] as const
+              ).map(([icon, label]) => (
                 <span
                   key={label}
                   className="hero-platform"

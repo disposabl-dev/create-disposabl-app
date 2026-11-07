@@ -29,6 +29,8 @@ test("PR installations and update channels are isolated from production", () => 
     () => configure({ config }),
   );
   assert.equal(result.android.package, "app.example.mobile.pr12");
+  assert.equal(result.updates.checkAutomatically, "ON_LOAD");
+  assert.equal(result.updates.fallbackToCacheTimeout, 0);
   assert.equal(result.updates.requestHeaders["expo-channel-name"], "pr-12");
   assert.deepEqual(result.android.runtimeVersion, { policy: "fingerprint" });
   const production = withEnv(
@@ -91,6 +93,8 @@ test("iOS previews share a provisionable identity while their channels remain is
   assert.equal(first.ios.bundleIdentifier, "app.example.mobile.preview");
   assert.equal(second.ios.bundleIdentifier, first.ios.bundleIdentifier);
   assert.equal(first.ios.buildNumber, "42");
+  assert.equal(first.updates.checkAutomatically, "ON_LOAD");
+  assert.equal(first.updates.fallbackToCacheTimeout, 0);
   assert.equal(first.updates.requestHeaders["expo-channel-name"], "pr-12");
   assert.equal(second.updates.requestHeaders["expo-channel-name"], "pr-13");
   assert.equal(
@@ -125,4 +129,39 @@ test("manual EAS iOS builds use their profile channel", () => {
     () => configure({ config: {} }),
   );
   assert.equal(config.updates.requestHeaders["expo-channel-name"], "preview");
+});
+
+test("isolated release tests disable native OTA loading even with a project configured", () => {
+  for (const projectId of [undefined, "test-project"]) {
+    const result = withEnv(
+      {
+        EXPO_PUBLIC_E2E: "true",
+        ...(projectId ? { EXPO_PROJECT_ID: projectId } : {}),
+      },
+      () =>
+        configure({
+          config: {
+            updates: { enabled: true, url: "https://example.com/updates" },
+          },
+        }),
+    );
+    assert.equal(result.updates.enabled, false);
+    assert.deepEqual(
+      result.plugins.find(
+        (plugin) => Array.isArray(plugin) && plugin[0] === "expo-dev-client",
+      ),
+      [
+        "expo-dev-client",
+        { toolsButton: false, skipOnboarding: true, showMenuAtLaunch: false },
+      ],
+    );
+  }
+  const normal = withEnv({ EXPO_PROJECT_ID: "test-project" }, () =>
+    configure({ config: { updates: { enabled: true } } }),
+  );
+  assert.equal(normal.updates.enabled, true);
+  const disabled = withEnv({ EXPO_PROJECT_ID: "test-project" }, () =>
+    configure({ config: { updates: { enabled: false } } }),
+  );
+  assert.equal(disabled.updates.enabled, false);
 });

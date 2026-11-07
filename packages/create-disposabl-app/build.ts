@@ -1,4 +1,5 @@
 import { cp, mkdtemp, readdir, rename, rm } from "node:fs/promises";
+import { lstatSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join, resolve, sep } from "node:path";
 import manifest from "./package.json";
@@ -49,6 +50,10 @@ try {
     cp(source, destination, {
       recursive: true,
       filter: (path) =>
+        !lstatSync(path).isSymbolicLink() &&
+        path !== join(root, "packages/tests/generator-reconfigure.test.ts") &&
+        path !== join(root, "packages/tests/starter-welcome.test.ts") &&
+        path !== join(root, "packages/tests/generator-cli.test.ts") &&
         path !== join(root, "apps/web/src/components/landing") &&
         ![
           ".git",
@@ -116,10 +121,13 @@ try {
     stderr: "inherit",
   });
   if ((await reset.exited) !== 0) throw new Error("Starter reset failed.");
-  await cp(
-    join(dir, "starter/web/index.tsx"),
-    join(templateDir, "apps/web/src/router/index.tsx"),
-  );
+  // npm templates omit symlinks; materialize Claude's links from the canonical skills.
+  for (const workspace of ["apps/mobile", "apps/web", "packages/backend"]) {
+    await copySource(
+      join(templateDir, workspace, ".agents/skills"),
+      join(templateDir, workspace, ".claude/skills"),
+    );
+  }
   for (const file of ["reset.ts", "starter", ".disposabl-staging.json"])
     await rm(join(templateDir, file), { recursive: true, force: true });
   // Removing product dependencies changes Bun's dependency graph and hoisting.

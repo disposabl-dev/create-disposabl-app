@@ -19,6 +19,7 @@ export const createRoutes = (enabled: boolean) =>
   rootRoute("__root.tsx", [
     layout("_providers", kitRoute("route.tsx"), [
       physical("."),
+      route("/pricing", kitRoute("pricing.tsx")),
       route("/legal", kitRoute("legal/index.tsx")),
       route("/legal/privacy", kitRoute("legal/privacy.tsx")),
       route("/legal/terms", kitRoute("legal/terms.tsx")),

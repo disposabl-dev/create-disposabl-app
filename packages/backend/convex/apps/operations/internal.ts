@@ -43,10 +43,7 @@ export const begin = internalMutation({
     if (kind === "setup") assertActive(app);
     else {
       await assertPreviewOnly(ctx, appId);
-      const agent = await ctx.db
-        .query("agentThreads")
-        .withIndex("by_appId", (q) => q.eq("appId", appId))
-        .unique();
+      const agent = app.agent;
       if (
         agent &&
         (agent.lease ||
@@ -227,15 +224,12 @@ export const erase = internalMutation({
     for (const preview of previews)
       await ctx.db.delete("previews", preview._id);
     if (previews.length === 100) return false;
-    const agent = await ctx.db
-      .query("agentThreads")
-      .withIndex("by_appId", (q) => q.eq("appId", appId))
-      .unique();
+    const agent = app.agent;
     if (agent) {
       const events = await ctx.db
         .query("agentEvents")
-        .withIndex("by_agentThreadId_eventId", (q) =>
-          q.eq("agentThreadId", agent._id),
+        .withIndex("by_threadId_eventId", (q) =>
+          q.eq("threadId", agent.threadId),
         )
         .take(100);
       for (const event of events) await ctx.db.delete("agentEvents", event._id);
@@ -244,7 +238,6 @@ export const erase = internalMutation({
         components.agent.threads.deleteAllForThreadIdAsync,
         { threadId: agent.threadId },
       );
-      await ctx.db.delete("agentThreads", agent._id);
     }
     // The sandbox belongs to the user and may be running their other apps.
     await ctx.db.delete("apps", app._id);

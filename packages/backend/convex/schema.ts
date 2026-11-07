@@ -1,11 +1,7 @@
-import {
-  organizationFields,
-  memberFields,
-  tokenFields,
-} from "./mcpEnterprise/validator";
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
-import { threadFields, eventFields } from "./agent/validator";
+import { profile } from "./users/validator";
+import { eventFields, execution } from "./agent/validator";
 import { pendingDelete } from "./apps/validator";
 import { deployment, platform, feature, releases } from "./validator";
 import {
@@ -15,27 +11,26 @@ import {
 } from "./connections/validator";
 
 export default defineSchema({
-  agentThreads: defineTable(threadFields)
-    .index("by_appId", ["appId"])
-    .index("by_userId_updatedAt", ["userId", "updatedAt"]),
+  files: defineTable({
+    owner: v.string(),
+    filename: v.string(),
+    mediaType: v.string(),
+    size: v.number(),
+    location: v.union(
+      v.object({ provider: v.literal("convex"), storageId: v.id("_storage") }),
+      v.object({
+        provider: v.literal("r2"),
+        key: v.string(),
+        account: v.string(),
+        bucket: v.string(),
+      }),
+    ),
+  }),
   agentEvents: defineTable(eventFields)
     .index("by_messageId", ["messageId"])
-    .index("by_agentThreadId_taskId", ["agentThreadId", "taskId"])
-    .index("by_agentThreadId_eventId", ["agentThreadId", "eventId"])
-    .index("by_agentThreadId_streaming", ["agentThreadId", "streaming"]),
-  mcpOrganizations: defineTable(organizationFields)
-    .index("by_tenantId", ["tenantId"])
-    .index("by_issuer", ["issuer"]),
-  mcpMembers: defineTable(memberFields)
-    .index("by_organizationId_userId", ["organizationId", "userId"])
-    .index("by_organizationId_verifiedEmail", [
-      "organizationId",
-      "verifiedEmail",
-    ])
-    .index("by_organizationId_subject", ["organizationId", "subject"]),
-  mcpEnterpriseTokens: defineTable(tokenFields)
-    .index("by_hash", ["hash"])
-    .index("by_organizationId_jti", ["organizationId", "jti"]),
+    .index("by_threadId_taskId", ["threadId", "taskId"])
+    .index("by_threadId_eventId", ["threadId", "eventId"])
+    .index("by_threadId_streaming", ["threadId", "streaming"]),
   serviceIdentities: defineTable({
     key: v.string(),
     token: v.optional(v.string()),
@@ -44,14 +39,7 @@ export default defineSchema({
     lease: v.optional(v.string()),
   }).index("by_key", ["key"]),
   users: defineTable({
-    // Legacy confirmation data is retained for schema compatibility, never required.
-    blacksmith: v.optional(
-      v.object({
-        owner: v.string(),
-        installationId: v.string(),
-        confirmedAt: v.number(),
-      }),
-    ),
+    profile: v.optional(profile),
     connectionState: v.optional(connectionState),
   }),
   connections: defineTable({
@@ -68,6 +56,7 @@ export default defineSchema({
     name: v.string(),
     platforms: v.array(platform),
     features: v.optional(v.array(feature)),
+    agent: v.optional(execution),
     posthogProject: v.optional(posthogProject),
     githubOwner: v.optional(v.string()),
     githubRepo: v.optional(v.string()),
@@ -84,7 +73,12 @@ export default defineSchema({
     ),
   })
     .index("by_appId", ["appId"])
-    .index("by_userId", ["userId"]),
+    // App lists use creation order; conversation lists use last activity.
+    // eslint-disable-next-line @convex-dev/no-duplicate-indexes
+    .index("by_userId", ["userId"])
+    .index("by_threadId", ["agent.threadId"])
+    .index("by_agentAccessHash", ["agent.access.hash"])
+    .index("by_userId_agentUpdatedAt", ["userId", "agent.updatedAt"]),
   previews: defineTable({
     appId: v.string(),
     reference: v.string(),

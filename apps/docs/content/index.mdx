@@ -1,10 +1,32 @@
 ---
-title: Documentation
-description: Guides for your application.
+title: Your app handbook
+description: Build, test, and deliver the platforms in your workspace.
 ---
 
-## Get started
+Start with [your workspace](/getting-started), then open the guide for a selected platform.
 
-Write your documentation in `apps/docs/content`.
+import { starterPlatforms } from "../../../packages/disposabl-kit/lib/starter";
 
-[Learn how to add a page](/guides/writing)
+<ul>
+  {[
+    ...new Map(
+      starterPlatforms.map((platform) => [platform.guide, platform]),
+    ).values(),
+  ].map((platform) => (
+    <li key={platform.guide}>
+      <a href={`/docs/${platform.guide}`}>
+        {platform.guide === "mobile"
+          ? "Mobile"
+          : platform.guide === "desktop"
+            ? "Desktop"
+            : platform.guide === "backend"
+              ? "Integrations"
+              : platform.title}
+      </a>
+    </li>
+  ))}
+</ul>
+
+[Backend](/backend): data, files, and shared services.
+
+These are starter examples. Keep the sections that apply to your app and replace them as your product grows. [Add your own page](/guides/writing).

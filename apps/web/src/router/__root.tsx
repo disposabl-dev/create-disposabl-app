@@ -1,10 +1,4 @@
-import { usePageTelemetry } from "@disposabl/disposabl-kit/client/lib/telemetry";
-import {
-  HeadContent,
-  Scripts,
-  createRootRoute,
-  useRouterState,
-} from "@tanstack/react-router";
+import { HeadContent, Scripts, createRootRoute } from "@tanstack/react-router";
 
 import site from "../../site.json";
 import { isAccountPage } from "@disposabl/disposabl-kit/lib/indexing";
@@ -98,18 +92,9 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body>
-        <PageTelemetry />
         {children}
         <Scripts />
       </body>
     </html>
   );
-}
-
-function PageTelemetry() {
-  const pathname = useRouterState({
-    select: (state) => state.location.pathname,
-  });
-  usePageTelemetry(pathname);
-  return null;
 }

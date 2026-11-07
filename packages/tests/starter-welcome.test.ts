@@ -1,0 +1,65 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import { createApp } from "../create-disposabl-app/scaffold";
+
+const exec = promisify(execFile);
+const template = resolve(
+  import.meta.dirname,
+  "../create-disposabl-app/dist/templates/default",
+);
+
+test("reset welcome reflects selected platforms and hides disabled docs", async () => {
+  const temp = await mkdtemp(join(tmpdir(), "starter-welcome-"));
+  try {
+    for (const docs of [false, true]) {
+      const app = join(temp, docs ? "docs" : "minimal");
+      await createApp(template, app, "welcome-fixture", {
+        version: "test",
+        platforms: ["web", "android"],
+        features: docs ? ["docs"] : [],
+      });
+      assert.equal(
+        existsSync(join(app, "apps/mobile/src/features/studio")),
+        false,
+      );
+      assert.equal(
+        existsSync(join(app, "apps/mobile/src/app/settings.tsx")),
+        true,
+      );
+      assert.equal(existsSync(join(app, "apps/docs")), docs);
+      await symlink(
+        resolve(import.meta.dirname, "../../node_modules"),
+        join(app, "node_modules"),
+        "dir",
+      );
+      await writeFile(
+        join(app, "welcome-check.tsx"),
+        `
+        import { createElement } from "react";
+        import { renderToStaticMarkup } from "react-dom/server";
+        import { Route } from "./apps/web/src/router/index";
+        console.log(renderToStaticMarkup(createElement(Route.options.component)));
+      `,
+      );
+      const { stdout } = await exec("bun", ["welcome-check.tsx"], { cwd: app });
+      assert.match(stdout, /Make something/);
+      assert.match(stdout, />Web</);
+      assert.match(stdout, />Android</);
+      assert.doesNotMatch(
+        stdout,
+        />iOS<|AgentOnboarding|Set up your workspace/,
+      );
+      assert.equal(stdout.includes('href="/docs/mobile"'), docs);
+      assert.equal(stdout.includes('href="/docs/web"'), docs);
+      assert.equal(stdout.includes('href="/docs/getting-started"'), docs);
+    }
+  } finally {
+    await rm(temp, { recursive: true, force: true });
+  }
+});

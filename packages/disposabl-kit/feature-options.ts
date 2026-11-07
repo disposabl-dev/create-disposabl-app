@@ -11,6 +11,11 @@ export const features = [
     hint: "Frontend sign-in and sign-up",
   },
   {
+    id: "payments",
+    label: "Payments",
+    hint: "Autumn billing · requires Authentication",
+  },
+  {
     id: "analytics",
     label: "Analytics",
     hint: "PostHog · requires Authentication and a PostHog connection",
@@ -22,6 +27,7 @@ export const featureIds = features.map(({ id }) => id);
 export const featureDependencies: Partial<Record<Feature, readonly Feature[]>> =
   {
     analytics: ["authentication"],
+    payments: ["authentication"],
   };
 
 export function resolveFeatures(values: readonly string[]): Feature[] {

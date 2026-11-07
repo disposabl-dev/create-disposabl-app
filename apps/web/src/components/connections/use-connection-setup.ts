@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { useAction, useMutation, useQuery } from "convex/react";
+import { useAction, useMutation, useQuery, useConvexAuth } from "convex/react";
 import { ConvexError } from "convex/values";
 import { api } from "../../../../../packages/backend/convex/_generated/api";
+
+import { setupContext } from "./flow-state";
 
 type Provider = "github" | "convex" | "posthog";
 type Installation = {
@@ -15,10 +17,22 @@ const isProvider = (value: string | null): value is Provider =>
   value === "github" || value === "convex" || value === "posthog";
 
 export function useConnectionSetup() {
+  const { isAuthenticated } = useConvexAuth();
+  const [fromCli, setFromCli] = useState(false);
   const [analyticsRequired, setAnalyticsRequired] = useState(false);
-  const status = useQuery(api.connections.index.status, {
-    features: analyticsRequired ? ["analytics"] : [],
-  });
+  const [paymentsRequired, setPaymentsRequired] = useState(false);
+  const [initialized, setInitialized] = useState(false);
+  const status = useQuery(
+    api.connections.index.status,
+    isAuthenticated
+      ? {
+          features: [
+            ...(analyticsRequired ? ["analytics" as const] : []),
+            ...(paymentsRequired ? ["payments" as const] : []),
+          ],
+        }
+      : "skip",
+  );
   const start = useAction(api.connections.index.start);
   const resumeInstall = useAction(api.connections.index.resumeGithubInstall);
   const complete = useAction(api.connections.index.complete);
@@ -45,20 +59,12 @@ export function useConnectionSetup() {
     if (consumed.current) return;
     consumed.current = true;
     const url = new URL(window.location.href);
-    const analyticsKey = "disposabl.setupAnalytics";
-    if (url.searchParams.has("features"))
-      sessionStorage.setItem(
-        analyticsKey,
-        url.searchParams.get("features") === "analytics" ? "1" : "0",
-      );
-    setAnalyticsRequired(sessionStorage.getItem(analyticsKey) === "1");
-    const mobileKey = "disposabl.setupMobile";
-    if (url.searchParams.has("mobile"))
-      sessionStorage.setItem(
-        mobileKey,
-        url.searchParams.get("mobile") === "1" ? "1" : "0",
-      );
-    setMobile(sessionStorage.getItem(mobileKey) === "1");
+    const context = setupContext(sessionStorage, url);
+    setFromCli(context.fromCli);
+    setAnalyticsRequired(context.analytics);
+    setPaymentsRequired(context.payments);
+    setMobile(context.mobile);
+    setInitialized(true);
     const queryProvider = url.searchParams.get("provider");
     const pending = sessionStorage.getItem(pendingKey);
     setGithubPending(pending === "github");
@@ -205,6 +211,15 @@ export function useConnectionSetup() {
     tab.opener = null;
     tab.document.title = "Connect your account";
     tab.document.body.textContent = "Opening connection setup…";
+    for (const key of [
+      "disposabl.cliSetup",
+      "disposabl.setupAnalytics",
+      "disposabl.setupMobile",
+      "disposabl.setupPayments",
+    ]) {
+      const value = sessionStorage.getItem(key);
+      if (value !== null) tab.sessionStorage.setItem(key, value);
+    }
     tab.sessionStorage.setItem(pendingKey, provider);
     tab.sessionStorage.removeItem(selectionKey);
     void run(async () => {
@@ -247,5 +262,8 @@ export function useConnectionSetup() {
     githubPending,
     mobile,
     analyticsRequired,
+    paymentsRequired,
+    fromCli,
+    initialized,
   };
 }

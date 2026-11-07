@@ -51,7 +51,7 @@ export const appIdeas = [
     prompt:
       "A team operations app with individual sign-in, role-based access, request approvals, an activity history, and an optional analytics dashboard. Help me design and test the access rules before publishing.",
   },
-];
+] as const;
 
 export function AppPlayground({
   onUseIdea,
@@ -61,7 +61,7 @@ export function AppPlayground({
   const hydrated = useHydrated();
   const [active, setActive] = useState(0);
   const [shared, setShared] = useState("");
-  const idea = appIdeas[active];
+  const idea = appIdeas[active] ?? appIdeas[0];
   async function share() {
     const url = new URL("/", window.location.origin);
     url.searchParams.set("idea", idea.id);

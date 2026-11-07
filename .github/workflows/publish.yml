@@ -45,12 +45,6 @@ jobs:
       - run: bun run lint
       - run: bun run typecheck
         working-directory: packages/cli
-      # Release the CLI first so the generator can install its latest published version.
-      - run: bun run release
-        working-directory: packages/cli
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-          npm_config_workspaces_update: "false"
       # semantic-release sets the package version, builds, tags this commit, and publishes.
       # Recovery after a publish failure: check npm and GitHub for the tagged version first.
       # A tagged version is skipped on rerun; restore missing artifacts from that exact commit/version.

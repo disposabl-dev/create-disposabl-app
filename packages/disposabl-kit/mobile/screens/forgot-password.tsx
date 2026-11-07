@@ -8,10 +8,11 @@ import { useState } from "react";
 import { Text, TextInput } from "react-native";
 import { api } from "../lib/convex";
 import { authErrorMessage } from "../../lib/auth-errors";
-import { AuthButton, AuthScreen, styles } from "../components/auth-ui";
+import { AuthButton, AuthScreen, useAuthStyles } from "../components/auth-ui";
 import { EmailLinkInput } from "../components/email-verification";
 
 export function ForgotPasswordScreen() {
+  const styles = useAuthStyles();
   const providers = useQuery(api.auth.providers);
   const { startPasswordRecovery, pending } = useStartPasswordRecovery(
     api.authEmail,
@@ -86,6 +87,7 @@ export function ForgotPasswordScreen() {
 }
 
 function ResetPassword({ code }: { code: string }) {
+  const styles = useAuthStyles();
   const state = useCompletePasswordRecovery(api.authEmail, { emailCode: code });
   const [password, setPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");

@@ -10,15 +10,15 @@ Expo ships breaking changes every SDK release. APIs you remember are likely rena
 
 ## Commands
 
-Use `bunx` instead of `npx` if the project uses bun (`bun.lock` present).
+Use Bun from this workspace. Run Expo commands in `apps/mobile`; run the selected platform tests from the repository root.
 
 ```bash
-npx expo install <package>  # ALWAYS use instead of npm/yarn/pnpm/bun add — resolves SDK-compatible versions
-npx expo start --dev-client # start the development-build server
-npx expo lint               # lint
-npx tsc --noEmit            # typecheck
-npx expo-doctor             # diagnose dependency and config issues
-npx expo install --fix      # fix incompatible package versions
+bunx expo install <package>  # ALWAYS use instead of npm/yarn/pnpm/bun add — resolves SDK-compatible versions
+bunx expo start --dev-client # start the development-build server
+bunx expo lint               # lint
+bunx tsc --noEmit            # typecheck
+bunx expo-doctor             # diagnose dependency and config issues
+bunx expo install --fix      # fix incompatible package versions
 ```
 
 Run lint and typecheck before declaring any task done.
@@ -39,5 +39,32 @@ Docs: https://docs.expo.dev/eas/index.md
 ## Rules
 
 - If `ios/` and `android/` directories do not exist, they are generated (Continuous Native Generation). Never create or edit them by hand — configure native behavior in `app.json` and config plugins.
-- Never use Expo Go. After adding a library with native code, rebuild the development client: `npx expo run:ios|android` locally, or `eas build --profile development`.
+- Never use Expo Go. After adding a library with native code, rebuild the development client: `bunx expo run:ios|android` locally, or `eas build --profile development`.
 - Prefer recommended Expo modules over third-party libraries, and check your available skills before adding dependencies. Docs: https://docs.expo.dev/versions/latest/index.md
+
+## Agent skills and supported versions
+
+Project skills live in `.agents/skills`, with Claude links in `.claude/skills` and source hashes in `skills-lock.json`. Read the relevant skill before using its workflow:
+
+- `expo-upgrade` for package alignment and Expo Doctor.
+- `expo-router`, `expo-ui`, and `expo-native-ui` for navigation and native presentation.
+- `expo-dev-client` for development builds; `eas-update` for this app's OTA updates.
+- `agent-device` and the platform simulator skill for visible runtime checks.
+
+Refresh installed Expo skills with `bunx skills update --project --yes <skill-names>` from this directory. Keep upstream skills unmodified and put project-specific rules here. These rules override a skill's generic cloud build, deployment, or device examples. Do not launch cloud builds or submit to a store merely to test a local change.
+
+Run `bunx expo install --check` and `bunx expo-doctor` after dependency changes. Use `bunx expo install <package>` and rebuild when native code changes. Match React across the mobile app and shared kit. The root `bunfig.toml` selects hoisted installs so Expo resolves one native module instance; retain that setting in generated apps. Do not hide duplicate native module warnings. A package's npm publication alone does not prove its CocoaPods and Maven dependencies are available. RevenueCat is pinned to the newest version whose native dependency graph has been verified locally; see `../../packages/disposabl-kit/PAYMENTS.md`.
+
+## Device ownership and E2E
+
+When T3 device tools are available, use `device_list` and `device_open`; launch and interact through the returned bound command. Use the device screenshot tool for visual evidence. Do not reuse another agent's device session. Follow a tool error's advice once, then report a persistent failure. Build, install, logs, Metro, and port forwards can use platform CLIs; UI actions use the bound device command.
+
+Give each simulator/emulator and Metro port one owner. Derive the test app ID from the built artifact's Info.plist or Android manifest; never invent a placeholder. Start E2E only after the app is installed. Keep flows in `packages/tests` and read its README. Use the app's development or isolated backend; no production test accounts or copied credentials.
+
+Build E2E binaries with `EXPO_PUBLIC_E2E=true`. This disables native OTA loading and sets Expo Dev Client defaults to hide its floating Tools button, skip onboarding, and keep the menu closed. Those overlays can intercept the account button. Existing development binaries can use Expo's documented launch URL flags `__expo_disable_fab=1`, `__expo_disable_onboarding=1`, and `__expo_disable_auto_launch=1` for that launch. Do not change app layout to work around a developer overlay.
+
+Report compilation, installation, visible behavior, and provider transactions separately. A working debug build does not prove release OTA, store purchase synchronization, or store distribution. Analytics remains off in development and E2E.
+
+## Product boundaries
+
+In the Disposabl management app, do not add a shell, embedded generated-app preview, or runtime app switching. Generated apps implement their own product requirements. Expo Updates updates the installed app only. This is a new starter; do not add legacy account selectors, schema migration layers, or backward-compatibility branches unless the app's requirements explicitly call for them.

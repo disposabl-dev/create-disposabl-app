@@ -2,14 +2,14 @@ import { authErrorMessage } from "../../lib/auth-errors";
 import { useMutation, useQuery } from "convex/react";
 import { useRef, useState } from "react";
 import { Keyboard, Switch, Text, TextInput, View } from "react-native";
-import { AuthButton, AuthScreen, styles } from "../components/auth-ui";
+import { AuthButton, AuthScreen, useAuthStyles } from "../components/auth-ui";
 import { api } from "../lib/convex";
 
 export function ChangePasswordScreen() {
+  const styles = useAuthStyles();
   const user = useQuery(api.auth.account);
   const usernameChange = useMutation(api.auth.changePassword);
   const emailChange = useMutation(api.authEmail.changePassword);
-  const providers = useQuery(api.auth.providers);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
@@ -34,7 +34,7 @@ export function ChangePasswordScreen() {
     Keyboard.dismiss();
     try {
       const changePassword =
-        user?.email && providers?.emailDelivery ? emailChange : usernameChange;
+        user?.passwordMethod === "email" ? emailChange : usernameChange;
       const result = await changePassword({
         currentPassword,
         newPassword,
@@ -69,7 +69,7 @@ export function ChangePasswordScreen() {
         <Text style={styles.body}>Loading your account...</Text>
       ) : user === null ? (
         <Text style={styles.error}>Your account could not be found.</Text>
-      ) : !user.username && !user.email ? (
+      ) : !user.passwordMethod ? (
         <Text style={styles.body}>
           This account uses an external sign-in provider. Continue using your
           sign-in provider.

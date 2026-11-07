@@ -6,20 +6,35 @@ import type { connectionStatus } from "./validator";
 export const connectionsUrl = (features: readonly string[] = []) => {
   const url = new URL(
     "/dashboard/connections",
-    env.CONNECTIONS_ORIGIN || "https://www.disposabl.dev",
+    env.CONNECTIONS_ORIGIN || env.CONVEX_SITE_URL,
   );
-  if (features.includes("analytics"))
-    url.searchParams.set("features", "analytics");
+  const required = features.filter(
+    (f) => f === "analytics" || f === "payments",
+  );
+  if (required.length) url.searchParams.set("features", required.join(","));
   return url.href;
 };
 
-export function requireConnections(status: Infer<typeof connectionStatus>) {
-  if (!status.ready)
+export function requireConnections(
+  status: Infer<typeof connectionStatus>,
+  platforms: readonly string[] = [],
+) {
+  const missing = [...status.missing];
+  if (
+    platforms.some((p) => p === "ios" || p === "android") &&
+    !status.expo &&
+    !missing.includes("expo")
+  )
+    missing.push("expo");
+  const url = new URL(status.connectionsUrl);
+  if (platforms.some((p) => p === "ios" || p === "android"))
+    url.searchParams.set("mobile", "1");
+  if (missing.length)
     throw new ConvexError({
       code: "connections_required",
-      missing: status.missing,
-      connectionsUrl: status.connectionsUrl,
-      message: `Connect ${status.missing.map((provider) => ({ github: "GitHub", convex: "Convex", posthog: "PostHog", expo: "Expo" })[provider]).join(" and ")} to continue setup. Your app choices and login are saved.`,
+      missing,
+      connectionsUrl: url.href,
+      message: `Connect ${missing.map((provider) => ({ github: "GitHub", convex: "Convex", posthog: "PostHog", expo: "Expo", autumn: "Autumn" })[provider]).join(" and ")} to continue setup. Your app choices and login are saved.`,
     });
 }
 

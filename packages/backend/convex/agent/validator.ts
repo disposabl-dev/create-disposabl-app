@@ -3,6 +3,7 @@ import {
   paginationResultValidator,
 } from "convex/server";
 import { v } from "convex/values";
+import { requestedConfiguration } from "../validator";
 
 export const status = v.union(
   v.literal("idle"),
@@ -10,7 +11,11 @@ export const status = v.union(
   v.literal("stopping"),
   v.literal("failed"),
 );
-export const sendArgs = { prompt: v.string(), appId: v.optional(v.string()) };
+export const sendArgs = {
+  prompt: v.string(),
+  appId: v.optional(v.string()),
+  ...requestedConfiguration,
+};
 export const historyArgs = {
   appId: v.optional(v.string()),
   paginationOpts: v.optional(paginationOptsValidator),
@@ -20,9 +25,7 @@ export const result = v.object({
   threadId: v.string(),
   status,
 });
-export const threadFields = {
-  userId: v.string(),
-  appId: v.string(),
+export const execution = v.object({
   threadId: v.string(),
   status,
   pending: v.array(v.string()),
@@ -34,6 +37,7 @@ export const threadFields = {
   stopFailures: v.optional(v.number()),
   stopUnconfirmed: v.optional(v.boolean()),
   delivery: v.optional(v.string()),
+  access: v.optional(v.object({ hash: v.string(), expiresAt: v.number() })),
   lease: v.optional(
     v.object({
       token: v.string(),
@@ -41,11 +45,11 @@ export const threadFields = {
       watchdog: v.id("_scheduled_functions"),
     }),
   ),
-};
+});
 export const thread = v.object({
-  ...threadFields,
-  _id: v.id("agentThreads"),
-  _creationTime: v.number(),
+  ...execution.fields,
+  appId: v.string(),
+  userId: v.string(),
 });
 export const message = v.object({
   id: v.string(),
@@ -58,6 +62,7 @@ export const message = v.object({
 export const history = v.union(
   v.object({
     kind: v.literal("messages"),
+    stopUnconfirmed: v.optional(v.boolean()),
     ...result.fields,
     error: v.optional(v.string()),
     ...paginationResultValidator(message).fields,
@@ -83,7 +88,7 @@ export const event = v.object({
   tools: v.optional(v.string()),
 });
 export const eventFields = {
-  agentThreadId: v.id("agentThreads"),
+  threadId: v.string(),
   eventId: v.string(),
   closed: v.optional(v.boolean()),
   messageId: v.string(),
@@ -91,4 +96,4 @@ export const eventFields = {
   taskId: v.optional(v.string()),
   tools: v.optional(v.string()),
 };
-export const workerArgs = { id: v.id("agentThreads"), token: v.string() };
+export const workerArgs = { id: v.string(), token: v.string() };

@@ -8,54 +8,64 @@
  * @module
  */
 
+import type * as auth from "../auth.js";
+import type * as authEmail from "../authEmail.js";
+import type * as authSetup from "../authSetup.js";
+import type * as emails from "../emails.js";
+import type * as files_index from "../files/index.js";
+import type * as files_internal from "../files/internal.js";
+import type * as http from "../http.js";
+import type * as mcp from "../mcp.js";
+import type * as telemetry from "../telemetry.js";
+import type * as users_index from "../users/index.js";
+import type * as users_internal from "../users/internal.js";
+
 import type {
   ApiFromModules,
   FilterApi,
   FunctionReference,
 } from "convex/server";
-import type * as auth from "../auth.js";
-import type * as authEmail from "../authEmail.js";
-import type * as authSetup from "../authSetup.js";
-import type * as emails from "../emails.js";
-import type * as http from "../http.js";
-import type * as mcp from "../mcp.js";
-import type * as mcpEnterprise_internal from "../mcpEnterprise/internal.js";
-import type * as mcpEnterprise_provision from "../mcpEnterprise/provision.js";
-import type * as mcpEnterprise_validator from "../mcpEnterprise/validator.js";
-import type * as users_index from "../users/index.js";
-import type * as users_internal from "../users/internal.js";
-import type * as telemetry from "../telemetry.js";
+
+declare const fullApi: ApiFromModules<{
+  auth: typeof auth;
+  authEmail: typeof authEmail;
+  authSetup: typeof authSetup;
+  emails: typeof emails;
+  "files/index": typeof files_index;
+  "files/internal": typeof files_internal;
+  http: typeof http;
+  mcp: typeof mcp;
+  telemetry: typeof telemetry;
+  "users/index": typeof users_index;
+  "users/internal": typeof users_internal;
+}>;
 
 /**
- * A utility for referencing Convex functions in your app's API.
+ * A utility for referencing Convex functions in your app's public API.
  *
  * Usage:
  * ```js
  * const myFunctionReference = api.myModule.myFunction;
  * ```
  */
-declare const fullApi: ApiFromModules<{
-  auth: typeof auth;
-  authEmail: typeof authEmail;
-  authSetup: typeof authSetup;
-  emails: typeof emails;
-  http: typeof http;
-  mcp: typeof mcp;
-  "mcpEnterprise/internal": typeof mcpEnterprise_internal;
-  "mcpEnterprise/provision": typeof mcpEnterprise_provision;
-  "mcpEnterprise/validator": typeof mcpEnterprise_validator;
-  "users/index": typeof users_index;
-  "users/internal": typeof users_internal;
-  telemetry: typeof telemetry;
-}>;
 export declare const api: FilterApi<
   typeof fullApi,
   FunctionReference<any, "public">
 >;
+
+/**
+ * A utility for referencing Convex functions in your app's internal API.
+ *
+ * Usage:
+ * ```js
+ * const myFunctionReference = internal.myModule.myFunction;
+ * ```
+ */
 export declare const internal: FilterApi<
   typeof fullApi,
   FunctionReference<any, "internal">
 >;
+
 export declare const components: {
   auth: import("@convex-dev/auth/_generated/component.js").ComponentApi<"auth">;
   authGoogle: import("@convex-dev/auth/components/google/_generated/component.js").ComponentApi<"authGoogle">;

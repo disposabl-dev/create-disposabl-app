@@ -1,0 +1,18 @@
+---
+title: Mobile
+description: Build and test a native app with Expo.
+---
+
+Mobile routes live in `apps/mobile/src/app`. Shared login, settings, appearance, and update UI live in `packages/disposabl-kit/mobile`. Settings remain available without an account; account features appear when authentication is selected.
+
+## Run locally
+
+From the workspace root, run `bun run --cwd apps/mobile ios` or `bun run --cwd apps/mobile android`. Use a development build, not Expo Go. Keep Metro running for debug builds. Native dependency changes require rebuilding the installed app.
+
+Run `bun run test --target ios` or `bun run test --target android` after installing the matching build. Use an isolated backend and leave E2E telemetry disabled.
+
+## Updates
+
+The release pipeline can publish compatible JavaScript and asset changes through EAS Update. Changes to native code or the runtime fingerprint require a new binary. Configure the Expo project and matching channel before publishing.
+
+The app downloads compatible updates at startup and after a long inactive period. A downloaded update can load on the next cold launch; the in-app update prompt lets a user restart sooner. Verify this with an installed release build—development builds and E2E builds do not prove OTA behavior.

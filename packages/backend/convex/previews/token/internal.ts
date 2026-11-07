@@ -4,12 +4,16 @@ import {
 } from "@disposabl/disposabl-kit/server/lib/functions";
 import { v } from "convex/values";
 import { internal } from "../../_generated/api";
-import { deployment, previewIdentity } from "../../validator";
+import {
+  deployment,
+  previewIdentity,
+  requestedConfiguration,
+} from "../../validator";
 import { analyticsConfig } from "../../connections/validator";
 
 export const create = internalAction({
   platforms: true,
-  args: { ...identityFields, ...previewIdentity },
+  args: { ...identityFields, ...previewIdentity, ...requestedConfiguration },
   returns: v.object({
     appId: v.string(),
     ...deployment.fields,

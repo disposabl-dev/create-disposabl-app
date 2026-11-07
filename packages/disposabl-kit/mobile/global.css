@@ -1,0 +1,165 @@
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/preflight.css" layer(base);
+@import "tailwindcss/utilities.css";
+
+@import "nativewind/theme";
+
+@source "../../../apps/mobile/src/**/*.{ts,tsx}";
+@source "./**/*.{ts,tsx}";
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-text: var(--primary-text);
+  --color-accent: var(--accent);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+
+  --font-sans: "Spline Sans";
+
+  --radius-panel: 1rem;
+  --radius-control: 2rem;
+
+  --tracking-brand: 0.125rem;
+
+  --spacing-brand-mark: 8rem;
+  --spacing-compact: 0.5rem;
+  --spacing-stack: 1rem;
+  --spacing-section: 3rem;
+  --spacing-tab-clearance: 4.125rem;
+  --spacing-tab-clearance-android: 6rem;
+
+  --container-mobile-content: 50rem;
+  --container-mobile-copy: 30rem;
+}
+
+/* Edit the mobile palette here. Native controls read these same variables. */
+:root {
+  --accent: #208aef;
+  --background: #f8f5ef;
+  --foreground: #101a32;
+  --card: #ffffff;
+  --card-foreground: var(--foreground);
+  --primary: #ff6b57;
+  --primary-foreground: #101a32;
+  --primary-text: #c13f32;
+  --muted: #e9e5dd;
+  --muted-foreground: #566078;
+  --border: #e9e5dd;
+  --destructive: #b42318;
+  --destructive-foreground: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #101a32;
+    --foreground: #f8f5ef;
+    --card: #17233f;
+    --card-foreground: var(--foreground);
+    --primary: #ff6b57;
+    --primary-foreground: #101a32;
+    --primary-text: var(--primary);
+    --muted: #263451;
+    --muted-foreground: #a8b0c3;
+    --border: #263451;
+    --destructive: #ff8a80;
+    --destructive-foreground: #101a32;
+  }
+}
+
+@utility accent-blue {
+  --accent: #208aef;
+}
+
+@utility accent-green {
+  --accent: #00c46a;
+}
+
+@utility accent-yellow {
+  --accent: #ffbd0a;
+}
+
+@utility accent-pink {
+  --accent: #f65fa0;
+}
+
+@utility accent-orange {
+  --accent: #f97316;
+}
+
+@utility accent-purple {
+  --accent: #7c5cff;
+}
+
+@utility accent-black {
+  --accent: #000000;
+}
+
+@media (prefers-color-scheme: dark) {
+  .accent-black {
+    --accent: #ffffff;
+  }
+}
+
+.type-default,
+.type-title,
+.type-subtitle,
+.type-small,
+.type-small-bold,
+.type-link {
+  font-family: "Spline Sans";
+}
+
+.type-default {
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 24px;
+}
+
+.type-title {
+  font-size: 48px;
+  font-weight: 600;
+  line-height: 52px;
+}
+
+.type-subtitle {
+  font-size: 32px;
+  font-weight: 600;
+  line-height: 44px;
+}
+
+.type-small {
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+}
+
+.type-small-bold {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 20px;
+}
+
+.type-link {
+  font-size: 14px;
+  line-height: 30px;
+}
+
+.type-code {
+  font-family: ui-monospace;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+@media android {
+  .type-code {
+    font-weight: 700;
+  }
+}

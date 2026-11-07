@@ -30,6 +30,12 @@ import type {
   AppsListData,
   AppsListErrors,
   AppsListResponses,
+  AppsRepositoryTokenData,
+  AppsRepositoryTokenErrors,
+  AppsRepositoryTokenResponses,
+  AppsRequestConfigurationData,
+  AppsRequestConfigurationErrors,
+  AppsRequestConfigurationResponses,
   AppsUpdateData,
   AppsUpdateErrors,
   AppsUpdateResponses,
@@ -192,6 +198,48 @@ export const appsList = <ThrowOnError extends boolean = false>(
     security: [{ scheme: "bearer", type: "http" }],
     url: "/api/apps/list",
     ...options,
+  });
+
+export const appsRepositoryToken = <ThrowOnError extends boolean = false>(
+  options: Options<AppsRepositoryTokenData, ThrowOnError>,
+): RequestResult<
+  AppsRepositoryTokenResponses,
+  AppsRepositoryTokenErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    AppsRepositoryTokenResponses,
+    AppsRepositoryTokenErrors,
+    ThrowOnError
+  >({
+    security: [{ scheme: "bearer", type: "http" }],
+    url: "/api/apps/repositoryToken",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+export const appsRequestConfiguration = <ThrowOnError extends boolean = false>(
+  options: Options<AppsRequestConfigurationData, ThrowOnError>,
+): RequestResult<
+  AppsRequestConfigurationResponses,
+  AppsRequestConfigurationErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    AppsRequestConfigurationResponses,
+    AppsRequestConfigurationErrors,
+    ThrowOnError
+  >({
+    security: [{ scheme: "bearer", type: "http" }],
+    url: "/api/apps/requestConfiguration",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
   });
 
 export const appsUpdate = <ThrowOnError extends boolean = false>(

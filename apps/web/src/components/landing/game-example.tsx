@@ -45,10 +45,11 @@ export function GameDemo({ disabled }: { disabled: boolean }) {
   function reveal(index: number) {
     if (open.length === 2 || open.includes(index) || matched.includes(index))
       return;
-    if (open.length === 1) {
+    const first = open.at(0);
+    if (first !== undefined) {
       setMoves((value) => value + 1);
-      if (cards[open[0]] === cards[index]) {
-        setMatched([...matched, open[0], index]);
+      if (cards[first] === cards[index]) {
+        setMatched([...matched, first, index]);
         setOpen([]);
         return;
       }

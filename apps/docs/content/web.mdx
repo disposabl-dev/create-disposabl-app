@@ -1,0 +1,14 @@
+---
+title: Web
+description: Make the first screen useful.
+---
+
+Start in `apps/web/src/router/index.tsx`. Routes use TanStack Router; reusable components live in `packages/disposabl-kit/client`.
+
+Run `bun run dev` and open the web address printed in the terminal. Changes appear as you work. Keep the welcome page useful until your product's first flow is ready.
+
+When documentation is selected, the site header links here automatically. Write pages in `apps/docs/content`. The web build includes them under `/docs`.
+
+## Delivery
+
+The configured GitHub Actions pipeline deploys the backend and website. A push alone does not prove deployment: check the workflow result and open the resulting URL. Test signed-out access, a fresh login, and saved data before sharing it.

@@ -1,10 +1,11 @@
+import { authReturnPath } from "../lib/auth-return";
 import { useCompleteSignUp } from "@convex-dev/auth/methods/email-password/react";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { Text, TextInput } from "react-native";
 import { api } from "../lib/convex";
 import { authErrorMessage } from "../../lib/auth-errors";
-import { AuthButton, styles } from "./auth-ui";
+import { AuthButton, useAuthStyles } from "./auth-ui";
 
 export function emailLinkCode(link: string): string {
   try {
@@ -19,6 +20,7 @@ export function EmailLinkInput({
 }: {
   onContinue: (code: string) => void;
 }) {
+  const styles = useAuthStyles();
   const [link, setLink] = useState("");
   return (
     <>
@@ -54,10 +56,12 @@ export function EmailVerification() {
 }
 
 function CompleteVerification({ code }: { code: string }) {
+  const styles = useAuthStyles();
+  const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
   const state = useCompleteSignUp(api.authEmail, { emailCode: code });
   useEffect(() => {
-    if (state.status === "complete") router.replace("/(authenticated)/account");
-  }, [state.status]);
+    if (state.status === "complete") router.replace(authReturnPath(returnTo));
+  }, [state.status, returnTo]);
   return (
     <Text
       accessibilityRole={state.status === "error" ? "alert" : undefined}

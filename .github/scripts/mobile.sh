@@ -36,15 +36,19 @@ bun -e '
   import {appendFileSync, readFileSync} from "node:fs";
   for (const [key, value] of Object.entries(parseEnv(readFileSync(`${process.env.RUNNER_TEMP}/expo.env`, "utf8")))) {
     // Web and mobile use the same backend from this deployment.
-    if (/^CONVEX_(URL|SITE_URL)$/.test(key) && value !== process.env[key]) throw new Error(`EAS overrides the deployed backend: ${key}`);
-    if (/^(EXPO_PUBLIC_|VITE_)?CONVEX_(URL|SITE_URL)$/.test(key)) continue;
+    const backend = /^(?:EXPO_PUBLIC_|VITE_)?(CONVEX_(?:URL|SITE_URL))$/.exec(key);
+    if (backend) {
+      if (value !== process.env[backend[1]]) throw new Error(`EAS overrides the deployed backend: ${key}`);
+      continue;
+    }
     if (/^(GITHUB_|RUNNER_|GH_|DISPOSABL_|BUN_|CI$|NODE_OPTIONS$|PATH$|HOME$|SOURCE(_PATH)?$|CHANNEL$|PLATFORM$|RELEASE_PREFIX$|MACOS_|EAS_(ENVIRONMENT|CLI)$|EXPO_(TOKEN|PROJECT_ID|OWNER|SLUG|NO_DOTENV)$)/.test(key)) throw new Error(`Reserved EAS variable: ${key}`);
     if (key === "EXPO_PUBLIC_DISPOSABL_ANALYTICS_ENABLED") continue;
     const delimiter = crypto.randomUUID();
     appendFileSync(process.env.GITHUB_ENV, `${key}<<${delimiter}\n${value}\n${delimiter}\n`);
   }
   const site = JSON.parse(readFileSync("../web/site.json", "utf8"));
-  const enabled = process.env.CHANNEL === "production" && site.analytics === true && (!site.backendOrigin || [site.backendOrigin, site.origin].includes(process.env.CONVEX_SITE_URL));
+  const app = JSON.parse(readFileSync("../../disposabl.json", "utf8"));
+  const enabled = process.env.CHANNEL === "production" && process.env.E2E_TELEMETRY_DISABLED !== "1" && app.features.includes("analytics") && !!(app.productionConvexSiteUrl || site.backendOrigin) && (app.productionConvexSiteUrl || site.backendOrigin) === process.env.CONVEX_SITE_URL;
   appendFileSync(process.env.GITHUB_ENV, `EXPO_PUBLIC_DISPOSABL_ANALYTICS_ENABLED=${enabled}\n`);
 '
     ;;

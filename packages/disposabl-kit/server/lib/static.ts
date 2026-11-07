@@ -1,3 +1,4 @@
+import config from "../../../../disposabl.json";
 import { isAccountPage } from "../../lib/indexing";
 import { httpActionGeneric, type HttpRouter } from "convex/server";
 import { components } from "../../../backend/convex/_generated/api";
@@ -34,6 +35,11 @@ export function registerPageRoutes(http: HttpRouter) {
       } catch {
         return new Response("Bad Request", { status: 400 });
       }
+      if (
+        !(config.features as readonly string[]).includes("docs") &&
+        (path === "/docs" || path.startsWith("/docs/"))
+      )
+        return new Response("Not Found", { status: 404 });
       if (
         process.env.AUTH_GOOGLE_ONLY === "true" &&
         [

@@ -24,9 +24,7 @@ function ChangePassword() {
     <PasswordPage title="Change password">
       {account === undefined || !providers ? (
         <p>Loading…</p>
-      ) : providers.googleOnly ||
-        !account ||
-        (!account.username && !account.email) ? (
+      ) : providers.googleOnly || !account || !account.passwordMethod ? (
         <p>
           This account uses an external sign-in provider. Change your password
           with that provider.
@@ -46,7 +44,7 @@ function ChangePassword() {
             setPending(true);
             try {
               const change =
-                account.email && providers.emailDelivery
+                account.passwordMethod === "email"
                   ? emailChange
                   : usernameChange;
               const result = await change({

@@ -21,6 +21,7 @@ import {
 import { createPlatformPrompt } from "./platform-prompt";
 import { projectSetup } from "./project-setup";
 import { createApp } from "./scaffold";
+import { reconfigureApp } from "./reconfigure";
 import { commitApp, install, setupApp } from "./setup";
 
 type Options = {
@@ -65,7 +66,7 @@ const program = new Command("create-disposabl-app")
   .helpOption("-h, --help")
   .addHelpText(
     "after",
-    "\nPlatforms:\n  web (required), android, ios, macos, windows, linux, api, mcp, cli, typescript-sdk\n  CLI and TypeScript SDK automatically include API.\n\nOptional features:\n  authentication, docs, analytics, faster-ci\n  Faster CI uses Blacksmith runners when its GitHub App is installed.\n  Analytics requires Authentication and a PostHog connection.\n  Authentication is enabled by default. Use --features none to disable frontend authentication.\n\nExamples:\n  bun create disposabl-app@latest\n  bun create disposabl-app@latest my-app --yes\n  bun create disposabl-app@latest my-app --platforms web,android,ios,mcp --features docs --yes\n  bun create disposabl-app@latest my-app --platforms web --features none --skip-install --json\n  bun create disposabl-app@latest --list-options --json\n\nWithout a TTY, supply an app name. App options are not prompted, but login is still required.\nPlatform and feature choices are saved in disposabl.json.\nBackend authentication code is always included. Every app checks your Disposabl login, asks you to sign in if needed, and creates an app UUID and development environment through https://www.disposabl.dev. Rerun the same command to resume an existing app.\n",
+    "\nPlatforms:\n  web (required), android, ios, macos, windows, linux, api, mcp, cli, typescript-sdk\n  CLI and TypeScript SDK automatically include API.\n\nOptional features:\n  authentication, docs, analytics, payments, faster-ci\n  Faster CI uses Blacksmith runners when its GitHub App is installed.\n  Analytics requires Authentication and a PostHog connection.\n  Payments requires Authentication and separate Autumn setup.\n  Authentication is enabled by default. Use --features none to disable frontend authentication.\n\nExamples:\n  bun create disposabl-app@latest\n  bun create disposabl-app@latest my-app --yes\n  bun create disposabl-app@latest my-app --platforms web,android,ios,mcp --features docs --yes\n  bun create disposabl-app@latest my-app --platforms web --features none --skip-install --json\n  bun create disposabl-app@latest --list-options --json\n\nWithout a TTY, supply an app name. App options are not prompted, but login is still required.\nPlatform and feature choices are saved in disposabl.json.\nBackend authentication code is always included. Every app checks your Disposabl login, asks you to sign in if needed, and creates an app UUID and development environment through https://www.disposabl.dev. Rerun the same command to resume an existing app.\n",
   )
   .configureOutput({ writeErr: () => {} })
   .exitOverride();
@@ -93,7 +94,7 @@ function showOptions(json: boolean) {
           defaults: { platforms: ["web"], features: selectFeatures() },
           folders: {
             web: "apps/web",
-            cli: "@disposabl/cli",
+            cli: "packages/cli",
             "typescript-sdk": "packages/sdk",
             android: "apps/mobile",
             ios: "apps/mobile",
@@ -175,6 +176,13 @@ async function main() {
         throw new Error(
           "This directory belongs to a different app. Choose a new directory.",
         );
+    }
+    if (options.platforms !== undefined || options.features !== undefined) {
+      const template = fileURLToPath(
+        new URL("./templates/default", import.meta.url),
+      );
+      await reconfigureApp(template, directory, version, options);
+      if (!options.skipInstall) await install(directory, false);
     }
     const appId = await setupApp(directory, name);
     if (

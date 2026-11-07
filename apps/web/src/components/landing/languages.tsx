@@ -38,8 +38,8 @@ export function LanguageCloud() {
   useEffect(() => {
     if (!cloud.current) return;
     const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
+      (entries) => {
+        if (entries.at(0)?.isIntersecting) {
           setEntered(true);
           observer.disconnect();
         }

@@ -24,6 +24,10 @@
     "authenticated": false
   },
   {
+    "path": "/pricing",
+    "authenticated": false
+  },
+  {
     "path": "/reset-password",
     "authenticated": false
   },

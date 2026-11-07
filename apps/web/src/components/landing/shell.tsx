@@ -3,6 +3,7 @@ import { useState, useRef, type ReactNode } from "react";
 import { ArrowUpRight, Menu, X, Sun, Moon } from "lucide-react";
 import { useTheme } from "@disposabl/disposabl-kit/client/lib/theme";
 import { BrandIcon } from "./brand-icon";
+import { docsEnabled } from "@disposabl/disposabl-kit/features";
 
 export const repository =
   "https://github.com/disposabl-dev/create-disposabl-app";
@@ -64,6 +65,7 @@ export function MarketingShell({
             <a href="/why-disposabl">Why Disposabl</a>
             <a href="/#pricing">Pricing</a>
             <a href="/stack">Tech stack</a>
+            {docsEnabled && <a href="/docs/">Docs</a>}
             <a
               className="nav-github"
               href={repository}
