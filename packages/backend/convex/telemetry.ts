@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import { platform } from "./validator";
 import { httpAction, internalAction } from "./_generated/server";
 import { getSessionUserId } from "@disposabl/disposabl-kit/server/lib/functions";
 import {
@@ -29,6 +30,12 @@ const properties = v.object({
   outcome: v.optional(v.union(v.literal("success"), v.literal("error"))),
   page: v.optional(pageValidator),
   duration_ms: v.optional(v.number()),
+  app_id: v.optional(v.string()),
+  time_since_app_creation_ms: v.optional(v.number()),
+  run_number: v.optional(v.number()),
+  run_attempt: v.optional(v.number()),
+  platform: v.optional(platform),
+  channel: v.optional(v.union(v.literal("production"), v.literal("preview"))),
 });
 export const send = internalAction({
   args: {
@@ -38,6 +45,8 @@ export const send = internalAction({
       v.literal("page_view"),
       v.literal("screen_view"),
       v.literal("app_setup"),
+      v.literal("app_created"),
+      v.literal("platform_deployment"),
     ),
     properties,
     userId: v.optional(v.string()),

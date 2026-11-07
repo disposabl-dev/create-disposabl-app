@@ -8,6 +8,7 @@ import {
   paginationResultValidator,
 } from "convex/server";
 import { ConvexError, v, type Infer } from "convex/values";
+import { scheduleTelemetry } from "@disposabl/disposabl-kit/server/lib/telemetry";
 import { assertActive } from "../apps/operations/internal";
 import { ownedApp } from "../apps/internal";
 import {
@@ -219,6 +220,28 @@ export const report = internalMutation({
       )
         return null;
     }
+    const transition =
+      (args.status === "ready" || args.status === "failed") &&
+      !(
+        previous?.status === args.status &&
+        previous.run.id === args.run.id &&
+        previous.run.attempt === args.run.attempt
+      );
+    if (transition)
+      await scheduleTelemetry(
+        ctx,
+        "platform_deployment",
+        {
+          app_id: app.appId,
+          platform: args.platform,
+          channel: args.production ? "production" : "preview",
+          outcome: args.status === "ready" ? "success" : "error",
+          time_since_app_creation_ms: Date.now() - app._creationTime,
+          run_number: args.run.number,
+          run_attempt: args.run.attempt,
+        },
+        args.userId,
+      );
     const {
       userId: _user,
       appId: _app,

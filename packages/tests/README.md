@@ -25,6 +25,8 @@ The initial flows check the public web page, the dashboard's authentication boun
 
 The repository's agent fixture flow (`flows/agent.e2e.ts`) creates test users, an app, and component history to verify ownership, pagination, and worker state without calling Boat. It requires `E2E_CONVEX_ADMIN_KEY` and explicitly skips when the key is absent; admin fixture calls are restricted to a loopback backend. Use only a disposable local deployment and keep the key out of source control and logs. Run through the `bun run e2e` or `bun run test` wrappers so E2E telemetry stays disabled.
 
+The storage fallback flow (`flows/files.e2e.ts`) uses the same loopback/admin restriction to confirm R2 is not configured before uploading. It checks downloaded bytes, anonymous and cross-user rejection, and owner deletion, removing only its own new file. It makes no R2 requests and skips when R2 is fully configured.
+
 The connections browser flow additionally exercises invalid Autumn key submission when `E2E_CONNECTIONS_ENABLED=1`. Set a temporary `CONNECTIONS_ENCRYPTION_KEY` on the isolated backend for that run; the invalid input is rejected before any Autumn request. Restore the backend setting afterward.
 
 ## Email provider verification

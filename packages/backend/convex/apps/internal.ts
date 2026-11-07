@@ -9,6 +9,7 @@ import {
   paginationResultValidator,
 } from "convex/server";
 import { ConvexError, v, type Infer } from "convex/values";
+import { scheduleTelemetry } from "@disposabl/disposabl-kit/server/lib/telemetry";
 import { appArgs, appResult, platform, feature } from "../validator";
 import { resolveFeatures } from "@disposabl/disposabl-kit/feature-options";
 import { requireConnections } from "../connections/config";
@@ -46,6 +47,12 @@ export const insert = internalMutation({
       features: resolveFeatures(args.features ?? []),
       expoAccountId: null,
     });
+    await scheduleTelemetry(
+      ctx,
+      "app_created",
+      { app_id: args.appId },
+      args.userId,
+    );
     return presentApp((await ctx.db.get("apps", id))!);
   },
 });

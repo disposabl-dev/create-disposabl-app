@@ -72,6 +72,7 @@ export const setup = internalAction({
         ctx,
         "app_setup",
         {
+          app_id: args.appId,
           outcome: "success",
           duration_ms: Date.now() - startedAt,
         },
@@ -83,6 +84,7 @@ export const setup = internalAction({
         ctx,
         "app_setup",
         {
+          app_id: args.appId,
           outcome: "error",
           duration_ms: Date.now() - startedAt,
         },
