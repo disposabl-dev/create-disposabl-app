@@ -7,6 +7,7 @@ import { join, resolve } from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { createApp } from "../create-disposabl-app/scaffold";
+import { displayAppName } from "../disposabl-kit/lib/app-name";
 
 const exec = promisify(execFile);
 const template = resolve(
@@ -44,11 +45,15 @@ test("reset welcome reflects selected platforms and hides disabled docs", async 
         import { createElement } from "react";
         import { renderToStaticMarkup } from "react-dom/server";
         import { Route } from "./apps/web/src/router/index";
+        import { PasswordPage } from "./packages/disposabl-kit/client/components/password-page";
         console.log(renderToStaticMarkup(createElement(Route.options.component)));
+        console.log(renderToStaticMarkup(createElement(PasswordPage, { title: "Welcome", children: "Form" })));
       `,
       );
       const { stdout } = await exec("bun", ["welcome-check.tsx"], { cwd: app });
       assert.match(stdout, /Make something/);
+      assert.match(stdout, /Your welcome-fixture account/);
+      assert.doesNotMatch(stdout, /disposabl-logo\.svg|Your Disposabl account/);
       assert.match(stdout, />Web</);
       assert.match(stdout, />Android</);
       assert.doesNotMatch(
@@ -62,4 +67,10 @@ test("reset welcome reflects selected platforms and hides disabled docs", async 
   } finally {
     await rm(temp, { recursive: true, force: true });
   }
+});
+
+test("UUID package names do not appear as app branding", () => {
+  assert.equal(displayAppName("4b468ab0-76e8-448f-b067-2b3599165a00"), null);
+  assert.equal(displayAppName("Folio"), "Folio");
+  assert.equal(displayAppName("Disposabl"), "Disposabl");
 });
