@@ -12,6 +12,7 @@ export function MessageComposer({
   label = "Your app idea",
   testID = "app-idea",
   sending = false,
+  compact = false,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -21,10 +22,19 @@ export function MessageComposer({
   label?: string;
   testID?: string;
   sending?: boolean;
+  compact?: boolean;
 }) {
   const c = useTheme();
   return (
-    <GlassSurface style={{ padding: 8, borderRadius: 28, gap: 4 }}>
+    <GlassSurface
+      style={{
+        padding: 8,
+        borderRadius: 28,
+        gap: 4,
+        flexDirection: compact ? "row" : "column",
+        alignItems: compact ? "flex-end" : "stretch",
+      }}
+    >
       <TextInput
         value={value}
         onChangeText={onChange}
@@ -37,8 +47,9 @@ export function MessageComposer({
         style={{
           fontSize: 17,
           lineHeight: 24,
-          minHeight: 100,
-          maxHeight: 176,
+          minHeight: compact ? 48 : 100,
+          maxHeight: compact ? 120 : 176,
+          flex: compact ? 1 : undefined,
           paddingHorizontal: 12,
           paddingTop: 10,
           paddingBottom: 6,
@@ -54,15 +65,17 @@ export function MessageComposer({
           paddingLeft: 12,
         }}
       >
-        <View style={{ flex: 1 }}>
-          <Label variant="caption" color={c.mutedForeground}>
-            {sending ? "Sending…" : "Start with your idea."}
-          </Label>
-        </View>
+        {!compact && (
+          <View style={{ flex: 1 }}>
+            <Label variant="caption" color={c.mutedForeground}>
+              {sending ? "Sending…" : "Start with your idea."}
+            </Label>
+          </View>
+        )}
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Send message"
-          testID="create-app"
+          testID={compact ? "send-message" : "create-app"}
           disabled={disabled || sending || !value.trim()}
           onPress={() => {
             feedback();
