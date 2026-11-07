@@ -28,16 +28,16 @@ jobs:
       group: npm-publish
       cancel-in-progress: false
     steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
       - name: Validate recovery version
         if: inputs.recovery_version != ''
         env:
           VERSION: ${{ inputs.recovery_version }}
         run: |
           [[ "$VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || { echo "Invalid recovery version"; exit 1; }
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-          persist-credentials: false
       - name: Verify recovery tag
         if: inputs.recovery_version != ''
         env:
