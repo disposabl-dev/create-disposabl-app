@@ -86,6 +86,11 @@ app.whenReady().then(() => {
     },
     supported,
     feed,
+    readyAt:
+      process.platform === 'win32' &&
+      process.argv.includes('--squirrel-firstrun')
+        ? Date.now() + 10_000
+        : 0,
     start: () => {
       autoUpdater.setFeedURL(
         process.platform === 'darwin'

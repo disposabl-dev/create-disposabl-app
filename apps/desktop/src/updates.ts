@@ -27,8 +27,10 @@ export function feedUrl(
 export function createUpdateController(options: {
   supported: boolean;
   feed: string;
+  readyAt?: number;
+  now?: () => number;
   start: () => void;
-  install: () => void;
+  install: () => void | Promise<void>;
   show: (kind: 'info' | 'error', message: string, detail?: string) => void;
   confirmRestart: () => Promise<boolean>;
   onState?: (state: UpdateState) => void;
@@ -39,11 +41,19 @@ export function createUpdateController(options: {
     state = next;
     options.onState?.(next);
   };
+  const restartError = () =>
+    options.show(
+      'error',
+      'Could not restart to install the update.',
+      'Your update is still downloaded. Try Restart to update again.',
+    );
   const restart = async () => {
     if (state !== 'ready' || confirming) return;
     confirming = true;
     try {
-      if (await options.confirmRestart()) options.install();
+      if (await options.confirmRestart()) await options.install();
+    } catch {
+      restartError();
     } finally {
       confirming = false;
     }
@@ -56,13 +66,18 @@ export function createUpdateController(options: {
       if (!options.supported)
         return options.show(
           'info',
-          'Use your system package manager to update this app.',
-          'Native in-app updates are supported on macOS and Windows only.',
+          'Automatic updates are unavailable for this build.',
+          'Download the latest installer from the app’s download page.',
         );
       if (!options.feed)
         return options.show(
           'error',
           'Updates are not configured for this build.',
+        );
+      if ((options.now ?? Date.now)() < (options.readyAt ?? 0))
+        return options.show(
+          'info',
+          'Finishing installation. Try checking for updates in a few seconds.',
         );
       if (state === 'ready') {
         void restart();
@@ -96,7 +111,7 @@ export function createUpdateController(options: {
       void restart();
     },
     error() {
-      if (state === 'ready') return;
+      if (state === 'ready') return restartError();
       setState('idle');
       options.show(
         'error',
