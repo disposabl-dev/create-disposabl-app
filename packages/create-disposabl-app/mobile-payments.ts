@@ -1,9 +1,14 @@
 import { existsSync } from "node:fs";
 import { readFile, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { join, sep } from "node:path";
 
-export const nativeBillingPath = "packages/disposabl-kit/mobile/billing/";
-export const nativeBillingTest = "packages/tests/native-billing.test.ts";
+export const nativeBillingPath =
+  join("packages", "disposabl-kit", "mobile", "billing") + sep;
+export const nativeBillingTest = join(
+  "packages",
+  "tests",
+  "native-billing.test.ts",
+);
 export const purchasesPackage = "react-native-purchases";
 const dependencyFields = [
   "dependencies",

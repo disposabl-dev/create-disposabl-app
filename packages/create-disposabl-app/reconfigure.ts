@@ -9,7 +9,7 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
-import { dirname, join, resolve, sep } from "node:path";
+import { basename, dirname, join, resolve, sep } from "node:path";
 import {
   selectFeatures,
   selectPlatforms,
@@ -125,7 +125,11 @@ export async function reconfigureApp(
       features: oldFeatures,
     });
     await createApp(template, after, name, combined);
-    if (!config.features.includes("payments")) await omitMobilePayments(after);
+    if (
+      oldFeatures.includes("payments") &&
+      !config.features.includes("payments")
+    )
+      await omitMobilePayments(after);
     const oldFiles = new Set(await files(before));
     const nextFiles = new Set(await files(after));
     const changes: { path: string; content?: Buffer }[] = [];
@@ -169,9 +173,10 @@ export async function reconfigureApp(
         continue; // Existing user files always win over restored files.
       else if (current.equals(prior)) changes.push({ path, content: next });
       else {
-        const merged = path.endsWith("/package.json")
-          ? mergePurchasesManifest(prior, next, current)
-          : undefined;
+        const merged =
+          basename(path) === "package.json"
+            ? mergePurchasesManifest(prior, next, current)
+            : undefined;
         if (merged) changes.push({ path, content: merged });
         else
           throw new Error(
