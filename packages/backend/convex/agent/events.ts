@@ -27,11 +27,15 @@ export async function syncResponses(
     )
       continue;
     const content = typeof data.content === "string" ? data.content : "";
-    const tools =
+    const toolPayload =
       Array.isArray(data.tools) && data.tools.length
         ? JSON.stringify(data.tools)
         : undefined;
-    if (content.length > 200_000 || (tools?.length ?? 0) > 100_000)
+    // Tool logs are optional presentation metadata. Never block the response
+    // or cancellation handshake because a tool emitted a large build log.
+    const tools =
+      toolPayload && toolPayload.length <= 100_000 ? toolPayload : undefined;
+    if (content.length > 200_000)
       throw new Error("Agent response exceeded the storage limit.");
     events.push({
       id: e.id,

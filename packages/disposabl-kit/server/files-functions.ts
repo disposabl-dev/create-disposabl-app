@@ -36,7 +36,7 @@ const fields = {
   size: v.number(),
   location,
 };
-const fileValidator = v.object({
+export const fileValidator = v.object({
   ...fields,
   _id: v.id("files"),
   _creationTime: v.number(),

@@ -4,17 +4,26 @@ import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { detectReference } from "../cli/preview";
 import { resolveFeatures } from "../disposabl-kit/feature-options";
+import { apiUrl, SERVICE_ORIGIN } from "../cli/origin";
 
 export type CliRunner = (
   args: string[],
   interactive?: boolean,
 ) => Promise<unknown>;
-export const runDisposabl: CliRunner = (args, interactive = false) =>
+export const runDisposabl = (
+  args: string[],
+  interactive = false,
+  origin?: string,
+): Promise<unknown> =>
   new Promise((resolve, reject) => {
     const child = spawn(
       process.execPath,
       [fileURLToPath(new URL("./disposabl.js", import.meta.url)), ...args],
       {
+        env: {
+          ...process.env,
+          ...(origin ? { DISPOSABL_API_ORIGIN: origin } : {}),
+        },
         stdio: interactive
           ? ["inherit", "inherit", "inherit"]
           : ["ignore", "pipe", "pipe"],
@@ -52,6 +61,20 @@ export async function setupApp(
   const reference = detectReference(directory);
   const path = join(directory, "disposabl.json");
   const config = JSON.parse(await readFile(path, "utf8"));
+  const origin = apiUrl(
+    process.env.DISPOSABL_API_ORIGIN || config.serviceOrigin || SERVICE_ORIGIN,
+  );
+  if (
+    config.appId &&
+    config.serviceOrigin &&
+    apiUrl(config.serviceOrigin) !== origin
+  )
+    throw new Error(
+      "This app belongs to a different Disposabl service. Use its saved service origin.",
+    );
+  config.serviceOrigin = origin;
+  if (run === runDisposabl)
+    run = (args, interactive) => runDisposabl(args, interactive, origin);
   config.features = resolveFeatures(config.features ?? []);
   // Persist dependencies before leaving the terminal for any connection flow.
   await writeFile(path, JSON.stringify(config, null, 2) + "\n");

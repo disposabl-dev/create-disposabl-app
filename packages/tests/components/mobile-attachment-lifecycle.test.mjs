@@ -160,3 +160,20 @@ test("unmount discards unsent uploaded files and preserves uncertain sends", asy
   controller.sendFailed(["rejected"], true);
   expect(removed).toEqual(["rejected"]);
 });
+
+test("uncertain send while mounted stays preserved after later unmount", async () => {
+  picker = deferred();
+  upload = deferred();
+  removed = [];
+  const renderer = await mount();
+  await act(async () => {
+    const work = controller.pick("files");
+    picker.resolve({ canceled: false, assets: [asset] });
+    upload.resolve("uncertain-mounted");
+    await work;
+  });
+  expect(controller.beginSend(["uncertain-mounted"])).toBe(true);
+  controller.sendFailed(["uncertain-mounted"]);
+  await act(async () => renderer.unmount());
+  expect(removed).toEqual([]);
+});

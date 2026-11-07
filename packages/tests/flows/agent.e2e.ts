@@ -32,10 +32,11 @@ test(
         admin?: boolean;
         componentPath?: string;
         mutation?: boolean;
+        action?: boolean;
       } = {},
     ) {
       const response = await fetch(
-        `${url.origin}/api/${options.admin ? "function" : options.mutation ? "mutation" : "query"}`,
+        `${url.origin}/api/${options.admin ? "function" : options.action ? "action" : options.mutation ? "mutation" : "query"}`,
         {
           method: "POST",
           headers: {
@@ -151,6 +152,7 @@ test(
               status: "processing",
               pending: [],
               updatedAt: Date.now(),
+              startedAt: Date.now() - 2000,
             },
           },
         ]),
@@ -388,9 +390,29 @@ test(
         lease: { token },
       });
       // The held lease keeps the scheduled worker from contacting Boat.
+      const attachmentId = await value(
+        "files/index:upload",
+        {
+          filename: "reference.txt",
+          mediaType: "text/plain",
+          bytes: {
+            $bytes: Buffer.from("Project reference fixture").toString("base64"),
+          },
+        },
+        { token: owner.token, action: true },
+      );
+      expect(
+        (
+          await call(
+            "agent/attachments:get",
+            { userId: other.id, ids: [attachmentId] },
+            { admin: true },
+          )
+        ).status,
+      ).toBe("error");
       const sent = await value(
         "agent/index:sendMessage",
-        { appId, prompt: "Queued fixture prompt" },
+        { appId, prompt: "Queued fixture prompt", fileIds: [attachmentId] },
         { token: owner.token, mutation: true },
       );
       expect(sent).toMatchObject({ appId, threadId: id, status: "processing" });
@@ -418,6 +440,17 @@ test(
       expect(
         messages.page.find(
           (m: { content: string }) => m.content === "Queued fixture prompt",
+        ).attachments,
+      ).toEqual([
+        {
+          id: attachmentId,
+          filename: "reference.txt",
+          mediaType: "text/plain",
+        },
+      ]);
+      expect(
+        messages.page.find(
+          (m: { content: string }) => m.content === "Queued fixture prompt",
         ).status,
       ).toBe("failed");
       await value(
@@ -426,12 +459,26 @@ test(
         { admin: true },
       );
       claimed = false;
+      await value(
+        "files/index:remove",
+        { id: attachmentId },
+        { token: owner.token, action: true },
+      );
       const aborted = await value(
         "agent/index:abortMessage",
         { appId },
         { token: owner.token, mutation: true },
       );
       expect(aborted).toMatchObject({ appId, threadId: id, status: "idle" });
+      const completedHistory = await value(
+        "agent/index:getMessages",
+        { appId },
+        { token: owner.token },
+      );
+      expect(completedHistory.startedAt).toBeGreaterThan(0);
+      expect(completedHistory.finishedAt).toBeGreaterThan(
+        completedHistory.startedAt,
+      );
       expect(
         (
           await call(

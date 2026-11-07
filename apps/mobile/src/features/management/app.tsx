@@ -7,12 +7,11 @@ import { useAttachments } from "../studio/attachments";
 import { attachmentIds } from "../studio/attachment-policy";
 import { useMutation, useQuery } from "convex/react";
 import { ConvexError } from "convex/values";
-import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { Stack, useLocalSearchParams } from "expo-router";
 import { useRef, useState } from "react";
 import {
   FlatList,
   KeyboardAvoidingView,
-  Pressable,
   ScrollView,
   Text,
   View,
@@ -20,36 +19,17 @@ import {
 import { api } from "../../../../../packages/backend/convex/_generated/api";
 import { Button, ErrorBoundary, Loading, useStyles } from "./ui";
 import { isNearConversationEnd } from "./conversation-scroll";
+import { ResponseProgress } from "./response-progress";
+import { ConversationHeader } from "./conversation-header";
 
 export function AppScreen() {
   const styles = useStyles();
-  const router = useRouter();
   const { appId } = useLocalSearchParams<{ appId: string }>();
   return (
     <ErrorBoundary>
       <View style={styles.screen}>
-        <Stack.Screen
-          options={{
-            title: "Messages",
-            headerRight: () =>
-              appId ? (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Details"
-                  onPress={() =>
-                    router.push({
-                      pathname: "/apps/[appId]/details",
-                      params: { appId },
-                    })
-                  }
-                  hitSlop={12}
-                >
-                  <Text style={styles.text}>Details</Text>
-                </Pressable>
-              ) : null,
-          }}
-        />
-        {appId && <Chat appId={appId} />}
+        {appId && <ConversationHeader appId={appId} />}
+        {appId && <Chat key={appId} appId={appId} />}
       </View>
     </ErrorBoundary>
   );
@@ -158,6 +138,21 @@ function Chat({ appId }: { appId: string }) {
     return <Text style={styles.muted}>Conversation unavailable.</Text>;
   const running =
     history.status === "processing" || history.status === "stopping";
+  const messages = [...history.page]
+    .reverse()
+    .filter((message) => message.content.trim() || message.attachments?.length);
+  const lastUser = messages.findLastIndex((message) => message.role === "user");
+  const responseIndex = messages.findIndex(
+    (message, index) => index > lastUser && message.role === "assistant",
+  );
+  const progress =
+    cursors.length === 1 ? (
+      <ResponseProgress
+        startedAt={history.startedAt}
+        finishedAt={history.finishedAt}
+        running={running}
+      />
+    ) : undefined;
   return (
     <KeyboardAvoidingView
       behavior={process.env.EXPO_OS === "ios" ? "padding" : undefined}
@@ -167,12 +162,13 @@ function Chat({ appId }: { appId: string }) {
       <FlatList
         ref={list}
         style={{ flex: 1 }}
-        data={[...history.page].reverse()}
+        data={messages}
         keyExtractor={(message) => message.id}
         keyboardDismissMode="on-drag"
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{
-          paddingHorizontal: Math.max(insets.left, insets.right, 24),
+          paddingLeft: Math.max(insets.left, 20),
+          paddingRight: Math.max(insets.right, 20),
           paddingVertical: 24,
           gap: 22,
           width: "100%",
@@ -211,7 +207,6 @@ function Chat({ appId }: { appId: string }) {
         }}
         ListHeaderComponent={
           <View style={{ gap: 12 }}>
-            <Text style={styles.muted}>{history.status}</Text>
             {!!history.error && (
               <Text accessibilityRole="alert" style={styles.text}>
                 {history.error}
@@ -233,22 +228,17 @@ function Chat({ appId }: { appId: string }) {
             No messages yet. Tell the agent what you want to build.
           </Text>
         }
-        renderItem={({ item }) => (
-          <MessageBubble
-            message={{
-              role: item.role,
-              text: item.content || (item.role === "user" ? "" : "Working…"),
-              attachments: (
-                item as typeof item & {
-                  attachments?: {
-                    id: string;
-                    filename: string;
-                    mediaType: string;
-                  }[];
-                }
-              ).attachments,
-            }}
-          />
+        renderItem={({ item, index }) => (
+          <View style={{ gap: 12 }}>
+            {index === responseIndex && progress}
+            <MessageBubble
+              message={{
+                role: item.role,
+                text: item.content,
+                attachments: item.attachments,
+              }}
+            />
+          </View>
         )}
         ListFooterComponent={
           cursors.length > 1 ? (
@@ -259,6 +249,8 @@ function Chat({ appId }: { appId: string }) {
                 setCursors(cursors.slice(0, -1));
               }}
             />
+          ) : responseIndex === -1 ? (
+            progress
           ) : undefined
         }
       />
@@ -283,6 +275,10 @@ function Chat({ appId }: { appId: string }) {
           value={prompt}
           onChange={setPrompt}
           onSend={(text) => void submit(text)}
+          onStop={() => void stop()}
+          stopAvailable={running || history.stopUnconfirmed}
+          stopRequired={history.stopUnconfirmed}
+          stopping={history.status === "stopping"}
           label="Message"
           testID="chat-message"
           placeholder="Ask for a change…"
@@ -290,21 +286,6 @@ function Chat({ appId }: { appId: string }) {
           compact
           disabled={history.status === "stopping" || history.stopUnconfirmed}
         />
-        {(running || history.stopUnconfirmed) && (
-          <View style={styles.row}>
-            <Button
-              title={
-                history.status === "stopping"
-                  ? "Stopping..."
-                  : history.stopUnconfirmed
-                    ? "Retry stop"
-                    : "Stop"
-              }
-              disabled={busy || history.status === "stopping"}
-              onPress={() => void stop()}
-            />
-          </View>
-        )}
         {!!error && (
           <Text accessibilityRole="alert" style={styles.text}>
             {error}

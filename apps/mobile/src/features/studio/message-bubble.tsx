@@ -79,14 +79,6 @@ export const MessageBubble = memo(function MessageBubble({
           : { width: "100%", gap: 12 }
       }
     >
-      {!user && (
-        <>
-          <Text style={{ color: c.mutedForeground, fontSize: 14 }}>
-            Assistant
-          </Text>
-          <View style={{ height: 1, backgroundColor: c.border }} />
-        </>
-      )}
       {!!message.text &&
         (user ? (
           <Text

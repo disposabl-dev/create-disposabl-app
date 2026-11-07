@@ -1,5 +1,6 @@
 import { internalAction } from "@disposabl/disposabl-kit/server/lib/functions";
 import { v, type Infer } from "convex/values";
+import { makeFunctionReference } from "convex/server";
 import { components, internal } from "../../_generated/api";
 import { env } from "../../_generated/server";
 import {
@@ -12,6 +13,7 @@ import {
 } from "../boat";
 import { thread } from "../validator";
 import { syncResponses } from "../events";
+import { attachmentPrompt } from "../attachments";
 import {
   agentEnvironment,
   authorizeSandbox,
@@ -29,14 +31,18 @@ export const tick = internalAction({
     );
     if (!current) return null;
     const ref = sandboxRef(current.userId);
+    let phase = "sandbox-status";
     try {
       let sandbox = await ctx.runQuery(components.boat.sandboxes.get, ref);
       if (current.status === "stopping") {
+        phase = "stop";
         // Confirm the conversation stopped before accepting more work.
         if (sandbox?.sandboxId) {
+          phase = "stop-refresh";
           sandbox = await boat.refresh(ctx, ref);
           if (["ready", "idle", "running"].includes(sandbox.state)) {
             const conversations = async () => {
+              phase = "stop-conversations";
               const data = await request(
                 sandbox!.sandboxId!,
                 "/conversations",
@@ -70,6 +76,7 @@ export const tick = internalAction({
             }
             if (current.conversationId) {
               try {
+                phase = "stop-interrupt";
                 await request(
                   sandbox.sandboxId!,
                   `/interrupt?conversation=${encodeURIComponent(current.conversationId)}`,
@@ -88,6 +95,7 @@ export const tick = internalAction({
                 throw new Error(
                   "Boat did not confirm the conversation stopped.",
                 );
+              phase = "stop-sync-responses";
               const { more } = await syncResponses(ctx, current, lease);
               if (remote.running || more) {
                 await ctx.runMutation(internal.agent.state.finish, {
@@ -171,18 +179,40 @@ export const tick = internalAction({
       }
       let promptId = current.promptId;
       let conversationId = current.conversationId;
+      phase = "prompt-status";
       let run = promptId
         ? object(await boat.promptStatus(ctx, { ...ref, promptId }))
         : undefined;
+      phase = "next-message";
       const queued = await ctx.runMutation(internal.agent.state.next, lease);
       if (queued) {
+        let prompt = queued.prompt;
+        try {
+          prompt += await attachmentPrompt(ctx, current.userId, queued.fileIds);
+        } catch {
+          await ctx.runMutation(
+            makeFunctionReference<
+              "mutation",
+              { id: string; token: string; messageId: string },
+              null
+            >("agent/attachments:reject"),
+            { ...lease, messageId: queued.messageId },
+          );
+          await ctx.runMutation(internal.agent.state.finish, {
+            ...lease,
+            delay: 0,
+            done: !promptId || run?.done === true,
+          });
+          return null;
+        }
         let sent:
           { promptId: string; conversationId: string | null } | undefined;
         if (run && !run.done && conversationId) {
+          phase = "steer";
           try {
             const steered = await request(sandbox.sandboxId, "/steer", {
               conversation: conversationId,
-              message: queued.prompt,
+              message: prompt,
             });
             if (typeof steered.promptId !== "string")
               throw new Error("Boat did not confirm message delivery.");
@@ -209,7 +239,9 @@ export const tick = internalAction({
           }
         }
         if (!sent) {
+          phase = "authorize-sandbox";
           await authorizeSandbox(ctx, current, lease);
+          phase = "send-prompt";
           sent = await boat.prompt(ctx, {
             ...ref,
             provider: "codex",
@@ -217,7 +249,7 @@ export const tick = internalAction({
               `Disposabl delivery ${queued.messageId}\n` +
               credentialInstructions(current.appId) +
               (conversationId ? "" : instructions(current.appId, app)) +
-              queued.prompt,
+              prompt,
             ...(conversationId
               ? { conversationId }
               : { newConversation: true }),
@@ -246,6 +278,7 @@ export const tick = internalAction({
         }
         run = object(await boat.promptStatus(ctx, { ...ref, promptId }));
       }
+      phase = "sync-responses";
       const { more, mutable } = await syncResponses(
         ctx,
         { ...current, conversationId },
@@ -270,6 +303,21 @@ export const tick = internalAction({
           : {}),
       });
     } catch (error) {
+      console.error("agent_worker_failure", {
+        phase,
+        kind: error instanceof Error ? error.name : "unknown",
+        ...(error instanceof Error
+          ? {
+              frames: error.stack
+                ?.split("\n")
+                .filter((line) => /^\s+at /.test(line))
+                .slice(0, 4),
+            }
+          : {}),
+        ...(error instanceof BoatError
+          ? { status: error.status, code: error.code }
+          : {}),
+      });
       // No provider payloads or credentials enter client-visible errors.
       const message =
         error instanceof BoatError && error.code === "provider_not_configured"

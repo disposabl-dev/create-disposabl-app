@@ -66,7 +66,8 @@ export function useAttachmentLifecycle<T extends string>(
     for (const id of ids) {
       state.current.pending.delete(id);
       // A rejected request after unmount can have an unknown server outcome.
-      if (sent || !state.current.mounted) state.current.owned.delete(id);
+      if (sent || !rejected || !state.current.mounted)
+        state.current.owned.delete(id);
       if (!sent && rejected && !state.current.mounted)
         void removeRef.current(id).catch(() => undefined);
     }

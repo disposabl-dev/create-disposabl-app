@@ -29,6 +29,21 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
+      ],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Allow $(PRODUCT_NAME) to use your microphone for dictation.",
+          "speechRecognitionPermission": "Allow $(PRODUCT_NAME) to turn your speech into prompt text."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Choose photos to attach to your app request.",
+          "cameraPermission": "Take a photo to attach to your app request.",
+          "microphonePermission": false
+        }
       ]
     ],
     "experiments": {

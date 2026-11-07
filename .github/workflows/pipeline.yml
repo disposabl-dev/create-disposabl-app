@@ -59,6 +59,7 @@ jobs:
         env:
           PR: ${{ github.event.number }}
           EXPO_CONNECTED: ${{ secrets.EXPO_TOKEN != '' }}
+          IOS_BUILDS_ENABLED: ${{ vars.IOS_BUILDS_ENABLED != 'false' }}
         run: bash "$GITHUB_WORKSPACE/.github/scripts/platforms.sh"
   web:
     name: Web

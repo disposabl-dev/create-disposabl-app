@@ -1,4 +1,5 @@
 import { MenuView } from "@expo/ui/community/menu";
+import { useState } from "react";
 import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { useTheme } from "../../../../../packages/disposabl-kit/mobile/design/use-theme";
 import { useDictation } from "../../../../../packages/disposabl-kit/mobile/components/use-dictation";
@@ -10,6 +11,10 @@ export function MessageComposer({
   value,
   onChange,
   onSend,
+  onStop,
+  stopAvailable = false,
+  stopRequired = false,
+  stopping = false,
   attachments,
   onPickAttachment,
   onRemoveAttachment,
@@ -25,6 +30,10 @@ export function MessageComposer({
   value: string;
   onChange: (value: string) => void;
   onSend: (text: string) => void;
+  onStop?: () => void;
+  stopAvailable?: boolean;
+  stopRequired?: boolean;
+  stopping?: boolean;
   attachments: Attachment[];
   onPickAttachment: (source: AttachmentSource) => void;
   onRemoveAttachment: (index: number) => void;
@@ -38,6 +47,8 @@ export function MessageComposer({
   compact?: boolean;
 }) {
   const c = useTheme();
+  const [expanded, setExpanded] = useState(false);
+  const inline = compact && (!expanded || !value);
   const actionsBusy = disabled || sending || attachmentsBusy;
   const blocked = actionsBusy || attachmentIds(attachments) === null;
   const dictation = useDictation({
@@ -47,11 +58,17 @@ export function MessageComposer({
     disabled: blocked,
   });
   const canSend = !blocked && !!value.trim();
+  const showStop = !!onStop && stopAvailable && (!value.trim() || stopRequired);
+  const actionEnabled = showStop ? !stopping && !sending : canSend;
   const input = (
     <TextInput
       value={value}
       onChangeText={onChange}
       multiline
+      onContentSizeChange={({ nativeEvent }) => {
+        if (inline && nativeEvent.contentSize.height > 56) setExpanded(true);
+        else if (!value) setExpanded(false);
+      }}
       scrollEnabled
       placeholder={placeholder}
       placeholderTextColor={c.mutedForeground}
@@ -60,9 +77,9 @@ export function MessageComposer({
       style={{
         fontSize: 17,
         lineHeight: 24,
-        minHeight: compact ? 44 : 100,
+        minHeight: inline ? 44 : compact ? 44 : 100,
         maxHeight: compact ? 120 : 176,
-        flex: compact ? 1 : undefined,
+        flex: inline ? 1 : undefined,
         paddingHorizontal: 8,
         paddingTop: 10,
         paddingBottom: 6,
@@ -141,12 +158,23 @@ export function MessageComposer({
       </Pressable>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Send message"
-        testID={compact ? "send-message" : "create-app"}
-        disabled={!canSend}
+        accessibilityLabel={
+          showStop
+            ? stopping
+              ? "Stopping"
+              : stopRequired
+                ? "Retry stop"
+                : "Stop generating"
+            : "Send message"
+        }
+        testID={
+          showStop ? "stop-agent" : compact ? "send-message" : "create-app"
+        }
+        disabled={!actionEnabled}
         onPress={() => {
           feedback();
-          onSend(value);
+          if (showStop) onStop?.();
+          else onSend(value);
         }}
         style={{
           width: 44,
@@ -155,10 +183,21 @@ export function MessageComposer({
           backgroundColor: c.foreground,
           alignItems: "center",
           justifyContent: "center",
-          opacity: canSend ? 1 : 0.4,
+          opacity: actionEnabled ? 1 : 0.4,
         }}
       >
-        <Icon name="send" color={c.background} />
+        {showStop ? (
+          <View
+            style={{
+              width: 16,
+              height: 16,
+              borderRadius: 3,
+              backgroundColor: c.background,
+            }}
+          />
+        ) : (
+          <Icon name="send" color={c.background} />
+        )}
       </Pressable>
     </>
   );
@@ -222,7 +261,7 @@ export function MessageComposer({
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={`Remove ${item.name}`}
-                disabled={actionsBusy}
+              disabled={actionsBusy}
               onPress={() => onRemoveAttachment(attachments.indexOf(item))}
             >
               <Icon name="close" />
@@ -316,10 +355,10 @@ export function MessageComposer({
           </View>
         ) : (
           <>
-            {!compact && input}
+            {!inline && input}
             <View style={{ flexDirection: "row", alignItems: "flex-end" }}>
               {plus}
-              {compact ? input : <View style={{ flex: 1 }} />}
+              {inline ? input : <View style={{ flex: 1 }} />}
               {actions}
             </View>
           </>

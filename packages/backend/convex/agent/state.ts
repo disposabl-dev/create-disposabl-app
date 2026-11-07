@@ -51,7 +51,11 @@ export const next = internalMutation({
   args: workerArgs,
   returns: v.union(
     v.null(),
-    v.object({ messageId: v.string(), prompt: v.string() }),
+    v.object({
+      messageId: v.string(),
+      prompt: v.string(),
+      fileIds: v.array(v.id("files")),
+    }),
   ),
   handler: async (ctx, args) => {
     const current = await locked(ctx, args);
@@ -63,7 +67,24 @@ export const next = internalMutation({
     );
     if (!message?.text) throw new Error("Saved user message is missing.");
     await patchThread(ctx, current, { delivery: messageId });
-    return { messageId, prompt: message.text };
+    const content = message.message?.content;
+    const fileIds = Array.isArray(content)
+      ? content.flatMap((part) => {
+          if (
+            part.type !== "file" ||
+            typeof part.data !== "object" ||
+            !("reference" in part.data)
+          )
+            return [];
+          const reference = part.data.reference.disposablFile;
+          if (typeof reference !== "string")
+            throw new Error("Saved attachment reference is invalid.");
+          const id = ctx.db.normalizeId("files", reference);
+          if (!id) throw new Error("Saved attachment reference is invalid.");
+          return [id];
+        })
+      : [];
+    return { messageId, prompt: message.text, fileIds };
   },
 });
 
@@ -259,6 +280,11 @@ export const finish = internalMutation({
     await patchThread(ctx, current, {
       status,
       pending,
+      ...((status === "idle" || status === "failed") &&
+      current.startedAt &&
+      !current.finishedAt
+        ? { finishedAt: Date.now() }
+        : {}),
       ...(status !== "processing" ? { access: undefined } : {}),
       error: args.unconfirmed
         ? "Boat delivery could not be confirmed. Retry abortMessage to reconcile this app's conversation; other apps were not interrupted."

@@ -33,6 +33,7 @@ const symbols = {
   file: ["paperclip", "attach-file"],
   send: ["arrow.up", "arrow-upward"],
   more: ["ellipsis", "more-horiz"],
+  compose: ["square.and.pencil", "edit-square"],
   grid: ["square.grid.2x2", "apps"],
   plus: ["plus", "add"],
   close: ["xmark", "close"],

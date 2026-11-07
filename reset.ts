@@ -36,6 +36,19 @@ const touched = [
   ".github/workflows",
   "apps/web/src/router",
   "apps/mobile/src/app/index.tsx",
+  "apps/mobile/package.json",
+  "apps/mobile/app.json",
+  "packages/disposabl-kit/package.json",
+  "packages/disposabl-kit/mobile/components/use-dictation.ts",
+  "packages/tests/mobile-dictation.test.ts",
+  "packages/tests/components/mobile-dictation.test.mjs",
+  "packages/tests/mobile-attachments.test.ts",
+  "packages/tests/mobile-attachment-lifecycle.test.ts",
+  "packages/tests/components/mobile-attachment-lifecycle.test.mjs",
+  "packages/tests/mobile-conversation-scroll.test.ts",
+  "packages/tests/agent-attachments.test.ts",
+  "packages/tests/agent-events.test.ts",
+  "packages/tests/generator-service-origin.test.ts",
   "apps/mobile/src/app/_layout.tsx",
   "apps/mobile/src/app/settings.tsx",
   "apps/mobile/src/app/(authenticated)/apps",
@@ -185,6 +198,16 @@ for (const entry of await readdir(convex)) {
     await rm(join(convex, entry), { recursive: true, force: true });
 }
 for (const path of [
+  "packages/tests/generator-service-origin.test.ts",
+  "packages/tests/mobile-attachment-lifecycle.test.ts",
+  "packages/tests/components/mobile-attachment-lifecycle.test.mjs",
+  "packages/disposabl-kit/mobile/components/use-dictation.ts",
+  "packages/tests/mobile-dictation.test.ts",
+  "packages/tests/components/mobile-dictation.test.mjs",
+  "packages/tests/mobile-attachments.test.ts",
+  "packages/tests/mobile-conversation-scroll.test.ts",
+  "packages/tests/agent-attachments.test.ts",
+  "packages/tests/agent-events.test.ts",
   "packages/backend/generated",
   "packages/sdk/src/generated",
   "packages/create-disposabl-app",
@@ -245,7 +268,27 @@ lock.workspaces["packages/backend"] = {
   devDependencies: backend.devDependencies,
 };
 delete turbo.tasks["create-disposabl-app#build"];
+// Chat capture belongs to the Disposabl product, not every generated mobile app.
+const mobile = await json("apps/mobile/package.json");
+const mobileConfig = await json("apps/mobile/app.json");
+const kit = await json("packages/disposabl-kit/package.json");
+const capturePackages = [
+  "expo-image-picker",
+  "expo-document-picker",
+  "expo-file-system",
+  "expo-speech-recognition",
+];
+for (const name of capturePackages) delete mobile.dependencies[name];
+delete kit.peerDependencies["expo-speech-recognition"];
+delete kit.peerDependenciesMeta["expo-speech-recognition"];
+mobileConfig.expo.plugins = mobileConfig.expo.plugins.filter(
+  (plugin: string | [string, unknown]) =>
+    !capturePackages.includes(typeof plugin === "string" ? plugin : plugin[0]),
+);
 for (const [path, value] of [
+  ["apps/mobile/package.json", mobile],
+  ["apps/mobile/app.json", mobileConfig],
+  ["packages/disposabl-kit/package.json", kit],
   [backendPath, backend],
   ["bun.lock", lock],
   ["turbo.json", turbo],
