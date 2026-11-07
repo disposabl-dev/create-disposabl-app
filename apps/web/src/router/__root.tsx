@@ -17,6 +17,8 @@ export const Route = createRootRoute({
       meta: [
         { charSet: "utf-8" },
         { name: "viewport", content: "width=device-width, initial-scale=1" },
+        { name: "page-type", content: "software" },
+        { name: "site-kind", content: "software" },
         { title },
         {
           name: "robots",
@@ -30,7 +32,7 @@ export const Route = createRootRoute({
         { name: "description", content: description },
         { property: "og:site_name", content: site.name },
         { property: "og:locale", content: "en_US" },
-        { name: "theme-color", content: "#F8F5EF" },
+        { name: "theme-color", content: "#ffffff" },
         { property: "og:type", content: "website" },
         { property: "og:title", content: title },
         { property: "og:description", content: description },
@@ -57,6 +59,10 @@ export const Route = createRootRoute({
       scripts:
         pathname === "/"
           ? [
+              {
+                children:
+                  "document.documentElement.classList.add('m-enter');setTimeout(()=>document.documentElement.classList.add('m-enter-done'),700)",
+              },
               {
                 type: "application/ld+json",
                 children: JSON.stringify({
@@ -87,7 +93,7 @@ export const Route = createRootRoute({
 
 function RootDocument({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" data-type="software" suppressHydrationWarning>
       <head>
         <HeadContent />
       </head>

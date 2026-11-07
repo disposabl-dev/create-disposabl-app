@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './router/__root'
 import { Route as DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRouteImport } from './../../../packages/disposabl-kit/client/routes/route'
 import { Route as IndexRouteImport } from './router/index'
 import { Route as DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthenticatedRouteRouteImport } from './../../../packages/disposabl-kit/client/routes/_authenticated/route'
+import { Route as BuildRouteImport } from './router/build'
 import { Route as DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesConsentRouteImport } from './../../../packages/disposabl-kit/client/routes/consent'
 import { Route as DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesForgotPasswordRouteImport } from './../../../packages/disposabl-kit/client/routes/_auth-pages/forgot-password'
 import { Route as DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalIndexRouteImport } from './../../../packages/disposabl-kit/client/routes/legal/index'
@@ -20,7 +21,9 @@ import { Route as MobileLoginRouteImport } from './router/mobile-login'
 import { Route as DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesPricingRouteImport } from './../../../packages/disposabl-kit/client/routes/pricing'
 import { Route as DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesResetPasswordRouteImport } from './../../../packages/disposabl-kit/client/routes/_auth-pages/reset-password'
 import { Route as DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesSignUpRouteImport } from './../../../packages/disposabl-kit/client/routes/_auth-pages/signUp'
+import { Route as StackRouteImport } from './router/stack'
 import { Route as DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesVerifyEmailRouteImport } from './../../../packages/disposabl-kit/client/routes/_auth-pages/verify-email'
+import { Route as WhyDisposablRouteImport } from './router/why-disposabl'
 import { Route as DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthenticatedChangePasswordRouteImport } from './../../../packages/disposabl-kit/client/routes/_authenticated/change-password'
 import { Route as AuthenticatedDashboardRouteImport } from './router/_authenticated/dashboard'
 import { Route as DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalDeleteAccountRouteImport } from './../../../packages/disposabl-kit/client/routes/legal/delete-account'
@@ -51,6 +54,12 @@ const DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthenticatedRoute
         DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRoute,
     } as any,
   )
+const BuildRoute = BuildRouteImport.update({
+  id: '/build',
+  path: '/build',
+  getParentRoute: () =>
+    DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRoute,
+} as any)
 const DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesConsentRoute =
   DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesConsentRouteImport.update(
     {
@@ -120,6 +129,12 @@ const DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesSignUpRou
         DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRoute,
     } as any,
   )
+const StackRoute = StackRouteImport.update({
+  id: '/stack',
+  path: '/stack',
+  getParentRoute: () =>
+    DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRoute,
+} as any)
 const DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesVerifyEmailRoute =
   DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesVerifyEmailRouteImport.update(
     {
@@ -129,6 +144,12 @@ const DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesVerifyEma
         DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRoute,
     } as any,
   )
+const WhyDisposablRoute = WhyDisposablRouteImport.update({
+  id: '/why-disposabl',
+  path: '/why-disposabl',
+  getParentRoute: () =>
+    DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRoute,
+} as any)
 const DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthenticatedChangePasswordRoute =
   DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthenticatedChangePasswordRouteImport.update(
     {
@@ -195,6 +216,7 @@ const AuthenticatedDashboardDotconnectionsRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/build': typeof BuildRoute
   '/consent': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesConsentRoute
   '/forgot-password': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesForgotPasswordRoute
   '/login': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesLoginRoute
@@ -202,7 +224,9 @@ export interface FileRoutesByFullPath {
   '/pricing': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesPricingRoute
   '/reset-password': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesResetPasswordRoute
   '/signup': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesSignUpRoute
+  '/stack': typeof StackRoute
   '/verify-email': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesVerifyEmailRoute
+  '/why-disposabl': typeof WhyDisposablRoute
   '/legal': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalIndexRoute
   '/change-password': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthenticatedChangePasswordRoute
   '/dashboard': typeof AuthenticatedDashboardRouteWithChildren
@@ -215,6 +239,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/build': typeof BuildRoute
   '/consent': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesConsentRoute
   '/forgot-password': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesForgotPasswordRoute
   '/login': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesLoginRoute
@@ -222,7 +247,9 @@ export interface FileRoutesByTo {
   '/pricing': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesPricingRoute
   '/reset-password': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesResetPasswordRoute
   '/signup': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesSignUpRoute
+  '/stack': typeof StackRoute
   '/verify-email': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesVerifyEmailRoute
+  '/why-disposabl': typeof WhyDisposablRoute
   '/legal': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalIndexRoute
   '/change-password': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthenticatedChangePasswordRoute
   '/dashboard': typeof AuthenticatedDashboardRouteWithChildren
@@ -237,6 +264,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_providers': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRouteWithChildren
   '/_providers/_authenticated': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthenticatedRouteRouteWithChildren
+  '/_providers/build': typeof BuildRoute
   '/_providers/consent': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesConsentRoute
   '/_providers/forgot-password': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesForgotPasswordRoute
   '/_providers/login': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesLoginRoute
@@ -244,7 +272,9 @@ export interface FileRoutesById {
   '/_providers/pricing': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesPricingRoute
   '/_providers/reset-password': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesResetPasswordRoute
   '/_providers/signup': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesSignUpRoute
+  '/_providers/stack': typeof StackRoute
   '/_providers/verify-email': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesVerifyEmailRoute
+  '/_providers/why-disposabl': typeof WhyDisposablRoute
   '/_providers/': typeof IndexRoute
   '/_providers/legal': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalIndexRoute
   '/_providers/_authenticated/change-password': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthenticatedChangePasswordRoute
@@ -260,6 +290,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/build'
     | '/consent'
     | '/forgot-password'
     | '/login'
@@ -267,7 +298,9 @@ export interface FileRouteTypes {
     | '/pricing'
     | '/reset-password'
     | '/signup'
+    | '/stack'
     | '/verify-email'
+    | '/why-disposabl'
     | '/legal'
     | '/change-password'
     | '/dashboard'
@@ -280,6 +313,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/build'
     | '/consent'
     | '/forgot-password'
     | '/login'
@@ -287,7 +321,9 @@ export interface FileRouteTypes {
     | '/pricing'
     | '/reset-password'
     | '/signup'
+    | '/stack'
     | '/verify-email'
+    | '/why-disposabl'
     | '/legal'
     | '/change-password'
     | '/dashboard'
@@ -301,6 +337,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/_providers'
     | '/_providers/_authenticated'
+    | '/_providers/build'
     | '/_providers/consent'
     | '/_providers/forgot-password'
     | '/_providers/login'
@@ -308,7 +345,9 @@ export interface FileRouteTypes {
     | '/_providers/pricing'
     | '/_providers/reset-password'
     | '/_providers/signup'
+    | '/_providers/stack'
     | '/_providers/verify-email'
+    | '/_providers/why-disposabl'
     | '/_providers/'
     | '/_providers/legal'
     | '/_providers/_authenticated/change-password'
@@ -346,6 +385,13 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthenticatedRouteRouteImport
+      parentRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRoute
+    }
+    '/_providers/build': {
+      id: '/_providers/build'
+      path: '/build'
+      fullPath: '/build'
+      preLoaderRoute: typeof BuildRouteImport
       parentRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRoute
     }
     '/_providers/consent': {
@@ -404,11 +450,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesSignUpRouteImport
       parentRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRoute
     }
+    '/_providers/stack': {
+      id: '/_providers/stack'
+      path: '/stack'
+      fullPath: '/stack'
+      preLoaderRoute: typeof StackRouteImport
+      parentRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRoute
+    }
     '/_providers/verify-email': {
       id: '/_providers/verify-email'
       path: '/verify-email'
       fullPath: '/verify-email'
       preLoaderRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesVerifyEmailRouteImport
+      parentRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRoute
+    }
+    '/_providers/why-disposabl': {
+      id: '/_providers/why-disposabl'
+      path: '/why-disposabl'
+      fullPath: '/why-disposabl'
+      preLoaderRoute: typeof WhyDisposablRouteImport
       parentRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRoute
     }
     '/_providers/_authenticated/change-password': {
@@ -507,6 +567,7 @@ const DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthenticatedRoute
 
 interface DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRouteChildren {
   DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthenticatedRouteRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthenticatedRouteRouteWithChildren
+  BuildRoute: typeof BuildRoute
   DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesConsentRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesConsentRoute
   DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesForgotPasswordRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesForgotPasswordRoute
   DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesLoginRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesLoginRoute
@@ -514,7 +575,9 @@ interface DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRouteChil
   DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesPricingRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesPricingRoute
   DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesResetPasswordRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesResetPasswordRoute
   DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesSignUpRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesSignUpRoute
+  StackRoute: typeof StackRoute
   DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesVerifyEmailRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesVerifyEmailRoute
+  WhyDisposablRoute: typeof WhyDisposablRoute
   IndexRoute: typeof IndexRoute
   DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalIndexRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalIndexRoute
   DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalDeleteAccountRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalDeleteAccountRoute
@@ -527,6 +590,7 @@ const DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRouteChildren
   {
     DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthenticatedRouteRoute:
       DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthenticatedRouteRouteWithChildren,
+    BuildRoute: BuildRoute,
     DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesConsentRoute:
       DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesConsentRoute,
     DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesForgotPasswordRoute:
@@ -540,8 +604,10 @@ const DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRouteChildren
       DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesResetPasswordRoute,
     DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesSignUpRoute:
       DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesSignUpRoute,
+    StackRoute: StackRoute,
     DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesVerifyEmailRoute:
       DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesVerifyEmailRoute,
+    WhyDisposablRoute: WhyDisposablRoute,
     IndexRoute: IndexRoute,
     DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalIndexRoute:
       DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalIndexRoute,

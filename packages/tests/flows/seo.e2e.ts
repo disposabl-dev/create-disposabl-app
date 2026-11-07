@@ -9,7 +9,9 @@ test(
     const response = await fetch(new URL("/", app.baseUrl));
     expect(response.status).toBe(200);
     const head = (await response.text()).split("</head>")[0];
-    expect(head).toContain(`property="og:title" content="${site.title}"`);
+    expect(head).toContain(
+      `property="og:title" content="${site.title.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")}"`,
+    );
     if (site.origin)
       expect(head).toContain(`rel="canonical" href="${site.origin}/"`);
     if (site.image) {

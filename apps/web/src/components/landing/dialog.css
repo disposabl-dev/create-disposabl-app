@@ -1,0 +1,209 @@
+.start-dialog {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  width: min(900px, calc(100% - 32px));
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  background: #f4f6f7;
+  color: var(--ink);
+  border: none;
+  border-radius: 24px;
+  padding: 32px;
+  box-shadow: 0 32px 100px #0008;
+}
+.start-dialog::backdrop {
+  background: #040609ad;
+  backdrop-filter: blur(12px);
+}
+.dialog-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+}
+.dialog-heading h2 {
+  font-size: 32px;
+}
+.dialog-heading button {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #e3e7eb;
+  flex-shrink: 0;
+}
+.start-dialog .landing-start {
+  margin-top: 30px;
+}
+.start-dialog .agent-logos {
+  margin-bottom: 30px;
+}
+.start-dialog .agent-logos > span {
+  display: none;
+}
+.start-dialog .agent-logo-stack {
+  gap: 12px;
+  padding: 0;
+  flex-wrap: wrap;
+}
+.start-dialog .agent-logo {
+  margin: 0;
+  width: 42px;
+  height: 42px;
+  border: 0;
+  border-radius: 10px;
+  background: white;
+  box-shadow: none;
+}
+.start-dialog .agent-logo img {
+  width: 28px;
+  height: 28px;
+  filter: none;
+}
+.start-dialog .landing-modes {
+  gap: 28px;
+  margin-bottom: 18px;
+}
+.start-dialog .landing-modes button,
+.start-dialog .landing-managers button {
+  font-size: 16px;
+  color: #4c5664;
+}
+.start-dialog .landing-modes button[aria-pressed="true"],
+.start-dialog .landing-managers button[aria-pressed="true"] {
+  color: var(--ink);
+}
+.start-dialog .landing-composer {
+  border: 1px solid #bec6d0;
+  background: white;
+  padding: 24px;
+  border-radius: 16px;
+}
+.start-dialog .landing-prompt {
+  font-size: 18px;
+}
+.start-dialog .landing-composer-footer {
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 20px;
+}
+.start-dialog .landing-composer-footer > p {
+  font-size: 16px;
+  color: #4c5664;
+}
+.start-dialog .landing-copy-button {
+  background: var(--ink);
+  font-size: 16px;
+  border-radius: 100px;
+  min-height: 48px;
+  padding-inline: 24px;
+}
+.start-dialog .landing-copy-error {
+  font-size: 16px;
+  width: 260px;
+}
+.start-dialog .landing-terminal code {
+  font-size: 16px;
+}
+.start-dialog {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+}
+.start-dialog .dialog-intro {
+  margin-top: 20px;
+  color: var(--muted);
+  font-size: 17px;
+}
+.dialog-help {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 16px;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.start-dialog .landing-modes button,
+.start-dialog .landing-managers button {
+  color: var(--muted);
+}
+.start-dialog .landing-modes button[aria-pressed="true"],
+.start-dialog .landing-managers button[aria-pressed="true"] {
+  color: var(--text);
+}
+.start-dialog .landing-composer {
+  background: var(--raised);
+  border-color: var(--line);
+}
+.start-dialog .landing-prompt {
+  color: var(--text);
+}
+.start-dialog .landing-composer-footer > p {
+  color: var(--muted);
+}
+.start-dialog .landing-copy-button {
+  background: var(--button);
+  color: var(--button-text);
+  border-radius: 8px;
+}
+.start-dialog .dialog-heading button {
+  background: var(--raised);
+}
+.start-dialog .landing-terminal code {
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 600px) {
+  .start-dialog {
+    padding: 24px;
+  }
+  .dialog-heading h2 {
+    font-size: 26px;
+  }
+  .start-dialog .landing-composer {
+    padding: 16px;
+  }
+  .start-dialog .landing-modes {
+    gap: 12px;
+  }
+  .start-dialog .landing-prompt {
+    font-size: 16px;
+  }
+  .start-dialog .agent-logo-stack {
+    gap: 6px;
+  }
+}
+
+.dialog-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin-top: 28px;
+}
+.dialog-bottom .dialog-help {
+  max-width: 260px;
+}
+.dialog-bottom .dialog-help svg {
+  flex: none;
+}
+.dialog-bottom .store-buttons {
+  flex: none;
+}
+@media (max-width: 800px) {
+  .dialog-bottom {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .dialog-bottom .dialog-help {
+    max-width: none;
+  }
+  .dialog-bottom .store-buttons {
+    max-width: 100%;
+  }
+}

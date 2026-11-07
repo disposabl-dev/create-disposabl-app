@@ -8,18 +8,14 @@ import dots from "./assets/dots.png";
 import instinct from "./assets/instinct.ico";
 
 const agents = [
-  { name: "Codex", icon: codex, url: "https://openai.com/codex/" },
-  {
-    name: "Claude Code",
-    icon: claude,
-    url: "https://claude.com/product/claude-code",
-  },
-  { name: "Cursor", icon: cursor, url: "https://cursor.com" },
-  { name: "Antigravity", icon: antigravity, url: "https://antigravity.google" },
-  { name: "Muse", icon: muse, url: "https://muse.ai" },
-  { name: "Grok Bot", icon: grok, url: "https://x.ai/bot" },
-  { name: "Dots", icon: dots, url: "https://chatgpt.com/features/dots/" },
-  { name: "Instinct", icon: instinct, url: "https://www.humaninstinct.com" },
+  { name: "Codex", icon: codex },
+  { name: "Claude Code", icon: claude },
+  { name: "Cursor", icon: cursor },
+  { name: "Antigravity", icon: antigravity },
+  { name: "Muse", icon: muse },
+  { name: "Grok Bot", icon: grok },
+  { name: "Dots", icon: dots },
+  { name: "Instinct", icon: instinct },
 ];
 
 export function AgentLogos() {
@@ -30,18 +26,10 @@ export function AgentLogos() {
         role="group"
         aria-label="Coding agents and assistants"
       >
-        {agents.map(({ name, icon, url }) => (
-          <a
-            key={name}
-            className="agent-logo"
-            href={url}
-            title={name}
-            aria-label={name}
-            target="_blank"
-            rel="noreferrer"
-          >
-            <img src={icon} alt="" width={20} height={20} />
-          </a>
+        {agents.map(({ name, icon }) => (
+          <span key={name} className="agent-logo" title={name}>
+            <img src={icon} alt={name} width={20} height={20} />
+          </span>
         ))}
       </div>
       <span>

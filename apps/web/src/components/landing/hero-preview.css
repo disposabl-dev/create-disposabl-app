@@ -1,0 +1,274 @@
+.product-stage {
+  position: relative;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 20px;
+  gap: 16px;
+  overflow: hidden;
+}
+.preview-switch {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.preview-switch button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  min-height: 44px;
+  color: var(--muted);
+  border: 0;
+  background: none;
+  border-radius: 7px;
+  font-size: 16px;
+}
+.preview-switch button[aria-pressed="true"] {
+  background: var(--text);
+  color: var(--surface);
+}
+.preview-switch .brand-icon {
+  width: 18px;
+  height: 18px;
+}
+.preview-switch button[aria-pressed="true"] .brand-monochrome {
+  filter: brightness(0) invert(1);
+}
+.dark .preview-switch button[aria-pressed="true"] .brand-monochrome {
+  filter: brightness(0);
+}
+.trip-window {
+  width: 100%;
+  max-width: 580px;
+  min-height: 490px;
+  background: #fff;
+  color: #202b2c;
+  border: 1px solid #d4d8d6;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 16px 30px #15233213;
+  transition: max-width 0.3s ease;
+}
+.trip-window.is-mobile {
+  max-width: 340px;
+  border: 6px solid #202427;
+  border-radius: 28px;
+}
+.trip-topbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 20px;
+  font-size: 16px;
+}
+.trip-topbar strong {
+  font-weight: 500;
+}
+.trip-topbar > span {
+  flex: 1;
+}
+.trip-topbar button {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  background: #f3f5f3;
+  border: 0;
+  border-radius: 8px;
+}
+.trip-cover {
+  height: 180px;
+  position: relative;
+  margin: 0 10px;
+  overflow: hidden;
+  border-radius: 6px;
+}
+.trip-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 53%;
+}
+.trip-cover > div {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  background: #fff;
+  padding: 12px 16px;
+  border-radius: 5px;
+}
+.trip-cover p {
+  font-size: 16px !important;
+  margin-bottom: 4px !important;
+  color: #32443b;
+}
+.launch-site .trip-cover .trip-title {
+  display: block;
+  font-weight: 500;
+  font-size: 30px;
+  letter-spacing: -0.04em;
+  color: #172d26;
+  line-height: 1.1;
+}
+.trip-content {
+  padding: 20px;
+}
+.trip-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.launch-site .trip-heading .itinerary-title {
+  font-weight: 500;
+  font-size: 18px;
+  color: #202b2c;
+}
+.trip-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 0;
+  border-bottom: 1px solid #e8ebe9;
+  font-size: 16px;
+}
+.trip-item > div {
+  display: grid;
+  gap: 5px;
+  flex: 1;
+}
+.trip-item strong {
+  font-weight: 500;
+}
+.trip-item > div > span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #637067;
+  font-size: 16px;
+}
+.trip-time {
+  width: 68px;
+  color: #6d736f;
+}
+.trip-save {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 16px;
+  padding-top: 20px;
+  color: #536057;
+}
+.trip-save > span {
+  display: flex;
+  gap: 10px;
+}
+.stage-platforms {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.stage-platforms span {
+  display: flex;
+}
+.stage-platforms .brand-icon {
+  width: 23px;
+  height: 23px;
+}
+@media (max-width: 1100px) {
+  .product-stage {
+    padding: 16px;
+    gap: 16px;
+  }
+  .trip-window {
+    min-height: 460px;
+  }
+  .trip-cover {
+    height: 190px;
+  }
+  .trip-time {
+    display: none;
+  }
+  .trip-content {
+    padding: 16px;
+  }
+  .trip-topbar {
+    padding: 8px 16px;
+  }
+  .preview-switch button {
+    padding-inline: 10px;
+  }
+}
+@media (max-width: 760px) {
+  .product-stage {
+    padding: 20px;
+    max-width: 580px;
+    width: 100%;
+    margin-inline: auto;
+  }
+  .trip-window {
+    min-height: 0;
+  }
+  .trip-cover {
+    height: 230px;
+  }
+  .trip-content {
+    padding: 20px;
+  }
+  .stage-platforms {
+    gap: 26px;
+  }
+}
+@media (max-width: 400px) {
+  .product-stage {
+    padding: 12px;
+  }
+  .preview-switch button {
+    font-size: 16px;
+    padding-inline: 8px;
+    gap: 6px;
+  }
+  .preview-switch .brand-icon {
+    display: none;
+  }
+  .trip-cover {
+    height: 180px;
+  }
+  .trip-item {
+    gap: 8px;
+  }
+  .trip-save {
+    font-size: 16px;
+  }
+  .trip-cover > div {
+    left: 8px;
+    bottom: 8px;
+    padding: 10px;
+  }
+  .launch-site .trip-cover .trip-title {
+    display: block;
+    font-weight: 500;
+    font-size: 27px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .trip-window {
+    transition: none;
+  }
+}
+
+.trip-window .brand-monochrome {
+  filter: brightness(0);
+}
+
+.trip-window button:focus-visible {
+  outline-color: #1a4be0;
+}

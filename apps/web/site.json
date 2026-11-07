@@ -1,10 +1,10 @@
 {
   "name": "Disposabl",
-  "title": "Disposabl | Your app, everywhere",
-  "description": "Build web, mobile, and desktop apps with your favorite coding agent. One open-source project, every platform. Start with Disposabl.",
+  "title": "Disposabl | Free app builder for web, mobile & desktop",
+  "description": "Build apps and games for web, iOS, Android and desktop with your own AI. Free on your computer, with sign-in, saved data, tests and publishing workflows included.",
   "origin": "https://www.disposabl.dev",
   "backendOrigin": "https://vivid-caterpillar-633.convex.site",
-  "image": "/og/disposabl-v1.png?v=20261105",
-  "imageAlt": "Disposabl. Your app, everywhere. Web, mobile, desktop, API, CLI and MCP.",
+  "image": "/og/disposabl-every-platform-coast.png",
+  "imageAlt": "Disposabl. Make your own app. For free. A travel planner example with a copy prompt action.",
   "analytics": true
 }
