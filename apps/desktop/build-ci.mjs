@@ -25,6 +25,7 @@ const original = await readFile(packagePath, 'utf8');
 try {
   await rm(join(root, 'out'), { recursive: true, force: true });
   await rm(join(root, '../../dist/release'), { recursive: true, force: true });
+  await rm(join(root, '../../dist/update'), { recursive: true, force: true });
   await writeFile(
     packagePath,
     JSON.stringify({ ...JSON.parse(original), version }, null, 2) + '\n',
@@ -51,6 +52,12 @@ try {
   await collect(join(root, 'out', 'make'));
   if (!(await readdir(destination)).length)
     throw new Error('Forge produced no artifacts');
+  const staged = spawnSync('node', ['stage-update.mjs'], {
+    cwd: root,
+    stdio: 'inherit',
+  });
+  if (staged.status !== 0)
+    throw new Error(`Update staging failed: ${staged.error ?? staged.status}`);
 } finally {
   await writeFile(packagePath, original);
 }

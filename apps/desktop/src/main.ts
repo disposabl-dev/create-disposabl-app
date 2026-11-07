@@ -1,4 +1,5 @@
-import { app, BrowserWindow } from 'electron';
+import { app, autoUpdater, BrowserWindow, dialog, Menu } from 'electron';
+import { createUpdateController, feedUrl, type UpdateState } from './updates';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 
@@ -44,6 +45,79 @@ async function createWindow() {
 }
 
 app.whenReady().then(() => {
+  const supported =
+    process.platform === 'darwin' || process.platform === 'win32';
+  const feed = app.isPackaged
+    ? feedUrl(
+        DISPOSABL_UPDATE_URL,
+        DISPOSABL_UPDATE_CHANNEL,
+        process.platform,
+        process.arch,
+      )
+    : '';
+  let state: UpdateState = 'idle';
+  const renderMenu = () => {
+    const labels = {
+      idle: 'Check for updates…',
+      checking: 'Checking for updates…',
+      downloading: 'Downloading update…',
+      ready: 'Restart to update…',
+    };
+    Menu.setApplicationMenu(
+      Menu.buildFromTemplate([
+        {
+          label: app.name,
+          submenu: [
+            { label: labels[state], click: updates.check },
+            { type: 'separator' },
+            { role: 'quit' },
+          ],
+        },
+        { role: 'editMenu' },
+        { role: 'viewMenu' },
+        { role: 'windowMenu' },
+      ]),
+    );
+  };
+  const updates = createUpdateController({
+    onState: (next) => {
+      state = next;
+      renderMenu();
+    },
+    supported,
+    feed,
+    start: () => {
+      autoUpdater.setFeedURL(
+        process.platform === 'darwin'
+          ? { url: `${feed}/RELEASES.json`, serverType: 'json' }
+          : { url: feed },
+      );
+      autoUpdater.checkForUpdates();
+    },
+    install: () => autoUpdater.quitAndInstall(),
+    show: (type, message, detail) => {
+      void dialog.showMessageBox({ type, message, detail });
+    },
+    confirmRestart: async () =>
+      (
+        await dialog.showMessageBox({
+          type: 'info',
+          message: 'Update downloaded',
+          detail:
+            'Restart to install the update. It may also be installed the next time you open the app.',
+          buttons: ['Restart', 'Later'],
+          defaultId: 0,
+          cancelId: 1,
+        })
+      ).response === 0,
+  });
+  if (supported) {
+    autoUpdater.on('update-available', updates.available);
+    autoUpdater.on('update-not-available', updates.unavailable);
+    autoUpdater.on('update-downloaded', updates.downloaded);
+    autoUpdater.on('error', updates.error);
+  }
+  renderMenu();
   void createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) void createWindow();

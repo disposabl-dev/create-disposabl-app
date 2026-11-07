@@ -358,6 +358,8 @@ jobs:
     env:
       PLATFORM: ${{ matrix.platform }}
       DISPOSABL_DESKTOP_PLATFORM: ${{ matrix.platform }}
+      DISPOSABL_DESKTOP_UPDATE_URL: ${{ vars.DISPOSABL_DESKTOP_UPDATE_URL }}
+      DISPOSABL_DESKTOP_UPDATE_CHANNEL: ${{ env.CHANNEL }}
       CONVEX_SITE_URL: ${{ needs.web.outputs.convex_site_url }}
       electron_config_cache: ${{ github.workspace }}/.cache/electron
     steps:
@@ -388,12 +390,22 @@ jobs:
           retention-days: 3
           compression-level: 0
           if-no-files-found: error
+      - name: Upload staged update feed
+        if: matrix.platform != 'linux' && env.DISPOSABL_DESKTOP_UPDATE_URL != '' && (matrix.platform != 'macos' || env.MACOS_NOTARIZE == 'true')
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-update-${{ env.PLATFORM }}
+          path: dist/update/
+          retention-days: 3
+          if-no-files-found: error
       - name: Upload unsigned macOS artifact
         if: matrix.platform == 'macos'
         uses: actions/upload-artifact@v4
         with:
           name: macos-unsigned
-          path: dist/release/*.dmg
+          path: |
+            dist/release/*.dmg
+            dist/release/*.zip
           retention-days: 3
           compression-level: 0
           if-no-files-found: error

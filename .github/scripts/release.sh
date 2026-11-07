@@ -82,7 +82,7 @@ case "$PLATFORM" in
   ios) test -s dist/release/ios.ipa; test -s dist/release/ios.json ;;
   linux) compgen -G 'dist/release/*.deb' > /dev/null; compgen -G 'dist/release/*.rpm' > /dev/null ;;
   windows) compgen -G 'dist/release/*.exe' > /dev/null; compgen -G 'dist/release/*.nupkg' > /dev/null; test -s dist/release/RELEASES ;;
-  macos) compgen -G 'dist/release/*.dmg' > /dev/null ;;
+  macos) compgen -G 'dist/release/*.dmg' > /dev/null; compgen -G 'dist/release/*.zip' > /dev/null ;;
   *) exit 1 ;;
 esac
     ;;

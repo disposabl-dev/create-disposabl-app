@@ -23,6 +23,7 @@
         "@electron-forge/maker-dmg": "8.0.1",
         "@electron-forge/maker-rpm": "8.0.1",
         "@electron-forge/maker-squirrel": "8.0.1",
+        "@electron-forge/maker-zip": "8.0.1",
         "@electron-forge/plugin-fuses": "8.0.1",
         "@electron-forge/plugin-vite": "8.0.1",
         "@electron-forge/publisher-github": "8.0.1",
@@ -570,6 +571,8 @@
     "@electron-forge/maker-rpm": ["@electron-forge/maker-rpm@8.0.1", "", { "dependencies": { "@electron-forge/maker-base": "8.0.1", "@electron-forge/shared-types": "8.0.1" }, "optionalDependencies": { "electron-installer-redhat": "^4.0.0" } }, "sha512-FAOUQeE3nzHfE0tE7vs2sWBDN1mspkpzoFQSJWk1qB3Qv9HF3iREYjzpV+AuGWe/zy0y5IK6mIx4GADdIlBaEg=="],
 
     "@electron-forge/maker-squirrel": ["@electron-forge/maker-squirrel@8.0.1", "", { "dependencies": { "@electron-forge/core-utils": "8.0.1", "@electron-forge/maker-base": "8.0.1", "@electron-forge/shared-types": "8.0.1" }, "optionalDependencies": { "electron-winstaller": "^5.3.0" } }, "sha512-V6QrJvvmX2xbITXP1+/bXYe2hkMM7BYnQ8vzVHDOca2P6pn68MZsCSewqm8wiBIBSEeYuRhrztvV8aMlJ5n5Mg=="],
+
+    "@electron-forge/maker-zip": ["@electron-forge/maker-zip@8.0.1", "", { "dependencies": { "@electron-forge/core-utils": "8.0.1", "@electron-forge/maker-base": "8.0.1", "@electron-forge/shared-types": "8.0.1", "cross-zip": "^4.0.0" } }, "sha512-EyMyAMFRZTPKbe6K1HEAgnpAMC7OvR8tQ2iG/5Vd++iG2AVdFJ9usChfW72n172jk9CTfFc7L88IF8lXMYYvIQ=="],
 
     "@electron-forge/multi-logger": ["@electron-forge/multi-logger@8.0.1", "", { "dependencies": { "debug": "^4.3.1", "ink": "^7.1.1", "react": "^19.2.0", "string-width": "^8.2.0", "wrap-ansi": "^10.0.0" } }, "sha512-cgYcETMtlkcYiMC8YcaaW8jFDmVZ6mbNBL0Yi0ekjoOjcBecJS/uy7+9GvM9DWq3Ie5YCfe4+AWuVR3HF56/sQ=="],
 
@@ -1962,6 +1965,8 @@
     "cross-dirname": ["cross-dirname@0.1.0", "", {}, "sha512-+R08/oI0nl3vfPcqftZRpytksBXDzOUveBq/NBVx0sUp1axwzPQrKinNx5yd5sxPu8j1wIy8AfnVQ+5eFdha6Q=="],
 
     "cross-spawn": ["cross-spawn@7.0.6", "", { "dependencies": { "path-key": "^3.1.0", "shebang-command": "^2.0.0", "which": "^2.0.1" } }, "sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA=="],
+
+    "cross-zip": ["cross-zip@4.0.1", "", {}, "sha512-n63i0lZ0rvQ6FXiGQ+/JFCKAUyPFhLQYJIqKaa+tSJtfKeULF/IDNDAbdnSIxgS4NTuw2b0+lj8LzfITuq+ZxQ=="],
 
     "crypto-random-string": ["crypto-random-string@4.0.0", "", { "dependencies": { "type-fest": "^1.0.1" } }, "sha512-x8dy3RnvYdlUcPOjkEHqozhiwzKNSq7GcPuXFbnyMOCHxX8V3OgIg/pYuabl2sbUPfIJaeAQB7PMOK8DFIdoRA=="],
 

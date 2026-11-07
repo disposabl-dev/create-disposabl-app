@@ -2,6 +2,7 @@ import { resolve } from 'node:path';
 import manifest from './package.json' with { type: 'json' };
 import type { ForgeConfig } from '@electron-forge/shared-types';
 import { MakerSquirrel } from '@electron-forge/maker-squirrel';
+import { MakerZIP } from '@electron-forge/maker-zip';
 import { MakerDMG } from '@electron-forge/maker-dmg';
 import { MakerDeb } from '@electron-forge/maker-deb';
 import { MakerRpm } from '@electron-forge/maker-rpm';
@@ -79,6 +80,7 @@ const config: ForgeConfig = {
   },
   makers: [
     new MakerSquirrel({ setupIcon: 'src/assets/icon.ico' }),
+    new MakerZIP({}, ['darwin']),
     new MakerDMG({ format: 'ULFO' }),
     new MakerRpm({ options: rpmOptions }),
     new MakerDeb({ options: { name: executableName, bin: executableName } }),
