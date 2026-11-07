@@ -101,11 +101,6 @@ if (config.appId) {
     if (!response.ok)
       throw new Error(`Cannot inspect release (${response.status}).`);
     const release = await response.json();
-    const updateOnly = /"action"\s*:\s*"update"/.test(release.body ?? "");
-    if (updateOnly) {
-      await call("/github/report", { platform, status: "ready" });
-      process.exit(0);
-    }
     const suffix = {
       android: ".apk",
       ios: ".ipa",
