@@ -5,6 +5,7 @@ import { AppState, Linking, Platform, Text, View } from "react-native";
 import type { PurchasesPackage } from "react-native-purchases";
 import { AuthButton, styles } from "../components/auth-ui";
 import { billingSession } from "./session";
+import { creditQuantity } from "../../payments/config";
 
 type Snapshot = {
   balance: number | null;
@@ -148,7 +149,9 @@ export function AccountBilling({ customerId }: { customerId: string }) {
       <Text style={styles.body}>
         Available: {data?.balance ?? "unavailable"}
       </Text>
-      <Text style={styles.body}>500 credits each monthly billing cycle.</Text>
+      <Text style={styles.body}>
+        {creditQuantity("monthly")} credits each monthly billing cycle.
+      </Text>
       {data?.hasMonthlyPlan && (
         <Text style={styles.body}>
           Your monthly plan is active or scheduled.

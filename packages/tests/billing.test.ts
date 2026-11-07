@@ -7,10 +7,55 @@ import {
   billingPlans,
   billingRequest,
   purchaseRequest,
+  monthlyPlanFromCustomer,
 } from "../disposabl-kit/server/billing";
+import {
+  pricing,
+  creditQuantity,
+  formatPrice,
+  type Pricing,
+} from "../disposabl-kit/payments/config";
 import { resolveFeatures } from "../disposabl-kit/feature-options";
 
 describe("billing boundary", () => {
+  test("editable starter prices drive server quantities and displayed allowances", () => {
+    assert.equal(formatPrice(pricing.monthly.price), "$5");
+    assert.equal(creditQuantity("monthly"), 500);
+    assert.equal(creditQuantity("topup"), 500);
+    const custom: Pricing = {
+      ...pricing,
+      featureId: "workspace_credits",
+      creditsPerDollar: 80,
+      monthly: { planId: "workspace_monthly", price: 12 },
+      topup: { planId: "workspace_topup", price: 3 },
+    };
+    const request = purchaseRequest(
+      "owner",
+      "topup",
+      "https://example.com/pricing",
+      custom,
+    );
+    assert.equal(request.plan_id, "workspace_topup");
+    assert.deepEqual(request.feature_quantities, [
+      { feature_id: "workspace_credits", quantity: 240, adjustable: false },
+    ]);
+    assert.equal(creditQuantity("monthly", custom), 960);
+    assert.equal(formatPrice(custom.monthly.price, custom), "$12");
+    assert.equal(
+      balanceFromCustomer(
+        { balances: { workspace_credits: { remaining: 37 } } },
+        custom,
+      ),
+      37,
+    );
+    assert.equal(
+      monthlyPlanFromCustomer(
+        { subscriptions: [{ plan_id: "workspace_monthly", status: "active" }] },
+        custom,
+      ),
+      true,
+    );
+  });
   test("payments requires authentication and disabled ignores credentials", () => {
     assert.deepEqual(resolveFeatures(["payments"]), [
       "authentication",

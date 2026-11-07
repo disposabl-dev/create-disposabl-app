@@ -1,8 +1,15 @@
+import {
+  pricing,
+  creditQuantity,
+  type Pricing,
+  type Purchase,
+} from "../payments/config";
+
 export const billingPlans = {
-  monthly: "credits_monthly",
-  topup: "credits_topup",
+  monthly: pricing.monthly.planId,
+  topup: pricing.topup.planId,
 } as const;
-export type Purchase = keyof typeof billingPlans;
+export type { Purchase } from "../payments/config";
 
 export function billingConfig(
   enabled: boolean,
@@ -59,16 +66,21 @@ export function purchaseRequest(
   customerId: string,
   purchase: Purchase,
   returnUrl: string,
+  config: Pricing = pricing,
 ) {
   if (!Object.hasOwn(billingPlans, purchase))
     throw new Error("Invalid purchase.");
   return {
     customer_id: customerId,
-    plan_id: billingPlans[purchase],
+    plan_id: config[purchase].planId,
     ...(purchase === "topup"
       ? {
           feature_quantities: [
-            { feature_id: "credits", quantity: 500, adjustable: false },
+            {
+              feature_id: config.featureId,
+              quantity: creditQuantity(purchase, config),
+              adjustable: false,
+            },
           ],
         }
       : {}),
@@ -79,10 +91,11 @@ export function purchaseRequest(
 
 export function balanceFromCustomer(
   customer: Record<string, unknown>,
+  config: Pricing = pricing,
 ): number | null {
   const balances = customer.balances as
     Record<string, { remaining?: unknown }> | undefined;
-  const remaining = balances?.credits?.remaining;
+  const remaining = balances?.[config.featureId]?.remaining;
   return typeof remaining === "number" && Number.isFinite(remaining)
     ? remaining
     : null;
@@ -91,6 +104,7 @@ export function balanceFromCustomer(
 /** Missing or unfamiliar provider data must not authorize another subscription. */
 export function monthlyPlanFromCustomer(
   customer: Record<string, unknown>,
+  config: Pricing = pricing,
 ): boolean | null {
   if (!Array.isArray(customer.subscriptions)) return null;
   let present = false;
@@ -101,7 +115,7 @@ export function monthlyPlanFromCustomer(
       !["active", "scheduled"].includes(subscription.status)
     )
       return null;
-    if (subscription.plan_id === billingPlans.monthly) present = true;
+    if (subscription.plan_id === config.monthly.planId) present = true;
   }
   return present;
 }
