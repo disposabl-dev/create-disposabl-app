@@ -199,20 +199,50 @@ test("deployment telemetry sends only approved platform, channel and elapsed tim
   await captureTelemetry(
     "platform_deployment",
     {
+      app_id: "private-app",
       platform: "android",
       channel: "preview",
       outcome: "success",
-      duration_ms: 7200000,
+      time_since_app_creation_ms: 7200000,
+      run_number: 2,
+      run_attempt: 1,
       prompt: "private",
       url: "https://private.example",
     } as any,
     "owner",
     config,
   );
-  assert.equal(body.properties.duration_ms, 7200000);
+  assert.equal(body.properties.time_since_app_creation_ms, 7200000);
+  assert.equal(body.properties.duration_ms, undefined);
+  assert.equal(body.properties.run_number, 2);
+  assert.equal(body.properties.run_attempt, 1);
   assert.equal(body.properties.platform, "android");
   assert.equal(body.properties.channel, "preview");
   assert.equal(JSON.stringify(body).includes("private"), false);
+  const appId = body.properties.app_id;
+  assert.match(appId, /^[a-f0-9]{64}$/);
+  await captureTelemetry(
+    "app_created",
+    { app_id: "private-app" },
+    "owner",
+    config,
+  );
+  assert.equal(body.properties.app_id, appId);
+  await captureTelemetry(
+    "app_setup",
+    { app_id: "private-app", duration_ms: 400 },
+    "owner",
+    config,
+  );
+  assert.equal(body.properties.app_id, appId);
+  assert.equal(body.properties.duration_ms, 400);
+  await captureTelemetry(
+    "app_created",
+    { app_id: "another-app" },
+    "owner",
+    config,
+  );
+  assert.notEqual(body.properties.app_id, appId);
 });
 
 test("release transitions measure from creation and ignore duplicate reports", async () => {
@@ -274,22 +304,53 @@ test("release transitions measure from creation and ignore duplicate reports", a
     await (report as any)._handler(ctx, args);
     assert.equal(scheduled.length, 1);
     assert.deepEqual(scheduled[0].properties, {
+      app_id: app.appId,
       platform: "web",
       channel: "production",
       outcome: "success",
-      duration_ms: 5000,
+      time_since_app_creation_ms: 5000,
+      run_number: 1,
+      run_attempt: 1,
     });
-    const failed = { ...args, status: "failed", run: { ...args.run, id: 2 } };
+    Date.now = () => 604801000;
+    const failed = {
+      ...args,
+      status: "failed",
+      run: { ...args.run, id: 2, number: 2 },
+    };
     await (report as any)._handler(ctx, failed);
     await (report as any)._handler(ctx, failed);
     assert.equal(scheduled.length, 2);
     assert.equal(scheduled[1].properties.outcome, "error");
+    assert.equal(scheduled[1].properties.time_since_app_creation_ms, 604800000);
+    assert.equal(
+      scheduled[1].properties.app_id,
+      scheduled[0].properties.app_id,
+    );
+    assert.equal(scheduled[1].properties.run_number, 2);
+    // Older and duplicate reports cannot alter the latest attempt's observations.
+    await (report as any)._handler(ctx, args);
+    assert.equal(scheduled.length, 2);
+    await (report as any)._handler(ctx, {
+      ...failed,
+      status: "ready",
+      run: { ...failed.run, attempt: 2 },
+    });
+    assert.equal(scheduled[2].properties.run_attempt, 2);
+    assert.equal(scheduled[2].properties.outcome, "success");
+    // A same-attempt correction remains reconcilable by app/run/attempt/platform/channel.
+    await (report as any)._handler(ctx, {
+      ...failed,
+      run: { ...failed.run, attempt: 2 },
+    });
+    assert.equal(scheduled[3].properties.run_attempt, 2);
+    assert.equal(scheduled[3].properties.outcome, "error");
     process.env.E2E_TELEMETRY_DISABLED = "1";
     await (report as any)._handler(ctx, {
       ...args,
       run: { ...args.run, id: 3 },
     });
-    assert.equal(scheduled.length, 2);
+    assert.equal(scheduled.length, 4);
   } finally {
     Date.now = original;
     appConfig.features.splice(0, appConfig.features.length, ...features);

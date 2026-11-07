@@ -22,6 +22,11 @@ export type TelemetryProperties = {
     | "account"
     | "other";
   duration_ms?: number;
+  /** Server-owned app identity; hashed before leaving the backend. */
+  app_id?: string;
+  time_since_app_creation_ms?: number;
+  run_number?: number;
+  run_attempt?: number;
   platform?:
     | "web"
     | "android"
@@ -63,7 +68,16 @@ export function telemetryEnabled(settingsOverride: AnalyticsConfig = settings) {
   );
 }
 
-/** Only trusted server callers can supply a user ID. */
+async function opaqueId(value: string) {
+  return Array.from(
+    new Uint8Array(
+      await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)),
+    ),
+    (b) => b.toString(16).padStart(2, "0"),
+  ).join("");
+}
+
+/** Only trusted server callers can supply a user or app ID. */
 export async function captureTelemetry(
   event: TelemetryEvent,
   properties: TelemetryProperties,
@@ -76,17 +90,12 @@ export async function captureTelemetry(
     process.env.POSTHOG_PROJECT_TOKEN!;
   const host = settingsOverride.analytics?.host ?? process.env.POSTHOG_HOST!;
   const identity = userId
-    ? Array.from(
-        new Uint8Array(
-          await crypto.subtle.digest(
-            "SHA-256",
-            new TextEncoder().encode(`disposabl:${token}:${userId}`),
-          ),
-        ),
-        (b) => b.toString(16).padStart(2, "0"),
-      ).join("")
+    ? await opaqueId(`disposabl:${token}:${userId}`)
     : crypto.randomUUID();
   const safe = {
+    ...(properties.app_id && {
+      app_id: await opaqueId(`disposabl:${token}:app:${properties.app_id}`),
+    }),
     ...(["api", "cli", "sdk", "mcp"].includes(properties.source ?? "") && {
       source: properties.source,
     }),
@@ -126,6 +135,14 @@ export async function captureTelemetry(
       properties.duration_ms! <= Number.MAX_SAFE_INTEGER && {
         duration_ms: Math.round(properties.duration_ms!),
       }),
+    ...Object.fromEntries(
+      (["time_since_app_creation_ms", "run_number", "run_attempt"] as const)
+        .filter(
+          (key) =>
+            Number.isSafeInteger(properties[key]) && properties[key]! >= 0,
+        )
+        .map((key) => [key, properties[key]]),
+    ),
   };
   try {
     await fetch(`${host}/capture/`, {

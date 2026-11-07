@@ -47,7 +47,12 @@ export const insert = internalMutation({
       features: resolveFeatures(args.features ?? []),
       expoAccountId: null,
     });
-    await scheduleTelemetry(ctx, "app_created", {}, args.userId);
+    await scheduleTelemetry(
+      ctx,
+      "app_created",
+      { app_id: args.appId },
+      args.userId,
+    );
     return presentApp((await ctx.db.get("apps", id))!);
   },
 });

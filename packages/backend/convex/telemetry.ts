@@ -30,6 +30,10 @@ const properties = v.object({
   outcome: v.optional(v.union(v.literal("success"), v.literal("error"))),
   page: v.optional(pageValidator),
   duration_ms: v.optional(v.number()),
+  app_id: v.optional(v.string()),
+  time_since_app_creation_ms: v.optional(v.number()),
+  run_number: v.optional(v.number()),
+  run_attempt: v.optional(v.number()),
   platform: v.optional(platform),
   channel: v.optional(v.union(v.literal("production"), v.literal("preview"))),
 });

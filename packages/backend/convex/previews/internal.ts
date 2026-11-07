@@ -232,10 +232,13 @@ export const report = internalMutation({
         ctx,
         "platform_deployment",
         {
+          app_id: app.appId,
           platform: args.platform,
           channel: args.production ? "production" : "preview",
           outcome: args.status === "ready" ? "success" : "error",
-          duration_ms: Date.now() - app._creationTime,
+          time_since_app_creation_ms: Date.now() - app._creationTime,
+          run_number: args.run.number,
+          run_attempt: args.run.attempt,
         },
         args.userId,
       );
