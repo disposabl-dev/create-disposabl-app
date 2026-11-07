@@ -1,3 +1,4 @@
+import { useHydrated } from "@tanstack/react-router";
 import { useState } from "react";
 import {
   ArrowRight,
@@ -34,6 +35,7 @@ export function AppWalkthrough({
 }: {
   onUseIdea: (idea: string) => void;
 }) {
+  const hydrated = useHydrated();
   const [step, setStep] = useState(1);
   const [time, setTime] = useState("10:30");
   const [accent, setAccent] = useState("coral");
@@ -56,6 +58,7 @@ export function AppWalkthrough({
         >
           {steps.map(({ title, icon: Icon, copy }, i) => (
             <button
+              disabled={!hydrated}
               key={title}
               className="walkthrough-step"
               aria-pressed={step === i}
@@ -79,6 +82,7 @@ export function AppWalkthrough({
             <span>Booking app example</span>
             <div role="group" aria-label="Example device">
               <button
+                disabled={!hydrated}
                 type="button"
                 aria-label="Show desktop example"
                 aria-pressed={!phone}
@@ -87,6 +91,7 @@ export function AppWalkthrough({
                 <Monitor size={21} />
               </button>
               <button
+                disabled={!hydrated}
                 type="button"
                 aria-label="Show phone example"
                 aria-pressed={phone}
@@ -138,6 +143,7 @@ export function AppWalkthrough({
                 >
                   {["09:00", "10:30", "14:00"].map((value) => (
                     <button
+                      disabled={!hydrated}
                       key={value}
                       aria-pressed={time === value}
                       onClick={() => setTime(value)}
@@ -157,6 +163,7 @@ export function AppWalkthrough({
                   >
                     {["coral", "blue", "green"].map((color) => (
                       <button
+                        disabled={!hydrated}
                         key={color}
                         className={`swatch-${color}`}
                         aria-label={`Use ${color} accent`}
@@ -172,6 +179,7 @@ export function AppWalkthrough({
             )}
           </div>
           <button
+            disabled={!hydrated}
             className="example-use"
             onClick={() => onUseIdea(bookingIdea)}
           >

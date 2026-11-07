@@ -1,3 +1,4 @@
+import { useHydrated } from "@tanstack/react-router";
 import { useState, useRef, type ReactNode } from "react";
 import { ArrowUpRight, Menu, X, Sun, Moon } from "lucide-react";
 import { useTheme } from "@disposabl/disposabl-kit/client/lib/theme";
@@ -29,6 +30,7 @@ export function MarketingShell({
   onStart?: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const hydrated = useHydrated();
   const { resolvedTheme, setTheme } = useTheme();
   const menuButton = useRef<HTMLButtonElement>(null);
   return (
@@ -53,6 +55,7 @@ export function MarketingShell({
             </span>
           </a>
           <button
+            disabled={!hydrated}
             ref={menuButton}
             className="mobile-menu-button"
             type="button"
@@ -84,7 +87,11 @@ export function MarketingShell({
               <BrandIcon name="GitHub" />
             </a>
             {onStart ? (
-              <button className="nav-start" onClick={onStart}>
+              <button
+                className="nav-start"
+                disabled={!hydrated}
+                onClick={onStart}
+              >
                 Get started <ArrowUpRight size={15} />
               </button>
             ) : (
@@ -94,6 +101,7 @@ export function MarketingShell({
             )}
           </div>
           <button
+            disabled={!hydrated}
             type="button"
             className="theme-toggle"
             aria-label="Toggle light and dark mode"

@@ -1,3 +1,4 @@
+import { useHydrated } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { ArrowRight, ArrowUpRight, X } from "lucide-react";
 import {
@@ -28,6 +29,7 @@ const ideas = [
 ];
 
 export function Home() {
+  const hydrated = useHydrated();
   const [selected, setSelected] = useState<Platform[]>([
     "web",
     "android",
@@ -91,6 +93,7 @@ export function Home() {
               Describe your app
             </label>
             <textarea
+              disabled={!hydrated}
               id="app-idea"
               ref={field}
               value={draft}
@@ -101,7 +104,12 @@ export function Home() {
             />
             <div className="idea-composer-actions">
               <span>Free on your computer</span>
-              <button id="start" type="submit" className="primary-link">
+              <button
+                id="start"
+                disabled={!hydrated}
+                type="submit"
+                className="primary-link"
+              >
                 Start with your AI <ArrowRight size={20} />
               </button>
             </div>
@@ -113,7 +121,12 @@ export function Home() {
             aria-label="Try an app idea"
           >
             {ideas.map(([title, prompt]) => (
-              <button type="button" key={title} onClick={() => useIdea(prompt)}>
+              <button
+                type="button"
+                disabled={!hydrated}
+                key={title}
+                onClick={() => useIdea(prompt)}
+              >
                 {title}
                 <ArrowUpRight size={16} />
               </button>
@@ -187,7 +200,7 @@ export function Home() {
             ))}
           </div>
         </section>
-        <Pricing onStart={start} />
+        <Pricing onStart={start} disabled={!hydrated} />
         <section
           className="language-section launch-container"
           aria-labelledby="language-title"
@@ -209,6 +222,7 @@ export function Home() {
           <h2>What will your app do?</h2>
           <button
             className="primary-link"
+            disabled={!hydrated}
             onClick={() => {
               field.current?.focus();
               field.current?.scrollIntoView({

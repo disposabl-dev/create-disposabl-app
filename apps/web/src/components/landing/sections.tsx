@@ -1,7 +1,13 @@
 import { ArrowUpRight, Check, Plus } from "lucide-react";
 import { TextLink } from "./shell";
 
-export function Pricing({ onStart }: { onStart: () => void }) {
+export function Pricing({
+  onStart,
+  disabled,
+}: {
+  onStart: () => void;
+  disabled: boolean;
+}) {
   return (
     <section
       id="pricing"
@@ -28,7 +34,11 @@ export function Pricing({ onStart }: { onStart: () => void }) {
                 </li>
               ))}
             </ul>
-            <button onClick={onStart} className="primary-link">
+            <button
+              disabled={disabled}
+              onClick={onStart}
+              className="primary-link"
+            >
               Start building
               <ArrowUpRight size={20} />
             </button>

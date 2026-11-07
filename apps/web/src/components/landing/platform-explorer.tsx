@@ -1,3 +1,4 @@
+import { useHydrated } from "@tanstack/react-router";
 import { Check } from "lucide-react";
 import {
   platforms,
@@ -76,6 +77,7 @@ export function PlatformExplorer({
   selected: Platform[];
   onChange: (value: Platform[]) => void;
 }) {
+  const hydrated = useHydrated();
   function toggle(id: Platform) {
     if (id === "web") return;
     const next = selected.includes(id)
@@ -109,6 +111,7 @@ export function PlatformExplorer({
       >
         {platforms.map(({ id, label }) => (
           <button
+            disabled={!hydrated}
             key={id}
             type="button"
             aria-pressed={selected.includes(id)}
