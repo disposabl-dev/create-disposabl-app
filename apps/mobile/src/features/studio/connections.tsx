@@ -98,7 +98,7 @@ function AuthenticatedConnectionGate({
   return (
     <View style={{ gap: 20 }}>
       <ConnectionPanel
-        connections={connections}
+        connections={connections ?? undefined}
         busy={busy}
         onConnect={() => void openConnections()}
         onProvider={() => void openConnections()}

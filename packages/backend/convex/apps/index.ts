@@ -26,20 +26,26 @@ export const list = query({
   handler: async (
     ctx,
     args,
-  ): Promise<PaginationResult<Infer<typeof appResult>>> =>
-    ctx.runQuery(internal.apps.internal.list, {
+  ): Promise<PaginationResult<Infer<typeof appResult>>> => {
+    const userId = await getSessionUserId(ctx);
+    if (!userId) return { page: [], isDone: true, continueCursor: "" };
+    return ctx.runQuery(internal.apps.internal.list, {
       ...args,
-      userId: await requireUser(ctx),
-    }),
+      userId,
+    });
+  },
 });
 export const get = query({
   args: { appId: v.string() },
-  returns: appResult,
-  handler: async (ctx, args): Promise<Infer<typeof appResult>> =>
-    ctx.runQuery(internal.apps.internal.get, {
+  returns: v.union(appResult, v.null()),
+  handler: async (ctx, args): Promise<Infer<typeof appResult> | null> => {
+    const userId = await getSessionUserId(ctx);
+    if (!userId) return null;
+    return ctx.runQuery(internal.apps.internal.get, {
       ...args,
-      userId: await requireUser(ctx),
-    }),
+      userId,
+    });
+  },
 });
 export const requestConfiguration = mutation({
   args: {

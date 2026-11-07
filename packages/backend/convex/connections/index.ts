@@ -20,12 +20,18 @@ async function requireUser(ctx: QueryCtx | MutationCtx | ActionCtx) {
 }
 export const status = query({
   args: { features: v.optional(v.array(feature)) },
-  returns: connectionStatus,
-  handler: async (ctx, args): Promise<Infer<typeof connectionStatus>> =>
-    ctx.runQuery(internal.connections.internal.status, {
+  returns: v.union(connectionStatus, v.null()),
+  handler: async (
+    ctx,
+    args,
+  ): Promise<Infer<typeof connectionStatus> | null> => {
+    const userId = await getSessionUserId(ctx);
+    if (!userId) return null;
+    return ctx.runQuery(internal.connections.internal.status, {
       ...args,
-      userId: await requireUser(ctx),
-    }),
+      userId,
+    });
+  },
 });
 export const start = action({
   args: {

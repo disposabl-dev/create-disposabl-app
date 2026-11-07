@@ -1,7 +1,41 @@
 import { test } from "@e2e-dev/web";
-import { expect } from "e2e";
+import { expect, test as backendTest } from "e2e";
 import { randomUUID } from "node:crypto";
 import { backendUrl, project } from "../project.ts";
+
+backendTest(
+  "management subscriptions clear when the session is absent",
+  { platforms: ["backend"] },
+  async () => {
+    const paginationOpts = { numItems: 10, cursor: null };
+    const emptyPage = { page: [], isDone: true, continueCursor: "" };
+    for (const [path, args, value] of [
+      ["connections/index:status", {}, null],
+      ["apps/index:list", { paginationOpts }, emptyPage],
+      ["apps/index:get", { appId: "signed-out" }, null],
+      [
+        "previews/index:list",
+        { appId: "signed-out", paginationOpts },
+        emptyPage,
+      ],
+      ["releases/index:get", { appId: "signed-out" }, null],
+      [
+        "agent/index:getMessages",
+        { appId: "signed-out", paginationOpts },
+        null,
+      ],
+    ]) {
+      const response = await fetch(`${backendUrl()}/api/query`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path, args }),
+        signal: AbortSignal.timeout(15_000),
+      });
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({ status: "success", value });
+    }
+  },
+);
 
 test(
   "login returns to connections and preserves the terminal setup URL",
