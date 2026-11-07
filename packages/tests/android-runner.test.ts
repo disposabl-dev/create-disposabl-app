@@ -48,6 +48,9 @@ test("Android disk preparation only removes unused hosted-runner toolchains", ()
       { RUNNER_ENVIRONMENT: "self-hosted" },
       { GITHUB_ACTIONS: "false" },
       { RUNNER_OS: "macOS" },
+      { RUNNER_ENVIRONMENT: "" },
+      { GITHUB_ACTIONS: "" },
+      { RUNNER_OS: "" },
     ];
     for (const overrides of otherRunners) {
       assert.equal(run("prepare", overrides).status, 0);
@@ -59,11 +62,15 @@ test("Android disk preparation only removes unused hosted-runner toolchains", ()
       "rm -rf -- /usr/share/dotnet /usr/local/.ghcup /opt/ghc /opt/hostedtoolcache/CodeQL\n",
     );
     assert.equal(run("check").status, 0);
+    assert.equal(run("check", { AVAILABLE: "26214400" }).status, 0);
+    assert.equal(run("check", { AVAILABLE: "26214399" }).status, 1);
     const low = run("check", { AVAILABLE: "1024" });
     assert.equal(low.status, 1);
     assert.match(low.stderr, /25 GiB free/);
     assert.equal(run("check", { AVAILABLE: "invalid" }).status, 1);
     assert.equal(run("unsupported").status, 1);
+    writeFileSync(join(dir, "sudo"), "#!/bin/sh\nexit 42\n", { mode: 0o755 });
+    assert.equal(run("prepare").status, 42);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

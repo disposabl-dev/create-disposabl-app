@@ -47,6 +47,18 @@ test("iOS builds can be paused independently of Android", () => {
       { cwd: dir, env: { ...env, IOS_BUILDS_ENABLED: "true" } },
     );
     assert.match(readFileSync(out, "utf8"), /^ios=true$/m);
+    writeFileSync(
+      join(dir, "bin/gh"),
+      '#!/bin/sh\ncase "$*" in *pulls/1/files*) echo .github/scripts/android-runner.sh;; *) exit 1;; esac\n',
+      { mode: 0o755 },
+    );
+    writeFileSync(out, "");
+    execFileSync(
+      "bash",
+      [resolve(import.meta.dirname, "../../.github/scripts/platforms.sh")],
+      { cwd: dir, env },
+    );
+    assert.match(readFileSync(out, "utf8"), /^android=true$/m);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

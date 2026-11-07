@@ -38,7 +38,7 @@ node --input-type=module -e '
   };
   const shared = p => /^(bun.lock$|package.json$|disposabl.json$|turbo.json$|bunfig.toml$|patches\/|vendor\/|\.github\/(workflows\/pipeline.yml$|scripts\/(platforms.sh|disposabl.mjs|release.sh)$))/.test(p);
   const affected = (platform, dependency) => enabled.includes(platform) && changes(platform).some(p => shared(p) || dependency.test(p));
-  const mobile = /^(apps\/mobile\/|packages\/disposabl-kit\/|\.github\/scripts\/(mobile|apple)\.sh$)/;
+  const mobile = /^(apps\/mobile\/|packages\/disposabl-kit\/|\.github\/scripts\/(mobile|apple|android-runner)\.sh$)/;
   for (const platform of ["android", "ios"]) console.log(`${platform}=${(platform === "ios" ? process.env.IOS_BUILDS_ENABLED !== "false" : process.env.EXPO_CONNECTED === "true") && affected(platform, mobile)}`);
   const production = process.env.GITHUB_EVENT_NAME === "push" && process.env.GITHUB_REF === "refs/heads/main";
   const desktop = (production ? ["linux", "windows", "macos"] : []).filter(platform => affected(platform, /^apps\/desktop\//))
