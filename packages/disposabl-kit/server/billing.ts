@@ -1,9 +1,4 @@
-import {
-  pricing,
-  creditQuantity,
-  type Pricing,
-  type Purchase,
-} from "../payments/config";
+import { pricing, creditQuantity, type Pricing } from "../payments/config";
 
 export type { Purchase } from "../payments/config";
 
@@ -60,7 +55,7 @@ export async function billingRequest(
 
 export function purchaseRequest(
   customerId: string,
-  purchase: Purchase,
+  purchase: string,
   returnUrl: string,
   config: Pricing = pricing,
 ) {
