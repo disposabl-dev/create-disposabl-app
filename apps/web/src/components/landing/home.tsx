@@ -122,10 +122,7 @@ export function Home() {
             <br />
             next big thing.
           </h2>
-          <button
-            className="primary-link"
-            onClick={start}
-          >
+          <button className="primary-link" onClick={start}>
             Start building free <ArrowUpRight size={18} />
           </button>
         </section>
