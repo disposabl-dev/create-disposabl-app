@@ -6,7 +6,11 @@ import { useRef, useState } from "react";
 import { Alert } from "react-native";
 import { api } from "../../../../../packages/backend/convex/_generated/api";
 import type { Id } from "../../../../../packages/backend/convex/_generated/dataModel";
-import { MAX_ATTACHMENTS } from "./attachment-policy";
+import {
+  ATTACHMENT_SIZE_ERROR,
+  attachmentUploadError,
+  MAX_ATTACHMENTS,
+} from "./attachment-policy";
 import { useAttachmentLifecycle } from "./attachment-lifecycle";
 
 export type Attachment = {
@@ -34,7 +38,7 @@ export function useAttachments() {
     try {
       const file = new File(attachment.uri);
       if (!file.size || file.size > MAX_BYTES)
-        throw new Error("File must be nonempty and at most 5 MiB.");
+        throw new Error(ATTACHMENT_SIZE_ERROR);
       const bytes = await file.arrayBuffer();
       if (!lifecycle.active(token)) return;
       const id = await upload({
@@ -52,7 +56,7 @@ export function useAttachments() {
       );
     } catch (error) {
       if (!lifecycle.active(token)) return;
-      const message = error instanceof Error ? error.message : "Upload failed.";
+      const message = attachmentUploadError(error);
       setAttachments((items) =>
         items.map((item) =>
           item.key === attachment.key ? { ...item, error: message } : item,
