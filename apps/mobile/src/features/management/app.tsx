@@ -3,6 +3,8 @@ import { useHeaderHeight } from "expo-router/react-navigation";
 import { Details } from "./details";
 import { MessageBubble } from "../studio/message-bubble";
 import { MessageComposer } from "../studio/message-composer";
+import { useAttachments } from "../studio/attachments";
+import { attachmentIds } from "../studio/attachment-policy";
 import { useMutation, useQuery } from "convex/react";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useRef, useState } from "react";
@@ -81,6 +83,14 @@ export function AppDetailsScreen() {
   );
 }
 function Chat({ appId }: { appId: string }) {
+  const {
+    attachments,
+    setAttachments,
+    pick,
+    retry,
+    remove,
+    busy: attachmentsBusy,
+  } = useAttachments();
   const styles = useStyles();
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
@@ -98,15 +108,24 @@ function Chat({ appId }: { appId: string }) {
   const [prompt, setPrompt] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  async function submit() {
-    if (!prompt.trim() || busy) return;
+  async function submit(text: string) {
+    const fileIds = attachmentIds(attachments);
+    if (!text.trim() || busy || attachmentsBusy || !fileIds) return;
     setBusy(true);
     setError("");
     try {
-      const submitted = prompt;
+      const submitted = text;
+      const originalPrompt = prompt;
       followLatest.current = true;
-      await send({ appId, prompt: submitted.trim() });
-      setPrompt((current) => (current === submitted ? "" : current));
+      await send({
+        appId,
+        prompt: submitted.trim(),
+        ...(fileIds.length ? { fileIds } : {}),
+      });
+      setAttachments([]);
+      setPrompt((current) =>
+        current === submitted || current === originalPrompt ? "" : current,
+      );
       setCursors([null]);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not send message.");
@@ -236,9 +255,14 @@ function Chat({ appId }: { appId: string }) {
         }}
       >
         <MessageComposer
+          attachments={attachments}
+          onPickAttachment={(source) => void pick(source)}
+          onRemoveAttachment={(index) => void remove(attachments[index])}
+          onRetryAttachment={(index) => void retry(attachments[index])}
+          attachmentsBusy={attachmentsBusy}
           value={prompt}
           onChange={setPrompt}
-          onSend={() => void submit()}
+          onSend={(text) => void submit(text)}
           label="Message"
           testID="chat-message"
           placeholder="Ask for a change…"

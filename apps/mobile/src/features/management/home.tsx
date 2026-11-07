@@ -13,6 +13,8 @@ import { useTheme } from "../../../../../packages/disposabl-kit/mobile/design/us
 import { ConnectionGate } from "../studio/connections";
 import { examples } from "../studio/data";
 import { MessageComposer } from "../studio/message-composer";
+import { useAttachments } from "../studio/attachments";
+import { attachmentIds } from "../studio/attachment-policy";
 import { Action, Screen, Label, Touch } from "../studio/ui";
 import { ErrorBoundary } from "./ui";
 
@@ -63,6 +65,14 @@ function ComposeEntry() {
 }
 
 function Composer() {
+  const {
+    attachments,
+    setAttachments,
+    pick,
+    retry,
+    remove,
+    busy: attachmentsBusy,
+  } = useAttachments();
   const { exampleSlug } = useLocalSearchParams<{ exampleSlug?: string }>();
   const example = examples.find((app) => app.slug === exampleSlug);
   const [prompt, setPrompt] = useState(example?.prompt ?? "");
@@ -73,16 +83,19 @@ function Composer() {
   const [error, setError] = useState("");
   const send = useMutation(api.agent.index.sendMessage);
   const c = useTheme();
-  async function submit() {
-    if (!prompt.trim() || busy) return;
+  async function submit(text: string) {
+    const fileIds = attachmentIds(attachments);
+    if (!text.trim() || busy || attachmentsBusy || !fileIds) return;
     setBusy(true);
     setError("");
     try {
       const result = await send({
-        prompt: prompt.trim(),
+        prompt: text.trim(),
+        ...(fileIds.length ? { fileIds } : {}),
         platforms: resolvePlatforms(selected),
         features: ["authentication"],
       });
+      setAttachments([]);
       router.replace({
         pathname: "/(authenticated)/apps/[appId]",
         params: { appId: result.appId },
@@ -100,9 +113,14 @@ function Composer() {
         A thought, a tool, a little corner of the internet.
       </Label>
       <MessageComposer
+        attachments={attachments}
+        onPickAttachment={(source) => void pick(source)}
+        onRemoveAttachment={(index) => void remove(attachments[index])}
+        onRetryAttachment={(index) => void retry(attachments[index])}
+        attachmentsBusy={attachmentsBusy}
         value={prompt}
         onChange={setPrompt}
-        onSend={() => void submit()}
+        onSend={(text) => void submit(text)}
         disabled={busy}
         sending={busy}
       />
