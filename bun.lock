@@ -322,7 +322,7 @@
     "lightningcss": "1.30.1",
   },
   "catalog": {
-    "@convex-dev/auth": "file:vendor/convex-auth-437831bd-disposabl.1.tgz",
+    "@convex-dev/auth": "file:vendor/convex-auth-437831bd-disposabl.3.tgz",
     "@convex-dev/mcp": "0.1.0-alpha.7",
     "@convex-dev/static-hosting": "0.2.1",
     "convex": "^1.49.0",
@@ -513,7 +513,7 @@
 
     "@convex-dev/agent": ["@convex-dev/agent@0.7.9", "", { "optionalDependencies": { "@ungap/structured-clone": "^1.4.0" }, "peerDependencies": { "@ai-sdk/provider": "^4.0.0", "@ai-sdk/provider-utils": "^5.0.0", "ai": "^7.0.129", "convex": "^1.46.0", "convex-helpers": "^0.1.127", "react": "^18.3.1 || ^19.0.0" }, "optionalPeers": ["react"] }, "sha512-/P7IU6CyzopR3olJmqQsLmy0sb9bTvubeuLTInsgqqQBgr7S7Z/N6L22AIer9dGcYTnW1sb7Lzacw61H2ptqbw=="],
 
-    "@convex-dev/auth": ["@convex-dev/auth@vendor/convex-auth-437831bd-disposabl.1.tgz", { "dependencies": { "@babel/code-frame": "^7.29.7", "@convex-dev/batch-worker": "^0.3.2", "@convex-dev/rate-limiter": "^0.3.2", "@simplewebauthn/browser": "^14.0.0", "@simplewebauthn/server": "^14.0.0", "argon2id-wasm": "0.0.0-alpha.2", "chalk": "^5.6.2", "commander": "^14.0.2", "cookie": "1.1.1", "jose": "^5.2.2" }, "peerDependencies": { "@convex-dev/resend": "^0.2.8", "convex": "^1.48.0", "next": "^16.0.0", "react": "^18.0.0 || ^19.0.0" }, "optionalPeers": ["@convex-dev/resend", "next", "react"], "hasInstallScript": true, "bin": { "@convex-dev/auth": "./dist/cli/init.js" } }, "sha512-/FUH41T19X1i8PHDuTjSGdKeVw1ArjSsf5GcRfqkdXuXi/H5/WpEOLwne1nb2INkf5jwb0W3iaah177CLob3MA=="],
+    "@convex-dev/auth": ["@convex-dev/auth@vendor/convex-auth-437831bd-disposabl.3.tgz", { "dependencies": { "@babel/code-frame": "^7.29.7", "@convex-dev/batch-worker": "^0.3.2", "@convex-dev/rate-limiter": "^0.3.2", "@simplewebauthn/browser": "^14.0.0", "@simplewebauthn/server": "^14.0.0", "argon2id-wasm": "0.0.0-alpha.2", "chalk": "^5.6.2", "commander": "^14.0.2", "cookie": "1.1.1", "jose": "^5.2.2" }, "peerDependencies": { "@convex-dev/resend": "^0.2.8", "convex": "^1.48.0", "next": "^16.0.0", "react": "^18.0.0 || ^19.0.0" }, "optionalPeers": ["@convex-dev/resend", "next", "react"], "hasInstallScript": true, "bin": { "@convex-dev/auth": "./dist/cli/init.js" } }, "sha512-ILtdtp/jnXthIDBCuUJ0Xwb/HFVuwbigdKgpBNYux39s0jjkKk50RPpxFivP9S6IsWd6Wl4uzQFe4dQGmCaavA=="],
 
     "@convex-dev/batch-worker": ["@convex-dev/batch-worker@0.3.6", "", { "dependencies": { "convex-helpers": "^0.1.127" }, "peerDependencies": { "convex": "^1.43.0" } }, "sha512-tR+9DaHR3jG3oqkIFX0ok/6944h7UHEQgT6HTmiuxU+lERYuYMsxA2IWwFD5yTFbCpO3YJhqXU4QdGY90sgUqQ=="],
 

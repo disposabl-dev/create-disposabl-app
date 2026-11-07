@@ -20,6 +20,10 @@
     "authenticated": false
   },
   {
+    "path": "/mobile-login",
+    "authenticated": false
+  },
+  {
     "path": "/pricing",
     "authenticated": false
   },

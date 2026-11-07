@@ -1,6 +1,7 @@
 /** Publicly reachable account flows still must not appear in search results. */
 export const accountPaths = [
   "/login",
+  "/mobile-login",
   "/signup",
   "/consent",
   "/forgot-password",
