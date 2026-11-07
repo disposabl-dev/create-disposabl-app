@@ -20,11 +20,21 @@ test(
     const build = await mkdtemp(
       join(tmpdir(), "disposabl-desktop-navigation-"),
     );
-    const server = createServer((_request, response) => {
+    const server = createServer((request, response) => {
+      if (request.url === "/frame-redirect") {
+        const address = server.address();
+        if (!address || typeof address === "string")
+          throw new Error("Missing fixture port");
+        response.writeHead(302, {
+          Location: `http://localhost:${address.port}/frame-arrived`,
+        });
+        response.end();
+        return;
+      }
       response.setHeader("Content-Type", "text/html");
       response.setHeader(
         "Content-Security-Policy",
-        "default-src 'self'; script-src 'none'",
+        "default-src 'self'; script-src 'none'; frame-src 'self' http://localhost:*",
       );
       response.end(
         "<!doctype html><title>Desktop navigation fixture</title><main>Local fixture</main>",

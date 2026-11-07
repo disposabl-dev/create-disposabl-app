@@ -24,6 +24,10 @@ let pendingAuth: string | undefined;
 function receiveAuth(url: string) {
   if (!desktopAuthCallback(url, DISPOSABL_DESKTOP_ID, website)) return;
   pendingAuth = url;
+  if (app.isReady() && (!mainWindow || mainWindow.isDestroyed())) {
+    void createWindow();
+    return;
+  }
   finishAuth();
 }
 function finishAuth() {
@@ -204,9 +208,9 @@ app.whenReady().then(() => {
     autoUpdater.on('error', updates.error);
   }
   renderMenu();
-  void createWindow();
+  if (!mainWindow || mainWindow.isDestroyed()) void createWindow();
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) void createWindow();
+    if (!mainWindow || mainWindow.isDestroyed()) void createWindow();
   });
 });
 app.on('window-all-closed', () => {

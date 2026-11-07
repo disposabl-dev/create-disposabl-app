@@ -43,7 +43,9 @@ export function protectNavigation(
     open(url);
   };
   contents.on('will-navigate', navigate);
-  contents.on('will-redirect', navigate);
+  contents.on('will-redirect', (event) => {
+    if (event.isMainFrame) navigate(event, event.url);
+  });
   contents.setWindowOpenHandler(({ url }) => {
     if (url === 'about:blank' || sameOrigin(url))
       return {

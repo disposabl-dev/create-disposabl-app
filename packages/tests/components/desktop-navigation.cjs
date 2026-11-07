@@ -64,6 +64,16 @@ require(path.join(build, "main.cjs"));
     "localStorage.setItem('flow-fixture', 'private-initiator-state')",
   );
 
+  const redirected = once(contents, "will-redirect");
+  await contents.executeJavaScript(
+    "window.frame = document.createElement('iframe'); window.frame.src='/frame-redirect'; document.body.append(window.frame)",
+  );
+  const [frameRedirect] = await redirected;
+  assert.equal(frameRedirect.isMainFrame, false);
+  assert.equal(frameRedirect.defaultPrevented, false);
+  assert.equal(opened.length, 0);
+  await contents.executeJavaScript("window.frame.remove()");
+
   console.log("stage: popup");
   let external = once(events, "external");
   assert.equal(
@@ -155,6 +165,50 @@ require(path.join(build, "main.cjs"));
     "disposabl-desktop-other://login?convexAuthCode=wrong-app",
   );
   assert.equal(contents.getURL(), before);
+
+  loaded = once(contents, "did-finish-load");
+  app.emit("second-instance", {}, [
+    "app",
+    `disposabl-desktop-${id}://login?convexAuthCode=second-instance-ticket`,
+  ]);
+  await loaded;
+  assert.equal(
+    new URL(contents.getURL()).searchParams.get("convexAuthCode"),
+    "second-instance-ticket",
+  );
+
+  if (process.platform === "darwin") {
+    const closedMain = once(window, "closed");
+    window.close();
+    await closedMain;
+    assert.equal(BrowserWindow.getAllWindows().length, 0);
+    const reopened = new Promise((resolve) =>
+      app.once("browser-window-created", (_event, replacement) => {
+        replacement.hide();
+        replacement.webContents.on("did-finish-load", () => {
+          if (
+            new URL(replacement.webContents.getURL()).searchParams.get(
+              "convexAuthCode",
+            ) === "reopened-ticket"
+          )
+            resolve(replacement);
+        });
+      }),
+    );
+    app.emit(
+      "open-url",
+      { preventDefault() {} },
+      `disposabl-desktop-${id}://login?convexAuthCode=reopened-ticket`,
+    );
+    const replacement = await reopened;
+    assert.equal(BrowserWindow.getAllWindows().length, 1);
+    assert.equal(
+      await replacement.webContents.executeJavaScript(
+        "localStorage.getItem('flow-fixture')",
+      ),
+      "private-initiator-state",
+    );
+  }
   assert.equal(dialogs.length, 1);
   console.log("DESKTOP_NAVIGATION_PASSED");
   clearTimeout(timeout);
