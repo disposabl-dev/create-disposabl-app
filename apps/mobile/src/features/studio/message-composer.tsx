@@ -79,8 +79,9 @@ export function MessageComposer({
         lineHeight: 24,
         minHeight: inline ? 44 : compact ? 44 : 100,
         maxHeight: compact ? 120 : 176,
-        flex: inline ? 1 : undefined,
-        paddingHorizontal: 8,
+        width: "100%",
+        paddingLeft: inline ? 52 : 8,
+        paddingRight: inline ? 96 : 8,
         paddingTop: 10,
         paddingBottom: 6,
         color: c.foreground,
@@ -355,10 +356,19 @@ export function MessageComposer({
           </View>
         ) : (
           <>
-            {!inline && input}
-            <View style={{ flexDirection: "row", alignItems: "flex-end" }}>
+            {input}
+            <View
+              pointerEvents="box-none"
+              style={{
+                flexDirection: "row",
+                alignItems: "flex-end",
+                ...(inline
+                  ? { position: "absolute", left: 6, right: 6, bottom: 6 }
+                  : {}),
+              }}
+            >
               {plus}
-              {inline ? input : <View style={{ flex: 1 }} />}
+              <View pointerEvents="none" style={{ flex: 1 }} />
               {actions}
             </View>
           </>

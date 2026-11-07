@@ -8,10 +8,12 @@ import { attachmentIds } from "../studio/attachment-policy";
 import { useMutation, useQuery } from "convex/react";
 import { ConvexError } from "convex/values";
 import { Stack, useLocalSearchParams } from "expo-router";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   FlatList,
+  Keyboard,
   KeyboardAvoidingView,
+  Platform,
   ScrollView,
   Text,
   View,
@@ -89,6 +91,20 @@ function Chat({ appId }: { appId: string }) {
   });
   const send = useMutation(api.agent.index.sendMessage);
   const abort = useMutation(api.agent.index.abortMessage);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+    const show = Keyboard.addListener("keyboardDidShow", (event) =>
+      setKeyboardHeight(event.endCoordinates.height),
+    );
+    const hide = Keyboard.addListener("keyboardDidHide", () =>
+      setKeyboardHeight(0),
+    );
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
   const [prompt, setPrompt] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -157,7 +173,7 @@ function Chat({ appId }: { appId: string }) {
     <KeyboardAvoidingView
       behavior={process.env.EXPO_OS === "ios" ? "padding" : undefined}
       keyboardVerticalOffset={headerHeight}
-      style={{ flex: 1 }}
+      style={{ flex: 1, marginBottom: keyboardHeight }}
     >
       <FlatList
         ref={list}
