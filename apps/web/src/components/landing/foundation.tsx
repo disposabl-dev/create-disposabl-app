@@ -1,4 +1,11 @@
-import { Check, Database, Plus, UserRound } from "lucide-react";
+import {
+  Check,
+  FileText,
+  RefreshCw,
+  Database,
+  ArrowUpRight,
+} from "lucide-react";
+import { BrandIcon } from "./brand-icon";
 import "./foundation.css";
 
 export function Foundation() {
@@ -9,85 +16,91 @@ export function Foundation() {
       aria-labelledby="foundation-title"
     >
       <div className="launch-container">
-        <h2 id="foundation-title">The parts your app needs.</h2>
-        <div className="app-foundation-grid">
-          <article className="foundation-card">
-            <details>
-              <summary>
-                Sign-in &amp; saved data <Plus size={22} aria-hidden="true" />
-              </summary>
+        <h2 id="foundation-title">Built in before you begin.</h2>
+        <div className="foundation-layout">
+          <article className="foundation-feature foundation-feature-large">
+            <div className="foundation-copy">
+              <h3>Accounts and data, connected.</h3>
               <p>
-                People can sign in and return to their saved work across your
-                selected apps.
+                Give people a place to sign in and come back to their saved
+                work, across your selected apps.
               </p>
-            </details>
-            <div
-              className="foundation-visual foundation-accounts"
-              aria-hidden="true"
-            >
-              <div>
-                <UserRound size={22} />
-                <span>Account</span>
-                <Check size={20} />
+            </div>
+            <div className="foundation-account-visual" aria-hidden="true">
+              <div className="foundation-signin">
+                <strong>Welcome back</strong>
+                <span>Email</span>
+                <div>you@example.com</div>
+                <span>Password</span>
+                <div>••••••••</div>
+                <b>Sign in</b>
               </div>
-              <div>
-                <Database size={22} />
-                <span>Saved data</span>
-                <Check size={20} />
+              <div className="foundation-saved">
+                <div>
+                  <Database size={20} /> Your saved work
+                </div>
+                <strong>Weekly plan</strong>
+                <span>Pick up where you left off</span>
+                <div className="foundation-platforms">
+                  <BrandIcon name="Web" />
+                  <BrandIcon name="iOS" />
+                  <BrandIcon name="Android" />
+                </div>
               </div>
             </div>
           </article>
-          <article className="foundation-card">
-            <details>
-              <summary>
-                Optional analytics <Plus size={22} aria-hidden="true" />
-              </summary>
+          <article className="foundation-feature foundation-feature-checks">
+            <div className="foundation-copy">
+              <h3>Test and publish</h3>
               <p>
-                Connect your own analytics account to understand how people use
-                your published app.
+                Starter tests and publishing workflows give your AI a path from
+                first version to real users.
               </p>
-            </details>
-            <div
-              className="foundation-visual foundation-chart"
-              aria-hidden="true"
-            >
-              <span />
-              <span />
-              <span />
-              <span />
-              <span />
-              <span />
+            </div>
+            <div className="foundation-pipeline" aria-hidden="true">
+              <div>
+                <Check size={20} />
+                <span>Web &amp; backend tests</span>
+              </div>
+              <div>
+                <Check size={20} />
+                <span>Mobile app build</span>
+              </div>
+              <div>
+                <ArrowUpRight size={20} />
+                <span>Preview &amp; release</span>
+              </div>
             </div>
           </article>
-          <article className="foundation-card">
-            <details>
-              <summary>
-                Build. Test. Improve. <Plus size={22} aria-hidden="true" />
-              </summary>
+          <article className="foundation-feature foundation-feature-content">
+            <div className="foundation-copy">
+              <h3>Docs and a blog</h3>
+              <p>Add a documentation site, or ask your AI to add a blog.</p>
+            </div>
+            <div className="foundation-docs" aria-hidden="true">
+              <nav>
+                <strong>Guides</strong>
+                <span>Getting started</span>
+                <span>Using your app</span>
+              </nav>
+              <div>
+                <FileText size={21} />
+                <strong>Getting started</strong>
+                <p>
+                  Welcome! Here’s how to get started and make the most of your
+                  app.
+                </p>
+              </div>
+            </div>
+          </article>
+          <article className="foundation-feature foundation-feature-extra">
+            <div>
+              <RefreshCw size={24} aria-hidden="true" />
+              <h3>More ways to grow.</h3>
               <p>
-                Starter checks help your AI test changes. Try ideas, compare
-                results, and keep improving.
+                Choose optional analytics and payments. Support for 85+
+                languages is coming soon.
               </p>
-            </details>
-            <div
-              className="foundation-visual foundation-cycle"
-              aria-hidden="true"
-            >
-              <svg viewBox="0 0 300 170" fill="none">
-                <path
-                  d="M80 40H225Q265 40 265 80Q265 130 210 130H75Q35 130 35 90Q35 40 80 40"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                />
-                <path
-                  d="m177 35 8 5-8 5M120 125l-8 5 8 5"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                />
-              </svg>
-              <span>Build</span>
-              <span>Test</span>
-              <span>Improve</span>
             </div>
           </article>
         </div>

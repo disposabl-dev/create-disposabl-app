@@ -1,104 +1,99 @@
 import { useState } from "react";
 import {
-  ArrowUpRight,
   Check,
+  ChevronRight,
+  Compass,
+  CalendarDays,
   MapPin,
   Plus,
-  CalendarDays,
-  Users,
-  Compass,
 } from "lucide-react";
-import { useHydrated } from "@tanstack/react-router";
+import { BrandIcon } from "./brand-icon";
+import "./hero-preview.css";
 
 export function HeroPreview() {
-  const [joined, setJoined] = useState(false);
-  const hydrated = useHydrated();
+  const [view, setView] = useState("Desktop");
+  const [saved, setSaved] = useState(false);
   return (
-    <div
-      className="hero-workbench"
-      aria-label="Interactive example of a community app"
-    >
-      <div className="workbench-orbit" aria-hidden="true" />
-      <div className="workbench-browser">
-        <div className="browser-chrome" aria-hidden="true">
+    <div className="product-stage" data-enter-media>
+      <div
+        className="preview-switch"
+        role="group"
+        aria-label="Preview an app on different platforms"
+      >
+        {[
+          ["Desktop", "Windows"],
+          ["Mobile", "Apple"],
+          ["Web", "Web"],
+        ].map(([name, icon]) => (
+          <button
+            key={name}
+            aria-pressed={view === name}
+            onClick={() => setView(name)}
+          >
+            <BrandIcon name={icon} />
+            {name}
+          </button>
+        ))}
+      </div>
+      <div className={`trip-window ${view === "Mobile" ? "is-mobile" : ""}`}>
+        <div className="trip-topbar">
+          <Compass size={22} />
+          <strong>Weekend plans</strong>
           <span />
-          <span />
-          <span />
-          <div>sunday.club</div>
-          <ArrowUpRight size={16} />
+          <button
+            aria-label={saved ? "Remove example trip" : "Save example trip"}
+            onClick={() => setSaved(!saved)}
+          >
+            {saved ? <Check size={20} /> : <Plus size={20} />}
+          </button>
         </div>
-        <div className="club-nav">
-          <strong>
-            <span className="club-mark">s</span> sunday club
-          </strong>
-          <span>
-            <Compass size={18} /> Explore
-          </span>
-          <div className="club-avatar">J</div>
+        <div className="trip-cover">
+          <img
+            src="/landing/lake.jpg"
+            alt="A mountain lake surrounded by pine forest"
+            width={500}
+            height={333}
+            fetchPriority="high"
+          />
+          <div>
+            <p>A weekend outdoors</p>
+            <strong className="trip-title">Room to roam.</strong>
+          </div>
         </div>
-        <div className="club-content">
-          <div className="club-poster" aria-hidden="true">
-            <div className="poster-sun" />
-            <div className="poster-hill hill-back" />
-            <div className="poster-hill hill-front" />
-            <div className="poster-path" />
-            <strong>
-              A little more
-              <br />
-              outside.
-            </strong>
-            <span className="poster-stamp">
-              <ArrowUpRight size={32} />
+        <div className="trip-content">
+          <div className="trip-heading">
+            <h3>Your itinerary</h3>
+            <CalendarDays size={22} />
+          </div>
+          <div className="trip-item">
+            <span className="trip-time">Friday</span>
+            <div>
+              <strong>Take the scenic route</strong>
+              <span>
+                <MapPin size={16} /> Lakeside trail
+              </span>
+            </div>
+            <ChevronRight size={20} />
+          </div>
+          <div className="trip-item">
+            <span className="trip-time">Saturday</span>
+            <div>
+              <strong>A day by the water</strong>
+              <span>
+                <MapPin size={16} /> Pine forest
+              </span>
+            </div>
+            <ChevronRight size={20} />
+          </div>
+          <div className="trip-save" aria-live="polite">
+            {saved
+              ? "Saved to your example trips"
+              : "Your plans, in your pocket."}
+            <span>
+              {saved ? <Check size={20} /> : <BrandIcon name="Apple" />}
             </span>
           </div>
-          <div className="club-event">
-            <div>
-              <h3>The Sunday walk</h3>
-              <p>
-                <MapPin size={16} /> Riverside park
-              </p>
-            </div>
-            <button
-              disabled={!hydrated}
-              onClick={() => setJoined(!joined)}
-              aria-label={joined ? "Leave example walk" : "Join example walk"}
-            >
-              {joined ? <Check size={18} /> : <Plus size={18} />}{" "}
-              {joined ? "You're in" : "Join us"}
-            </button>
-          </div>
         </div>
-      </div>
-      <div className="workbench-phone" aria-hidden="true">
-        <div className="mini-island" />
-        <div className="mini-top">
-          <span className="club-mark">s</span>
-          <span>Sunday</span>
-          <Plus size={20} />
-        </div>
-        <h3>
-          See you
-          <br />
-          outside.
-        </h3>
-        <div className="phone-event-art">
-          <span />
-          <span />
-          <span />
-          <Compass size={48} />
-        </div>
-        <strong>The Sunday walk</strong>
-        <p>Sunday · 9:00 am</p>
-        <div className="mini-join">
-          {joined ? <Check size={18} /> : <Plus size={18} />}{" "}
-          {joined ? "You're in" : "Join the walk"}
-        </div>
-        <div className="mini-bottom">
-          <Compass size={20} />
-          <CalendarDays size={20} />
-          <Users size={20} />
-        </div>
-        <div className="mini-home" />
       </div>
     </div>
   );

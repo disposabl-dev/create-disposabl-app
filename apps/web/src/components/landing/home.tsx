@@ -15,7 +15,6 @@ import { HeroPreview } from "./hero-preview";
 import { AgentWorkspace } from "./agent-workspace";
 import { AppPlayground, appIdeas } from "./playground";
 import { Foundation } from "./foundation";
-import { LanguageCloud } from "./languages";
 import "./home.css";
 
 export function Home() {
@@ -57,25 +56,24 @@ export function Home() {
   return (
     <MarketingShell onStart={start}>
       <main id="main" className="launch-home">
-        <section className="maker-hero" aria-labelledby="hero-title">
+        <section
+          className="maker-hero hero hero--split"
+          data-enter
+          aria-labelledby="hero-title"
+        >
           <div className="launch-container workshop-hero">
             <div className="hero-message">
               <h1 id="hero-title">
-                That should
+                Free app builder.
                 <br />
-                be an <span>app.</span>
+                Every platform.
               </h1>
-              <p className="hero-promise">
-                Make it with your AI.
-                <br />
-                <strong>Free on your computer.</strong>
-              </p>
               <StartActions onDetails={start} />
             </div>
             <HeroPreview />
           </div>
           <div className="platform-ribbon launch-container">
-            <p>Web. Mobile. Desktop.</p>
+            <p>Web, mobile, desktop & beyond.</p>
             <div aria-label="Supported platforms">
               {["Web", "Apple", "Android", "Windows", "Linux"].map((name) => (
                 <span
@@ -97,19 +95,18 @@ export function Home() {
         <Foundation />
         <AgentWorkspace />
         <Pricing onStart={start} disabled={!hydrated} />
-        <LanguageCloud />
+
         <Questions />
         <section
           className="closing-start launch-container"
           aria-labelledby="closing-title"
         >
           <h2 id="closing-title">
-            You know that app
+            Your next app
             <br />
-            you keep thinking about?
+            starts here.
           </h2>
           <div>
-            <p>Make it yours.</p>
             <StartActions onDetails={start} closing />
           </div>
         </section>

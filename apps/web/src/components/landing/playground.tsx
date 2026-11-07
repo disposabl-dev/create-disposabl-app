@@ -4,16 +4,19 @@ import {
   ArrowUpRight,
   Copy,
   Info,
-  Star,
-  Heart,
-  Moon,
-  Sun,
-  Zap,
-  Flower2,
+  ArrowLeft,
+  ArrowRight,
+  Play,
+  Pause,
+  Check,
+  CalendarDays,
+  LayoutGrid,
+  Search,
 } from "lucide-react";
 import { BookingDemo, PlannerDemo, CommunityDemo } from "./app-examples";
 import { GameDemo } from "./game-example";
 import { OperationsDemo } from "./operations-example";
+import { BrandIcon } from "./brand-icon";
 
 export const appIdeas = [
   {
@@ -53,6 +56,41 @@ export const appIdeas = [
   },
 ] as const;
 
+const details = [
+  {
+    title: "A planner that fits your day.",
+    features: ["Tasks and routines", "Weekly goals", "Saved progress"],
+    platforms: ["Web", "Apple", "Android", "Windows", "Linux"],
+  },
+  {
+    title: "A game you want to play.",
+    features: [
+      "Touch and keyboard controls",
+      "Scores and progress",
+      "Your rules and artwork",
+    ],
+    platforms: ["Web", "Apple", "Android"],
+  },
+  {
+    title: "An app for your people.",
+    features: ["Events and RSVPs", "Member accounts", "Community updates"],
+    platforms: ["Web", "Apple", "Android"],
+  },
+  {
+    title: "Bookings on your terms.",
+    features: [
+      "Services and availability",
+      "Customer accounts",
+      "Appointment management",
+    ],
+    platforms: ["Web", "Apple", "Android"],
+  },
+  {
+    title: "Software for how you work.",
+    features: ["Team access", "Approvals and activity", "Connected workspaces"],
+    platforms: ["Web", "Windows", "Apple", "Linux"],
+  },
+];
 export function AppPlayground({
   onUseIdea,
 }: {
@@ -61,14 +99,31 @@ export function AppPlayground({
   const hydrated = useHydrated();
   const [active, setActive] = useState(0);
   const [shared, setShared] = useState("");
-  const idea = appIdeas[active] ?? appIdeas[0];
+  const [playing, setPlaying] = useState(false);
+  const idea = appIdeas[active];
+  const detail = details[active];
   useEffect(() => {
-    const id = new URLSearchParams(window.location.search).get("idea");
-    const index = appIdeas.findIndex((item) => item.id === id);
-    if (index >= 0) setActive(index);
+    const id = new URLSearchParams(location.search).get("idea");
+    const i = appIdeas.findIndex((x) => x.id === id);
+    if (i >= 0) setActive(i);
   }, []);
+  useEffect(() => {
+    if (!playing) return;
+    const timer = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        setActive((v) => (v + 1) % appIdeas.length);
+        setShared("");
+      }
+    }, 7000);
+    return () => clearInterval(timer);
+  }, [playing]);
+  function choose(i: number) {
+    setActive((i + appIdeas.length) % appIdeas.length);
+    setShared("");
+    setPlaying(false);
+  }
   async function share() {
-    const url = new URL("/", window.location.origin);
+    const url = new URL("/", location.origin);
     url.searchParams.set("idea", idea.id);
     url.hash = "examples";
     try {
@@ -86,6 +141,27 @@ export function AppPlayground({
     >
       <div className="playground-heading">
         <h2 id="playground-title">See what you can make.</h2>
+        <div className="showcase-controls">
+          <button
+            aria-label="Previous app example"
+            onClick={() => choose(active - 1)}
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <button
+            aria-label={playing ? "Pause app examples" : "Play app examples"}
+            aria-pressed={playing}
+            onClick={() => setPlaying(!playing)}
+          >
+            {playing ? <Pause size={20} /> : <Play size={20} />}
+          </button>
+          <button
+            aria-label="Next app example"
+            onClick={() => choose(active + 1)}
+          >
+            <ArrowRight size={20} />
+          </button>
+        </div>
       </div>
       <div
         className="playground-tabs"
@@ -94,28 +170,47 @@ export function AppPlayground({
       >
         {appIdeas.map((item, i) => (
           <button
-            disabled={!hydrated}
-            aria-pressed={i === active}
             key={item.id}
-            onClick={() => {
-              setActive(i);
-              setShared("");
-            }}
+            disabled={!hydrated}
+            aria-pressed={active === i}
+            onClick={() => choose(i)}
           >
             {item.label}
-            <ArrowUpRight size={22} />
           </button>
         ))}
       </div>
-      <div className={`playground-panel example-${idea.id}`}>
+      <div
+        className={`playground-panel example-${idea.id}`}
+        onFocusCapture={() => setPlaying(false)}
+        onPointerEnter={() => setPlaying(false)}
+      >
         <div className="playground-story">
-          <h3>{idea.title}</h3>
+          <h3>{detail.title}</h3>
+          <ul>
+            {detail.features.map((text) => (
+              <li key={text}>
+                <Check size={18} />
+                {text}
+              </li>
+            ))}
+          </ul>
+          <div
+            className="example-platforms"
+            aria-label="Platforms for this example"
+          >
+            {detail.platforms.map((name) => (
+              <span key={name} title={name} role="img" aria-label={name}>
+                <BrandIcon name={name} />
+              </span>
+            ))}
+          </div>
           <button
             className="primary-link"
             disabled={!hydrated}
             onClick={() => onUseIdea(idea.prompt)}
           >
-            Build this app <ArrowUpRight size={20} />
+            Build this app
+            <ArrowUpRight size={20} />
           </button>
           <button className="share-idea" disabled={!hydrated} onClick={share}>
             <Copy size={18} />
@@ -126,87 +221,61 @@ export function AppPlayground({
           </div>
         </div>
         <div className="playground-demo">
-          <div className="phone-companion" aria-hidden="true">
-            <div className="phone-island" />
-            <span>
-              {idea.id === "planner"
-                ? "Your week"
-                : idea.id === "game"
-                  ? "All matched."
-                  : idea.id === "community"
-                    ? "Together"
-                    : idea.id === "booking"
-                      ? "Your calendar"
-                      : "Your team"}
-            </span>
-            {idea.id === "game" ? (
-              <>
-                <p className="companion-score">6 / 6 pairs</p>
-                <div className="companion-game">
-                  {[
-                    Star,
-                    Heart,
-                    Moon,
-                    Sun,
-                    Zap,
-                    Star,
-                    Flower2,
-                    Moon,
-                    Heart,
-                    Flower2,
-                    Sun,
-                    Zap,
-                  ].map((Icon, i) => (
-                    <span key={i}>
-                      <Icon size={22} />
-                    </span>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <div className="companion-art">
-                <i />
-                <i />
-                <i />
-                <i />
-                <i />
-                <i />
-                <i />
-              </div>
-            )}
-          </div>
-          <div className="demo-phone">
-            <div className="phone-hardware" aria-hidden="true">
-              <span>9:41</span>
-              <div className="phone-island" />
-              <span>▮▮▮</span>
-            </div>
-            <div className="phone-screen">
+          <div className="showcase-window">
+            <div className="showcase-chrome">
+              <LayoutGrid size={20} />
+              <span>{idea.label}</span>
               <div className="demo-disclosure">
                 <button
                   aria-label="About this interactive example"
                   aria-describedby={`demo-info-${idea.id}`}
                 >
-                  <Info size={16} />
-                  Demo
+                  <Info size={18} />
                 </button>
                 <span id={`demo-info-${idea.id}`} role="tooltip">
                   Interactive example. Nothing is booked, saved, or sent.
                 </span>
               </div>
-              {idea.id === "booking" ? (
-                <BookingDemo disabled={!hydrated} />
-              ) : idea.id === "planner" ? (
-                <PlannerDemo disabled={!hydrated} />
-              ) : idea.id === "game" ? (
-                <GameDemo disabled={!hydrated} />
-              ) : idea.id === "community" ? (
-                <CommunityDemo disabled={!hydrated} />
-              ) : (
-                <OperationsDemo disabled={!hydrated} />
-              )}
             </div>
-            <div className="phone-home" aria-hidden="true" />
+            <div className="showcase-body">
+              <aside className="showcase-sidebar" aria-hidden="true">
+                <CalendarDays size={24} />
+                <strong>
+                  {idea.id === "planner"
+                    ? "Your week"
+                    : idea.id === "game"
+                      ? "Play again"
+                      : idea.id === "operations"
+                        ? "Your team"
+                        : "Your space"}
+                </strong>
+                <span>Overview</span>
+                <span>Saved</span>
+                <span>Settings</span>
+                <div className="showcase-month">
+                  {"MTWTFSS".split("").map((d, i) => (
+                    <span key={i}>{d}</span>
+                  ))}
+                  {Array.from({ length: 28 }, (_, i) => (
+                    <i key={i}>{i + 1}</i>
+                  ))}
+                </div>
+                <Search size={20} />
+              </aside>
+              <div className="showcase-screen" key={idea.id}>
+                {idea.id === "booking" ? (
+                  <BookingDemo disabled={!hydrated} />
+                ) : idea.id === "planner" ? (
+                  <PlannerDemo disabled={!hydrated} />
+                ) : idea.id === "game" ? (
+                  <GameDemo disabled={!hydrated} />
+                ) : idea.id === "community" ? (
+                  <CommunityDemo disabled={!hydrated} />
+                ) : (
+                  <OperationsDemo disabled={!hydrated} />
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </div>

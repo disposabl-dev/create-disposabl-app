@@ -1,10 +1,10 @@
 {
   "name": "Disposabl",
   "title": "Disposabl | Free app builder for web, mobile & desktop",
-  "description": "Make apps and games with the AI you choose. Build for web, iOS, Android, and desktop. Free local building. Your AI. Your computer. Your code.",
+  "description": "Build apps and games for web, iOS, Android and desktop with your own AI. Free on your computer, with sign-in, saved data, tests and publishing workflows included.",
   "origin": "https://www.disposabl.dev",
   "backendOrigin": "https://vivid-caterpillar-633.convex.site",
-  "image": "/og/disposabl-that-should-be-an-app.png",
-  "imageAlt": "Disposabl. That should be an app. Make it with your AI. Free on your computer. A community app shown on web and mobile.",
+  "image": "/og/disposabl-every-platform.png",
+  "imageAlt": "Disposabl. Free app builder. Every platform. A travel planner example with a copy prompt action.",
   "analytics": true
 }

@@ -19,11 +19,7 @@ export function BookingDemo({ disabled }: { disabled: boolean }) {
         </span>
         <strong>Studio sessions</strong>
       </div>
-      <h4>
-        A good time
-        <br />
-        to begin.
-      </h4>
+      <h4>Book a session</h4>
       <p>A one-to-one session, on your schedule.</p>
       <div className="demo-days" role="group" aria-label="Example booking day">
         {["Mon", "Tue", "Wed", "Thu", "Fri"].map((d, i) => (
@@ -94,12 +90,9 @@ export function PlannerDemo({ disabled }: { disabled: boolean }) {
         <span className="planner-mark" aria-hidden="true">
           ✳
         </span>
-        <strong>A little space</strong>
+        <strong>Daily planner</strong>
       </div>
-      <h4>
-        Today is
-        <br />a fresh start.
-      </h4>
+      <h4>Today</h4>
       <div className="planner-progress">
         <span>
           {complete} of {tasks.length} done
@@ -127,6 +120,9 @@ export function PlannerDemo({ disabled }: { disabled: boolean }) {
           </button>
         ))}
       </div>
+      <label className="planner-label" htmlFor="example-task">
+        Add a task
+      </label>
       <form
         className="planner-add"
         onSubmit={(e) => {
@@ -138,6 +134,7 @@ export function PlannerDemo({ disabled }: { disabled: boolean }) {
         }}
       >
         <input
+          id="example-task"
           aria-label="Add a demo task"
           placeholder={
             tasks.length < 6 ? "One more thing…" : "Your day is full"

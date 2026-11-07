@@ -1,13 +1,8 @@
+@import url("/landing/taste/motion/motion.css");
 @import "./base.css";
 @import "./guides.css";
-@import "./responsive.css";
-
-@import "./maker.css";
-
-@import "./studio.css";
-@import "./languages.css";
-
-@import "./workshop.css";
-@import "./hero-preview.css";
-@import "./agent-workspace.css";
+@import "./dialog.css";
+@import "./demo-apps.css";
+@import "./showcase.css";
 @import "./start-actions.css";
+@import "./ecosystem.css";

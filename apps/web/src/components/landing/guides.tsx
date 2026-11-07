@@ -117,7 +117,7 @@ function StackPage() {
   return (
     <>
       <GuideHero
-        title="One kit. Every platform."
+        title="Choose your app’s platforms"
         intro="Choose where your app will run and see the tools that support each platform."
       />
       <PlatformExplorer selected={selected} onChange={setSelected} />
@@ -172,7 +172,7 @@ function BuildPage() {
   return (
     <>
       <GuideHero
-        title="Build your first app."
+        title="How to build with Disposabl"
         intro="Create a project, work with your coding agent, and take your app from a local preview to a release."
       />
       <section className="guide-section">
@@ -260,7 +260,7 @@ function WhyPage() {
   return (
     <>
       <GuideHero
-        title="Your AI can code. Give it a head start."
+        title="Your AI, with the setup done"
         intro="Give your AI a starting point for sign-in, saved data, tests, and publishing."
       />
       <section className="guide-section why-flow">

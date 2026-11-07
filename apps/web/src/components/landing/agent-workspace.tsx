@@ -1,42 +1,42 @@
 import { useState } from "react";
 import {
   ArrowUpRight,
-  Check,
+  ArrowRight,
   GitBranch,
   Layers,
   Repeat2,
-  ArrowRight,
-  Circle,
-  Folder,
-  Terminal,
-  Play,
 } from "lucide-react";
+import "./agent-workspace.css";
 
 const modes = [
   {
-    title: "Keep improving",
+    title: "Refine",
     icon: Repeat2,
-    text: "Build a version, test it, then refine it. Ask your agent to keep working toward a clearer result.",
+    text: "Ask your agent to build, test, and improve an idea over several rounds.",
     task: "Make booking easier",
-    items: [
+    lanes: [
       "Build the booking flow",
-      "Check it on a phone",
-      "Simplify the confirmation",
+      "Test the experience",
+      "Refine the result",
     ],
   },
   {
-    title: "Compare approaches",
+    title: "Compare",
     icon: GitBranch,
-    text: "Try different approaches in separate previews. Compare what works and choose what to keep.",
-    task: "Two ways to book",
-    items: ["Calendar first", "Services first", "Compare both previews"],
+    text: "Try different approaches in separate previews, then compare how they work.",
+    task: "Explore two approaches",
+    lanes: [
+      "Preview A · Calendar first",
+      "Preview B · Service first",
+      "Compare the results",
+    ],
   },
   {
     title: "Work in parallel",
     icon: Layers,
-    text: "Work on different apps in separate conversations. Project files and dependencies stay in the remote workspace.",
-    task: "Room for another idea",
-    items: ["A booking app", "A weekend game", "Your community app"],
+    text: "Work on different apps in separate conversations in your remote workspace.",
+    task: "Continue your projects",
+    lanes: ["Booking app", "Team workspace", "Personal planner"],
   },
 ] as const;
 
@@ -44,116 +44,149 @@ export function AgentWorkspace() {
   const [active, setActive] = useState(0);
   const mode = modes[active] ?? modes[0];
   return (
-    <section
-      className="agent-workspace launch-container"
-      aria-labelledby="agent-title"
-    >
-      <div className="agent-section-heading">
-        <h2 id="agent-title">
-          Big jobs.
-          <br />
-          Quiet laptop.
-        </h2>
-        <div>
-          <h3>Meet Agent Mode.</h3>
-          <p>
-            Your agent works on a remote computer. Let longer tasks run there
-            while you get on with your day.
-          </p>
-          <a className="text-link" href="/build#agent-mode">
-            How Agent Mode works <ArrowUpRight size={19} />
-          </a>
-        </div>
-      </div>
-      <div className="agent-workspace-body">
-        <div
-          className="agent-mode-controls"
-          role="group"
-          aria-label="Explore Agent Mode"
-        >
-          {modes.map((item, index) => (
-            <button
-              key={item.title}
-              aria-pressed={active === index}
-              onClick={() => setActive(index)}
-            >
-              <item.icon size={22} />
-              <span>{item.title}</span>
-              <ArrowRight size={20} />
-            </button>
-          ))}
-          <p aria-live="polite">{mode.text}</p>
-        </div>
-        <div
-          className="remote-example"
-          key={active}
-          aria-label="Illustrative remote workflow"
-        >
-          <div className="remote-top">
-            <span className="remote-dot" /> Remote workspace<span>Example</span>
+    <section className="agent-workspace" aria-labelledby="agent-title">
+      <div className="launch-container">
+        <div className="agent-heading">
+          <h2 id="agent-title">Agent Mode</h2>
+          <div>
+            <p>
+              Give your agent a remote computer for longer tasks, while you get
+              on with your day.
+            </p>
+            <a href="/build#agent-mode">
+              Explore Agent Mode <ArrowUpRight size={19} />
+            </a>
           </div>
-          <div className="remote-task">
-            <Folder size={22} />
-            <h3>{mode.task}</h3>
-          </div>
-          <div className="remote-work-list">
-            {mode.items.map((item, index) => (
-              <div key={item} style={{ animationDelay: `${index * 80}ms` }}>
-                <span className={index === 2 ? "task-current" : "task-done"}>
-                  {active === 2 ? (
-                    <Layers size={18} />
-                  ) : index === 2 ? (
-                    <Circle size={18} />
-                  ) : (
-                    <Check size={18} />
-                  )}
-                </span>
-                <span>{item}</span>
-                {active === 1 ? (
-                  <span className="preview-symbol">
-                    <ArrowUpRight size={18} />
-                  </span>
-                ) : active === 2 ? (
-                  <span className="task-line" />
-                ) : null}
-              </div>
+        </div>
+        <div className="agent-workspace-body">
+          <div
+            className="agent-mode-tabs"
+            role="group"
+            aria-label="Explore Agent Mode"
+          >
+            {modes.map((item, index) => (
+              <button
+                key={item.title}
+                type="button"
+                aria-pressed={active === index}
+                onClick={() => setActive(index)}
+              >
+                <item.icon size={21} />
+                {item.title}
+              </button>
             ))}
+            <p aria-live="polite">{mode.text}</p>
           </div>
-          <div className="remote-preview" aria-hidden="true">
-            <div className="remote-preview-nav">
-              <span />
-              <span />
-              <span />
+          <div
+            className="agent-window"
+            aria-label="Illustrative remote workspace"
+          >
+            <div className="agent-window-top">
+              <span className="agent-window-dot" />
+              Remote workspace <span>Example</span>
             </div>
-            <div className="remote-preview-content">
-              <div>
-                <span className="preview-date">
-                  SUN
-                  <br />
-                  <strong>24</strong>
-                </span>
-                <div>
-                  <strong>Your next booking</strong>
-                  <span>Choose a time that works.</span>
-                </div>
+            <div className="agent-window-main">
+              <div className="agent-session">
+                <span>Your request</span>
+                <strong>{mode.task}</strong>
               </div>
-              <div className="preview-time-row">
-                <span>9:00</span>
-                <span>10:30</span>
-                <span>12:00</span>
+              <div className="agent-previews" aria-hidden="true">
+                {active === 0 ? (
+                  <>
+                    <Preview title="Before" kind="before" />
+                    <ArrowRight className="agent-refine-arrow" size={24} />
+                    <Preview title="After" kind="after" />
+                  </>
+                ) : active === 1 ? (
+                  <>
+                    <Preview title="Calendar first" kind="calendar" />
+                    <Preview title="Service first" kind="service" />
+                  </>
+                ) : (
+                  <>
+                    <Preview title="Booking app" kind="calendar" />
+                    <Preview title="Team workspace" kind="team" />
+                    <Preview title="Personal planner" kind="planner" />
+                  </>
+                )}
               </div>
             </div>
-          </div>
-          <div className="remote-bottom">
-            <span>
-              <Terminal size={17} /> Files stay here
-            </span>
-            <span>
-              <Play size={16} /> Preview &amp; refine
-            </span>
           </div>
         </div>
       </div>
     </section>
+  );
+}
+
+function Preview({ title, kind }: { title: string; kind: string }) {
+  return (
+    <div className="agent-preview">
+      <div className="agent-preview-title">{title}</div>
+      <div className="agent-preview-screen">
+        {kind === "calendar" ? (
+          <>
+            <strong>Choose a day</strong>
+            <div className="agent-calendar">
+              <span>Mon</span>
+              <span>Tue</span>
+              <span>Wed</span>
+              <b>12</b>
+              <b>13</b>
+              <b>14</b>
+            </div>
+            <div className="agent-preview-button">Choose time</div>
+          </>
+        ) : kind === "service" ? (
+          <>
+            <strong>Choose a service</strong>
+            <div className="agent-preview-row">
+              Consultation <span>→</span>
+            </div>
+            <div className="agent-preview-row">
+              Follow-up <span>→</span>
+            </div>
+          </>
+        ) : kind === "team" ? (
+          <>
+            <strong>Team projects</strong>
+            <div className="agent-preview-row">
+              Launch plan <span>→</span>
+            </div>
+            <div className="agent-preview-row">
+              Ideas <span>→</span>
+            </div>
+          </>
+        ) : kind === "planner" ? (
+          <>
+            <strong>Today</strong>
+            <div className="agent-preview-row">○ Review plans</div>
+            <div className="agent-preview-row">○ Make time to focus</div>
+          </>
+        ) : (
+          <>
+            <strong>Book a consultation</strong>
+            {kind === "before" ? (
+              <>
+                <div className="agent-preview-row">
+                  Choose a day <span>→</span>
+                </div>
+                <div className="agent-preview-row">
+                  Choose a time <span>→</span>
+                </div>
+                <div className="agent-preview-row">
+                  Review booking <span>→</span>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="agent-preview-row">Monday · 10:00</div>
+                <div className="agent-preview-row">Monday · 14:00</div>
+                <div className="agent-preview-button">Choose &amp; book</div>
+              </>
+            )}
+          </>
+        )}
+      </div>
+    </div>
   );
 }

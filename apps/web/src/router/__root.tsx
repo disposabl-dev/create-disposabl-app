@@ -17,6 +17,8 @@ export const Route = createRootRoute({
       meta: [
         { charSet: "utf-8" },
         { name: "viewport", content: "width=device-width, initial-scale=1" },
+        { name: "page-type", content: "software" },
+        { name: "site-kind", content: "software" },
         { title },
         {
           name: "robots",
@@ -87,7 +89,7 @@ export const Route = createRootRoute({
 
 function RootDocument({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" data-type="software" suppressHydrationWarning>
       <head>
         <HeadContent />
       </head>

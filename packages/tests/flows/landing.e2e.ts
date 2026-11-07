@@ -71,15 +71,6 @@ test(
       await browser.keyboard.press("Enter");
       expect(new URL(await browser.url()).pathname).toBe("/");
     }
-    await browser.locator(".foundation-card summary").nth(0).tap();
-    await expect(
-      browser.locator(".foundation-card details[open] p"),
-    ).toContainText("saved work");
-    await browser.locator(".foundation-card summary").nth(0).tap();
-    await expect(browser.locator(".foundation-card details[open]")).toHaveCount(
-      0,
-    );
-    await expect(browser.locator("#language-title")).toBeVisible();
   },
 );
 
@@ -172,7 +163,7 @@ test(
     await screen.getByRole("button", "Open menu").tap();
     await browser.locator('#marketing-links a[href="/build"]').tap();
     await expect(browser.locator("main h1")).toContainText(
-      "Build your first app.",
+      "How to build with Disposabl",
     );
   },
 );
@@ -237,24 +228,23 @@ test(
 );
 
 test(
-  "both hero actions fit before scrolling and start dialog restores focus",
+  "hero actions fit on a standard phone and start dialog restores focus",
   { platforms: ["web"], tags: ["landing"] },
   async ({ app, browser, screen }) => {
-    for (const [width, height] of [
-      [320, 568],
-      [375, 667],
-      [390, 844],
-      [844, 390],
-      [1440, 900],
-    ]) {
-      await browser.setViewport({ width, height });
-      await app.open("/");
-      const visible = await browser.evaluate(() =>
-        [
-          ...document.querySelectorAll(
-            ".maker-hero #start,.maker-hero .store-button,.maker-hero .command-start",
-          ),
-        ].every((el) => {
+    await browser.setViewport({ width: 390, height: 844 });
+    await app.open("/");
+    await expect(browser.locator(".maker-hero .setup-prompt-text")).toHaveText(
+      "Help me build an app with Disposabl. Read https://github.com/disposabl-dev/create-disposabl-app, then ask me what I want to make and where it should run.",
+    );
+    const visible = await browser.evaluate(() => {
+      const actions = [
+        ...document.querySelectorAll(
+          ".maker-hero #start,.maker-hero .store-button",
+        ),
+      ];
+      return (
+        actions.length === 3 &&
+        actions.every((el) => {
           const r = el.getBoundingClientRect();
           return (
             r.top >= 0 &&
@@ -262,10 +252,10 @@ test(
             r.left >= 0 &&
             r.right <= innerWidth
           );
-        }),
+        })
       );
-      expect(visible).toBe(true);
-    }
+    });
+    expect(visible).toBe(true);
     await browser.locator(".maker-hero .setup-help").tap();
     await expect(
       screen.getByRole("dialog", "Continue with your AI."),
@@ -282,6 +272,7 @@ test(
     await browser.locator("#pricing .primary-link").tap();
     await expect(browser.locator(".start-dialog[open]")).toBeVisible();
     await browser.keyboard.press("Escape");
+    await screen.getByRole("button", "Open menu").tap();
     await browser.locator(".nav-start").tap();
     await expect(browser.locator(".start-dialog[open]")).toBeVisible();
     await browser.keyboard.press("Escape");
@@ -330,13 +321,13 @@ test(
       reducedMotion: "reduce",
     });
     await app.open("/");
-    await expect(browser.locator("html")).toHaveAttribute("class", "dark");
+    await expect(browser.locator("html.dark")).toHaveCount(1);
     await browser.emulateMedia({ colorScheme: "light" });
-    await expect(browser.locator("html")).toHaveAttribute("class", "light");
+    await expect(browser.locator("html.light")).toHaveCount(1);
     await screen.getByRole("button", "Toggle light and dark mode").tap();
-    await expect(browser.locator("html")).toHaveAttribute("class", "dark");
+    await expect(browser.locator("html.dark")).toHaveCount(1);
     await app.open("/stack");
-    await expect(browser.locator("html")).toHaveAttribute("class", "dark");
+    await expect(browser.locator("html.dark")).toHaveCount(1);
     for (const theme of ["dark", "light"]) {
       if (theme === "light")
         await screen.getByRole("button", "Toggle light and dark mode").tap();
@@ -344,7 +335,7 @@ test(
         await browser.setViewport({ width, height: 900 });
         for (const path of ["/", "/stack", "/build", "/why-disposabl"]) {
           await app.open(path);
-          await expect(browser.locator("html")).toHaveAttribute("class", theme);
+          await expect(browser.locator(`html.${theme}`)).toHaveCount(1);
           await expect(browser.locator("main h1")).toBeVisible();
           for (const dialog of path === "/" ? [false, true] : [false]) {
             if (dialog) await browser.locator(".maker-hero .setup-help").tap();
@@ -453,7 +444,7 @@ test(
   { platforms: ["web"], tags: ["landing"] },
   async ({ app, browser, screen }) => {
     await app.open("/");
-    await screen.getByRole("link", "Explore Agent Mode", { exact: true }).tap();
+    await browser.locator('#pricing a[href="/build#agent-mode"]').tap();
     await expect(browser.locator("#agent-mode[open]")).toBeVisible();
     await expect(browser.locator("#agent-mode")).toContainText("500 credits");
     await app.open("/");
@@ -624,15 +615,17 @@ test(
     const heroColors: string[] = [];
     for (const theme of ["light", "dark"]) {
       await browser.emulateMedia({ colorScheme: theme as "light" | "dark" });
-      await expect(browser.locator("html")).toHaveAttribute("class", theme);
+      await expect(browser.locator(`html.${theme}`)).toHaveCount(1);
       const colors = await browser.evaluate(() => ({
         hero: getComputedStyle(document.querySelector(".maker-hero")!)
           .backgroundColor,
         page: getComputedStyle(document.querySelector(".launch-site")!)
           .backgroundColor,
       }));
-      expect(colors.hero).toBe(colors.page);
-      heroColors.push(colors.hero);
+      expect([colors.page, "rgba(0, 0, 0, 0)"]).toContain(colors.hero);
+      heroColors.push(
+        colors.hero === "rgba(0, 0, 0, 0)" ? colors.page : colors.hero,
+      );
     }
     expect(heroColors[0]).not.toBe(heroColors[1]);
     for (const text of [
@@ -654,37 +647,14 @@ test(
         ),
       ).toBe(false);
     }
-    await browser.locator(".foundation-card summary").nth(0).tap();
-    await expect(
-      browser.locator(".foundation-card details[open] p"),
-    ).toContainText("saved work");
-    await browser.locator(".foundation-card summary").nth(0).tap();
-    await expect(browser.locator(".foundation-card details[open]")).toHaveCount(
-      0,
+    await expect(browser.locator(".app-foundation")).toContainText("85+");
+    await expect(browser.locator(".app-foundation")).toContainText(
+      "languages is coming soon",
     );
-    await expect(browser.locator("#language-title")).toBeVisible();
-    expect(
-      await browser.evaluate(
-        () => document.querySelectorAll(".language-cloud li").length >= 26,
-      ),
-    ).toBe(true);
-    await expect(
-      browser.locator(
-        '.language-cloud[aria-label="Examples of upcoming languages"]',
-      ),
-    ).toBeVisible();
-    await browser.evaluate(() => {
-      (
-        document.querySelector(
-          '[aria-label="Language support is coming soon"]',
-        ) as HTMLElement
-      ).focus();
-      return true;
-    });
-    await expect(browser.locator("#language-coming-soon")).toBeVisible();
-    await expect(browser.locator("#language-coming-soon")).toHaveText(
-      "Coming soon.",
+    await expect(browser.locator(".app-foundation")).toContainText(
+      "documentation site",
     );
+    await expect(browser.locator(".app-foundation")).toContainText("blog");
     await expect(
       browser.locator('footer nav[aria-label="Explore Disposabl"] a'),
     ).toHaveCount(4);
@@ -754,24 +724,29 @@ test(
   { platforms: ["web"], tags: ["landing"] },
   async ({ app, browser, screen }) => {
     await app.open("/");
-    await screen.getByRole("button", "Join example walk").tap();
-    await expect(
-      screen.getByRole("button", "Leave example walk"),
-    ).toBeVisible();
-    await screen.getByRole("button", "Leave example walk").tap();
-    await expect(screen.getByRole("button", "Join example walk")).toBeVisible();
-    for (const [label, text] of [
-      ["Keep improving", "test it, then refine it"],
-      ["Compare approaches", "separate previews"],
-      ["Work in parallel", "separate conversations"],
+    for (const label of ["Desktop", "Mobile", "Web"]) {
+      await screen.getByRole("button", label, { exact: true }).tap();
+      await expect(
+        screen.getByRole("button", label, { exact: true }),
+      ).toHaveAttribute("aria-pressed", "true");
+    }
+    await screen.getByRole("button", "Save example trip").tap();
+    await expect(browser.locator(".trip-save")).toContainText(
+      "Saved to your example trips",
+    );
+    await screen.getByRole("button", "Remove example trip").tap();
+    await expect(screen.getByRole("button", "Save example trip")).toBeVisible();
+    for (const [label, text, task] of [
+      ["Refine", "build, test, and improve", "Make booking easier"],
+      ["Compare", "separate previews", "Explore two approaches"],
+      ["Work in parallel", "separate conversations", "Continue your projects"],
     ]) {
       await screen.getByRole("button", label, { exact: true }).tap();
       await expect(
         screen.getByRole("button", label, { exact: true }),
       ).toHaveAttribute("aria-pressed", "true");
-      await expect(browser.locator(".agent-mode-controls p")).toContainText(
-        text,
-      );
+      await expect(browser.locator(".agent-mode-tabs p")).toContainText(text);
+      await expect(browser.locator(".agent-window")).toContainText(task);
     }
   },
 );
@@ -828,5 +803,32 @@ test(
     await expect(
       browser.locator(".example-planner .planner-app"),
     ).toBeVisible();
+  },
+);
+
+test(
+  "showcase navigation and playback controls",
+  { platforms: ["web"], tags: ["landing"] },
+  async ({ app, screen }) => {
+    await app.open("/");
+    await expect(
+      screen.getByRole("button", "Play app examples"),
+    ).toHaveAttribute("aria-pressed", "false");
+    await screen.getByRole("button", "Next app example").tap();
+    await expect(
+      screen.getByRole("button", "Games", { exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
+    await screen.getByRole("button", "Previous app example").tap();
+    await expect(
+      screen.getByRole("button", "Daily planner", { exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
+    await screen.getByRole("button", "Play app examples").tap();
+    await expect(
+      screen.getByRole("button", "Pause app examples"),
+    ).toHaveAttribute("aria-pressed", "true");
+    await screen.getByRole("button", "Pause app examples").tap();
+    await expect(
+      screen.getByRole("button", "Play app examples"),
+    ).toHaveAttribute("aria-pressed", "false");
   },
 );

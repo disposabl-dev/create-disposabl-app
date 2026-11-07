@@ -1,38 +1,41 @@
 .guide-main {
-  padding-bottom: 100px;
+  padding-bottom: 112px;
 }
 .guide-main p {
   color: var(--muted);
-  line-height: 1.55;
   font-size: 18px;
+  line-height: 1.6;
+}
+.guide-main h1,
+.guide-main h2,
+.guide-main h3 {
+  font-family: var(--display);
+  font-weight: 500;
+  letter-spacing: -0.04em;
 }
 .guide-hero {
-  padding: clamp(70px, 10vw, 150px) 0 70px;
-  border-bottom: 2px solid var(--text);
+  padding: clamp(80px, 10vw, 144px) 0 clamp(64px, 8vw, 112px);
+  border-bottom: 1px solid var(--line);
 }
 .guide-hero h1 {
-  max-width: 1050px;
-  font-size: clamp(54px, 8.5vw, 120px);
-  line-height: 0.92;
-  letter-spacing: -0.065em;
-  font-weight: 750;
+  max-width: 900px;
+  font-size: clamp(44px, 6vw, 72px);
+  line-height: 1.06;
 }
 .guide-hero > p {
-  max-width: 650px;
-  font-size: clamp(20px, 2vw, 26px);
-  margin-top: 34px;
+  max-width: 620px;
+  margin-top: 24px;
 }
 .guide-section,
 .guide-main .platform-section {
-  padding: clamp(64px, 8vw, 110px) 0;
+  padding: clamp(72px, 9vw, 120px) 0;
   border-bottom: 1px solid var(--line);
 }
 .guide-section h2,
 .guide-main .platform-section h2,
 .guide-end h2 {
-  font-size: clamp(40px, 5.5vw, 72px);
-  line-height: 0.98;
-  letter-spacing: -0.055em;
+  font-size: clamp(40px, 4vw, 48px);
+  line-height: 1.12;
 }
 .guide-section-heading {
   max-width: 760px;
@@ -46,39 +49,38 @@
 .foundation-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  border-top: 2px solid var(--text);
+  border-top: 1px solid var(--line);
 }
 .guide-steps article,
 .foundation-grid article {
   position: relative;
-  padding: 30px 30px 40px 0;
+  padding: 32px 32px 36px 0;
   border-bottom: 1px solid var(--line);
 }
 .guide-steps article:nth-child(even),
 .foundation-grid article:nth-child(even) {
-  padding-left: 30px;
+  padding-left: 32px;
   border-left: 1px solid var(--line);
 }
 .guide-steps h3,
 .foundation-grid h3,
 .stack-card h3,
 .ownership h3 {
-  font-size: 26px;
-  line-height: 1.12;
-  letter-spacing: -0.03em;
-  margin: 36px 0 12px;
+  font-size: 24px;
+  line-height: 1.2;
+  margin: 28px 0 12px;
 }
 .guide-steps p,
 .foundation-grid p,
 .stack-card p {
-  max-width: 440px;
+  max-width: 480px;
 }
 .step-icon,
-.foundation-grid article > svg {
-  color: #2445ff;
+.foundation-grid article > svg,
+.step-arrow {
+  color: var(--text);
 }
 .step-arrow {
-  color: #2445ff;
   margin-top: 24px;
 }
 .guide-details,
@@ -87,7 +89,7 @@
 .why-flow {
   display: grid;
   grid-template-columns: 1fr 1.2fr;
-  gap: clamp(40px, 8vw, 120px);
+  gap: clamp(40px, 8vw, 112px);
 }
 .guide-details > div > p,
 .shared-architecture > div > p,
@@ -96,15 +98,15 @@
   margin-top: 22px;
 }
 .detail-list details {
-  border-top: 1px solid var(--text);
-  padding: 25px 0;
+  border-top: 1px solid var(--line);
+  padding: 24px 0;
 }
 .detail-list details:last-child {
-  border-bottom: 1px solid var(--text);
+  border-bottom: 1px solid var(--line);
 }
 .detail-list summary {
-  font-size: 24px;
-  font-weight: 700;
+  font-size: 20px;
+  font-weight: 500;
   cursor: pointer;
 }
 .detail-list p {
@@ -115,23 +117,23 @@
   color: var(--text);
 }
 .build-evidence {
-  border-top: 2px solid var(--text);
+  border-top: 1px solid var(--line);
   padding-top: 28px;
 }
 .build-evidence h3 {
-  font-size: 26px;
+  font-size: 24px;
 }
 .evidence-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   margin: 30px 0;
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
+  border-block: 1px solid var(--line);
 }
 .evidence-item {
   display: flex;
   flex-direction: column;
   padding: 24px 24px 24px 0;
+  color: var(--text);
 }
 .evidence-item + .evidence-item {
   border-left: 1px solid var(--line);
@@ -143,8 +145,9 @@
   font-size: 16px;
 }
 .evidence-item strong {
-  font-size: clamp(36px, 4vw, 54px);
-  letter-spacing: -0.05em;
+  font-size: clamp(32px, 4vw, 48px);
+  font-weight: 500;
+  letter-spacing: -0.04em;
   margin: 14px 0 8px;
 }
 .guide-end {
@@ -152,13 +155,10 @@
   justify-content: space-between;
   align-items: flex-end;
   gap: 40px;
-  background: #2445ff;
-  color: white;
-  padding: clamp(32px, 5vw, 64px);
-  margin-top: 80px;
+  padding: clamp(40px, 5vw, 64px) 0 0;
+  margin-top: 48px;
 }
 .guide-end p {
-  color: white;
   margin-top: 16px;
 }
 .guide-end-links {
@@ -167,31 +167,28 @@
   flex-wrap: wrap;
   gap: 22px;
 }
-.guide-end .text-link {
-  color: white;
-}
 .guide-main .platform-toggles {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin: 30px 0;
+  margin: 32px 0 48px;
 }
 .guide-main .platform-toggle {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  border: 1px solid var(--text);
-  border-radius: 0;
-  padding: 14px 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 13px 16px;
   background: var(--surface);
   color: var(--text);
   font-size: 16px;
   cursor: pointer;
 }
 .guide-main .platform-toggle[aria-pressed="true"] {
-  border-color: #2445ff;
-  background: #2445ff;
-  color: white;
+  border-color: var(--text);
+  background: var(--text);
+  color: var(--surface);
 }
 .guide-main .platform-toggle[aria-disabled="true"] {
   cursor: default;
@@ -212,15 +209,15 @@
 .guide-main .stack-results {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  border-top: 2px solid var(--text);
+  border-top: 1px solid var(--line);
 }
 .guide-main .stack-card {
-  padding: 30px 30px 30px 0;
+  padding: 32px 32px 32px 0;
   border-bottom: 1px solid var(--line);
 }
 .guide-main .stack-card:nth-child(even) {
   border-left: 1px solid var(--line);
-  padding-left: 30px;
+  padding-left: 32px;
 }
 .guide-main .stack-card h3 {
   margin-top: 0;
@@ -229,7 +226,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin: 22px 0;
+  margin: 24px 0;
 }
 .guide-main .stack-tags > span,
 .guide-main .stack-brand {
@@ -237,6 +234,7 @@
   align-items: center;
   gap: 8px;
   border: 1px solid var(--line);
+  border-radius: 8px;
   padding: 8px 10px;
   font-size: 16px;
 }
@@ -263,7 +261,7 @@
   border-bottom: 1px solid var(--line);
 }
 .architecture-list > div:first-child {
-  border-top: 2px solid var(--text);
+  border-top: 1px solid var(--line);
 }
 .architecture-list strong,
 .architecture-list small {
@@ -277,12 +275,12 @@
 .why-flow-diagram {
   display: flex;
   align-items: stretch;
-  gap: 12px;
+  gap: 16px;
 }
 .why-flow-diagram > svg {
   flex: none;
   align-self: center;
-  color: #2445ff;
+  color: var(--muted);
 }
 .why-flow-diagram > div {
   flex: 1;
@@ -290,11 +288,8 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
-  border-top: 2px solid var(--text);
+  border-top: 1px solid var(--line);
   padding: 20px 0;
-}
-.why-flow-diagram > div > svg {
-  color: #2445ff;
 }
 .why-flow-diagram strong,
 .why-flow-diagram span {
@@ -317,13 +312,9 @@
   .guide-end {
     align-items: flex-start;
     flex-direction: column;
-    margin-top: 60px;
   }
 }
 @media (max-width: 520px) {
-  .guide-hero h1 {
-    font-size: clamp(48px, 12vw, 64px);
-  }
   .guide-steps,
   .foundation-grid,
   .guide-main .stack-results,
@@ -351,4 +342,10 @@
   .guide-main .platform-toggle {
     flex: 1 1 135px;
   }
+}
+.guide-main .platform-toggle[aria-pressed="true"] .brand-monochrome {
+  filter: brightness(0) invert(1);
+}
+.dark .guide-main .platform-toggle[aria-pressed="true"] .brand-monochrome {
+  filter: brightness(0);
 }

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, Copy, Info, Terminal } from "lucide-react";
+import { Check, Copy, ArrowUpRight, Terminal } from "lucide-react";
 import { useHydrated } from "@tanstack/react-router";
 import { BrandIcon } from "./brand-icon";
 import { setupPrompt } from "../agent-onboarding";
@@ -32,39 +32,42 @@ export function StartActions({
   }
   return (
     <div className={`start-actions${closing ? " closing-actions" : ""}`}>
-      <div className="agent-start-row">
-        <button
-          id={closing ? undefined : "start"}
-          disabled={!hydrated}
-          className="copy-start"
-          onClick={() => void copy("prompt")}
-        >
-          {copied === "prompt" ? <Check size={21} /> : <Copy size={21} />}
-          {copied === "prompt" ? "Copied" : "Copy AI prompt"}
-        </button>
-        <div
-          className="start-agent-logos"
-          role="group"
-          aria-label="Use with your coding agent"
-        >
-          {[
-            ["Claude Code", claude],
-            ["Codex", codex],
-            ["Cursor", cursor],
-          ].map(([name, icon]) => (
-            <span key={name} title={name}>
-              <img src={icon} alt={name} width={28} height={28} />
-            </span>
-          ))}
+      <div className="visible-prompt">
+        <p className="setup-prompt-text">{setupPrompt}</p>
+        <div className="agent-start-row">
+          <button
+            id={closing ? undefined : "start"}
+            disabled={!hydrated}
+            className="copy-start"
+            onClick={() => void copy("prompt")}
+          >
+            {copied === "prompt" ? <Check size={21} /> : <Copy size={21} />}
+            {copied === "prompt" ? "Copied" : "Copy prompt"}
+          </button>
+          <div
+            className="start-agent-logos"
+            role="group"
+            aria-label="Use with your coding agent"
+          >
+            {[
+              ["Claude Code", claude],
+              ["Codex", codex],
+              ["Cursor", cursor],
+            ].map(([name, icon]) => (
+              <span key={name} title={name}>
+                <img src={icon} alt={name} width={28} height={28} />
+              </span>
+            ))}
+          </div>
+          <button
+            className="setup-help"
+            disabled={!hydrated}
+            aria-label="View setup instructions"
+            onClick={onDetails}
+          >
+            <ArrowUpRight size={20} />
+          </button>
         </div>
-        <button
-          className="setup-help"
-          disabled={!hydrated}
-          aria-label="View setup instructions"
-          onClick={onDetails}
-        >
-          <Info size={20} />
-        </button>
       </div>
       <div className="store-group">
         <div className="store-buttons">

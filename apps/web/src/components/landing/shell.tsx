@@ -1,5 +1,5 @@
 import { useHydrated } from "@tanstack/react-router";
-import { useState, useRef, type ReactNode } from "react";
+import { useState, useRef, useEffect, type ReactNode } from "react";
 import { ArrowUpRight, Menu, X, Sun, Moon } from "lucide-react";
 import { useTheme } from "@disposabl/disposabl-kit/client/lib/theme";
 import { BrandIcon } from "./brand-icon";
@@ -29,11 +29,46 @@ export function MarketingShell({
   onStart?: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const shell = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const root = shell.current;
+    if (!root) return;
+    type Motion = {
+      refresh: () => void;
+      mountAll: (root: HTMLElement) => Promise<unknown>;
+      unmountAll: (root: HTMLElement) => void;
+    };
+    const runtime = window as Window & { disposablLandingMotion?: Motion };
+    let disposed = false;
+    const mount = () => {
+      if (disposed) return;
+      runtime.disposablLandingMotion?.refresh();
+      void runtime.disposablLandingMotion?.mountAll(root);
+    };
+    if (runtime.disposablLandingMotion) mount();
+    let script = document.querySelector<HTMLScriptElement>(
+      "script[data-landing-motion]",
+    );
+    if (!script) {
+      script = document.createElement("script");
+      script.type = "module";
+      script.src = "/landing/taste/init.js";
+      script.dataset.landingMotion = "";
+      document.head.appendChild(script);
+    }
+    script.addEventListener("load", mount);
+    return () => {
+      disposed = true;
+      script.removeEventListener("load", mount);
+      runtime.disposablLandingMotion?.unmountAll(root);
+    };
+  }, []);
+
   const hydrated = useHydrated();
   const { resolvedTheme, setTheme } = useTheme();
   const menuButton = useRef<HTMLButtonElement>(null);
   return (
-    <div className="launch-site">
+    <div className="launch-site" ref={shell}>
       <a className="skip-link" href="#main">
         Skip to content
       </a>
@@ -48,9 +83,21 @@ export function MarketingShell({
       >
         <nav className="launch-container" aria-label="Website navigation">
           <a className="wordmark" href="/" aria-label="Disposabl home">
-            <span>
-              disposabl<span className="brand-period">.</span>
-            </span>
+            <img
+              className="logo-light-ground"
+              src="/disposabl-logo.svg"
+              alt=""
+              width={36}
+              height={36}
+            />
+            <img
+              className="logo-dark-ground"
+              src="/disposabl-logo-light.svg"
+              alt=""
+              width={36}
+              height={36}
+            />
+            <span>disposabl</span>
           </a>
           <div
             id="marketing-links"
@@ -135,13 +182,9 @@ export function MarketingShell({
             )}
           </div>
           <div className="footer-directory">
-            <p>
-              Your AI.
-              <br />
-              Your computer.
-              <br />
-              Your code.
-            </p>
+            <h3 className="footer-belief" data-moment="word-highlight">
+              Build with your AI, on your computer, with code you can keep.
+            </h3>
             <nav aria-label="Explore Disposabl">
               <a href="/build">How it works</a>
               <a href="/stack">Tech stack</a>
@@ -168,6 +211,20 @@ export function MarketingShell({
           </a>
           <div className="footer-colophon">
             <span>© {new Date().getFullYear()} Disposabl</span>
+            <details className="photo-credit">
+              <summary>Image credit</summary>
+              <p>
+                Lake photograph by{" "}
+                <a href="https://commons.wikimedia.org/wiki/File:Ergaki,_Artists%27_Lake_and_pine_forest,_Sayan_Mountains,_Russia.jpg">
+                  Vyacheslav Argenberg, Wikimedia Commons
+                </a>
+                ,{" "}
+                <a href="https://creativecommons.org/licenses/by/4.0/">
+                  CC BY 4.0
+                </a>
+                . Cropped for the example app.
+              </p>
+            </details>
             <a href="#main">Back to top ↑</a>
           </div>
         </div>

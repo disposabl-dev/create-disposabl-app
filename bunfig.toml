@@ -8,6 +8,7 @@ pathIgnorePatterns = ["**/dist/**", "**/out/**", "**/.output/**"]
 
 [fmt]
 ignorePatterns = [
+  "apps/web/public/landing/taste/**",
   "**/routeTree.gen.ts",
   "**/convex/_generated/**",
   "**/.agents/**",
