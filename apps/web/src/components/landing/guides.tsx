@@ -95,7 +95,7 @@ function EndCard({
   return (
     <aside className="guide-end">
       <div>
-        <h2>Ready to build?</h2>
+        <h2>Make something useful.</h2>
         <p>Create a project and make it your own.</p>
       </div>
       <div className="guide-end-links">
@@ -116,13 +116,13 @@ function StackPage() {
   return (
     <>
       <GuideHero
-        title="The tech stack"
+        title="One kit. Every platform."
         intro="Choose where your app will run and see the tools that support each platform."
       />
       <PlatformExplorer selected={selected} onChange={setSelected} />
       <section className="guide-section shared-architecture">
         <div>
-          <h2>One connected foundation</h2>
+          <h2>Connected where it counts</h2>
           <p>
             Your selected platforms connect to a shared backend. Mobile uses
             React Native; desktop packages the web experience. They do not all
@@ -170,7 +170,7 @@ function BuildPage() {
   return (
     <>
       <GuideHero
-        title="How to build with Disposabl"
+        title="Build your first app."
         intro="Create a project, work with your coding agent, and take your app from a local preview to a release."
       />
       <section className="guide-section">
@@ -195,7 +195,7 @@ function BuildPage() {
       </section>
       <section className="guide-section guide-details">
         <div>
-          <h2>What to expect</h2>
+          <h2>The practical details</h2>
           <p>Open each step for the practical details.</p>
         </div>
         <div className="detail-list">
@@ -242,7 +242,7 @@ function BuildPage() {
       </section>
       <section id="build-times" className="guide-section">
         <div className="guide-section-heading">
-          <h2>Build times vary</h2>
+          <h2>A real build, in context</h2>
           <p>
             Setup, feature work, compilation, signing, and store review take
             different amounts of time. Here is one actual CI run for context.
@@ -258,7 +258,7 @@ function WhyPage() {
   return (
     <>
       <GuideHero
-        title="Why Disposabl?"
+        title="Your AI can code. Give it a head start."
         intro="Give your AI a starting point for sign-in, saved data, tests, and publishing."
       />
       <section className="guide-section why-flow">
@@ -291,7 +291,7 @@ function WhyPage() {
       </section>
       <section className="guide-section">
         <div className="guide-section-heading">
-          <h2>What comes with your project</h2>
+          <h2>The essentials, already connected</h2>
           <p>
             The pieces work together from the start, and you can change them as
             your needs grow.

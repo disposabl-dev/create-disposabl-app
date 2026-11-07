@@ -1,10 +1,10 @@
 {
   "name": "Disposabl",
   "title": "Disposabl | Free app builder for web, mobile & desktop",
-  "description": "Build an app of your own with the AI you choose. Create apps for web, iOS, Android, and desktop. Free on your computer. Your code is yours to keep.",
+  "description": "Make your own app with the AI you choose. Build for web, iOS, Android, and desktop. Free local building. Your AI. Your computer. Your code.",
   "origin": "https://www.disposabl.dev",
   "backendOrigin": "https://vivid-caterpillar-633.convex.site",
   "image": "/og/disposabl-build.png",
-  "imageAlt": "Disposabl. Build an app of your own. Free app building for web, phones, and computers. Your AI. Your computer. Your code.",
+  "imageAlt": "Disposabl. Make your own app. For free. Your AI. Your computer. Your code. Free local app building for web, phones, and desktop.",
   "analytics": true
 }

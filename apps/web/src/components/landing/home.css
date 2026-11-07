@@ -1,4 +1,5 @@
 @import "./base.css";
-@import "./walkthrough.css";
 @import "./guides.css";
 @import "./responsive.css";
+
+@import "./maker.css";

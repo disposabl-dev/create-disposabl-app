@@ -93,7 +93,7 @@ test(
     await app.open("/");
     await browser.locator("#start").tap();
     await screen.getByRole("button", "Copy prompt", { exact: true }).tap();
-    await expect(screen.getByRole("status")).toHaveText(
+    await expect(browser.locator(".start-dialog [role=status]")).toHaveText(
       "Select the text to copy it manually.",
     );
     await expect(browser.locator(".landing-prompt")).toContainText(
@@ -145,7 +145,7 @@ test(
     await screen.getByRole("button", "Open menu").tap();
     await screen.getByRole("link", "How it works", { exact: true }).tap();
     await expect(browser.locator("main h1")).toContainText(
-      "How to build with Disposabl",
+      "Build your first app.",
     );
   },
 );
@@ -260,18 +260,24 @@ test(
       "500 credits",
     );
     for (const [name, text] of [
-      ["A booking app", "book an appointment"],
-      ["A personal planner", "weekly goals"],
-      ["A team workspace", "assign tasks"],
+      ["Booking app", "book an appointment"],
+      ["Daily planner", "weekly goals"],
+      ["Community app", "organize events"],
     ]) {
       await screen.getByRole("button", name, { exact: true }).tap();
+      await expect(
+        screen.getByRole("button", name, { exact: true }),
+      ).toHaveAttribute("aria-pressed", "true");
+      await screen.getByRole("button", "Build this app", { exact: true }).tap();
+      expect(
+        await browser.evaluate(
+          () =>
+            (document.querySelector("#app-idea") as HTMLTextAreaElement).value,
+        ),
+      ).toContain(text);
       await expect(browser.locator(".start-dialog[open]")).toHaveCount(0);
       await browser.locator("#start").tap();
       await expect(browser.locator(".landing-prompt")).toContainText(text);
-      await screen.getByRole("button", "Copy prompt", { exact: true }).tap();
-      await expect(screen.getByRole("status")).toHaveText(
-        "Copied to clipboard.",
-      );
       await browser.keyboard.press("Escape");
     }
     await browser
@@ -380,24 +386,37 @@ test(
     ])
       expect(home).not.toContain(word);
     await expect(browser.locator(".platform-toggles")).toHaveCount(0);
-    await browser.locator(".walkthrough-step").nth(1).tap();
+    await screen.getByRole("button", "Thu 19", { exact: true }).tap();
     await screen.getByRole("button", "14:00", { exact: true }).tap();
-    await expect(browser.locator(".booking-selected")).toContainText(
-      "14:00 selected",
+    await screen
+      .getByRole("button", "Book Thu at 14:00", { exact: true })
+      .tap();
+    await expect(
+      screen.getByRole("button", "Example booking confirmed"),
+    ).toBeVisible();
+    await screen.getByRole("button", "Daily planner", { exact: true }).tap();
+    await screen.getByRole("button", "Finish the thing I started").tap();
+    await expect(browser.locator(".planner-progress")).toContainText(
+      "2 of 3 done",
     );
-    await browser.locator(".walkthrough-step").nth(2).tap();
-    await screen.getByRole("button", "Use blue accent").tap();
-    await expect(browser.locator(".walkthrough-canvas")).toHaveAttribute(
-      "class",
-      "walkthrough-canvas accent-blue",
+    await browser
+      .locator('[aria-label="Add a demo task"]')
+      .fill("Plan a picnic");
+    await screen.getByRole("button", "Add task", { exact: true }).tap();
+    await expect(screen.getByRole("button", "Plan a picnic")).toBeVisible();
+    await expect(browser.locator(".planner-progress")).toContainText(
+      "2 of 4 done",
     );
-    await screen.getByRole("button", "Show phone example").tap();
-    await expect(browser.locator(".example-phone")).toBeVisible();
-    await screen.getByRole("button", "Use this idea", { exact: true }).tap();
-    await expect(browser.locator("#app-idea")).toHaveValue(
-      "An app for my business where customers can choose a service, pick a time, and book an appointment.",
+    await screen.getByRole("button", "Community app", { exact: true }).tap();
+    await screen.getByRole("button", "Count me in", { exact: true }).tap();
+    await expect(
+      screen.getByRole("button", "You’re on the example guest list"),
+    ).toHaveAttribute("aria-pressed", "true");
+    await screen.getByRole("button", "You’re on the example guest list").tap();
+    await expect(screen.getByRole("button", "Count me in")).toHaveAttribute(
+      "aria-pressed",
+      "false",
     );
-    await expect(browser.locator(".start-dialog[open]")).toHaveCount(0);
   },
 );
 
@@ -422,5 +441,68 @@ test(
         return r.top >= 0 && r.top < innerHeight;
       }),
     ).toBe(true);
+  },
+);
+
+test(
+  "sharing an example copies only its generic idea and supports direct links",
+  { platforms: ["web"], tags: ["landing"] },
+  async ({ app, browser, screen }) => {
+    await browser.addInitScript(() => {
+      Object.defineProperty(navigator, "clipboard", {
+        configurable: true,
+        value: {
+          writeText: async (text: string) => {
+            (window as any).__sharedUrl = text;
+          },
+        },
+      });
+    });
+    await app.open("/");
+    await browser.locator("#app-idea").fill("private custom draft");
+    await screen.getByRole("button", "Daily planner", { exact: true }).tap();
+    await screen.getByRole("button", "Share this idea", { exact: true }).tap();
+    await expect(browser.locator(".share-feedback")).toContainText(
+      "Link copied",
+    );
+    const copied = await browser.evaluate(
+      () => (window as any).__sharedUrl as string,
+    );
+    const url = new URL(copied);
+    expect(url.origin).toBe(new URL(await browser.url()).origin);
+    expect(url.pathname).toBe("/");
+    expect(url.search).toBe("?idea=planner");
+    expect(url.hash).toBe("");
+    await app.open("/?idea=planner");
+    await expect(browser.locator("#app-idea")).toHaveValue(
+      "A personal planner for my tasks, routines, and weekly goals. I want to see what matters today and keep track of my progress.",
+    );
+    await browser.locator("#start").tap();
+    await expect(browser.locator(".landing-prompt")).toContainText(
+      "weekly goals",
+    );
+  },
+);
+
+test(
+  "sharing shows a usable link when clipboard access fails",
+  { platforms: ["web"], tags: ["landing"] },
+  async ({ app, browser, screen }) => {
+    await browser.addInitScript(() => {
+      Object.defineProperty(navigator, "clipboard", {
+        configurable: true,
+        value: {
+          writeText: async () => {
+            throw new Error("Clipboard denied");
+          },
+        },
+      });
+    });
+    await app.open("/");
+    await screen.getByRole("button", "Community app", { exact: true }).tap();
+    await screen.getByRole("button", "Share this idea", { exact: true }).tap();
+    await expect(browser.locator(".share-feedback")).toHaveText(
+      new URL("/?idea=community", app.baseUrl).href,
+    );
   },
 );

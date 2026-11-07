@@ -133,6 +133,7 @@ export function MarketingShell({
             <span>© {new Date().getFullYear()} Disposabl</span>
             <nav aria-label="Footer navigation">
               <a href="/build">Build guide</a>
+              <a href="/stack">Tech stack</a>
               <a href="/why-disposabl">Why Disposabl</a>
               <a href="/legal/privacy">Privacy</a>
               <a href="/legal/terms">Terms</a>

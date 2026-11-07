@@ -169,25 +169,6 @@ body:has(.start-dialog[open]) {
 .theme-sun {
   display: none;
 }
-.launch-hero {
-  padding-block: 52px 46px;
-  text-align: center;
-}
-.launch-hero h1 {
-  font-size: clamp(58px, 6.8vw, 88px);
-  line-height: 1.04;
-  font-weight: 560;
-  letter-spacing: -0.065em;
-}
-.hero-period {
-  color: var(--accent);
-}
-.launch-site .hero-description {
-  font-size: 21px;
-  line-height: 1.5;
-  margin: 24px auto 30px;
-  color: var(--muted);
-}
 .idea-composer {
   max-width: 740px;
   margin: auto;
@@ -251,29 +232,6 @@ body:has(.start-dialog[open]) {
 .primary-link:hover {
   transform: translateY(-2px);
   box-shadow: 0 5px 14px #0002;
-}
-.idea-suggestions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  margin: 18px auto 28px;
-}
-.idea-suggestions button {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 13px;
-  min-height: 42px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  font-size: 16px;
-  color: var(--muted);
-}
-.idea-suggestions button:hover {
-  color: var(--text);
-  border-color: var(--text);
 }
 .store-buttons {
   display: flex;
@@ -360,36 +318,6 @@ body:has(.start-dialog[open]) {
   margin-top: 10px;
   color: var(--muted);
 }
-.devices-section {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  align-items: center;
-  gap: 60px;
-  padding-block: 65px;
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
-}
-.devices-section p {
-  color: var(--muted);
-  margin-top: 20px;
-}
-.device-list {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 34px 16px;
-}
-.device-list > span {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 13px;
-  font-size: 16px;
-}
-.device-list .brand-icon {
-  width: 30px;
-  height: 30px;
-  filter: var(--brand-filter);
-}
 .pricing-section {
   padding-block: 110px;
 }
@@ -459,13 +387,6 @@ body:has(.start-dialog[open]) {
 .language-section h2 {
   font-size: 34px;
   line-height: 1.25;
-}
-.language-art {
-  display: grid;
-  grid-template-columns: auto auto;
-  gap: 16px 36px;
-  font-size: 28px;
-  color: var(--muted);
 }
 .inline-link {
   text-decoration: underline;

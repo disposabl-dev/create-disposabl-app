@@ -1,8 +1,3 @@
-@media (min-width: 1600px) {
-  .launch-hero {
-    padding-block: 70px 56px;
-  }
-}
 @media (max-width: 1100px) {
   .launch-container {
     padding-inline: 32px;
@@ -18,16 +13,6 @@
   }
   .nav-github {
     display: none !important;
-  }
-  .walkthrough-steps {
-    padding: 20px;
-  }
-  .walkthrough-step {
-    padding: 20px 10px;
-    gap: 12px;
-  }
-  .walkthrough-step > svg:last-child {
-    display: none;
   }
   .ownership-section {
     gap: 50px;
@@ -70,42 +55,6 @@
     justify-content: center;
     margin-top: 8px;
   }
-  .launch-hero {
-    padding-block: 52px;
-  }
-  .launch-hero h1 {
-    font-size: 65px;
-  }
-  .walkthrough {
-    grid-template-columns: 1fr;
-  }
-  .walkthrough-steps {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 6px;
-    padding: 14px;
-  }
-  .walkthrough-step {
-    flex-direction: column;
-    padding: 16px 12px;
-    gap: 12px;
-  }
-  .walkthrough-step strong {
-    font-size: 18px;
-  }
-  .walkthrough-step span span {
-    display: none;
-  }
-  .walkthrough-canvas {
-    border-left: 0;
-    border-top: 1px solid var(--line);
-  }
-  .example-stage {
-    max-width: 460px;
-  }
-  .example-phone {
-    max-width: 300px;
-  }
   .ownership-section {
     padding-block: 78px;
     grid-template-columns: 1fr;
@@ -120,14 +69,6 @@
   }
   .ownership-heading .text-link {
     margin-top: 22px;
-  }
-  .devices-section {
-    grid-template-columns: 1fr;
-    gap: 40px;
-  }
-  .device-list {
-    grid-template-columns: repeat(6, 1fr);
-    gap: 20px;
   }
   .price-card {
     padding: 28px;
@@ -164,17 +105,6 @@
     width: 28px;
     height: 28px;
   }
-  .launch-hero {
-    padding-block: 38px 40px;
-  }
-  .launch-hero h1 {
-    font-size: clamp(48px, 12vw, 62px);
-    letter-spacing: -0.06em;
-  }
-  .launch-site .hero-description {
-    font-size: 18px;
-    margin: 20px auto 24px;
-  }
   .idea-composer {
     padding: 17px;
     border-radius: 13px;
@@ -195,17 +125,6 @@
   .idea-composer .primary-link {
     width: 100%;
   }
-  .idea-suggestions {
-    gap: 8px;
-    margin-block: 15px 18px;
-  }
-  .idea-suggestions button {
-    font-size: 16px;
-    padding: 6px 10px;
-  }
-  .idea-suggestions button svg {
-    display: none;
-  }
   .store-buttons {
     gap: 26px;
   }
@@ -224,45 +143,6 @@
     gap: 18px;
     margin-bottom: 24px;
   }
-  .walkthrough-section {
-    padding-top: 32px;
-  }
-  .walkthrough-steps {
-    gap: 2px;
-    padding: 8px;
-  }
-  .walkthrough-step {
-    padding: 12px 8px;
-    gap: 12px;
-    border-radius: 7px;
-  }
-  .walkthrough-step strong {
-    font-size: 16px;
-    line-height: 1.4;
-  }
-  .walkthrough-canvas {
-    padding: 16px;
-  }
-  .example-toolbar {
-    gap: 8px;
-  }
-  .example-toolbar > span {
-    max-width: 150px;
-  }
-  .example-toolbar button {
-    width: 38px;
-  }
-  .example-stage {
-    padding: 22px;
-    margin-block: 20px;
-    min-height: 330px;
-  }
-  .example-idea p {
-    font-size: 23px;
-  }
-  .example-requirements {
-    gap: 12px;
-  }
   .ownership-heading h2 {
     font-size: 39px;
   }
@@ -271,10 +151,6 @@
   }
   .ownership-details h3 {
     font-size: 23px;
-  }
-  .device-list {
-    grid-template-columns: repeat(3, 1fr);
-    gap: 30px 12px;
   }
   .pricing-section {
     padding-block: 78px;
@@ -294,10 +170,6 @@
     align-items: flex-start;
     padding-block: 48px;
     gap: 28px;
-  }
-  .language-art {
-    font-size: 25px;
-    gap: 10px 28px;
   }
   .faq-section h2 {
     font-size: 34px;
@@ -334,39 +206,14 @@
   .launch-container {
     padding-inline: 16px;
   }
-  .launch-hero {
-    padding-top: 28px;
-  }
-  .launch-hero h1 {
-    font-size: 45px;
-  }
-  .launch-site .hero-description {
-    font-size: 17px;
-    margin: 18px auto;
-  }
-  .idea-suggestions {
-    gap: 6px;
-  }
-  .idea-suggestions button {
-    padding-inline: 7px;
-  }
   .store-buttons {
     gap: 22px;
-  }
-  .walkthrough-canvas {
-    padding: 12px;
-  }
-  .example-stage {
-    padding: 18px;
   }
 }
 
 @media (max-width: 540px) {
   .store-group {
     margin-top: 14px;
-  }
-  .idea-suggestions {
-    margin-bottom: 0;
   }
 }
 @media (max-width: 540px) {

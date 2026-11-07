@@ -3,181 +3,163 @@
 }
 .guide-main p {
   color: var(--muted);
-  line-height: 1.6;
+  line-height: 1.55;
+  font-size: 18px;
 }
 .guide-hero {
-  padding: 64px 0 50px;
-  border-bottom: 1px solid var(--line);
-}
-.guide-back {
-  display: inline-block;
-  color: var(--muted);
-  font-size: 16px;
-  margin-bottom: 48px;
-}
-.guide-back:hover {
-  color: var(--accent-text);
+  padding: clamp(70px, 10vw, 150px) 0 70px;
+  border-bottom: 2px solid var(--text);
 }
 .guide-hero h1 {
-  max-width: 850px;
-  font-size: clamp(44px, 5.5vw, 68px);
-  line-height: 1.03;
-  letter-spacing: -0.055em;
-  font-weight: 550;
+  max-width: 1050px;
+  font-size: clamp(54px, 8.5vw, 120px);
+  line-height: 0.92;
+  letter-spacing: -0.065em;
+  font-weight: 750;
 }
 .guide-hero > p {
-  max-width: 680px;
-  font-size: 20px;
-  margin-top: 24px;
+  max-width: 650px;
+  font-size: clamp(20px, 2vw, 26px);
+  margin-top: 34px;
 }
 .guide-section,
 .guide-main .platform-section {
-  padding: 80px 0;
+  padding: clamp(64px, 8vw, 110px) 0;
   border-bottom: 1px solid var(--line);
 }
 .guide-section h2,
 .guide-main .platform-section h2,
 .guide-end h2 {
-  font-size: clamp(34px, 4vw, 48px);
-  line-height: 1.1;
-  letter-spacing: -0.04em;
+  font-size: clamp(40px, 5.5vw, 72px);
+  line-height: 0.98;
+  letter-spacing: -0.055em;
 }
 .guide-section-heading {
-  max-width: 700px;
-  margin-bottom: 36px;
+  max-width: 760px;
+  margin-bottom: 48px;
 }
 .guide-section-heading p,
 .section-heading p {
-  margin-top: 16px;
+  margin-top: 20px;
 }
 .guide-steps,
 .foundation-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-top: 2px solid var(--text);
 }
 .guide-steps article,
-.foundation-grid article,
-.stack-card {
+.foundation-grid article {
   position: relative;
-  background: var(--raised);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 28px;
+  padding: 30px 30px 40px 0;
+  border-bottom: 1px solid var(--line);
+}
+.guide-steps article:nth-child(even),
+.foundation-grid article:nth-child(even) {
+  padding-left: 30px;
+  border-left: 1px solid var(--line);
 }
 .guide-steps h3,
 .foundation-grid h3,
 .stack-card h3,
 .ownership h3 {
-  font-size: 22px;
-  line-height: 1.25;
-  margin: 22px 0 10px;
+  font-size: 26px;
+  line-height: 1.12;
+  letter-spacing: -0.03em;
+  margin: 36px 0 12px;
 }
 .guide-steps p,
 .foundation-grid p,
 .stack-card p {
-  font-size: 17px;
+  max-width: 440px;
 }
-.step-icon {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  color: var(--accent-text);
-}
-.step-icon span {
-  color: var(--muted);
-  font-size: 16px;
+.step-icon,
+.foundation-grid article > svg {
+  color: #2445ff;
 }
 .step-arrow {
-  position: absolute;
-  right: 28px;
-  bottom: 28px;
-  color: var(--accent-text);
-}
-.guide-steps article p {
-  max-width: 90%;
+  color: #2445ff;
+  margin-top: 24px;
 }
 .guide-details,
 .shared-architecture,
 .ownership,
 .why-flow {
   display: grid;
-  grid-template-columns: 1fr 1.4fr;
-  gap: 64px;
+  grid-template-columns: 1fr 1.2fr;
+  gap: clamp(40px, 8vw, 120px);
 }
 .guide-details > div > p,
 .shared-architecture > div > p,
 .ownership > div > p,
 .why-flow > div > p {
-  margin-top: 18px;
+  margin-top: 22px;
 }
 .detail-list details {
-  border-top: 1px solid var(--line);
-  padding: 22px 0;
+  border-top: 1px solid var(--text);
+  padding: 25px 0;
 }
 .detail-list details:last-child {
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--text);
 }
 .detail-list summary {
-  font-size: 20px;
-  font-weight: 600;
+  font-size: 24px;
+  font-weight: 700;
   cursor: pointer;
 }
 .detail-list p {
-  margin-top: 16px;
-  font-size: 17px;
+  margin-top: 18px;
 }
 .detail-list code {
   overflow-wrap: anywhere;
   color: var(--text);
 }
 .build-evidence {
-  background: var(--raised);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 28px;
+  border-top: 2px solid var(--text);
+  padding-top: 28px;
 }
 .build-evidence h3 {
-  font-size: 22px;
+  font-size: 26px;
 }
 .evidence-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
-  margin: 24px 0;
+  margin: 30px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
 }
 .evidence-item {
   display: flex;
   flex-direction: column;
-  padding: 20px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 8px;
+  padding: 24px 24px 24px 0;
 }
-.evidence-item span {
-  font-size: 16px;
+.evidence-item + .evidence-item {
+  border-left: 1px solid var(--line);
+  padding-left: 24px;
 }
-.evidence-item strong {
-  font-size: 30px;
-  margin: 14px 0 8px;
-}
+.evidence-item span,
 .evidence-item p,
 .evidence-caveat {
   font-size: 16px;
 }
+.evidence-item strong {
+  font-size: clamp(36px, 4vw, 54px);
+  letter-spacing: -0.05em;
+  margin: 14px 0 8px;
+}
 .guide-end {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  gap: 32px;
-  background: var(--raised);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 40px;
+  align-items: flex-end;
+  gap: 40px;
+  background: #2445ff;
+  color: white;
+  padding: clamp(32px, 5vw, 64px);
   margin-top: 80px;
 }
 .guide-end p {
-  margin-top: 12px;
+  color: white;
+  margin-top: 16px;
 }
 .guide-end-links {
   display: flex;
@@ -185,27 +167,31 @@
   flex-wrap: wrap;
   gap: 22px;
 }
+.guide-end .text-link {
+  color: white;
+}
 .guide-main .platform-toggles {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
   margin: 30px 0;
 }
 .guide-main .platform-toggle {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 12px 14px;
+  border: 1px solid var(--text);
+  border-radius: 0;
+  padding: 14px 18px;
   background: var(--surface);
   color: var(--text);
   font-size: 16px;
   cursor: pointer;
 }
 .guide-main .platform-toggle[aria-pressed="true"] {
-  border-color: var(--accent-text);
-  background: var(--raised);
+  border-color: #2445ff;
+  background: #2445ff;
+  color: white;
 }
 .guide-main .platform-toggle[aria-disabled="true"] {
   cursor: default;
@@ -221,12 +207,20 @@
   height: 16px;
   display: grid;
   place-items: center;
-  color: var(--accent-text);
+  color: currentColor;
 }
 .guide-main .stack-results {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 16px;
+  border-top: 2px solid var(--text);
+}
+.guide-main .stack-card {
+  padding: 30px 30px 30px 0;
+  border-bottom: 1px solid var(--line);
+}
+.guide-main .stack-card:nth-child(even) {
+  border-left: 1px solid var(--line);
+  padding-left: 30px;
 }
 .guide-main .stack-card h3 {
   margin-top: 0;
@@ -234,7 +228,7 @@
 .guide-main .stack-tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
   margin: 22px 0;
 }
 .guide-main .stack-tags > span,
@@ -242,9 +236,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 7px;
   padding: 8px 10px;
   font-size: 16px;
 }
@@ -258,26 +250,25 @@
 .guide-main .shared-stack > div {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
 }
 .architecture-list {
   display: grid;
-  gap: 0;
 }
 .architecture-list > div {
   display: flex;
   gap: 16px;
   align-items: flex-start;
-  padding: 18px 0;
+  padding: 20px 0;
   border-bottom: 1px solid var(--line);
 }
 .architecture-list > div:first-child {
-  border-top: 1px solid var(--line);
+  border-top: 2px solid var(--text);
 }
 .architecture-list strong,
 .architecture-list small {
   display: block;
-  font-size: 17px;
+  font-size: 18px;
 }
 .architecture-list small {
   color: var(--muted);
@@ -285,110 +276,79 @@
 }
 .why-flow-diagram {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   gap: 12px;
 }
 .why-flow-diagram > svg {
   flex: none;
-  color: var(--accent-text);
+  align-self: center;
+  color: #2445ff;
 }
 .why-flow-diagram > div {
   flex: 1;
-  align-self: stretch;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  background: var(--raised);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 20px;
+  gap: 14px;
+  border-top: 2px solid var(--text);
+  padding: 20px 0;
 }
-.why-flow-diagram > div > svg,
-.foundation-grid article > svg {
-  color: var(--accent-text);
+.why-flow-diagram > div > svg {
+  color: #2445ff;
 }
 .why-flow-diagram strong,
 .why-flow-diagram span {
-  font-size: 16px;
+  font-size: 17px;
 }
 .why-flow-diagram span {
   color: var(--muted);
-}
-.foundation-grid {
-  grid-template-columns: repeat(3, 1fr);
 }
 .ownership h3 {
   margin-top: 0;
 }
 @media (max-width: 800px) {
-  .guide-hero {
-    padding: 45px 0 55px;
-  }
-  .guide-section,
-  .guide-main .platform-section {
-    padding: 58px 0;
-  }
   .guide-details,
   .shared-architecture,
   .ownership,
   .why-flow {
     grid-template-columns: 1fr;
-    gap: 32px;
-  }
-  .foundation-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  .evidence-grid {
-    grid-template-columns: 1fr;
+    gap: 36px;
   }
   .guide-end {
     align-items: flex-start;
     flex-direction: column;
-    margin-top: 58px;
+    margin-top: 60px;
   }
 }
 @media (max-width: 520px) {
   .guide-hero h1 {
-    font-size: 44px;
+    font-size: clamp(48px, 12vw, 64px);
   }
   .guide-steps,
   .foundation-grid,
-  .guide-main .stack-results {
+  .guide-main .stack-results,
+  .evidence-grid {
     grid-template-columns: 1fr;
+  }
+  .guide-steps article:nth-child(even),
+  .foundation-grid article:nth-child(even),
+  .guide-main .stack-card:nth-child(even) {
+    border-left: 0;
+    padding-left: 0;
+  }
+  .evidence-item + .evidence-item {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+    padding-left: 0;
   }
   .why-flow-diagram {
     flex-direction: column;
-    align-items: stretch;
   }
   .why-flow-diagram > svg {
-    align-self: center;
+    align-self: flex-start;
     transform: rotate(90deg);
-  }
-  .guide-end {
-    padding: 26px;
   }
   .guide-main .platform-toggle {
     flex: 1 1 135px;
-  }
-}
-@media (min-width: 1100px) {
-  .guide-steps {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-  .guide-steps article {
-    padding: 26px;
-  }
-  .guide-steps article p {
-    max-width: 100%;
-  }
-  .guide-steps .step-arrow {
-    position: static;
-    margin-top: 24px;
-  }
-}
-@media (max-width: 800px) {
-  .why-flow-diagram {
-    grid-row: 1;
   }
 }

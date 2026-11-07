@@ -10,23 +10,9 @@ import { AgentOnboarding } from "../agent-onboarding";
 import { MarketingShell, TextLink } from "./shell";
 import { Pricing, Questions } from "./sections";
 import { BrandIcon } from "./brand-icon";
-import { AppWalkthrough } from "./walkthrough";
+import { AppPlayground, appIdeas } from "./playground";
+import { Foundation } from "./foundation";
 import "./home.css";
-
-const ideas = [
-  [
-    "A booking app",
-    "An app for my business where customers can choose a service, pick a time, and book an appointment.",
-  ],
-  [
-    "A personal planner",
-    "A personal planner for my tasks, routines, and weekly goals. I want to see what matters today and keep track of my progress.",
-  ],
-  [
-    "A team workspace",
-    "A workspace where my team can organize projects, assign tasks, and share updates. Each person should only see the projects they can access.",
-  ],
-];
 
 export function Home() {
   const hydrated = useHydrated();
@@ -41,6 +27,11 @@ export function Home() {
   const field = useRef<HTMLTextAreaElement>(null);
   useEffect(() => {
     const openFromLink = () => {
+      const sharedIdea = new URLSearchParams(window.location.search).get(
+        "idea",
+      );
+      const example = appIdeas.find((item) => item.id === sharedIdea);
+      if (example) setDraft(example.prompt);
       const requested = new URLSearchParams(window.location.search)
         .get("platforms")
         ?.split(",");
@@ -68,72 +59,85 @@ export function Home() {
   return (
     <MarketingShell onStart={start}>
       <main id="main" className="launch-home">
-        <section
-          className="launch-hero launch-container"
-          aria-labelledby="hero-title"
-        >
-          <h1 id="hero-title">
-            Build an app
-            <br />
-            of your own<span className="hero-period">.</span>
-          </h1>
-          <p className="hero-description">
-            Free app building for the web,
-            <br />
-            phones, and computers.
-          </p>
-          <form
-            className="idea-composer"
-            onSubmit={(event) => {
-              event.preventDefault();
-              start();
-            }}
-          >
-            <label className="sr-only" htmlFor="app-idea">
-              Describe your app
-            </label>
-            <textarea
-              disabled={!hydrated}
-              id="app-idea"
-              ref={field}
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
-              maxLength={2000}
-              placeholder="What would you like your app to do?"
-              rows={2}
-            />
-            <div className="idea-composer-actions">
-              <span>Free on your computer</span>
-              <button
-                id="start"
-                disabled={!hydrated}
-                type="submit"
-                className="primary-link"
-              >
-                Start with your AI <ArrowRight size={20} />
-              </button>
+        <section className="maker-hero" aria-labelledby="hero-title">
+          <div className="launch-container maker-hero-grid">
+            <div className="maker-statement">
+              <h1 id="hero-title">
+                Make your
+                <br />
+                own app.
+                <br />
+                <em>For free.</em>
+              </h1>
+              <p>Build with your AI, on your computer. Keep the code.</p>
             </div>
-          </form>
-          <StoreButtons />
-          <div
-            className="idea-suggestions"
-            role="group"
-            aria-label="Try an app idea"
-          >
-            {ideas.map(([title, prompt]) => (
-              <button
-                type="button"
-                disabled={!hydrated}
-                key={title}
-                onClick={() => useIdea(prompt)}
+            <div className="maker-entry">
+              <h2>Your idea starts here.</h2>
+              <p>
+                Get a starting prompt for your AI.
+                <br />
+                Make the app you have in mind.
+              </p>
+              <form
+                className="idea-composer"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  start();
+                }}
               >
-                {title}
-                <ArrowUpRight size={16} />
-              </button>
-            ))}
+                <label className="sr-only" htmlFor="app-idea">
+                  Describe your app
+                </label>
+                <textarea
+                  disabled={!hydrated}
+                  id="app-idea"
+                  ref={field}
+                  value={draft}
+                  onChange={(event) => setDraft(event.target.value)}
+                  maxLength={2000}
+                  placeholder="I want an app that…"
+                  rows={3}
+                />
+                <button
+                  id="start"
+                  disabled={!hydrated}
+                  type="submit"
+                  className="primary-link"
+                >
+                  Get started free <ArrowUpRight size={22} />
+                </button>
+              </form>
+              <div className="hero-local">
+                <span className="local-dot" />
+                Free local builds. Your AI. Your code.
+              </div>
+              <StoreButtons />
+            </div>
+          </div>
+          <div
+            className="hero-platforms launch-container"
+            aria-label="Build for these platforms"
+          >
+            <span>One idea. Everywhere.</span>
+            <div>
+              {[
+                ["Web", "Web"],
+                ["Apple", "iOS"],
+                ["Android", "Android"],
+                ["macOS", "macOS"],
+                ["Windows", "Windows"],
+                ["Linux", "Linux"],
+              ].map(([icon, label]) => (
+                <span key={label}>
+                  <BrandIcon name={icon} />
+                  {label}
+                </span>
+              ))}
+            </div>
           </div>
         </section>
-        <AppWalkthrough onUseIdea={useIdea} />
+        <AppPlayground onUseIdea={useIdea} />
+        <Foundation />
         <section
           className="ownership-section launch-container"
           aria-labelledby="ownership-title"
@@ -144,60 +148,32 @@ export function Home() {
               <br />
               Your computer.
               <br />
-              Your code.
+              <span>Your code.</span>
             </h2>
             <TextLink href="/why-disposabl">Why build with Disposabl?</TextLink>
           </div>
           <div className="ownership-details">
             <article>
-              <h3>Start with the parts connected.</h3>
+              <h3>Already paying for AI? Use it.</h3>
               <p>
-                Sign-in, saved data, tests, and publishing are ready for your AI
-                to build on. Spend your time making the app useful.
+                Bring Claude Code, Codex, Cursor, or another coding agent. Local
+                mode adds no Disposabl subscription or credit meter.
               </p>
             </article>
             <article>
-              <h3>Use the AI you choose.</h3>
+              <h3>Make one app. Or a hundred.</h3>
               <p>
-                Work with Claude Code, Codex, Cursor, or another coding agent.
-                Disposabl gives it a complete starting point.
+                A tool for yourself, a home for your community, a product to
+                sell. Every supported platform is included.
               </p>
             </article>
             <article>
-              <h3>Keep what you make.</h3>
+              <h3>You can take it with you.</h3>
               <p>
-                Your project lives in your own account. Change it, share it, or
-                build a business with it. The code is yours.
+                Your source lives in your own repository. Keep building, switch
+                agents, hire a team. You choose what happens next.
               </p>
             </article>
-          </div>
-        </section>
-        <section
-          className="devices-section launch-container"
-          aria-labelledby="devices-title"
-        >
-          <div>
-            <h2 id="devices-title">Wherever you need it.</h2>
-            <p>
-              Build for a browser, a phone, or a desktop.
-              <br />
-              Choose your platforms when you start.
-            </p>
-          </div>
-          <div className="device-list">
-            {[
-              ["Web", "Web"],
-              ["Apple", "iPhone & iPad"],
-              ["Android", "Android"],
-              ["macOS", "Mac"],
-              ["Windows", "Windows"],
-              ["Linux", "Linux"],
-            ].map(([icon, label]) => (
-              <span key={label}>
-                <BrandIcon name={icon} />
-                {label}
-              </span>
-            ))}
           </div>
         </section>
         <Pricing onStart={start} disabled={!hydrated} />
@@ -210,16 +186,11 @@ export function Home() {
             <br />
             Coming soon.
           </h2>
-          <div className="language-art" aria-hidden="true">
-            <span>Hello</span>
-            <span>こんにちは</span>
-            <span>Hola</span>
-            <span>नमस्ते</span>
-          </div>
+          <p>More people should get to make software in their own words.</p>
         </section>
         <Questions />
         <section className="final-section launch-container">
-          <h2>What will your app do?</h2>
+          <h2>You know what’s missing. Make it.</h2>
           <button
             className="primary-link"
             disabled={!hydrated}
@@ -231,7 +202,7 @@ export function Home() {
               });
             }}
           >
-            Start with an idea <ArrowRight size={20} />
+            Make your app <ArrowRight size={20} />
           </button>
         </section>
       </main>
