@@ -29,6 +29,10 @@ test("reset welcome reflects selected platforms and hides disabled docs", async 
         existsSync(join(app, "apps/mobile/src/features/studio")),
         false,
       );
+      assert.equal(
+        existsSync(join(app, "packages/tests/flows/mobile-chat.e2e.ts")),
+        false,
+      );
       const mobile = JSON.parse(
         await readFile(join(app, "apps/mobile/package.json"), "utf8"),
       );
