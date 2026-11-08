@@ -151,3 +151,29 @@ export const reRequest = mutation({
     return null;
   },
 });
+
+// The user ID stands in for the production HTTP action's verified session.
+export const claim = mutation({
+  args: {
+    hash: v.optional(v.string()),
+    newHash: v.string(),
+    userId: v.optional(v.string()),
+  },
+  handler: (ctx, args) => ctx.runMutation(anyApi.telemetry.claimIdentity, args),
+});
+export const identity = query({
+  args: { hash: v.string() },
+  handler: (ctx, { hash }) =>
+    ctx.db
+      .query("telemetryIdentities")
+      .withIndex("by_hash", (q) => q.eq("hash", hash))
+      .unique(),
+});
+export const bucket = query({
+  args: {},
+  handler: (ctx) =>
+    ctx.db
+      .query("telemetryIssuance")
+      .withIndex("by_key", (q) => q.eq("key", "global"))
+      .unique(),
+});

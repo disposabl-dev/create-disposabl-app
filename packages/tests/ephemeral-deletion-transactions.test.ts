@@ -102,3 +102,82 @@ test(
     assert.equal(newRequest.telemetryIdentitiesDeleted, 1);
   },
 );
+
+test(
+  "guarded claims cannot recreate identities during or after cleanup",
+  { skip: !base },
+  async () => {
+    const owner = await m("create", { pending: false });
+    const other = await m("create", { pending: false });
+    const ownerId = owner.userId;
+    assert.equal(
+      await m("claim", { userId: ownerId, newHash: "combined-before" }),
+      false,
+    );
+    assert.equal(
+      (await q("identity", { hash: "combined-before" })).userId,
+      ownerId,
+    );
+    assert.equal(await m("claim", { newHash: "combined-anonymous" }), false);
+    assert.equal(
+      await m("claim", { userId: other.userId, newHash: "combined-other" }),
+      false,
+    );
+    await m("seed", { userId: ownerId, count: 105 });
+    await m("reRequest", { userId: ownerId, requestedAt: owner.requestedAt });
+    const args = { userId: ownerId, expectedRequestedAt: owner.requestedAt };
+    const bucketBefore = await q("bucket", {});
+    const attempts = await Promise.allSettled([
+      m("batch", args),
+      m("batch", args),
+      m("batch", args),
+      m("claim", { userId: ownerId, newHash: "combined-late-1" }),
+      m("claim", {
+        userId: ownerId,
+        hash: "combined-anonymous",
+        newHash: "combined-late-2",
+      }),
+      m("claim", {
+        userId: ownerId,
+        hash: "combined-before",
+        newHash: "combined-late-3",
+      }),
+    ]);
+    for (const result of attempts.slice(0, 3))
+      assert.equal(result.status, "fulfilled");
+    for (const result of attempts.slice(3)) {
+      assert.equal(result.status, "rejected");
+      if (result.status === "rejected")
+        assert.match(
+          String(result.reason),
+          /Account deletion has been requested/,
+        );
+    }
+    const completed = await m("batch", args);
+    assert.equal(completed.state, "known_user_bound_cleared");
+    assert.equal(completed.billingHandoffsDeleted, 105);
+    assert.equal(completed.telemetryIdentitiesDeleted, 106);
+    await assert.rejects(
+      m("claim", { userId: ownerId, newHash: "combined-after" }),
+      /Account deletion has been requested/,
+    );
+    assert.equal((await q("inspect", { userId: ownerId })).identities, 0);
+    for (const hash of [
+      "combined-before",
+      "combined-late-1",
+      "combined-late-2",
+      "combined-late-3",
+      "combined-after",
+    ])
+      assert.equal(await q("identity", { hash }), null);
+    assert.equal(
+      (await q("identity", { hash: "combined-anonymous" })).userId,
+      undefined,
+    );
+    assert.equal(
+      (await q("identity", { hash: "combined-other" })).userId,
+      other.userId,
+    );
+    assert.deepEqual(await q("bucket", {}), bucketBefore);
+  },
+);
