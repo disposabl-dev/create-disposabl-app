@@ -198,9 +198,12 @@ function PurchasePage({ session }: { session: string | null }) {
         <section className="rounded-lg border p-6">
           <h2 className="text-xl font-semibold">Monthly</h2>
           <p>{formatPrice(pricing.monthly.price)} / month</p>
-          <p>{creditQuantity("monthly")} credits each billing cycle.</p>
+          <p>
+            {creditQuantity("monthly")} credits each month. Unused monthly
+            credits expire.
+          </p>
           <button
-            className="mt-4 rounded bg-black px-4 py-2 text-white disabled:opacity-50"
+            className="mt-4 rounded bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50"
             disabled={!session || busy || hasMonthlyPlan !== false}
             onClick={() => void purchase("monthly")}
           >
@@ -214,7 +217,7 @@ function PurchasePage({ session }: { session: string | null }) {
           <p>{formatPrice(pricing.topup.price)} once</p>
           <p>{creditQuantity("topup")} credits that do not expire.</p>
           <button
-            className="mt-4 rounded bg-black px-4 py-2 text-white disabled:opacity-50"
+            className="mt-4 rounded bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50"
             disabled={!session || busy}
             onClick={() => void purchase("topup")}
           >
