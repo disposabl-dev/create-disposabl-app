@@ -34,7 +34,12 @@ test(
     }
     const app = randomBytes(16).toString("hex");
     const feed = `${site.origin}/desktop/updates/${app}/production/win32/x64/`;
-    async function upload(build: number, attempt: number, bytes: string) {
+    async function upload(
+      build: number,
+      attempt: number,
+      bytes: string,
+      platform: "win32" | "darwin" = "win32",
+    ) {
       const url = await call("uploadUrl", {});
       expect(url.status).toBe("success");
       expect(new URL(url.value).hostname).toBe(origin.hostname);
@@ -45,12 +50,12 @@ test(
       return {
         app,
         channel: "production",
-        platform: "win32",
-        arch: "x64",
+        platform,
+        arch: platform === "darwin" ? "arm64" : "x64",
         version,
         build,
         attempt,
-        filename: `fixture-${version}-full.nupkg`,
+        filename: `fixture-${version}${platform === "darwin" ? ".zip" : "-full.nupkg"}`,
         storageId,
         sha256: createHash("sha256").update(bytes).digest("hex"),
         sha1: createHash("sha1").update(bytes).digest("hex").toUpperCase(),
@@ -98,5 +103,49 @@ test(
       (await fetch(feed.replace("/production/", "/preview/") + "RELEASES"))
         .status,
     ).toBe(404);
+
+    const mac = await upload(1, 1, "macOS production package", "darwin");
+    expect((await call("publish", mac)).status).toBe("success");
+    const macFeed = feed.replace("/win32/x64/", "/darwin/arm64/");
+    const macManifest = await fetch(`${macFeed}RELEASES.json`);
+    expect(macManifest.headers.get("content-type")).toBe("application/json");
+    expect(macManifest.headers.get("cache-control")).toBe("no-store");
+    const macRelease = {
+      currentRelease: mac.version,
+      releases: [
+        {
+          version: mac.version,
+          updateTo: {
+            version: mac.version,
+            name: mac.version,
+            url: `${macFeed}${mac.filename}`,
+          },
+        },
+      ],
+    };
+    expect(await macManifest.json()).toEqual(macRelease);
+    expect(await (await fetch(`${macFeed}${mac.filename}`)).text()).toBe(
+      "macOS production package",
+    );
+    const preview = await upload(2, 1, "macOS preview package", "darwin");
+    expect(
+      (await call("publish", { ...preview, channel: "preview" })).status,
+    ).toBe("success");
+    expect(await (await fetch(`${macFeed}RELEASES.json`)).json()).toEqual(
+      macRelease,
+    );
+    const previewFeed = macFeed.replace("/production/", "/preview/");
+    const previewManifest = await (
+      await fetch(`${previewFeed}RELEASES.json`)
+    ).json();
+    expect(previewManifest.currentRelease).toBe(preview.version);
+    const previewUrl = previewManifest.releases[0].updateTo.url;
+    expect(previewUrl).toBe(previewFeed + preview.filename);
+    expect(await (await fetch(previewUrl)).text()).toBe(
+      "macOS preview package",
+    );
+    expect(await (await fetch(`${feed}RELEASES`)).text()).toBe(
+      `${next.sha1} ${feed}${next.filename} ${next.size}\n`,
+    );
   },
 );
