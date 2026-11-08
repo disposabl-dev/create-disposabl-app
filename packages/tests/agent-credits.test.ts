@@ -10,6 +10,74 @@ import * as agent from "../backend/convex/agent/internal";
 import * as agentNative from "../backend/convex/agent/index";
 import * as appsNative from "../backend/convex/apps/index";
 import * as appsInternal from "../backend/convex/apps/internal";
+import { debitCompute } from "../backend/convex/agent/computeDebit";
+
+test("compute debit validates the atomic check response and never retries ambiguity", async () => {
+  let calls = 0;
+  const good = {
+    allowed: true,
+    customer_id: "owner",
+    required_balance: 10,
+    balance: {
+      feature_id: "credits",
+      unlimited: false,
+      overage_allowed: false,
+      remaining: 0,
+    },
+  };
+  const request =
+    (response: Record<string, unknown>) =>
+    async (_key: string, method: string, body: object) => {
+      calls++;
+      assert.equal(method, "balances.check");
+      assert.deepEqual(body, {
+        customer_id: "owner",
+        feature_id: "credits",
+        required_balance: 10,
+        send_event: true,
+      });
+      return response;
+    };
+  assert.equal(
+    await debitCompute("owner", false, "key", request(good)),
+    "disabled",
+  );
+  assert.equal(calls, 0);
+  assert.equal(
+    await debitCompute("owner", true, "key", request(good)),
+    "confirmed",
+  );
+  assert.equal(
+    await debitCompute(
+      "owner",
+      true,
+      "key",
+      request({ ...good, allowed: false }),
+    ),
+    "denied",
+  );
+  for (const response of [
+    { ...good, customer_id: "other" },
+    { ...good, required_balance: 1 },
+    { ...good, balance: { ...good.balance, unlimited: true } },
+    { ...good, balance: { ...good.balance, overage_allowed: true } },
+    { ...good, balance: { ...good.balance, remaining: null } },
+    { ...good, balance: null },
+  ])
+    assert.equal(
+      await debitCompute("owner", true, "key", request(response)),
+      "unknown",
+    );
+  const before = calls;
+  assert.equal(
+    await debitCompute("owner", true, "key", async () => {
+      calls++;
+      throw new Error("timeout");
+    }),
+    "unknown",
+  );
+  assert.equal(calls, before + 1);
+});
 
 const customer =
   (remaining: unknown) =>
