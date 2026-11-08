@@ -962,8 +962,8 @@ test(
         layout.dialogLeft >= 0 && layout.dialogRight <= width && layout.inside,
       ).toBe(true);
       expect(layout.heights).toEqual([
-        width <= 600 ? 48 : 56,
-        width <= 600 ? 48 : 56,
+        width <= 600 ? 40 : 48,
+        width <= 600 ? 40 : 48,
       ]);
       await browser.keyboard.press("Escape");
     }
