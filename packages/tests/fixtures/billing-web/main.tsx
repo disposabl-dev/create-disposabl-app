@@ -15,5 +15,7 @@ const Component =
               <a href="/pricing">Return to pricing</a>
             </main>
           )
-        : Pricing.options.component;
+        : location.pathname === "/portal"
+          ? () => <h1>Fixture billing portal</h1>
+          : Pricing.options.component;
 createRoot(document.getElementById("root")!).render(<Component />);
