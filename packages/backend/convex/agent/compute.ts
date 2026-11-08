@@ -127,6 +127,7 @@ export async function claimWindow(
 export const settle = internalMutation({
   args: {
     debitId: v.id("computeDebits"),
+    responseBalance: v.optional(v.number()),
     outcome: v.union(
       v.literal("confirmed"),
       v.literal("denied"),
@@ -134,12 +135,20 @@ export const settle = internalMutation({
     ),
   },
   returns: v.null(),
-  handler: async (ctx, { debitId, outcome }) => {
+  handler: async (ctx, { debitId, outcome, responseBalance }) => {
     const debit = await ctx.db.get("computeDebits", debitId);
     if (!debit || debit.state !== "dispatching") return null;
     const session = await ctx.db.get("computeSessions", debit.sessionId);
     if (!session || session.debitId !== debitId) return null;
-    await ctx.db.patch("computeDebits", debitId, { state: outcome });
+    if (
+      responseBalance !== undefined &&
+      (!Number.isFinite(responseBalance) || outcome !== "confirmed")
+    )
+      throw new Error("Invalid debit response balance.");
+    await ctx.db.patch("computeDebits", debitId, {
+      state: outcome,
+      ...(responseBalance !== undefined ? { responseBalance } : {}),
+    });
     if (
       outcome === "confirmed" &&
       ["starting", "active"].includes(session.state) &&
@@ -275,23 +284,37 @@ export const getDebit = internalQuery({
   handler: (ctx, { debitId }) => ctx.db.get("computeDebits", debitId),
 });
 
+// Terminal outcomes are recorded atomically with enqueue; failed enqueues roll back.
 export const notice = internalMutation({
-  args: { debitId: v.id("computeDebits"), balance: v.number() },
+  args: { debitId: v.id("computeDebits"), failed: v.optional(v.boolean()) },
   returns: v.null(),
-  handler: async (ctx, { debitId, balance }) => {
+  handler: async (ctx, { debitId, failed }) => {
     const debit = await ctx.db.get("computeDebits", debitId);
-    if (!debit || debit.state !== "confirmed" || debit.noticeComplete)
+    if (
+      !debit ||
+      debit.state !== "confirmed" ||
+      debit.noticeComplete ||
+      debit.noticeOutcome
+    )
       return null;
     const session = await ctx.db.get("computeSessions", debit.sessionId);
     const userId = session && ctx.db.normalizeId("users", session.userId);
-    if (userId && debit.paidUntil > Date.now())
-      await ctx.runMutation(internal.product.lowCreditEmail.queue, {
-        userId,
-        windowId: debitId,
-        paidUntil: debit.paidUntil,
-        balance,
-      });
-    await ctx.db.patch("computeDebits", debitId, { noticeComplete: true });
+    const outcome =
+      debit.paidUntil <= Date.now()
+        ? "expired"
+        : failed
+          ? "failed"
+          : !userId
+            ? "invalid_user"
+            : debit.responseBalance === undefined
+              ? "missing_balance"
+              : await ctx.runMutation(internal.product.lowCreditEmail.queue, {
+                  userId,
+                  windowId: debitId,
+                  paidUntil: debit.paidUntil,
+                  balance: debit.responseBalance,
+                });
+    await ctx.db.patch("computeDebits", debitId, { noticeOutcome: outcome });
     return null;
   },
 });

@@ -15,7 +15,7 @@ export const queue = internalMutationGeneric({
     return queueLowCreditNotice(args, {
       enabled: config.enabled,
       environment: config.environment,
-      e2e: config.e2e,
+      e2e: process.env.E2E_TELEMETRY_DISABLED === "1" ? "1" : config.e2e,
       sender: "fixture@example.invalid",
       apiKey: "fixture",
       paymentUrl: "https://example.invalid/pricing",

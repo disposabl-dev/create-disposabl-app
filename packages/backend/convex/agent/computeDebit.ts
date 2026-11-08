@@ -1,7 +1,9 @@
 import { pricing } from "../../../disposabl-kit/payments/config";
 import { billingRequest } from "@disposabl/disposabl-kit/server/billing";
 
-export type DebitResult = "confirmed" | "denied" | "unknown" | "disabled";
+export type DebitResult =
+  | { outcome: "confirmed"; responseBalance: number }
+  | { outcome: "denied" | "unknown" | "disabled" };
 
 /** Call only after persisting an exclusive dispatch claim. Never retry unknown. */
 export async function debitCompute(
@@ -10,8 +12,8 @@ export async function debitCompute(
   key: string | undefined,
   request = billingRequest,
 ): Promise<DebitResult> {
-  if (!enabled) return "disabled";
-  if (!key?.trim()) return "unknown";
+  if (!enabled) return { outcome: "disabled" };
+  if (!key?.trim()) return { outcome: "unknown" };
   try {
     const result = await request(key.trim(), "balances.check", {
       customer_id: userId,
@@ -20,8 +22,8 @@ export async function debitCompute(
       send_event: true,
     });
     if (result.customer_id !== userId || result.required_balance !== 10)
-      return "unknown";
-    if (result.allowed === false) return "denied";
+      return { outcome: "unknown" };
+    if (result.allowed === false) return { outcome: "denied" };
     const balance = result.balance;
     if (
       result.allowed !== true ||
@@ -29,16 +31,16 @@ export async function debitCompute(
       typeof balance !== "object" ||
       Array.isArray(balance)
     )
-      return "unknown";
+      return { outcome: "unknown" };
     const details = balance as Record<string, unknown>;
     return details.feature_id === pricing.featureId &&
       details.unlimited === false &&
       details.overage_allowed === false &&
       typeof details.remaining === "number" &&
       Number.isFinite(details.remaining)
-      ? "confirmed"
-      : "unknown";
+      ? { outcome: "confirmed", responseBalance: details.remaining }
+      : { outcome: "unknown" };
   } catch {
-    return "unknown";
+    return { outcome: "unknown" };
   }
 }

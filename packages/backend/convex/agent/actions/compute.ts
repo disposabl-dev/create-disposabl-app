@@ -1,9 +1,5 @@
 import { paymentsEnabled } from "@disposabl/disposabl-kit/features";
 import { internalAction } from "@disposabl/disposabl-kit/server/lib/functions";
-import {
-  balanceFromCustomer,
-  billingRequest,
-} from "@disposabl/disposabl-kit/server/billing";
 import { v } from "convex/values";
 import { components, internal } from "../../_generated/api";
 import { env, type ActionCtx } from "../../_generated/server";
@@ -12,10 +8,12 @@ import { boat, sandboxRef } from "../boat";
 import { debitCompute } from "../computeDebit";
 import { computeSessionArgs } from "../computeValidator";
 
-async function fund(
+export async function fund(
   ctx: ActionCtx,
   sessionId: Id<"computeSessions">,
   expectedDebit?: Id<"computeDebits">,
+  performDebit = (userId: string) =>
+    debitCompute(userId, paymentsEnabled, env.AUTUMN_SECRET_KEY),
 ) {
   const debit: Doc<"computeDebits"> | null = await ctx.runMutation(
     internal.agent.compute.claim,
@@ -24,14 +22,13 @@ async function fund(
   if (!debit) return;
   const session = await ctx.runQuery(internal.agent.compute.get, { sessionId });
   if (!session) return;
-  const outcome = await debitCompute(
-    session.userId,
-    paymentsEnabled,
-    env.AUTUMN_SECRET_KEY,
-  );
+  const outcome = await performDebit(session.userId);
   await ctx.runMutation(internal.agent.compute.settle, {
     debitId: debit._id,
-    outcome: outcome === "disabled" ? "unknown" : outcome,
+    outcome: outcome.outcome === "disabled" ? "unknown" : outcome.outcome,
+    ...(outcome.outcome === "confirmed"
+      ? { responseBalance: outcome.responseBalance }
+      : {}),
   });
 }
 
@@ -106,45 +103,42 @@ export const stop = internalAction({
   },
 });
 
+/** Retries only queue failures, at most five times and only within the paid window. */
+export async function deliverNotice(
+  ctx: ActionCtx,
+  debitId: Id<"computeDebits">,
+  attempt: number,
+) {
+  const debit = await ctx.runQuery(internal.agent.compute.getDebit, {
+    debitId,
+  });
+  if (
+    !debit ||
+    debit.state !== "confirmed" ||
+    debit.noticeComplete ||
+    debit.noticeOutcome
+  )
+    return null;
+  try {
+    await ctx.runMutation(internal.agent.compute.notice, { debitId });
+  } catch {
+    if (attempt < 5 && debit.paidUntil > Date.now())
+      await ctx.scheduler.runAfter(
+        30_000,
+        internal.agent.actions.compute.notice,
+        { debitId, attempt: attempt + 1 },
+      );
+    else
+      await ctx.runMutation(internal.agent.compute.notice, {
+        debitId,
+        failed: true,
+      });
+  }
+  return null;
+}
+
 export const notice = internalAction({
   args: { debitId: v.id("computeDebits"), attempt: v.number() },
   returns: v.null(),
-  handler: async (ctx, { debitId, attempt }) => {
-    const debit = await ctx.runQuery(internal.agent.compute.getDebit, {
-      debitId,
-    });
-    if (
-      !paymentsEnabled ||
-      !debit ||
-      debit.state !== "confirmed" ||
-      debit.noticeComplete ||
-      debit.paidUntil <= Date.now()
-    )
-      return null;
-    try {
-      const session = await ctx.runQuery(internal.agent.compute.get, {
-        sessionId: debit.sessionId,
-      });
-      if (!session || !env.AUTUMN_SECRET_KEY) return null;
-      const balance = balanceFromCustomer(
-        await billingRequest(env.AUTUMN_SECRET_KEY, "customers.get_or_create", {
-          customer_id: session.userId,
-        }),
-      );
-      if (balance === null) throw new Error("Balance unavailable");
-      await ctx.runMutation(internal.agent.compute.notice, {
-        debitId,
-        balance,
-      });
-    } catch {
-      if (attempt < 5)
-        await ctx.scheduler.runAfter(
-          30_000,
-          internal.agent.actions.compute.notice,
-          { debitId, attempt: attempt + 1 },
-        );
-      else console.error("compute_notice_unconfirmed");
-    }
-    return null;
-  },
+  handler: (ctx, { debitId, attempt }) => deliverNotice(ctx, debitId, attempt),
 });

@@ -234,6 +234,7 @@ test("boundary recovery is armed before renewal; notices cannot replay after com
   await (settle as any)._handler(f.ctx, {
     debitId: f.debit._id,
     outcome: "confirmed",
+    responseBalance: 9,
   });
   await scheduleBoundary(
     f.ctx,
@@ -249,8 +250,8 @@ test("boundary recovery is armed before renewal; notices cannot replay after com
     ),
   );
   assert.ok(f.scheduled.some((r) => r.name === "agent/actions/compute:renew"));
-  await (notice as any)._handler(f.ctx, { debitId: f.debit._id, balance: 9 });
-  await (notice as any)._handler(f.ctx, { debitId: f.debit._id, balance: 9 });
+  await (notice as any)._handler(f.ctx, { debitId: f.debit._id });
+  await (notice as any)._handler(f.ctx, { debitId: f.debit._id });
   assert.equal(f.notices(), 1);
   const empty = fixture();
   assert.equal(await admitSession(empty.ctx, "owner", false), undefined);

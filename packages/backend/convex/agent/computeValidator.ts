@@ -24,6 +24,19 @@ export const computeDebitFields = {
   ),
   paidUntil: v.number(),
   noticeComplete: v.optional(v.boolean()),
+  responseBalance: v.optional(v.number()),
+  noticeOutcome: v.optional(
+    v.union(
+      v.literal("queued"),
+      v.literal("disabled"),
+      v.literal("no_verified_email"),
+      v.literal("not_low"),
+      v.literal("expired"),
+      v.literal("invalid_user"),
+      v.literal("missing_balance"),
+      v.literal("failed"),
+    ),
+  ),
   resolution: v.optional(
     v.object({
       outcome: v.union(v.literal("confirmed"), v.literal("denied")),

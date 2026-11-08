@@ -38,23 +38,22 @@ test("compute debit validates the atomic check response and never retries ambigu
       });
       return response;
     };
-  assert.equal(
-    await debitCompute("owner", false, "key", request(good)),
-    "disabled",
-  );
+  assert.deepEqual(await debitCompute("owner", false, "key", request(good)), {
+    outcome: "disabled",
+  });
   assert.equal(calls, 0);
-  assert.equal(
-    await debitCompute("owner", true, "key", request(good)),
-    "confirmed",
-  );
-  assert.equal(
+  assert.deepEqual(await debitCompute("owner", true, "key", request(good)), {
+    outcome: "confirmed",
+    responseBalance: 0,
+  });
+  assert.deepEqual(
     await debitCompute(
       "owner",
       true,
       "key",
       request({ ...good, allowed: false }),
     ),
-    "denied",
+    { outcome: "denied" },
   );
   for (const response of [
     { ...good, customer_id: "other" },
@@ -64,17 +63,17 @@ test("compute debit validates the atomic check response and never retries ambigu
     { ...good, balance: { ...good.balance, remaining: null } },
     { ...good, balance: null },
   ])
-    assert.equal(
+    assert.deepEqual(
       await debitCompute("owner", true, "key", request(response)),
-      "unknown",
+      { outcome: "unknown" },
     );
   const before = calls;
-  assert.equal(
+  assert.deepEqual(
     await debitCompute("owner", true, "key", async () => {
       calls++;
       throw new Error("timeout");
     }),
-    "unknown",
+    { outcome: "unknown" },
   );
   assert.equal(calls, before + 1);
 });
@@ -195,4 +194,36 @@ test("legacy mutations remain callable only before payments are enabled", () => 
       (entry) => entry.name === "apps/internal:requestConfigurationLegacy",
     ),
   );
+});
+
+test("debit response is preserved through the real HTTP parser without a second request", async () => {
+  const { billingRequest } = await import("../disposabl-kit/server/billing");
+  let calls = 0;
+  const result = await debitCompute(
+    "owner",
+    true,
+    "fixture",
+    (key, method, body) =>
+      billingRequest(key, method, body, async (url, options) => {
+        calls++;
+        assert.equal(url, "https://api.useautumn.com/v1/balances.check");
+        assert.equal(JSON.parse(String(options?.body)).send_event, true);
+        return new Response(
+          JSON.stringify({
+            customer_id: "owner",
+            required_balance: 10,
+            allowed: true,
+            balance: {
+              feature_id: "credits",
+              unlimited: false,
+              overage_allowed: false,
+              remaining: 7,
+            },
+          }),
+          { status: 200 },
+        );
+      }),
+  );
+  assert.deepEqual(result, { outcome: "confirmed", responseBalance: 7 });
+  assert.equal(calls, 1);
 });

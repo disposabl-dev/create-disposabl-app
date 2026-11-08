@@ -19,7 +19,7 @@ type Message = {
   idempotencyKey: string;
 };
 
-/** The caller supplies the confirmed debit's immutable window and post-debit balance. */
+/** The caller supplies the confirmed debit window and its response balance. */
 export async function queueLowCreditNotice(
   notice: Notice,
   options: {
@@ -80,7 +80,8 @@ export async function queueLowCreditNotice(
 }
 
 /**
- * Call only after a confirmed debit, with its authoritative post-debit balance.
+ * Call only after a confirmed debit, with its recorded response balance.
+ * Autumn has not established whether that response is before or after consumption.
  * Use the same windowId and paidUntil for retries, unique per user and paid window.
  * Enqueue deduplication lasts while the Resend component retains its email record.
  * Schedule or retry from durable compute state without undoing the debit; never
