@@ -42,12 +42,15 @@ module.exports = ({ config }) => {
   }
   return {
     ...config,
-    scheme: [
-      ...new Set([
-        ...[config.scheme || []].flat(),
-        `disposabl-${project.name.replace(/[^a-z0-9.-]/g, "-")}`,
-      ]),
-    ],
+    scheme:
+      process.env.EXPO_PUBLIC_E2E === "true" && process.env.E2E_ANDROID_SCHEME
+        ? [process.env.E2E_ANDROID_SCHEME]
+        : [
+            ...new Set([
+              ...[config.scheme || []].flat(),
+              `disposabl-${project.name.replace(/[^a-z0-9.-]/g, "-")}`,
+            ]),
+          ],
     owner: process.env.EXPO_OWNER || config.owner,
     slug: process.env.EXPO_SLUG || config.slug,
     ios: {
@@ -63,9 +66,11 @@ module.exports = ({ config }) => {
       ...config.android,
       ...(projectId ? { runtimeVersion: { policy: "fingerprint" } } : {}),
       package:
-        channel === "production"
-          ? basePackage
-          : `${basePackage}.${channel.replaceAll("-", "")}`,
+        process.env.EXPO_PUBLIC_E2E === "true" && process.env.E2E_ANDROID_APP_ID
+          ? process.env.E2E_ANDROID_APP_ID
+          : channel === "production"
+            ? basePackage
+            : `${basePackage}.${channel.replaceAll("-", "")}`,
       versionCode,
     },
     plugins: [
@@ -73,9 +78,13 @@ module.exports = ({ config }) => {
       "./plugins/with-android-signing.js",
       ...(process.env.EXPO_PUBLIC_E2E === "true"
         ? [
+            ...(process.env.E2E_ANDROID_LOOPBACK === "true"
+              ? ["./plugins/with-e2e-network.js"]
+              : []),
             [
               "expo-dev-client",
               {
+                addGeneratedScheme: false,
                 toolsButton: false,
                 skipOnboarding: true,
                 showMenuAtLaunch: false,
