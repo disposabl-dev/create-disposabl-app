@@ -1,0 +1,59 @@
+.themed-text {
+  color: var(--foreground);
+}
+
+.type-default,
+.type-title,
+.type-subtitle,
+.type-small,
+.type-small-bold,
+.type-link {
+  font-family: "Spline Sans";
+}
+
+.type-default {
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 24px;
+}
+
+.type-title {
+  font-size: 48px;
+  font-weight: 600;
+  line-height: 52px;
+}
+
+.type-subtitle {
+  font-size: 32px;
+  font-weight: 600;
+  line-height: 44px;
+}
+
+.type-small {
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+}
+
+.type-small-bold {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 20px;
+}
+
+.type-link {
+  font-size: 14px;
+  line-height: 30px;
+}
+
+.type-code {
+  font-family: ui-monospace;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+@media android {
+  .type-code {
+    font-weight: 700;
+  }
+}
