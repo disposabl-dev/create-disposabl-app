@@ -314,7 +314,6 @@ async function main() {
       setup?.installing();
       await install(directory, Boolean(setup?.live));
     }
-    if (hasBun) execFileSync("bun", ["fmt"], { cwd: directory, stdio: "pipe" });
     setup?.finish({
       installation: options.skipInstall ? "Skipped" : "Complete",
     });
