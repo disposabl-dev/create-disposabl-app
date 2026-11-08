@@ -119,7 +119,7 @@ function fixture() {
       version) :;;
       pack)
         mkdir -p "$RUNNER_TEMP/pack-source/dist"
-        node -e 'const fs=require("node:fs"); const d=process.env; let m={name:d.PACKAGE_NAME || "@disposabl/cli",version:d.VERSION,repository:{type:"git",url:"https://github.com/example/app"}}; if(d.PACK_CASE==="userinfo") m.repository.url="https://user:synthetic-secret@example.test/repo"; if(d.PACK_CASE==="query") m.homepage="https://example.test/?token=synthetic-secret"; if(d.PACK_CASE==="invalid") m.bugs={url:"https://synthetic-secret@"}; if(d.PACK_CASE==="whitespace") m.homepage=" https://user:synthetic-secret@example.test/"; if(d.PACK_CASE==="key") m.repository={"synthetic-secret":"https://user:synthetic-secret@example.test/"}; fs.writeFileSync(d.RUNNER_TEMP+"/pack-source/package.json",JSON.stringify(m)); fs.writeFileSync(d.RUNNER_TEMP+"/pack-source/dist/index.js","// fixture");'
+        node -e 'const fs=require("node:fs"); const d=process.env; let m={name:d.PACKAGE_NAME || "@disposabl/cli",version:d.VERSION,repository:{type:"git",url:"https://github.com/example/app"}}; if(d.PACK_CASE==="userinfo") m.repository.url="https://user:synthetic-secret@example.test/repo"; if(d.PACK_CASE==="query") m.homepage="https://example.test/?token=synthetic-secret"; if(d.PACK_CASE==="invalid") m.bugs={url:"https://synthetic-secret@"}; if(d.PACK_CASE==="whitespace") m.homepage=" https://user:synthetic-secret@example.test/"; if(d.PACK_CASE==="key") m.repository={"synthetic-secret":"https://user:synthetic-secret@example.test/"}; if(d.PACK_CASE==="single-slash") m.homepage="https:/example.test/?token=synthetic-secret"; if(d.PACK_CASE==="backslash") m.homepage="https:"+String.fromCharCode(92)+"user:synthetic-secret@example.test/repo"; fs.writeFileSync(d.RUNNER_TEMP+"/pack-source/package.json",JSON.stringify(m)); fs.writeFileSync(d.RUNNER_TEMP+"/pack-source/dist/index.js","// fixture");'
         "$REAL_NPM" pack "$RUNNER_TEMP/pack-source" --json --ignore-scripts --pack-destination "$PWD" > "$RUNNER_TEMP/real-pack.json" || exit 1
         node -e 'const p=require(process.argv[1]);p[0].integrity="sha512-test";process.stdout.write(JSON.stringify(p))' "$RUNNER_TEMP/real-pack.json";;
       publish)
@@ -225,6 +225,8 @@ test(
         "invalid",
         "whitespace",
         "key",
+        "single-slash",
+        "backslash",
       ]) {
         const result = f.run(
           recovery,
@@ -448,6 +450,14 @@ test(
         ],
         ["homepage", "https://example.test/?token=synthetic-secret"],
         ["homepage", " https://user:synthetic-secret@example.test/ "],
+        ["homepage", "https:/example.test/?token=synthetic-secret"],
+        ["homepage", "//user:synthetic-secret@example.test/"],
+        [
+          "homepage",
+          "https:" +
+            String.fromCharCode(92) +
+            "user:synthetic-secret@example.test/repo",
+        ],
         ["homepage", "\u0000ht\ttps://user:synthetic-secret@example.test/"],
         [
           "repository",

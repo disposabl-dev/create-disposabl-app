@@ -10,10 +10,18 @@ export function verifyMetadata(manifest) {
         .trim()
         .replace(/[\u0000-\u0020]/g, "")
         .replace(/^git\+/i, "");
-      if (/^[a-z][a-z\d+.-]*:\/\//i.test(candidate)) {
+      if (
+        /^[a-z][a-z\d+.-]*:/i.test(candidate) ||
+        /^[\\/]{2}/.test(candidate)
+      ) {
         let url;
         try {
-          url = new URL(candidate);
+          url = new URL(
+            candidate,
+            /^[\\/]{2}/.test(candidate)
+              ? "https://metadata.invalid"
+              : undefined,
+          );
         } catch {
           throw new Error(`Invalid URL in package metadata: ${field}`);
         }
