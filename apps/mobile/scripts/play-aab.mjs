@@ -1,8 +1,9 @@
 import { execFileSync } from "node:child_process";
-import { accessSync, readFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { readFileSync, realpathSync } from "node:fs";
+import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { fingerprint, verifyBundle } from "./verify-play-aab.mjs";
+import { freshAndroid } from "./fresh-android.mjs";
 
 const mobile = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const env = process.env;
@@ -53,10 +54,17 @@ for (const key of ["EXPO_PUBLIC_CONVEX_URL", "EXPO_PUBLIC_CONVEX_SITE_URL"]) {
   )
     throw new Error(`${key} must be a non-loopback HTTPS URL`);
 }
-accessSync(required("BUNDLETOOL_JAR"));
+env.BUNDLETOOL_JAR = realpathSync(required("BUNDLETOOL_JAR"));
+env.ANDROID_KEYSTORE_PATH = realpathSync(env.ANDROID_KEYSTORE_PATH);
+if (env.ANDROID_KEYSTORE_PATH.startsWith(`${mobile}${sep}android${sep}`))
+  throw new Error(
+    "Keep the upload keystore outside the generated Android project",
+  );
 env.DISPOSABL_MOBILE_CHANNEL = "production";
 env.DISPOSABL_ANDROID_CHANNEL = "production";
 env.EXPO_NO_DOTENV = "1";
+env.EXPO_NO_TELEMETRY = "1";
+env.DO_NOT_TRACK = "1";
 const keyInfo = run(
   "keytool",
   [
@@ -85,14 +93,6 @@ if (
   throw new Error(
     "Expo package or version does not match verified Play identity",
   );
-const gradle = readFileSync(join(mobile, "android/app/build.gradle"), "utf8");
-if (
-  !gradle.includes(`applicationId '${packageId}'`) ||
-  !gradle.includes(`versionCode ${version}\n`)
-)
-  throw new Error(
-    "Generated Android project does not match Expo package and version; generate a fresh native project before building",
-  );
 const architectures = config.extra?.disposablAndroidArchitectures;
 if (
   !Array.isArray(architectures) ||
@@ -103,6 +103,31 @@ if (
   new Set(architectures).size !== architectures.length
 )
   throw new Error("Invalid configured Android architectures");
+freshAndroid(mobile, () =>
+  run(
+    "bun",
+    [
+      "x",
+      "--no-install",
+      "expo",
+      "prebuild",
+      "--platform",
+      "android",
+      "--no-install",
+    ],
+    {
+      stdio: "inherit",
+    },
+  ),
+);
+const gradle = readFileSync(join(mobile, "android/app/build.gradle"), "utf8");
+if (
+  !gradle.includes(`applicationId '${packageId}'`) ||
+  !gradle.includes(`versionCode ${version}\n`)
+)
+  throw new Error(
+    "Fresh Android project does not match verified Play identity",
+  );
 run(
   "./gradlew",
   [

@@ -1,10 +1,69 @@
 import { test, expect } from "bun:test";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { mkdtempSync, writeFileSync, chmodSync, rmSync } from "node:fs";
+import {
+  mkdtempSync,
+  writeFileSync,
+  chmodSync,
+  rmSync,
+  mkdirSync,
+  readFileSync,
+  existsSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { verifyBundle } from "./verify-play-aab.mjs";
+import { freshAndroid } from "./fresh-android.mjs";
+
+test("Play prebuild replaces stale native settings and preserves the prior project", () => {
+  const mobile = mkdtempSync(join(tmpdir(), "play-prebuild-test-"));
+  const android = join(mobile, "android");
+  mkdirSync(join(android, "app"), { recursive: true });
+  writeFileSync(join(android, "app/build.gradle"), "same package and version");
+  writeFileSync(
+    join(android, "old-native-settings"),
+    "E2E client and old OTA channel",
+  );
+  let saved;
+  try {
+    saved = freshAndroid(mobile, () => {
+      expect(existsSync(android)).toBe(false);
+      mkdirSync(join(android, "app"), { recursive: true });
+      writeFileSync(join(android, "app/build.gradle"), "fresh production");
+    });
+    expect(existsSync(join(android, "old-native-settings"))).toBe(false);
+    expect(
+      readFileSync(join(saved, "android/old-native-settings"), "utf8"),
+    ).toBe("E2E client and old OTA channel");
+    expect(readFileSync(join(android, "app/build.gradle"), "utf8")).toBe(
+      "fresh production",
+    );
+  } finally {
+    rmSync(mobile, { recursive: true, force: true });
+    if (saved) rmSync(saved, { recursive: true, force: true });
+  }
+});
+
+test("failed Play prebuild restores the previous native project", () => {
+  const mobile = mkdtempSync(join(tmpdir(), "play-prebuild-failure-"));
+  const android = join(mobile, "android");
+  mkdirSync(android);
+  writeFileSync(join(android, "original"), "preserve");
+  try {
+    expect(() =>
+      freshAndroid(mobile, () => {
+        expect(existsSync(android)).toBe(false);
+        mkdirSync(android);
+        writeFileSync(join(android, "partial"), "incomplete generation");
+        throw new Error("prebuild failed");
+      }),
+    ).toThrow("prebuild failed");
+    expect(readFileSync(join(android, "original"), "utf8")).toBe("preserve");
+    expect(existsSync(join(android, "partial"))).toBe(false);
+  } finally {
+    rmSync(mobile, { recursive: true, force: true });
+  }
+});
 
 test("bundle verification rejects identity, ABI, signer and signature mismatches", () => {
   const dir = mkdtempSync(join(tmpdir(), "play-aab-test-"));

@@ -199,9 +199,9 @@ code, and upload certificate SHA-256 in Play Console. For a new listing, use
 its confirmed package ID and `0` as the previous version. Do not use a debug
 key for a Play submission.
 
-Use a dedicated local checkout with a fresh Android prebuild generated for the
-production channel, package and version. Configure the intended production
-backend URLs explicitly and set these environment variables:
+Use a dedicated local checkout configured for the confirmed package and version.
+The script generates a fresh production Android project. Configure the intended
+production backend URLs explicitly and set these environment variables:
 
 - `PLAY_PACKAGE_ID`, `PLAY_PREVIOUS_VERSION_CODE`, `PLAY_UPLOAD_CERT_SHA256`
 - `DISPOSABL_ANDROID_VERSION_CODE` (greater than the previous version)
@@ -211,8 +211,13 @@ backend URLs explicitly and set these environment variables:
 - `BUNDLETOOL_JAR`, the local path to the official standalone bundletool jar
 
 Run `node apps/mobile/scripts/play-aab.mjs` from the repository root. It checks
-the keystore certificate and Expo/native identity before building, uses the
-configured Android architectures, and verifies the resulting AAB's manifest,
+the keystore certificate and Expo identity, then moves any existing `android`
+directory to a printed temporary backup path and runs a fresh Expo prebuild.
+Native customizations must be represented in Expo config/plugins; stale native
+files are never reused. A failed prebuild restores the previous directory and
+preserves partial output in the backup. Keep the upload keystore outside
+`android`; relative input paths resolve from the command's working directory.
+The build uses the configured Android architectures and verifies the AAB's manifest,
 ABIs and upload signature. It prints the output path and SHA-256. It does not
 upload or submit the bundle. Keep signing values out of shell history and logs.
 A debug-signed or E2E bundle is not a Play release.
