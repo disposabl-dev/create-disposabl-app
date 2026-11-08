@@ -1,1 +1,7 @@
-{"name":"billing-handoff-transaction-fixture","private":true,"dependencies":{"convex":"^1.49.0"}}
+{
+  "name": "billing-handoff-transaction-fixture",
+  "private": true,
+  "dependencies": {
+    "convex": "^1.49.0"
+  }
+}
