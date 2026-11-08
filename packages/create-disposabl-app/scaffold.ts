@@ -281,10 +281,18 @@ main().catch((error) => {
       join(destination, "disposabl.json"),
       JSON.stringify(config, null, 2) + "\n",
     );
-    // Match the CLI's formatting for direct callers while keeping --skip-install
-    // usable on machines where Bun is not installed.
-    if (spawnSync("bun", ["--version"], { stdio: "ignore" }).status === 0)
-      execFileSync("bun", ["fmt"], { cwd: destination, stdio: "pipe" });
+    // Formatting is optional without a compatible Bun, including direct calls
+    // and reconfiguration snapshots. A supported formatter's errors still fail.
+    if (
+      spawnSync("bun", ["fmt", "--no-script", "--help"], {
+        cwd: destination,
+        stdio: "ignore",
+      }).status === 0
+    )
+      execFileSync("bun", ["fmt", "--no-script"], {
+        cwd: destination,
+        stdio: "pipe",
+      });
   } catch (error) {
     // Only remove the directory created by this invocation, never an existing app.
     await rm(destination, { recursive: true, force: true });
