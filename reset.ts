@@ -373,6 +373,9 @@ delete turbo.tasks["create-disposabl-app#build"];
 // Chat capture and rendering belong to the Disposabl product.
 const mobile = await json("apps/mobile/package.json");
 const mobileConfig = await json("apps/mobile/app.json");
+// Store listing identities belong to Disposabl, not newly generated apps.
+delete mobileConfig.expo.ios.bundleIdentifier;
+delete mobileConfig.expo.android.package;
 const kit = await json("packages/disposabl-kit/package.json");
 const chatPackages = [
   "expo-image-picker",

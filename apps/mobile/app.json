@@ -8,9 +8,11 @@
     "scheme": "mobile",
     "userInterfaceStyle": "automatic",
     "ios": {
+      "bundleIdentifier": "dev.disposabl.mobile",
       "icon": "./assets/images/icon.png"
     },
     "android": {
+      "package": "com.yastai.disposabl",
       "adaptiveIcon": {
         "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

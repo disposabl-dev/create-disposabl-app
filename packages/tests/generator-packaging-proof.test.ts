@@ -69,6 +69,14 @@ test("packaged starter and both generated profiles exclude product proof fixture
       roots.push(destination);
     }
     for (const root of roots) {
+      const mobileConfigPath = join(root, "apps/mobile/app.json");
+      if (existsSync(mobileConfigPath)) {
+        const mobileConfig = JSON.parse(
+          await readFile(mobileConfigPath, "utf8"),
+        );
+        assert.equal(mobileConfig.expo.ios.bundleIdentifier, undefined);
+        assert.equal(mobileConfig.expo.android.package, undefined);
+      }
       const publisher = await readFile(
         join(root, "packages/disposabl-kit/legal/publisher.ts"),
         "utf8",
