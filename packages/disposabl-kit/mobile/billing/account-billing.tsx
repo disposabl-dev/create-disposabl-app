@@ -5,6 +5,7 @@ import { AppState, Linking, Platform, Text, View } from "react-native";
 import type { PurchasesPackage } from "react-native-purchases";
 import { AuthButton, authClasses } from "../components/auth-ui";
 import { billingSession } from "./session";
+import { presentMonthlyPaywall, validMonthlyOffering } from "./paywall";
 import { creditQuantity } from "../../payments/config";
 
 type Snapshot = {
@@ -62,11 +63,13 @@ export function AccountBilling({ customerId }: { customerId: string }) {
           );
           if (latest())
             setMonthly(
-              offerings.current?.availablePackages.find(
-                (entry) =>
-                  entry.product.identifier === productId &&
-                  entry.product.subscriptionPeriod === "P1M",
-              ) ?? null,
+              offerings.current &&
+                validMonthlyOffering(
+                  offerings.current.availablePackages,
+                  productId,
+                )
+                ? (offerings.current.availablePackages[0] ?? null)
+                : null,
             );
         } else setMonthly(null);
         if (latest()) setRefreshError("");
@@ -100,26 +103,33 @@ export function AccountBilling({ customerId }: { customerId: string }) {
     const version = generation.current;
     setBusy(true);
     setMessage("");
-    let completed = false;
+    let completed: "purchased" | "restored" | null = null;
     try {
-      await billingSession.run(customerId, version, key, async (sdk) => {
-        const latest = await getSnapshot({});
-        if (!current(version)) throw new Error("Account changed.");
-        if (!latest.nativeSubscriptionsEnabled)
-          throw new Error("Not configured.");
-        if (restore) return sdk.restorePurchases();
-        const info = await sdk.getCustomerInfo();
-        if (!current(version)) throw new Error("Account changed.");
-        if (
-          latest.hasMonthlyPlan !== false ||
-          info.activeSubscriptions.length
-        ) {
-          throw new Error("existing_subscription");
-        }
-        if (!monthly) throw new Error("Product unavailable.");
-        return sdk.purchasePackage(monthly);
-      });
-      completed = true;
+      const outcome = await billingSession.run(
+        customerId,
+        version,
+        key,
+        async (sdk) => {
+          if (restore) {
+            const latest = await getSnapshot({});
+            if (!current(version)) throw new Error("Account changed.");
+            if (!latest.nativeSubscriptionsEnabled)
+              throw new Error("Not configured.");
+            await sdk.restorePurchases();
+            return "restored" as const;
+          }
+          if (!monthly || !productId) throw new Error("Product unavailable.");
+          return presentMonthlyPaywall(
+            sdk,
+            () => getSnapshot({}),
+            () => current(version),
+            productId,
+          );
+        },
+      );
+      completed = outcome === "cancelled" ? null : outcome;
+      if (outcome === "cancelled" && current(version))
+        setMessage("Purchase cancelled.");
     } catch (error) {
       if (current(version))
         setMessage(
@@ -135,9 +145,10 @@ export function AccountBilling({ customerId }: { customerId: string }) {
       if (current(version)) setBusy(false);
     }
     if (completed && current(version)) {
-      const confirmation = restore
-        ? "Restore check completed. Any eligible purchases will sync to your account."
-        : "Purchase received. Credits appear after payment sync.";
+      const confirmation =
+        completed === "restored"
+          ? "Restore check completed. Any eligible purchases will sync to your account."
+          : "Purchase received. Credits appear after payment sync.";
       setMessage(confirmation);
       await refresh(version);
     }

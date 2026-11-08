@@ -139,3 +139,71 @@ test("a failed login cannot leave another user's identity trusted", async () => 
   await session.run("alice", session.select("alice"), "public", async () => {});
   assert.deepEqual(logins, ["bob", "alice"]);
 });
+
+test("monthly paywall permits only a verified current offering and fresh customer", async () => {
+  const { presentMonthlyPaywall, validMonthlyOffering } =
+    await import("../disposabl-kit/mobile/billing/paywall");
+  const monthly = {
+    product: { identifier: "monthly", subscriptionPeriod: "P1M" },
+  };
+  const topup = { product: { identifier: "topup", subscriptionPeriod: null } };
+  assert.equal(validMonthlyOffering([monthly], "monthly"), true);
+  assert.equal(validMonthlyOffering([monthly, topup], "monthly"), false);
+  assert.equal(validMonthlyOffering([topup], "monthly"), false);
+  assert.equal(validMonthlyOffering([], "monthly"), false);
+  const snapshot = async () => ({
+    balance: 0,
+    hasMonthlyPlan: false,
+    nativeSubscriptionsEnabled: true,
+  });
+  let shown = 0;
+  const sdk = {
+    getCustomerInfo: async () => ({ activeSubscriptions: [] }),
+    getOfferings: async () => ({ current: { availablePackages: [monthly] } }),
+  };
+  const show = async () => {
+    shown++;
+    return "cancelled" as const;
+  };
+  assert.equal(
+    await presentMonthlyPaywall(
+      sdk as never,
+      snapshot,
+      () => true,
+      "monthly",
+      show,
+    ),
+    "cancelled",
+  );
+  assert.equal(shown, 1);
+  await assert.rejects(
+    presentMonthlyPaywall(
+      sdk as never,
+      async () => ({ ...(await snapshot()), hasMonthlyPlan: true }),
+      () => true,
+      "monthly",
+      show,
+    ),
+    /existing_subscription/,
+  );
+  await assert.rejects(
+    presentMonthlyPaywall(sdk as never, snapshot, () => false, "monthly", show),
+    /Account changed/,
+  );
+  await assert.rejects(
+    presentMonthlyPaywall(
+      {
+        ...sdk,
+        getOfferings: async () => ({
+          current: { availablePackages: [monthly, topup] },
+        }),
+      } as never,
+      snapshot,
+      () => true,
+      "monthly",
+      show,
+    ),
+    /unavailable/,
+  );
+  assert.equal(shown, 1);
+});

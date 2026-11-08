@@ -130,6 +130,16 @@ test("native payments selection adds and removes the SDK without replacing custo
         features === "payments",
       );
       assert.equal(existsSync(join(app, billingPath)), features === "payments");
+      assert.equal(
+        existsSync(
+          join(app, "packages/disposabl-kit/mobile/billing/paywall.ts"),
+        ),
+        features === "payments",
+      );
+      assert.equal(
+        existsSync(join(app, "packages/tests/native-billing.test.ts")),
+        features === "payments",
+      );
     }
     const config = await read(app, "disposabl.json");
     const manifestBefore = await read(app, manifestPath);

@@ -4,13 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import { Platform, Text, View } from "react-native";
 import { billingSession } from "../../../../../packages/disposabl-kit/mobile/billing/session";
 import { Action } from "../studio/ui";
-import { validMonthlyOffering } from "./submission-policy";
+import {
+  presentMonthlyPaywall,
+  type BillingSnapshot,
+} from "../../../../../packages/disposabl-kit/mobile/billing/paywall";
 
-export type BillingSnapshot = {
-  balance: number | null;
-  hasMonthlyPlan: boolean | null;
-  nativeSubscriptionsEnabled: boolean;
-};
+export type { BillingSnapshot } from "../../../../../packages/disposabl-kit/mobile/billing/paywall";
 
 export function PaymentGate({
   customerId,
@@ -54,41 +53,13 @@ export function PaymentGate({
     setBusy(true);
     setError("");
     try {
-      await billingSession.run(
-        customerId,
-        version.current,
-        key,
-        async (sdk) => {
-          const current = await snapshot({});
-          if (!billingSession.current(customerId, version.current))
-            throw new Error("Account changed.");
-          if (
-            !current.nativeSubscriptionsEnabled ||
-            current.hasMonthlyPlan !== false
-          )
-            throw new Error("Subscription unavailable.");
-          const info = await sdk.getCustomerInfo();
-          if (!billingSession.current(customerId, version.current))
-            throw new Error("Account changed.");
-          if (info.activeSubscriptions.length)
-            throw new Error("You already have a subscription.");
-          const offering = (await sdk.getOfferings()).current;
-          if (!billingSession.current(customerId, version.current))
-            throw new Error("Account changed.");
-          if (
-            !offering ||
-            !validMonthlyOffering(offering.availablePackages, productId)
-          )
-            throw new Error("Store offering is unavailable.");
-          const RevenueCatUI = (await import("react-native-purchases-ui"))
-            .default;
-          if (!billingSession.current(customerId, version.current))
-            throw new Error("Account changed.");
-          await RevenueCatUI.presentPaywall({
-            offering,
-            displayCloseButton: true,
-          });
-        },
+      await billingSession.run(customerId, version.current, key, (sdk) =>
+        presentMonthlyPaywall(
+          sdk,
+          () => snapshot({}),
+          () => billingSession.current(customerId, version.current),
+          productId,
+        ),
       );
       await refresh();
     } catch {

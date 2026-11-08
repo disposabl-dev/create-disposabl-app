@@ -277,6 +277,7 @@
         "react-native": "0.88.1",
         "react-native-css": "3.1.0-rc.1",
         "react-native-purchases": "10.16.0",
+        "react-native-purchases-ui": "10.16.0",
         "react-native-safe-area-context": "~5.11.1",
       },
       "optionalPeers": [
@@ -292,6 +293,7 @@
         "react-native",
         "react-native-css",
         "react-native-purchases",
+        "react-native-purchases-ui",
         "react-native-safe-area-context",
       ],
     },
