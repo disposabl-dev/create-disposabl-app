@@ -67,7 +67,10 @@ export async function billingRequest(
     },
     body: JSON.stringify(body),
   });
-  if (!response.ok) throw new Error("Billing is temporarily unavailable.");
+  // Autumn may accept a write for deferred processing with a success-shaped
+  // 202 body. It is not a definitive result; callers must retain unknown holds.
+  if (!response.ok || response.status === 202)
+    throw new Error("Billing is temporarily unavailable.");
   const result: unknown = await response.json();
   if (!result || typeof result !== "object" || Array.isArray(result))
     throw new Error("Billing is temporarily unavailable.");

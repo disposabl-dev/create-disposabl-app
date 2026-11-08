@@ -12,6 +12,7 @@ import { getFunctionName } from "convex/server";
 // Real HTTP and installed adapter code; every provider response is simulated locally.
 test("loopback provider faults preserve the debit and snapshot boundaries", async () => {
   let balance = 20,
+    checkStatus = 200,
     checks = 0,
     lost = false,
     failStop = true;
@@ -26,6 +27,7 @@ test("loopback provider faults preserve the debit and snapshot boundaries", asyn
     requests.push({ path: req.url!, body, headers: req.headers });
     res.setHeader("content-type", "application/json");
     if (req.url === "/v1/balances.check") {
+      res.statusCode = checkStatus;
       checks++;
       const allowed = balance >= 10;
       if (allowed) balance -= 10;
@@ -96,6 +98,21 @@ test("loopback provider faults preserve the debit and snapshot boundaries", asyn
     );
     assert.equal(balance, 0);
     assert.equal(checks, 2); // no replay of a potentially committed debit
+    lost = false;
+    checkStatus = 202;
+    balance = 20;
+    assert.deepEqual(
+      await debitCompute("owner", true, "inert-test-key", request),
+      { outcome: "unknown" },
+    );
+    assert.equal(balance, 10);
+    assert.equal(checks, 3); // a success-shaped 202 must not confirm or retry
+    balance = 0;
+    assert.deepEqual(
+      await debitCompute("owner", true, "inert-test-key", request),
+      { outcome: "unknown" },
+    );
+    assert.equal(checks, 4); // a denial-shaped 202 is not definitive either
     const check = requests[0];
     assert.equal(check.headers["x-api-version"], "2.6.0");
     assert.deepEqual(check.body, {

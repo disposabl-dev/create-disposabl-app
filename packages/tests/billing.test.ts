@@ -182,4 +182,22 @@ describe("billing boundary", () => {
       /Billing is temporarily unavailable/,
     );
   });
+  test("accepted responses cannot establish a final billing result", async () => {
+    for (const method of [
+      "balances.check",
+      "balances.update",
+      "balances.create",
+    ]) {
+      let requests = 0;
+      const mock = (async () => {
+        requests++;
+        return Response.json({ success: true, allowed: true }, { status: 202 });
+      }) as typeof fetch;
+      await assert.rejects(
+        billingRequest("test-key", method, {}, mock),
+        /Billing is temporarily unavailable/,
+      );
+      assert.equal(requests, 1);
+    }
+  });
 });
