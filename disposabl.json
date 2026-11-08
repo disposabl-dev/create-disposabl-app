@@ -1,5 +1,5 @@
 {
   "version": "0.1.0",
   "platforms": ["web", "android", "ios", "api", "mcp", "cli", "typescript-sdk"],
-  "features": ["authentication", "docs", "faster-ci"]
+  "features": ["authentication", "docs"]
 }
