@@ -224,7 +224,7 @@ export const googleLookup = mutation({
 });
 
 // Product operator handler, exposed only by this disposable fixture.
-import { runBatch as productAuthBatch } from "../../../packages/backend/convex/users/authDeletion";
+import { runBatch as productAuthBatch } from "../../../../backend/convex/users/authDeletion";
 export const requestProductDeletion = mutation({
   args: { userId: v.id("users") },
   handler: async (ctx, { userId }) => {
