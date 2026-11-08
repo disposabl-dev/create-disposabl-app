@@ -59,6 +59,7 @@ type Env = {
   readonly RESEND_API_KEY: string | undefined;
   readonly RESEND_FROM_EMAIL: string | undefined;
   readonly RESEND_WEBHOOK_SECRET: string | undefined;
+  readonly REVENUECAT_CONSUMABLE_INTEGRATION_VERIFIED: string | undefined;
   readonly REVENUECAT_CONSUMABLE_OWNER: string | undefined;
   readonly REVENUECAT_ENVIRONMENT: string | undefined;
   readonly REVENUECAT_PROJECT_ID: string | undefined;

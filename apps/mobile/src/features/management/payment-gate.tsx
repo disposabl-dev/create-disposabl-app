@@ -22,7 +22,7 @@ export function PaymentGate({
   cancel,
 }: {
   customerId: string;
-  data: (BillingSnapshot & { monthlyCheckoutPending?: boolean }) | null;
+  data: BillingSnapshot | null;
   refresh: () => Promise<number | null>;
   proceed: () => void;
   cancel: () => void;
