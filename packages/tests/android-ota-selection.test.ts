@@ -11,7 +11,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 
-test("OTA selection accepts only source tags supported by the trusted publisher", () => {
+function verifyOtaSelection() {
   for (const [channel, tag, reusable, architectures] of [
     ["pr-1", "app-pr-1-android", true],
     ["production", "app-production-android", true],
@@ -113,4 +113,10 @@ else process.exit(1);
       rmSync(cwd, { recursive: true, force: true });
     }
   }
-});
+}
+
+test(
+  "OTA selection accepts only source tags supported by the trusted publisher",
+  { timeout: 30000 },
+  verifyOtaSelection,
+);

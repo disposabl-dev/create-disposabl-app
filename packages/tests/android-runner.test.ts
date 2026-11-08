@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, writeFileSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 
 test("Android build diagnostics preserve Gradle arguments and failure status", () => {
   const dir = mkdtempSync(join(tmpdir(), "android-build-"));
@@ -197,7 +197,17 @@ test("native warmup and production use the same exact-commit cache", () => {
     join(root, ".github/workflows/pipeline.yml"),
     "utf8",
   );
-  const prime = Bun.YAML.parse(primeText) as {
+  const prime = JSON.parse(
+    execFileSync(
+      process.execPath,
+      [
+        "-e",
+        "console.log(JSON.stringify(Bun.YAML.parse(await Bun.file(process.argv[1]).text())))",
+        join(root, ".github/workflows/android-cache-prime.yml"),
+      ],
+      { encoding: "utf8" },
+    ),
+  ) as {
     jobs: { prime: { if: string; "timeout-minutes": number } };
   };
   assert.equal(prime.jobs.prime.if, "github.ref == 'refs/heads/main'");
