@@ -2,6 +2,7 @@ import { VariableContextProvider } from "nativewind";
 import { MenuView } from "../../../../../packages/disposabl-kit/mobile/design/nativewind";
 import { useState } from "react";
 import {
+  Dimensions,
   Pressable,
   ScrollView,
   Text,
@@ -56,7 +57,11 @@ export function MessageComposer({
 }) {
   const c = useTheme();
   const { width, height } = useWindowDimensions();
-  const compactLandscape = process.env.EXPO_OS === "android" && width > height;
+  const screen = Dimensions.get("screen");
+  const compactLandscape =
+    process.env.EXPO_OS === "android" &&
+    width > height &&
+    screen.width > screen.height;
   const [expanded, setExpanded] = useState(false);
   const inline = compact && (compactLandscape || !expanded || !value);
   const actionsBusy = disabled || sending || attachmentsBusy;

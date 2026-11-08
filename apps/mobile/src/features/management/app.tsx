@@ -11,6 +11,7 @@ import { ConvexError } from "convex/values";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { useRef, useState } from "react";
 import {
+  Dimensions,
   FlatList,
   KeyboardAvoidingView,
   ScrollView,
@@ -74,7 +75,11 @@ function Chat({ appId }: { appId: string }) {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
   const { width, height } = useWindowDimensions();
-  const compactLandscape = process.env.EXPO_OS === "android" && width > height;
+  const screen = Dimensions.get("screen");
+  const compactLandscape =
+    process.env.EXPO_OS === "android" &&
+    width > height &&
+    screen.width > screen.height;
   const list = useRef<FlatList>(null);
   const followLatest = useRef(true);
   const userScrolling = useRef(false);
