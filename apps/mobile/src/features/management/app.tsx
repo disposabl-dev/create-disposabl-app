@@ -9,15 +9,14 @@ import { attachmentIds } from "../studio/attachment-policy";
 import { useMutation, useQuery } from "convex/react";
 import { ConvexError } from "convex/values";
 import { Stack, useLocalSearchParams } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import {
   FlatList,
-  Keyboard,
   KeyboardAvoidingView,
-  Platform,
   ScrollView,
   Text,
   View,
+  useWindowDimensions,
 } from "react-native";
 import { api } from "../../../../../packages/backend/convex/_generated/api";
 import { Button, ErrorBoundary, Loading } from "./ui";
@@ -74,6 +73,8 @@ function Chat({ appId }: { appId: string }) {
   } = useAttachments();
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
+  const { width, height } = useWindowDimensions();
+  const compactLandscape = process.env.EXPO_OS === "android" && width > height;
   const list = useRef<FlatList>(null);
   const followLatest = useRef(true);
   const userScrolling = useRef(false);
@@ -85,20 +86,6 @@ function Chat({ appId }: { appId: string }) {
   });
   const send = useMutation(api.agent.index.sendMessage);
   const abort = useMutation(api.agent.index.abortMessage);
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
-  useEffect(() => {
-    if (Platform.OS !== "android") return;
-    const show = Keyboard.addListener("keyboardDidShow", (event) =>
-      setKeyboardHeight(event.endCoordinates.height),
-    );
-    const hide = Keyboard.addListener("keyboardDidHide", () =>
-      setKeyboardHeight(0),
-    );
-    return () => {
-      show.remove();
-      hide.remove();
-    };
-  }, []);
   const [prompt, setPrompt] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -174,14 +161,13 @@ function Chat({ appId }: { appId: string }) {
         "--chat-right": Math.max(insets.right, 20),
         "--composer-left": Math.max(insets.left, 24),
         "--composer-right": Math.max(insets.right, 24),
-        "--composer-bottom": Math.max(insets.bottom, 16),
-        "--keyboard-height": keyboardHeight,
+        "--composer-bottom": Math.max(insets.bottom, compactLandscape ? 4 : 16),
       }}
     >
       <KeyboardAvoidingView
-        behavior={process.env.EXPO_OS === "ios" ? "padding" : undefined}
+        behavior="padding"
         keyboardVerticalOffset={headerHeight}
-        className="mb-[var(--keyboard-height)] flex-1"
+        className="flex-1"
       >
         <FlatList
           ref={list}
@@ -274,7 +260,9 @@ function Chat({ appId }: { appId: string }) {
             ) : undefined
           }
         />
-        <View className="w-full max-w-[820px] self-center gap-[12px] pt-[12px] pb-[var(--composer-bottom)] pl-[var(--composer-left)] pr-[var(--composer-right)]">
+        <View
+          className={`w-full max-w-[820px] self-center gap-[12px] ${compactLandscape ? "pt-[4px]" : "pt-[12px]"} pb-[var(--composer-bottom)] pl-[var(--composer-left)] pr-[var(--composer-right)]`}
+        >
           <MessageComposer
             attachments={attachments}
             onPickAttachment={(source) => void pick(source)}

@@ -1,7 +1,14 @@
 import { VariableContextProvider } from "nativewind";
 import { MenuView } from "../../../../../packages/disposabl-kit/mobile/design/nativewind";
 import { useState } from "react";
-import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import {
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+  useWindowDimensions,
+} from "react-native";
 import { useTheme } from "../../../../../packages/disposabl-kit/mobile/design/use-theme";
 import { useDictation } from "../../../../../packages/disposabl-kit/mobile/components/use-dictation";
 import type { Attachment, AttachmentSource } from "./attachments";
@@ -48,8 +55,10 @@ export function MessageComposer({
   compact?: boolean;
 }) {
   const c = useTheme();
+  const { width, height } = useWindowDimensions();
+  const compactLandscape = process.env.EXPO_OS === "android" && width > height;
   const [expanded, setExpanded] = useState(false);
-  const inline = compact && (!expanded || !value);
+  const inline = compact && (compactLandscape || !expanded || !value);
   const actionsBusy = disabled || sending || attachmentsBusy;
   const blocked = actionsBusy || attachmentIds(attachments) === null;
   const dictation = useDictation({
@@ -66,6 +75,7 @@ export function MessageComposer({
       value={value}
       onChangeText={onChange}
       multiline
+      disableFullscreenUI
       onContentSizeChange={({ nativeEvent }) => {
         if (inline && nativeEvent.contentSize.height > 56) setExpanded(true);
         else if (!value) setExpanded(false);
@@ -75,7 +85,7 @@ export function MessageComposer({
       placeholderTextColor={c.mutedForeground}
       accessibilityLabel={label}
       testID={testID}
-      className={`w-full pt-[10px] pb-[6px] text-[17px] leading-[24px] text-foreground align-top ${inline ? "min-h-[44px] pl-[52px] pr-[96px]" : compact ? "min-h-[44px] px-[8px]" : "min-h-[100px] px-[8px]"} ${compact ? "max-h-[120px]" : "max-h-[176px]"}`}
+      className={`w-full pt-[10px] pb-[6px] text-[17px] leading-[24px] text-foreground align-top ${inline ? "min-h-[44px] pl-[52px] pr-[96px]" : compact ? "min-h-[44px] px-[8px]" : "min-h-[100px] px-[8px]"} ${compact ? (compactLandscape ? "max-h-[44px]" : "max-h-[120px]") : "max-h-[176px]"}`}
     />
   );
   const plus = (
