@@ -1,0 +1,5 @@
+# Native inbox transaction fixture
+
+Disposable local Convex only. This fixture reuses the production inbox handlers and validators with a minimal users table. Its scheduled `revenuecat:dispatch` is inert: it never calls Autumn, RevenueCat, or a store. Tests manually claim and reconcile operations to model worker crashes and provider outcomes. This proves local Convex transactional behavior, not provider delivery, a store purchase, scheduling guarantees, or exactly-once provider writes.
+
+Check ports 3490 and 3491 are free. From this directory, start `CONVEX_AGENT_MODE=anonymous E2E_TELEMETRY_DISABLED=1 DO_NOT_TRACK=1 bunx convex dev --local-cloud-port 3490 --local-site-port 3491 --typecheck disable --codegen disable`. From the repository root run `NATIVE_INBOX_FIXTURE_URL=http://127.0.0.1:3490 E2E_TELEMETRY_DISABLED=1 DO_NOT_TRACK=1 bun test packages/tests/native-inbox-transactions.test.ts`. Stop the process after testing. Use a fresh isolated anonymous deployment; never point this fixture at shared or cloud data. The test rejects other URLs. These fixture files and test must be excluded from generated starters by the integrator.

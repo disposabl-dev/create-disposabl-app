@@ -1,0 +1,7 @@
+{
+  "name": "native-inbox-transaction-fixture",
+  "private": true,
+  "dependencies": {
+    "convex": "^1.49.0"
+  }
+}

@@ -1,0 +1,255 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
+import {
+  balanceId,
+  type PurchaseEvent,
+} from "../disposabl-kit/server/revenuecat-contract";
+
+const url = process.env.NATIVE_INBOX_FIXTURE_URL;
+if (url && !["http://127.0.0.1:3490", "http://localhost:3490"].includes(url))
+  throw new Error(
+    "Native inbox fixture requires the isolated loopback deployment on port 3490",
+  );
+async function call(name: string, args: object, query = false): Promise<any> {
+  const response = await fetch(`${url}/api/${query ? "query" : "mutation"}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path: `fixture:${name}`, args, format: "json" }),
+  });
+  const result = (await response.json()) as any;
+  if (result.status !== "success")
+    throw new Error(result.errorMessage ?? JSON.stringify(result));
+  return result.value;
+}
+const user = () => call("user", { label: randomUUID() });
+const event = (
+  customer: string,
+  transaction = randomUUID(),
+): PurchaseEvent => ({
+  deliveryId: randomUUID(),
+  project: "project",
+  app: "apple",
+  environment: "SANDBOX",
+  store: "APP_STORE",
+  product: "apple-coins",
+  customer,
+  transaction,
+  type: "purchase",
+});
+const deliver = async (e: PurchaseEvent) =>
+  call("deliver", { event: e, balanceId: await balanceId(e) });
+const scope = (e: PurchaseEvent, id: string) => ({
+  balanceId: id,
+  project: e.project,
+  app: e.app,
+  environment: e.environment,
+  store: e.store,
+  product: e.product,
+});
+const state = (id: string) => call("state", { balanceId: id }, true);
+const evidence = "fixture provider record";
+
+test(
+  "real Convex serializes duplicate Apple deliveries and preserves ownership",
+  { skip: !url },
+  async () => {
+    const [alice, bob] = await Promise.all([user(), user()]);
+    const e = event(alice),
+      id = await balanceId(e);
+    const replies = await Promise.all(
+      Array.from({ length: 16 }, () => deliver(e)),
+    );
+    assert.ok(replies.every((value) => value === "pending"));
+    let s = await state(id);
+    assert.equal(s.deliveries.length, 1);
+    assert.equal(s.purchase.customer, alice);
+    assert.equal(s.purchase.state, "queued");
+    const conflict = { ...e, deliveryId: randomUUID(), customer: bob };
+    assert.equal(await deliver(conflict), "operator_review");
+    s = await state(id);
+    assert.equal(s.deliveries.filter((row: any) => row.conflict).length, 1);
+    assert.equal(s.purchase.customer, alice);
+    const claims = await Promise.all(
+      Array.from({ length: 12 }, () => call("take", scope(e, id))),
+    );
+    assert.equal(claims.filter(Boolean).length, 1);
+    assert.deepEqual(claims.find(Boolean), { customer: alice, kind: "grant" });
+    assert.equal((await state(id)).purchase.state, "grant_unknown");
+    assert.equal(await deliver({ ...e, deliveryId: randomUUID() }), "pending");
+    assert.equal(await call("take", scope(e, id)), null);
+    assert.equal(
+      await call("reconcile", {
+        balanceId: id,
+        kind: "grant",
+        evidence: "",
+      }).then(
+        () => false,
+        () => true,
+      ),
+      true,
+    );
+    assert.equal(
+      await call("reconcile", { balanceId: id, kind: "grant", evidence }),
+      true,
+    );
+    assert.equal((await state(id)).purchase.state, "granted");
+    assert.equal(
+      await call("reconcile", { balanceId: id, kind: "grant", evidence }),
+      false,
+    );
+    assert.equal(await call("take", scope(e, id)), null);
+  },
+);
+
+test(
+  "concurrent cross-user deliveries retain one owner and quarantine the other",
+  { skip: !url },
+  async () => {
+    const [alice, bob] = await Promise.all([user(), user()]);
+    const first = event(alice),
+      second = { ...first, customer: bob, deliveryId: randomUUID() };
+    const outcomes = await Promise.all([deliver(first), deliver(second)]);
+    assert.deepEqual(outcomes.sort(), ["operator_review", "pending"]);
+    const id = await balanceId(first),
+      s = await state(id);
+    assert.equal(s.deliveries.length, 2);
+    assert.equal(s.deliveries.filter((row: any) => row.conflict).length, 1);
+    const winner = s.deliveries.find((row: any) => !row.conflict);
+    assert.equal(s.purchase.customer, winner.customer);
+    assert.notEqual(
+      s.purchase.customer,
+      s.deliveries.find((row: any) => row.conflict).customer,
+    );
+  },
+);
+
+test(
+  "real Convex fences early and late refunds and reconciles unknown writes",
+  { skip: !url },
+  async () => {
+    const alice = await user();
+    const early = event(alice),
+      earlyId = await balanceId(early);
+    assert.equal(
+      await deliver({ ...early, type: "cancel" }),
+      "operator_review",
+    );
+    await deliver({ ...early, deliveryId: randomUUID() });
+    assert.equal((await state(earlyId)).purchase.state, "tombstone");
+    assert.equal(await call("take", scope(early, earlyId)), null);
+
+    const late = event(alice),
+      id = await balanceId(late);
+    await deliver(late);
+    assert.equal((await call("take", scope(late, id))).kind, "grant");
+    await deliver({ ...late, type: "cancel", deliveryId: randomUUID() });
+    assert.equal((await state(id)).purchase.refundPending, true);
+    assert.equal(await call("take", scope(late, id)), null);
+    assert.equal(
+      await call("reconcile", { balanceId: id, kind: "grant", evidence }),
+      true,
+    );
+    assert.equal((await state(id)).purchase.state, "refund_review");
+    assert.equal(
+      await call("approveRefund", { balanceId: id, evidence }),
+      true,
+    );
+    const claims = await Promise.all(
+      Array.from({ length: 8 }, () => call("take", scope(late, id))),
+    );
+    assert.equal(claims.filter(Boolean).length, 1);
+    assert.equal(claims.find(Boolean).kind, "refund");
+    assert.equal((await state(id)).purchase.state, "refund_unknown");
+    await deliver({ ...late, deliveryId: randomUUID(), type: "cancel" });
+    assert.equal(await call("take", scope(late, id)), null);
+    assert.equal(
+      await call("reconcile", { balanceId: id, kind: "refund", evidence }),
+      true,
+    );
+    assert.equal((await state(id)).purchase.state, "refunded");
+    assert.equal(await call("take", scope(late, id)), null);
+
+    const granted = event(alice),
+      grantedId = await balanceId(granted);
+    await deliver(granted);
+    assert.equal((await call("take", scope(granted, grantedId))).kind, "grant");
+    await call("finish", { balanceId: grantedId, kind: "grant" });
+    assert.equal((await state(grantedId)).purchase.state, "granted");
+    await deliver({ ...granted, type: "cancel", deliveryId: randomUUID() });
+    assert.equal((await state(grantedId)).purchase.state, "refund_review");
+    assert.equal(await call("take", scope(granted, grantedId)), null);
+  },
+);
+
+test(
+  "local route selection isolates stores and rejects absent or ambiguous routes",
+  { skip: !url },
+  async () => {
+    const routes = [
+      { app: "apple", store: "APP_STORE", product: "apple-coins" },
+      { app: "google", store: "PLAY_STORE", product: "google-coins" },
+    ];
+    const payload = (r: (typeof routes)[number]) => ({
+      api_version: "1.0",
+      event: {
+        id: "event",
+        type: "NON_RENEWING_PURCHASE",
+        app_id: r.app,
+        store: r.store,
+        product_id: r.product,
+        environment: "SANDBOX",
+        app_user_id: "customer",
+        transaction_id: "transaction",
+      },
+    });
+    const identity = (r: (typeof routes)[number]) => ({
+      ...r,
+      project: "project",
+      environment: "SANDBOX",
+    });
+    const route = (
+      list: unknown,
+      r: (typeof routes)[number],
+      id = identity(r),
+    ) =>
+      call(
+        "route",
+        { routes: JSON.stringify(list), event: payload(r), identity: id },
+        true,
+      );
+    assert.deepEqual(await route(routes, routes[0]!), {
+      selected: "apple",
+      resolved: "apple",
+    });
+    assert.deepEqual(await route(routes, routes[1]!), {
+      selected: "google",
+      resolved: "google",
+    });
+    assert.deepEqual(await route([routes[1]], routes[0]!), {
+      selected: null,
+      resolved: null,
+    });
+    assert.equal(await route([routes[0], routes[0]], routes[0]!), null);
+    assert.deepEqual(
+      await route(routes, { ...routes[0]!, store: "PLAY_STORE" }),
+      { selected: null, resolved: null },
+    );
+    const alice = await user(),
+      apple = event(alice),
+      google = {
+        ...apple,
+        app: "google",
+        store: "PLAY_STORE",
+        product: "google-coins",
+        deliveryId: randomUUID(),
+      };
+    const appleId = await balanceId(apple),
+      googleId = await balanceId(google);
+    assert.notEqual(appleId, googleId);
+    await Promise.all([deliver(apple), deliver(google)]);
+    assert.equal(await call("take", scope(google, appleId)), null);
+    assert.equal((await call("take", scope(apple, appleId))).kind, "grant");
+    assert.equal((await call("take", scope(google, googleId))).kind, "grant");
+  },
+);
