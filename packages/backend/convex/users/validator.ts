@@ -9,6 +9,12 @@ export const mcpDeletionProgress = v.object({
   updatedAt: v.number(),
 });
 
+export const authDeletionProgress = v.object({
+  state: v.literal("blocked"),
+  blocker: v.literal("remote_work_drain_unverified"),
+  updatedAt: v.number(),
+});
+
 export const profile = v.object({
   name: v.optional(v.string()),
   email: v.optional(v.string()),

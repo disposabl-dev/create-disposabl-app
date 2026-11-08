@@ -229,3 +229,33 @@ test("late OAuth callback stops before provider exchange when state consumption 
     globalThis.fetch = original;
   }
 });
+
+test("auth cleanup stays blocked without proven remote drain", async () => {
+  const { runBatch } = await import("../backend/convex/users/authDeletion");
+  let user: any = {
+    deletionRequestedAt: 123,
+    deletionStop: { state: "archived_observed" },
+    mcpDeletion: { state: "attributed_complete" },
+  };
+  let writes = 0;
+  const ctx = {
+    db: {
+      get: async (_table: string, id: string) => (id === "owner" ? user : null),
+      patch: async (_table: string, _id: string, patch: object) => {
+        writes++;
+        user = { ...user, ...patch };
+      },
+    },
+    runMutation: () => {
+      throw new Error("must not touch auth components");
+    },
+  };
+  const call = (userId: string, expectedRequestedAt: number) =>
+    (runBatch as any)._handler(ctx, { userId, expectedRequestedAt });
+  await assert.rejects(() => call("other", 123), /Matching deletion request/);
+  await assert.rejects(() => call("owner", 124), /Matching deletion request/);
+  const result = await call("owner", 123);
+  assert.equal(result.blocker, "remote_work_drain_unverified");
+  assert.deepEqual(await call("owner", 123), result);
+  assert.equal(writes, 1);
+});

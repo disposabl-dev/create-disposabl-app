@@ -67,6 +67,7 @@ const productProofTests = [
 // symlinks may be packaged, but reset must never read or write through a link.
 const touched = [
   ...productProofTests,
+  "packages/backend/convex/users/authDeletion.ts",
   "packages/backend/convex",
   "packages/backend/generated",
   "packages/backend/package.json",
@@ -280,6 +281,7 @@ for (const entry of await readdir(convex)) {
 }
 for (const path of [
   ...productProofTests,
+  "packages/backend/convex/users/authDeletion.ts",
   "packages/tests/generator-service-origin.test.ts",
   "packages/tests/mobile-attachment-lifecycle.test.ts",
   "packages/tests/components/mobile-attachment-lifecycle.test.mjs",
