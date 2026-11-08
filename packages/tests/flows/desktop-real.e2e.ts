@@ -14,6 +14,7 @@ test(
       process.env.E2E_DESKTOP_REAL !== "1",
       "Explicit local desktop verification only",
     );
+    expect(process.env.E2E_TELEMETRY_DISABLED).toBe("1");
     const backend = process.env.E2E_CONVEX_URL ?? "http://127.0.0.1:3310";
     if (!["127.0.0.1", "localhost"].includes(new URL(backend).hostname))
       throw new Error("Local backend required");
@@ -65,8 +66,10 @@ test(
         ["-e", 'console.log(require("electron"))'],
         { cwd: root, encoding: "utf8" },
       ).trim();
-      const env = {
+      const env: NodeJS.ProcessEnv = {
         ...process.env,
+        DO_NOT_TRACK: "1",
+        E2E_TELEMETRY_DISABLED: "1",
         DESKTOP_TEST_USER: username,
         DESKTOP_TEST_PASSWORD: password,
       };

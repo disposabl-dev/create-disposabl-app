@@ -11,6 +11,8 @@ import {
 } from "../create-disposabl-app/options";
 
 const excluded = [
+  "packages/tests/flows/desktop-real.e2e.ts",
+  "packages/tests/components/desktop-real.cjs",
   "packages/tests/architecture-transactions.test.ts",
   "packages/tests/fixtures/architecture-convex",
   "packages/tests/generator-architecture-setup.test.ts",
