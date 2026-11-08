@@ -11,8 +11,8 @@ import { root } from "../project";
 // All fixture writes are restricted to the isolated loopback backend.
 test(
   "mobile chat presents local conversation states",
-  { platforms: ["android"], timeout: 180000 },
-  async ({ app, screen }) => {
+  { platforms: ["android", "ios"], timeout: 180000 },
+  async ({ app, screen, platform, device }) => {
     const url = new URL(process.env.E2E_CONVEX_URL || "http://invalid");
     const key = process.env.E2E_CONVEX_ADMIN_KEY;
     test.skip(
@@ -211,19 +211,33 @@ test(
             screen.getByRole("button", "Change password", { exact: true }),
           ).toBeVisible();
           await logOut.tap();
+          await expect(
+            screen.getByRole("button", "Close settings", { exact: true }),
+          ).toHaveCount(0);
           await screen.getByRole("button", "Settings", { exact: true }).tap();
         }
         await signIn.tap();
         const name = screen.getByRole("textbox", "Username", { exact: true });
         await name.tap();
         await name.fill(username);
+        if (platform === "ios")
+          await screen.getByText("next", { exact: true }).tap();
         await screen
           .getByRole("textbox", "Password", { exact: true })
           .fill(password);
         await expect(
           screen.getByRole("button", "Log in", { exact: true }),
         ).toBeEnabled();
-        await screen.getByRole("button", "Log in", { exact: true }).tap();
+        if (platform === "ios")
+          await screen.getByText("go", { exact: true }).tap();
+        else await screen.getByRole("button", "Log in", { exact: true }).tap();
+        const savePassword = screen.getByRole("button", "Not Now", {
+          exact: true,
+        });
+        await expect(
+          screen.getByText(username, { exact: true }).first().or(savePassword),
+        ).toBeVisible();
+        if (await savePassword.isVisible()) await savePassword.tap();
         await expect(
           screen.getByRole("button", "Close settings", { exact: true }),
         ).toBeVisible({ timeout: 30000 });
@@ -237,6 +251,14 @@ test(
           .getByRole("tab", "Your apps", { exact: true })
           .or(screen.getByRole("button", "Your apps", { exact: true }))
           .tap();
+        await screen
+          .getByRole("button", "Open Chat unconfirmed", { exact: true })
+          .tap();
+        await expect(
+          screen.getByRole("button", "Retry stop", { exact: true }),
+        ).toBeVisible();
+        await app.screenshot("chat-stop-unconfirmed");
+        await screen.getByRole("button", "Back", { exact: true }).tap();
         await screen
           .getByRole("button", "Open Chat proof", { exact: true })
           .tap();
@@ -256,11 +278,39 @@ test(
           screen.getByText("Assistant", { exact: true }),
         ).toHaveCount(0);
         await app.screenshot("chat-active");
+        await screen.getByRole("button", "Chat options", { exact: true }).tap();
+        await (
+          platform === "ios"
+            ? screen.getByRole("button", "App settings", { exact: true })
+            : screen.getByText("App settings", { exact: true })
+        ).tap();
         await screen.scrollUntilVisible(
+          platform === "ios"
+            ? screen.getByRole("link", "View web build logs", { exact: true })
+            : screen.getByText("View build logs", { exact: true }),
+        );
+        await app.screenshot("chat-build-logs");
+        if (platform === "ios") {
+          // A visible link does not mean its native scroll view has settled.
+          await device.unstable_raw.client.command.wait({
+            stable: true,
+            quietMs: 500,
+            timeoutMs: 5000,
+          });
+          await device.back();
+        } else
+          await screen
+            .getByRole("button", "Navigate up", { exact: true })
+            .tap();
+        const transcript =
+          platform === "ios" ? screen.getByTestId("chat-transcript") : screen;
+        if (platform === "ios")
+          await expect(screen.getByTestId("chat-transcript")).toBeVisible();
+        await transcript.scrollUntilVisible(
           screen.getByText("End of response.", { exact: true }),
         );
-        await screen.scrollUntilVisible(
-          screen.getByRole("heading", "Conversation proof", { exact: true }),
+        await transcript.scrollUntilVisible(
+          screen.getByText("Conversation proof", { exact: true }),
           { direction: "up" },
         );
         await call(
@@ -288,14 +338,14 @@ test(
         // The heading changes in the same subscription update as the appended
         // message, so the assertion cannot pass against the previous snapshot.
         await expect(
-          screen.getByRole("heading", "Conversation refreshed", {
+          screen.getByText("Conversation refreshed", {
             exact: true,
           }),
         ).toBeVisible();
         await expect(
           screen.getByText("While reading earlier content.", { exact: true }),
         ).not.toBeVisible();
-        await screen.scrollUntilVisible(
+        await transcript.scrollUntilVisible(
           screen.getByText("While reading earlier content.", { exact: true }),
         );
         await call(
@@ -317,7 +367,7 @@ test(
         await expect(
           screen.getByText("Latest response follows.", { exact: true }),
         ).toBeVisible();
-        const input = screen.getByRole("textbox", "Message", { exact: true });
+        const input = screen.getByTestId("chat-message");
         await input.tap();
         await input.fill(
           "This is a multiline draft for the local composer.\nIt stays within the available width.",
@@ -344,21 +394,6 @@ test(
           screen.getByRole("button", "Send message", { exact: true }),
         ).toBeVisible();
         await app.screenshot("chat-completed");
-        await screen.getByRole("button", "Chat options", { exact: true }).tap();
-        await screen.getByText("App settings", { exact: true }).tap();
-        await screen.scrollUntilVisible(
-          screen.getByText("View build logs", { exact: true }),
-        );
-        await app.screenshot("chat-build-logs");
-        await screen.getByRole("button", "Navigate up", { exact: true }).tap();
-        await screen.getByRole("button", "Back", { exact: true }).tap();
-        await screen
-          .getByRole("button", "Open Chat unconfirmed", { exact: true })
-          .tap();
-        await expect(
-          screen.getByRole("button", "Retry stop", { exact: true }),
-        ).toBeVisible();
-        await app.screenshot("chat-stop-unconfirmed");
       } finally {
         for (const id of claims)
           await call(

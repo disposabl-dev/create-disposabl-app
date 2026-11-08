@@ -177,6 +177,7 @@ function Chat({ appId }: { appId: string }) {
     >
       <FlatList
         ref={list}
+        testID="chat-transcript"
         style={{ flex: 1 }}
         data={messages}
         keyExtractor={(message) => message.id}
