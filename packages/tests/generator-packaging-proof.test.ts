@@ -1,4 +1,5 @@
 import { test } from "node:test";
+import { spawnSync } from "node:child_process";
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
@@ -11,6 +12,7 @@ import {
 } from "../create-disposabl-app/options";
 
 const excluded = [
+  "packages/tests/legal-product-providers.test.ts",
   "packages/tests/fixtures/file-deletion-convex",
   "packages/backend/convex/users/fileDeletion.ts",
   "packages/tests/fixtures/auth-identity-erasure-convex",
@@ -59,12 +61,13 @@ const template = resolve(
   "../create-disposabl-app/dist/templates/default",
 );
 
-test("packaged starter and both generated profiles exclude product proof fixtures", async () => {
+test("packaged starter and generated profiles exclude product proof fixtures", async () => {
   const temp = await mkdtemp(join(tmpdir(), "disposabl-packaging-proof-"));
   try {
     const roots = [template];
     for (const [name, platforms, features] of [
       ["web-minimal", "web", "none"],
+      ["web-payments", "web", "authentication,payments"],
       [
         "all-platforms",
         "web,android,ios,macos,windows,linux,api,mcp,cli,typescript-sdk",
@@ -136,6 +139,33 @@ test("packaged starter and both generated profiles exclude product proof fixture
       assert.match(publisher, /operatorName: ""/);
       assert.match(publisher, /privacyEmail: ""/);
       assert.doesNotMatch(publisher, /Yast AI|vivek@yast\.ai/);
+      if (root !== template) {
+        const result = spawnSync(
+          process.execPath,
+          [
+            "-e",
+            `import { legalConfig, legalIsDraft } from "./packages/disposabl-kit/legal/config.ts"; console.log(JSON.stringify({ names: legalConfig.providers.map(p => p.name), operator: legalConfig.operatorName, email: legalConfig.privacyEmail, reviewed: legalConfig.reviewed, draft: legalIsDraft() }));`,
+          ],
+          { cwd: root, encoding: "utf8" },
+        );
+        assert.equal(result.status, 0, result.stderr);
+        const legal = JSON.parse(result.stdout);
+        assert.equal(legal.operator, "");
+        assert.equal(legal.email, "");
+        assert.equal(legal.reviewed, false);
+        assert.equal(legal.draft, true);
+        for (const name of ["GitHub", "Expo", "Boat"])
+          assert.ok(!legal.names.includes(name));
+        assert.deepEqual(
+          legal.names,
+          root.endsWith("web-minimal")
+            ? ["Convex"]
+            : root.endsWith("web-payments")
+              ? ["Convex", "Google", "Autumn"]
+              : ["Convex", "Google", "PostHog", "Autumn", "RevenueCat"],
+        );
+      }
+
       const fixtures = join(root, "packages/tests/fixtures");
       if (existsSync(fixtures)) assert.deepEqual(await readdir(fixtures), []);
       const testsReadme = await readFile(

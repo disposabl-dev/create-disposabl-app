@@ -1,5 +1,10 @@
 import project from "../../../package.json";
-import { authenticationEnabled, analyticsEnabled } from "../features";
+import {
+  authenticationEnabled,
+  analyticsEnabled,
+  paymentsEnabled,
+} from "../features";
+import config from "../../../disposabl.json";
 import { publisher } from "./publisher";
 
 // Public draft details. Each app publisher must review these before launch.
@@ -17,8 +22,11 @@ export const legalConfig = {
   providers: [
     {
       name: "Convex",
-      purpose: "Application database, hosting, and account authentication",
+      purpose: authenticationEnabled
+        ? "Application database, hosting, and account authentication"
+        : "Application database and hosting",
     },
+    ...publisher.providers,
     ...(authenticationEnabled
       ? [
           {
@@ -34,6 +42,25 @@ export const legalConfig = {
             name: "PostHog",
             purpose: "Usage analytics when configured by the publisher",
           },
+        ]
+      : []),
+    ...(paymentsEnabled
+      ? [
+          {
+            name: "Autumn",
+            purpose: "Billing and credit balances when payments are configured",
+          },
+          ...(config.platforms.some(
+            (platform) => platform === "android" || platform === "ios",
+          )
+            ? [
+                {
+                  name: "RevenueCat",
+                  purpose:
+                    "Mobile purchase and subscription information when payments are configured",
+                },
+              ]
+            : []),
         ]
       : []),
   ],

@@ -2,4 +2,5 @@
 export const publisher = {
   operatorName: "",
   privacyEmail: "",
+  providers: [] as { name: string; purpose: string }[],
 };
