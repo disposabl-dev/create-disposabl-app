@@ -84,15 +84,15 @@ test("loopback provider faults preserve the debit and snapshot boundaries", asyn
       billingRequest(key, method, body, (_url, init) =>
         fetch(`${base}/v1/${method}`, init),
       );
-    assert.equal(
+    assert.deepEqual(
       await debitCompute("owner", true, "inert-test-key", request),
-      "confirmed",
+      { outcome: "confirmed", responseBalance: 10 },
     );
     assert.equal(balance, 10);
     lost = true;
-    assert.equal(
+    assert.deepEqual(
       await debitCompute("owner", true, "inert-test-key", request),
-      "unknown",
+      { outcome: "unknown" },
     );
     assert.equal(balance, 0);
     assert.equal(checks, 2); // no replay of a potentially committed debit

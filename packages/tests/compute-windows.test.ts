@@ -298,10 +298,10 @@ test("loopback balance at renewal and late payment require a fresh message after
     );
   try {
     const f = await running();
-    assert.equal(
-      await debitCompute("owner", true, "test", request),
-      "confirmed",
-    );
+    assert.deepEqual(await debitCompute("owner", true, "test", request), {
+      outcome: "confirmed",
+      responseBalance: 0,
+    });
     await (settle as any)._handler(f.ctx, {
       debitId: f.debit._id,
       outcome: "confirmed",
@@ -314,10 +314,10 @@ test("loopback balance at renewal and late payment require a fresh message after
       true,
     );
     assert.ok(renewal);
-    assert.equal(
-      await debitCompute("owner", true, "test", request),
-      "confirmed",
-    );
+    assert.deepEqual(await debitCompute("owner", true, "test", request), {
+      outcome: "confirmed",
+      responseBalance: 0,
+    });
     await (settle as any)._handler(f.ctx, {
       debitId: renewal._id,
       outcome: "confirmed",
@@ -330,7 +330,9 @@ test("loopback balance at renewal and late payment require a fresh message after
       true,
     );
     assert.ok(next);
-    assert.equal(await debitCompute("owner", true, "test", request), "denied");
+    assert.deepEqual(await debitCompute("owner", true, "test", request), {
+      outcome: "denied",
+    });
     await (settle as any)._handler(f.ctx, {
       debitId: next._id,
       outcome: "denied",
@@ -379,10 +381,14 @@ test("loopback balance at renewal and late payment require a fresh message after
     assert.ok(lateRenewal);
     balance = 10;
     const lateOutcome = await debitCompute("owner", true, "test", request);
-    assert.equal(lateOutcome, "confirmed");
+    assert.deepEqual(lateOutcome, { outcome: "confirmed", responseBalance: 0 });
+    assert.equal(lateOutcome.outcome, "confirmed");
+    if (lateOutcome.outcome !== "confirmed")
+      throw new Error("Expected confirmed debit");
     await (settle as any)._handler(race.ctx, {
       debitId: lateRenewal._id,
-      outcome: lateOutcome,
+      outcome: lateOutcome.outcome,
+      responseBalance: lateOutcome.responseBalance,
     });
     assert.equal(race.rows.get(race.sessionId).state, "active");
   } finally {
