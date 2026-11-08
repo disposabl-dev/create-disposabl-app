@@ -25,6 +25,8 @@ if (
 // Product-only proof harnesses must not enter generated apps. Keep the same
 // paths in the symlink validation and removal inventories.
 const productProofTests = [
+  "packages/tests/billing-handoff-local.test.ts",
+  "packages/tests/fixtures/billing-handoff-local",
   "packages/tests/ios-save-password.test.ts",
   "packages/tests/helpers/ios-save-password.ts",
   "packages/tests/flows/account-deletion-receipt.e2e.ts",

@@ -12,6 +12,8 @@ import {
 } from "../create-disposabl-app/options";
 
 const excluded = [
+  "packages/tests/billing-handoff-local.test.ts",
+  "packages/tests/fixtures/billing-handoff-local",
   "packages/tests/ios-save-password.test.ts",
   "packages/tests/helpers/ios-save-password.ts",
   "packages/tests/flows/account-deletion-receipt.e2e.ts",
