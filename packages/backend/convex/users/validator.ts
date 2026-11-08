@@ -57,3 +57,15 @@ export const account = v.object({
   profile: v.union(profile, v.null()),
   passwordMethod: v.union(v.literal("username"), v.literal("email"), v.null()),
 });
+
+export const ephemeralDeletionProgress = v.object({
+  requestedAt: v.number(),
+  state: v.union(
+    v.literal("in_progress"),
+    v.literal("known_user_bound_cleared"),
+  ),
+  batches: v.number(),
+  billingHandoffsDeleted: v.number(),
+  telemetryIdentitiesDeleted: v.number(),
+  updatedAt: v.number(),
+});

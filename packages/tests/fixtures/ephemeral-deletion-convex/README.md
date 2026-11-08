@@ -1,0 +1,5 @@
+# Disposable ephemeral deletion fixture
+
+Run `python3 packages/tests/fixtures/ephemeral-deletion-convex/run.py` only with ports 3540 and 3541 free. It starts a fresh loopback database, disables beacon and telemetry before synchronization, strips inherited provider variables, and stops only its own backend. It deploys the actual product schema and re-exports the registered product internal mutation; the public fixture bridge only seeds synthetic data and invokes that mutation. No provider or external service is contacted.
+
+The test covers over 100 rows per table, concurrent calls, replay, request matching, transactional rollback, other-owner and anonymous identity retention, the global issuance bucket, billing attempts, compute debits, webhook deliveries, receipts, and the user record. A synthetic changed-request test checks progress cannot carry over to a different request. It does not delete financial records or prove whole-account erasure. `known_user_bound_cleared` depends on the separately implemented telemetry identity write fence being integrated; this fixture does not exercise that fence, nor can it attribute anonymous identities.

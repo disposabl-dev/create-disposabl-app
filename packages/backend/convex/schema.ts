@@ -10,6 +10,7 @@ import { v } from "convex/values";
 import {
   authDeletionProgress,
   fileDeletionProgress,
+  ephemeralDeletionProgress,
   mcpDeletionProgress,
   profile,
 } from "./users/validator";
@@ -49,7 +50,9 @@ export default defineSchema({
     hash: v.string(),
     userId: v.optional(v.string()),
     expiresAt: v.number(),
-  }).index("by_hash", ["hash"]),
+  })
+    .index("by_hash", ["hash"])
+    .index("by_userId", ["userId"]),
   computeSessions: defineTable(computeSessionFields).index("by_userId", [
     "userId",
   ]),
@@ -65,7 +68,9 @@ export default defineSchema({
     browserSessionId: v.optional(v.string()),
     returnExpiresAt: v.optional(v.number()),
     expiresAt: v.number(),
-  }).index("by_hash", ["hash"]),
+  })
+    .index("by_hash", ["hash"])
+    .index("by_userId", ["userId"]),
   billingAttempts: defineTable({
     userId: v.string(),
     purchase: v.string(),
@@ -122,6 +127,7 @@ export default defineSchema({
     mcpDeletion: v.optional(mcpDeletionProgress),
     authDeletion: v.optional(authDeletionProgress),
     fileDeletion: v.optional(fileDeletionProgress),
+    ephemeralDeletion: v.optional(ephemeralDeletionProgress),
     deletionStop: v.optional(
       v.object({
         state: v.union(
