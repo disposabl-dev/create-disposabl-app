@@ -260,3 +260,133 @@ test("boundary recovery is armed before renewal; notices cannot replay after com
   );
   assert.equal(empty.rows.size, 0);
 });
+
+test("loopback balance at renewal and late payment require a fresh message after denial", async () => {
+  const { createServer } = await import("node:http");
+  const { debitCompute } = await import("../backend/convex/agent/computeDebit");
+  const { billingRequest } = await import("../disposabl-kit/server/billing");
+  let balance = 10;
+  const server = createServer(async (req, res) => {
+    let raw = "";
+    for await (const chunk of req) raw += chunk;
+    const body = JSON.parse(raw);
+    const allowed = balance >= 10;
+    if (allowed) balance -= 10;
+    res.setHeader("content-type", "application/json");
+    res.end(
+      JSON.stringify({
+        customer_id: body.customer_id,
+        required_balance: 10,
+        allowed,
+        balance: {
+          feature_id: "credits",
+          unlimited: false,
+          overage_allowed: false,
+          remaining: balance,
+        },
+      }),
+    );
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  if (!address || typeof address === "string")
+    throw new Error("No loopback listener");
+  const request: typeof billingRequest = (key, method, body) =>
+    billingRequest(key, method, body, (_url, init) =>
+      fetch(`http://127.0.0.1:${address.port}/${method}`, init),
+    );
+  try {
+    const f = await running();
+    assert.equal(
+      await debitCompute("owner", true, "test", request),
+      "confirmed",
+    );
+    await (settle as any)._handler(f.ctx, {
+      debitId: f.debit._id,
+      outcome: "confirmed",
+    });
+    f.rows.get(f.sessionId).paidUntil = 0;
+    balance += 10; // Provider reports payment before this simulated boundary check.
+    const renewal = await claimWindow(
+      f.ctx,
+      { sessionId: f.sessionId, expectedDebit: f.debit._id },
+      true,
+    );
+    assert.ok(renewal);
+    assert.equal(
+      await debitCompute("owner", true, "test", request),
+      "confirmed",
+    );
+    await (settle as any)._handler(f.ctx, {
+      debitId: renewal._id,
+      outcome: "confirmed",
+    });
+    assert.equal(f.rows.get(f.sessionId).state, "active");
+    f.rows.get(f.sessionId).paidUntil = 0;
+    const next = await claimWindow(
+      f.ctx,
+      { sessionId: f.sessionId, expectedDebit: renewal._id },
+      true,
+    );
+    assert.ok(next);
+    assert.equal(await debitCompute("owner", true, "test", request), "denied");
+    await (settle as any)._handler(f.ctx, {
+      debitId: next._id,
+      outcome: "denied",
+    });
+    balance += 10; // Payment after a definitive failed renewal cannot restart this session.
+    assert.equal(
+      await claimWindow(
+        f.ctx,
+        { sessionId: f.sessionId, expectedDebit: next._id },
+        true,
+      ),
+      null,
+    );
+    await (settle as any)._handler(f.ctx, {
+      debitId: renewal._id,
+      outcome: "confirmed",
+    });
+    assert.equal(f.rows.get(f.sessionId).state, "stopping");
+    await (stopping as any)._handler(f.ctx, {
+      sessionId: f.sessionId,
+      token: "stop",
+    });
+    await (stopped as any)._handler(f.ctx, {
+      sessionId: f.sessionId,
+      token: "stop",
+      archived: true,
+    });
+    const fresh = await admitSession(f.ctx, "owner", true);
+    assert.ok(fresh);
+    assert.notEqual(fresh, f.sessionId);
+    assert.equal(f.rows.get(fresh).state, "starting");
+
+    // Characterize the unresolved race: a provider credit arriving after the
+    // deadline but before its check is processed can fund the old session.
+    const race = await running();
+    await (settle as any)._handler(race.ctx, {
+      debitId: race.debit._id,
+      outcome: "confirmed",
+    });
+    race.rows.get(race.sessionId).paidUntil = 0;
+    const lateRenewal = await claimWindow(
+      race.ctx,
+      { sessionId: race.sessionId, expectedDebit: race.debit._id },
+      true,
+    );
+    assert.ok(lateRenewal);
+    balance = 10;
+    const lateOutcome = await debitCompute("owner", true, "test", request);
+    assert.equal(lateOutcome, "confirmed");
+    await (settle as any)._handler(race.ctx, {
+      debitId: lateRenewal._id,
+      outcome: lateOutcome,
+    });
+    assert.equal(race.rows.get(race.sessionId).state, "active");
+  } finally {
+    await new Promise<void>((resolve, reject) =>
+      server.close((err) => (err ? reject(err) : resolve())),
+    );
+  }
+});
