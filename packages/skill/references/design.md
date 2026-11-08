@@ -12,4 +12,8 @@ Make the design distinctive through choices that suit the product, rather than a
 
 Use concise copy and real visuals suited to the product. Prioritize useful task UI over decorative filler; do not impose a fixed palette.
 
+For native screens, preserve the starter's shared appearance preference. Use `useTheme` from `packages/disposabl-kit/mobile/design/use-theme.ts`, or derive a product-specific light/dark palette with `useResolvedColorScheme` from the adjacent `theme-provider.tsx`. Apply it to custom screen backgrounds, headers, cards, text, and inputs, with readable status and navigation bars. Reuse the existing provider; fixed light surfaces can become unreadable when Settings switches the system chrome to Dark.
+
+When the app exposes Light, Dark, and System settings, verify the rendered guest and signed-in screens in those modes, including after restart and an OS appearance change in System mode. A changed selector label does not prove the screen changed. Add behavior coverage for the visible colors and preference persistence in `packages/tests`.
+
 Use the app's real tasks and representative content to evaluate the design. Check the landing page and signed-in experience at desktop and mobile widths in the browser, and inspect native layouts on the requested target device. Verify typography, contrast, hierarchy, focus states, wrapping, empty/error/loading states, and consistency with the chosen brand. Fix visible issues before calling the design complete.
