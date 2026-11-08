@@ -21,7 +21,8 @@
     "build": "bun build.ts",
     "typecheck": "bun check",
     "lint": "bun check",
-    "release": "semantic-release"
+    "release": "semantic-release",
+    "prepack": "node ../disposabl-kit/server/release/verify-metadata.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",

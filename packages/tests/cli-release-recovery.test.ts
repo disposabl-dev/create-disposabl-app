@@ -204,3 +204,93 @@ test("network, registry, and dist-tag failures do not publish", () => {
     "vars.DISPOSABL_CLI_POSTHOG_PROJECT_TOKEN",
   );
 });
+
+test(
+  "release metadata excludes synthetic Git credentials in actual npm packs",
+  { timeout: 30000 },
+  async () => {
+    const { publicRepositoryUrl, verifyConditions } =
+      // @ts-expect-error The release plugin is plain JavaScript.
+      await import("../disposabl-kit/server/release/clients.mjs");
+    for (const original of [
+      "git@github.com:example/app.git",
+      "ssh://git@github.com/example/app.git",
+      "https://user:synthetic-secret@github.com/example/app.git?token=synthetic-secret",
+    ])
+      expect(publicRepositoryUrl(original)).toBe(
+        "git+https://github.com/example/app.git",
+      );
+    const dir = mkdtempSync(join(tmpdir(), "release-metadata-"));
+    const root = resolve(import.meta.dirname, "../..");
+    const helper = join(dir, "packages/disposabl-kit/server/release");
+    mkdirSync(helper, { recursive: true });
+    writeFileSync(
+      join(helper, "verify-metadata.mjs"),
+      readFileSync(
+        join(root, "packages/disposabl-kit/server/release/verify-metadata.mjs"),
+      ),
+    );
+    for (const name of ["cli", "sdk", "create-disposabl-app"]) {
+      const folder = join(dir, "packages", name);
+      mkdirSync(join(folder, "dist"), { recursive: true });
+      writeFileSync(join(folder, "dist/index.js"), "// fixture\n");
+      const manifest = JSON.parse(
+        readFileSync(join(root, "packages", name, "package.json"), "utf8"),
+      );
+      writeFileSync(join(folder, "package.json"), JSON.stringify(manifest));
+      if (name !== "create-disposabl-app") {
+        verifyConditions(
+          {},
+          {
+            cwd: folder,
+            options: {
+              repositoryUrl:
+                "https://synthetic-user:synthetic-secret@github.com/example/app.git?token=synthetic-secret",
+              originalRepositoryURL: "git+https://github.com/example/app.git",
+            },
+          },
+        );
+      }
+      const pack = () =>
+        spawnSync("npm", ["pack", "--json", "--pack-destination", dir], {
+          cwd: folder,
+          encoding: "utf8",
+          env: {
+            PATH: process.env.PATH,
+            NODE_ENV: "test",
+            HOME: dir,
+            npm_config_userconfig: join(dir, "empty-npmrc"),
+          },
+        });
+      let result = pack();
+      expect(result.status).toBe(0);
+      const archive = join(dir, JSON.parse(result.stdout)[0].filename);
+      const packed = JSON.parse(
+        execFileSync("tar", ["-xOf", archive, "package/package.json"], {
+          encoding: "utf8",
+        }),
+      );
+      expect(JSON.stringify(packed)).not.toContain("synthetic-secret");
+      expect(packed.repository.url).not.toContain("@");
+      for (const [field, value] of [
+        [
+          "repository",
+          {
+            type: "git",
+            url: "https://user:synthetic-secret@example.test/repo",
+          },
+        ],
+        ["homepage", "https://example.test/?token=synthetic-secret"],
+        ["bugs", { url: "https://example.test/#synthetic-secret" }],
+        ["funding", { url: "https://user:synthetic-secret@example.test/" }],
+      ]) {
+        const unsafe = { ...packed, [field as string]: value };
+        writeFileSync(join(folder, "package.json"), JSON.stringify(unsafe));
+        result = pack();
+        expect(result.status).not.toBe(0);
+        expect(result.stderr).toContain("Unsafe URL in package metadata");
+        expect(result.stderr).not.toContain("synthetic-secret");
+      }
+    }
+  },
+);

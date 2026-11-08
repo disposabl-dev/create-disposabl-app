@@ -22,7 +22,8 @@
     "build": "bun run generate && tsc -p tsconfig.build.json",
     "typecheck": "bun run generate && tsc --noEmit",
     "lint": "bun check",
-    "release": "semantic-release"
+    "release": "semantic-release",
+    "prepack": "node ../disposabl-kit/server/release/verify-metadata.mjs"
   },
   "devDependencies": {
     "@hey-api/openapi-ts": "0.99.0",
