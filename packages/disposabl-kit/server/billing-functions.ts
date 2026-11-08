@@ -72,20 +72,29 @@ export const beginAttempt = internalMutation({
       )
       .unique();
     if (same) {
-      if (same.purchase !== args.purchase || !same.url)
+      if (
+        same.purchase !== args.purchase ||
+        same.resolvedAt !== undefined ||
+        !same.url
+      )
         throw new Error("A previous checkout needs review.");
       return same.url;
     }
     const prior = await ctx.db
       .query("billingAttempts")
-      .withIndex("by_userId_purchase_url", (q) =>
-        q
+      .withIndex("by_userId_purchase_resolvedAt_url", (q) => {
+        const open = q
           .eq("userId", args.userId)
           .eq("purchase", args.purchase)
-          .eq("url", undefined),
-      )
+          .eq("resolvedAt", undefined);
+        // A returned monthly link remains payable until the provider closes it.
+        return args.purchase === "monthly" ? open : open.eq("url", undefined);
+      })
       .first();
-    if (prior) throw new Error("A previous checkout needs review.");
+    if (prior) {
+      if (args.purchase === "monthly" && prior.url) return prior.url;
+      throw new Error("A previous checkout needs review.");
+    }
     await ctx.db.insert("billingAttempts", args);
     return null;
   },
@@ -100,25 +109,52 @@ export const finishAttempt = internalMutation({
         q.eq("userId", args.userId).eq("requestId", args.requestId),
       )
       .unique();
-    if (!prior || prior.purchase !== args.purchase || prior.url)
+    if (
+      !prior ||
+      prior.purchase !== args.purchase ||
+      prior.resolvedAt !== undefined ||
+      prior.url
+    )
       throw new Error("Invalid checkout attempt.");
     await ctx.db.patch("billingAttempts", prior._id, { url: args.url });
     return null;
   },
 });
-// An operator may clear only an uncertain attempt after checking the provider.
+// Internal operator reconciliation retains evidence; never release a payable link.
 export const resolveAttempt = internalMutation({
-  args: { userId: v.string(), requestId: v.string() },
+  args: {
+    userId: v.string(),
+    requestId: v.string(),
+    outcome: v.union(
+      v.literal("completed"),
+      v.literal("expired"),
+      v.literal("cancelled"),
+      v.literal("not_charged"),
+    ),
+    evidence: v.string(),
+  },
   returns: v.null(),
-  handler: async (ctx, { userId, requestId }) => {
+  handler: async (ctx, { userId, requestId, outcome, evidence }) => {
     const row = await ctx.db
       .query("billingAttempts")
       .withIndex("by_userId_requestId", (q) =>
         q.eq("userId", userId).eq("requestId", requestId),
       )
       .unique();
-    if (!row || row.url) throw new Error("Unknown attempt not found.");
-    await ctx.db.delete("billingAttempts", row._id);
+    if (!row || row.resolvedAt !== undefined)
+      throw new Error("Open attempt not found.");
+    if (
+      evidence.trim().length < 10 ||
+      evidence.length > 2000 ||
+      (row.url && outcome === "not_charged")
+    )
+      throw new Error(
+        "Verify that the provider checkout is completed, cancelled or expired before releasing it.",
+      );
+    await ctx.db.patch("billingAttempts", row._id, {
+      resolvedAt: Date.now(),
+      resolution: { outcome, evidence: evidence.trim() },
+    });
     return null;
   },
 });
@@ -130,10 +166,11 @@ export const hasUnknownAttempt = internalQuery({
       if (
         await ctx.db
           .query("billingAttempts")
-          .withIndex("by_userId_purchase_url", (q) =>
+          .withIndex("by_userId_purchase_resolvedAt_url", (q) =>
             q
               .eq("userId", userId)
               .eq("purchase", purchase)
+              .eq("resolvedAt", undefined)
               .eq("url", undefined),
           )
           .first()

@@ -4,6 +4,7 @@ import {
   beginAttempt,
   finishAttempt,
   hasUnknownAttempt,
+  resolveAttempt,
 } from "../disposabl-kit/server/billing-functions";
 
 test("uncertain checkout persists and prevents replay without blocking a different purchase", async () => {
@@ -13,6 +14,7 @@ test("uncertain checkout persists and prevents replay without blocking a differe
     purchase: string;
     requestId: string;
     url?: string;
+    resolvedAt?: number;
   }[] = [];
   const ctx = {
     db: {
@@ -77,5 +79,28 @@ test("uncertain checkout persists and prevents replay without blocking a differe
   });
   assert.equal(await pending(), false);
   assert.equal(await begin("monthly", "one"), "https://checkout.example/one");
+  assert.equal(await begin("monthly", "two"), "https://checkout.example/one");
+  assert.equal(
+    await begin("monthly", "another-device"),
+    "https://checkout.example/one",
+  );
+  assert.equal(rows.filter((row) => row.purchase === "monthly").length, 1);
+  await assert.rejects(
+    (resolveAttempt as any)._handler(ctx, {
+      userId: "alice",
+      requestId: "one",
+      outcome: "not_charged",
+      evidence: "Still a payable checkout link",
+    }),
+    /completed, cancelled or expired/,
+  );
+  await (resolveAttempt as any)._handler(ctx, {
+    userId: "alice",
+    requestId: "one",
+    outcome: "cancelled",
+    evidence: "Provider fixture confirms checkout cancellation",
+  });
+  assert.ok(rows[0].resolvedAt);
   assert.equal(await begin("monthly", "two"), null);
+  await assert.rejects(begin("monthly", "one"), /review/);
 });

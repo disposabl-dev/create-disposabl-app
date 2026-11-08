@@ -33,8 +33,17 @@ export default defineSchema({
     purchase: v.string(),
     requestId: v.string(),
     url: v.optional(v.string()),
+    resolvedAt: v.optional(v.number()),
+    resolution: v.optional(
+      v.object({ outcome: v.string(), evidence: v.string() }),
+    ),
   })
-    .index("by_userId_purchase_url", ["userId", "purchase", "url"])
+    .index("by_userId_purchase_resolvedAt_url", [
+      "userId",
+      "purchase",
+      "resolvedAt",
+      "url",
+    ])
     .index("by_userId_requestId", ["userId", "requestId"]),
   desktopUpdates: desktopUpdateTable,
   files: defineTable({
