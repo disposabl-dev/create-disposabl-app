@@ -11,7 +11,6 @@ import { ConvexError } from "convex/values";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { useRef, useState } from "react";
 import {
-  Dimensions,
   FlatList,
   KeyboardAvoidingView,
   ScrollView,
@@ -75,11 +74,7 @@ function Chat({ appId }: { appId: string }) {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
   const { width, height } = useWindowDimensions();
-  const screen = Dimensions.get("screen");
-  const compactLandscape =
-    process.env.EXPO_OS === "android" &&
-    width > height &&
-    screen.width > screen.height;
+  const compactViewport = process.env.EXPO_OS === "android" && width > height;
   const list = useRef<FlatList>(null);
   const followLatest = useRef(true);
   const userScrolling = useRef(false);
@@ -166,7 +161,7 @@ function Chat({ appId }: { appId: string }) {
         "--chat-right": Math.max(insets.right, 20),
         "--composer-left": Math.max(insets.left, 24),
         "--composer-right": Math.max(insets.right, 24),
-        "--composer-bottom": Math.max(insets.bottom, compactLandscape ? 4 : 16),
+        "--composer-bottom": Math.max(insets.bottom, compactViewport ? 4 : 16),
       }}
     >
       <KeyboardAvoidingView
@@ -266,7 +261,7 @@ function Chat({ appId }: { appId: string }) {
           }
         />
         <View
-          className={`w-full max-w-[820px] self-center gap-[12px] ${compactLandscape ? "pt-[4px]" : "pt-[12px]"} pb-[var(--composer-bottom)] pl-[var(--composer-left)] pr-[var(--composer-right)]`}
+          className={`w-full max-w-[820px] self-center gap-[12px] ${compactViewport ? "pt-[4px]" : "pt-[12px]"} pb-[var(--composer-bottom)] pl-[var(--composer-left)] pr-[var(--composer-right)]`}
         >
           <MessageComposer
             attachments={attachments}

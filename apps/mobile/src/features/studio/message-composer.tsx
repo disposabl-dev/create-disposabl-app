@@ -2,7 +2,6 @@ import { VariableContextProvider } from "nativewind";
 import { MenuView } from "../../../../../packages/disposabl-kit/mobile/design/nativewind";
 import { useState } from "react";
 import {
-  Dimensions,
   Pressable,
   ScrollView,
   Text,
@@ -57,13 +56,10 @@ export function MessageComposer({
 }) {
   const c = useTheme();
   const { width, height } = useWindowDimensions();
-  const screen = Dimensions.get("screen");
-  const compactLandscape =
-    process.env.EXPO_OS === "android" &&
-    width > height &&
-    screen.width > screen.height;
+  // Keep controls usable in short windows, including keyboard-resized portrait.
+  const compactViewport = process.env.EXPO_OS === "android" && width > height;
   const [expanded, setExpanded] = useState(false);
-  const inline = compact && (compactLandscape || !expanded || !value);
+  const inline = compact && (compactViewport || !expanded || !value);
   const actionsBusy = disabled || sending || attachmentsBusy;
   const blocked = actionsBusy || attachmentIds(attachments) === null;
   const dictation = useDictation({
@@ -90,7 +86,7 @@ export function MessageComposer({
       placeholderTextColor={c.mutedForeground}
       accessibilityLabel={label}
       testID={testID}
-      className={`w-full pt-[10px] pb-[6px] text-[17px] leading-[24px] text-foreground align-top ${inline ? "min-h-[44px] pl-[52px] pr-[96px]" : compact ? "min-h-[44px] px-[8px]" : "min-h-[100px] px-[8px]"} ${compact ? (compactLandscape ? "max-h-[44px]" : "max-h-[120px]") : "max-h-[176px]"}`}
+      className={`w-full pt-[10px] pb-[6px] text-[17px] leading-[24px] text-foreground align-top ${inline ? "min-h-[44px] pl-[52px] pr-[96px]" : compact ? "min-h-[44px] px-[8px]" : "min-h-[100px] px-[8px]"} ${compact ? (compactViewport ? "max-h-[44px]" : "max-h-[120px]") : "max-h-[176px]"}`}
     />
   );
   const plus = (
