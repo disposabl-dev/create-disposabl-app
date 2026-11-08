@@ -7,7 +7,8 @@ export async function deletionPending(
 ) {
   const id = ctx.db.normalizeId("users", userId);
   const user = id ? await ctx.db.get("users", id) : null;
-  return user?.deletionRequestedAt !== undefined;
+  // Removing an owner must never reopen access through surviving app records.
+  return !user || user.deletionRequestedAt !== undefined;
 }
 
 export async function requireNotDeleting(
@@ -16,6 +17,6 @@ export async function requireNotDeleting(
 ) {
   if (await deletionPending(ctx, userId))
     throw new ConvexError(
-      "Account deletion has been requested. Contact support for assistance.",
+      "Account deletion has been requested or this account no longer exists. Contact support for assistance.",
     );
 }
