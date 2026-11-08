@@ -14,7 +14,7 @@ import { ownedApp } from "../apps/internal";
 import { assertActive } from "../apps/operations/internal";
 import { history, historyArgs, result, sendArgs } from "./validator";
 import { requireConnections } from "../connections/config";
-import { readThread, patchThread } from "./threads";
+import { readThread, patchThread, assertSessionRebind } from "./threads";
 import { resolvePlatforms } from "@disposabl/disposabl-kit/platforms";
 import { resolveFeatures } from "@disposabl/disposabl-kit/feature-options";
 import { ownedAttachments, attachmentReferences } from "./attachments";
@@ -113,6 +113,7 @@ export const enqueueMessage = internalMutation({
       },
     });
     const computeSessionId = await admitSession(ctx, userId);
+    assertSessionRebind(current, computeSessionId);
     await patchThread(ctx, current, {
       computeSessionId,
       ...(computeSessionId !== current.computeSessionId

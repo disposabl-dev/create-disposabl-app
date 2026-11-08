@@ -43,3 +43,5 @@ After repository setup, `disposabl apps repositoryToken --appId <appId> --config
 ## Verification
 
 Authenticated TesterArmy E2E tests live in `packages/tests`. They use a development or isolated backend with telemetry disabled. The loopback fixture verifies automatic CLI login, REST app boundaries, token rotation, and stop invalidation without real Boat calls or model credentials. Live sandbox installation, provider provisioning, and cancellation still require a separate configured Boat run.
+
+Hold recovery also requires every old app to be terminal with no pending message or uncertain delivery. Let its existing worker finish suspended before resolving; normal stop confirmation alone is insufficient. Admission rejects rebinding an app while old work or any worker lease remains. A delayed tick can then claim only freshly admitted work, and old lease tokens cannot finish that new work.

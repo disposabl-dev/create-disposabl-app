@@ -1,3 +1,5 @@
+import { ConvexError } from "convex/values";
+import type { Id } from "../_generated/dataModel";
 import type { Infer } from "convex/values";
 import type { Doc } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
@@ -33,4 +35,22 @@ export async function patchThread(
   if (!app) throw new Error("Agent app no longer exists.");
   const { appId: _appId, userId: _userId, ...state } = current;
   await ctx.db.patch("apps", app._id, { agent: { ...state, ...patch } });
+}
+
+/** Old workers and queued messages must finish before a different paid session binds. */
+export function assertSessionRebind(
+  current: Thread,
+  next: Id<"computeSessions"> | undefined,
+) {
+  if (current.computeSessionId === next) return;
+  if (
+    current.lease ||
+    current.pending.length ||
+    current.delivery ||
+    current.status === "processing" ||
+    current.status === "stopping"
+  )
+    throw new ConvexError(
+      "Previous sandbox work is still stopping. Try again after it finishes.",
+    );
 }

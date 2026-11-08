@@ -237,3 +237,92 @@ test(
     assert.equal(await call("auth", { hash }, true), null);
   },
 );
+
+test(
+  "same-app recovery drains old messages before either delayed-tick ordering",
+  { skip: !url },
+  async () => {
+    for (const tickBeforeMessage of [true, false]) {
+      const userId = randomUUID();
+      const sessionId = await call("admit", { userId });
+      const app = await call("queuedApp", { userId, sessionId });
+      const debit = await call("claim", { sessionId });
+      await call("crash", { debitId: debit._id });
+      await call("stop", { sessionId, token: "stop" });
+      await call("stoppedResult", { sessionId, token: "stop", archived: true });
+      const resolution = {
+        sessionId,
+        debitId: debit._id,
+        outcome: "denied",
+        evidence: "Final provider denial, no request remains in flight",
+        operator: "fixture",
+      };
+      await assert.rejects(
+        call("resolveHold", resolution),
+        /Old work must finish/,
+      );
+      await call("claimWorkerLease", { id: app.threadId, token: "old" });
+      await assert.rejects(
+        call("resolveHold", resolution),
+        /leases must drain/,
+      );
+      await call("suspendWorker", { id: app.threadId, token: "old" });
+      const [old] = await call("messages", { ids: [app.messageId] }, true);
+      assert.equal(old.status, "failed");
+      await call("resolveHold", resolution);
+      if (tickBeforeMessage)
+        assert.equal(
+          await call("claimWorkerLease", {
+            id: app.threadId,
+            token: "delayed",
+          }),
+          null,
+        );
+      const next = await call("enqueueSameApp", { id: app.threadId });
+      assert.notEqual(next.sessionId, sessionId);
+      const claimed = await call("claimWorkerLease", {
+        id: app.threadId,
+        token: "delayed",
+      });
+      assert.equal(claimed.computeSessionId, next.sessionId);
+      assert.deepEqual(claimed.pending, [next.messageId]);
+      await assert.rejects(
+        call("suspendWorker", { id: app.threadId, token: "old" }),
+        /lease expired/,
+      );
+      const [fresh] = await call("messages", { ids: [next.messageId] }, true);
+      assert.notEqual(fresh.status, "failed");
+      await call("suspendWorker", { id: app.threadId, token: "delayed" });
+    }
+  },
+);
+
+test(
+  "session rebind rejects undrained work even after a denied debit's stop",
+  { skip: !url },
+  async () => {
+    const userId = randomUUID();
+    const sessionId = await call("admit", { userId });
+    const app = await call("queuedApp", { userId, sessionId });
+    const debit = await call("claim", { sessionId });
+    await call("settleDebit", { debitId: debit._id, outcome: "denied" });
+    await call("stop", { sessionId, token: "stop" });
+    await call("stoppedResult", { sessionId, token: "stop", archived: true });
+    await assert.rejects(
+      call("enqueueSameApp", { id: app.threadId }),
+      /still stopping/,
+    );
+    await call("claimWorkerLease", { id: app.threadId, token: "old" });
+    await assert.rejects(
+      call("enqueueSameApp", { id: app.threadId }),
+      /still stopping/,
+    );
+    await call("suspendWorker", { id: app.threadId, token: "old" });
+    const next = await call("enqueueSameApp", { id: app.threadId });
+    assert.notEqual(next.sessionId, sessionId);
+    await assert.rejects(
+      call("suspendWorker", { id: app.threadId, token: "old" }),
+      /lease expired/,
+    );
+  },
+);

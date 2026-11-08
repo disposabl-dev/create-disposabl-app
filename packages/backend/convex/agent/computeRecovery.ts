@@ -81,6 +81,19 @@ export const resolve = internalMutation({
         .take(100);
       if (apps.length === 100 || apps.some((app) => app.agent?.lease))
         return fail("Worker leases must drain before resolution.");
+      if (
+        apps.some(
+          (app) =>
+            app.agent &&
+            (app.agent.status === "processing" ||
+              app.agent.status === "stopping" ||
+              app.agent.pending.length ||
+              app.agent.delivery),
+        )
+      )
+        return fail(
+          "Old work must finish and pending messages must be failed before resolution.",
+        );
     }
     await ctx.db.patch("computeDebits", debit._id, {
       resolution: {

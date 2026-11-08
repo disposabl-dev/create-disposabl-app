@@ -173,3 +173,80 @@ export const expireAccess = mutation({
     });
   },
 });
+
+import { saveMessage } from "@convex-dev/agent";
+import { components } from "../../../../backend/convex/_generated/api";
+import {
+  claim as claimWorker,
+  finish,
+} from "../../../../backend/convex/agent/state";
+import {
+  getThread,
+  patchThread,
+  assertSessionRebind,
+} from "../../../../backend/convex/agent/threads";
+export const queuedApp = mutation({
+  args: { userId: v.string(), sessionId: v.id("computeSessions") },
+  handler: async (ctx, a) => {
+    const thread = await ctx.runMutation(
+      components.agent.threads.createThread,
+      { userId: a.userId },
+    );
+    const { messageId } = await saveMessage(ctx, components.agent, {
+      threadId: thread._id,
+      userId: a.userId,
+      message: { role: "user", content: "old work" },
+    });
+    const appId = await ctx.db.insert("apps", {
+      appId: thread._id,
+      name: "queued fixture",
+      platforms: ["web"],
+      userId: a.userId,
+      agent: {
+        threadId: thread._id,
+        computeSessionId: a.sessionId,
+        status: "processing",
+        pending: [messageId],
+        updatedAt: Date.now(),
+      },
+    });
+    return { appId, threadId: thread._id, messageId };
+  },
+});
+export const claimWorkerLease = mutation({
+  args: { id: v.string(), token: v.string() },
+  handler: (ctx, args) => (claimWorker as any)._handler(ctx, args),
+});
+export const suspendWorker = mutation({
+  args: { id: v.string(), token: v.string() },
+  handler: (ctx, args) =>
+    (finish as any)._handler(ctx, { ...args, suspended: true }),
+});
+export const enqueueSameApp = mutation({
+  args: { id: v.string() },
+  handler: async (ctx, { id }) => {
+    const current = (await getThread(ctx as any, id))!;
+    const sessionId = await admitSession(ctx as any, current.userId, true);
+    assertSessionRebind(current, sessionId);
+    const { messageId } = await saveMessage(ctx, components.agent, {
+      threadId: id,
+      userId: current.userId,
+      message: { role: "user", content: "new work" },
+    });
+    await patchThread(ctx as any, current, {
+      computeSessionId: sessionId,
+      pending: [...current.pending, messageId],
+      status: "processing",
+      delivery: undefined,
+      promptId: undefined,
+    });
+    return { sessionId, messageId };
+  },
+});
+export const messages = query({
+  args: { ids: v.array(v.string()) },
+  handler: (ctx, { ids }) =>
+    ctx.runQuery(components.agent.messages.getMessagesByIds, {
+      messageIds: ids,
+    }),
+});
