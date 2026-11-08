@@ -208,10 +208,10 @@ function BuildPage() {
             <summary>Agent Mode</summary>
             <p>
               Local mode uses your computer and coding agent. Agent Mode runs
-              work in a remote sandbox for $5 with 500 credits and no
-              subscription. Credit use varies by task. Project context is sent
-              outside your computer; review the agent’s changes and test
-              results.
+              work in a remote sandbox. See <a href="/pricing">pricing</a> for
+              monthly and one-time credit options. Credit use varies by task.
+              Project context is sent outside your computer; review the agent’s
+              changes and test results.
             </p>
           </details>
         </div>

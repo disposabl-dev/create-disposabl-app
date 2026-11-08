@@ -1,5 +1,10 @@
 import { ArrowUpRight, Check, Plus } from "lucide-react";
 import { TextLink } from "./shell";
+import {
+  creditQuantity,
+  formatPrice,
+  pricing,
+} from "../../../../../packages/disposabl-kit/payments/config";
 
 export function Pricing({
   onStart,
@@ -45,14 +50,14 @@ export function Pricing({
           </article>
           <article className="price-card agent-price">
             <h3>Agent Mode</h3>
-            <p className="price-number">$5</p>
+            <p className="price-number">{formatPrice(pricing.topup.price)}</p>
             <ul>
               {[
-                "500 credits",
+                `${creditQuantity("topup")} credits`,
                 "Work on a remote computer",
                 "Longer tasks and refinements",
                 "Compare versions side by side",
-                "No subscription",
+                "One-time purchase, credits do not expire",
               ].map((text) => (
                 <li key={text}>
                   <Check size={20} />
@@ -60,7 +65,7 @@ export function Pricing({
                 </li>
               ))}
             </ul>
-            <TextLink href="/build#agent-mode">Explore Agent Mode</TextLink>
+            <TextLink href="/pricing">See all pricing</TextLink>
           </article>
         </div>
       </div>
@@ -71,7 +76,7 @@ export function Pricing({
 export const faqs = [
   [
     "Is Disposabl really free?",
-    "Local mode is free, including the starter, supported platforms, source code, and local builds. Your AI tools, hosting, and app store developer accounts may charge separately. Agent Mode costs $5 and includes 500 credits, with no subscription.",
+    `Local mode is free, including the starter, supported platforms, source code, and local builds. Your AI tools, hosting, and app store developer accounts may charge separately. Agent Mode offers ${creditQuantity("monthly")} credits for ${formatPrice(pricing.monthly.price)} per month, or a ${formatPrice(pricing.topup.price)} one-time purchase of ${creditQuantity("topup")} credits. Monthly credits expire; one-time credits do not.`,
   ],
   [
     "Why use this if I already have Claude Code or Codex?",
@@ -99,7 +104,7 @@ export const faqs = [
   ],
   [
     "What does Agent Mode do, and how do credits work?",
-    "Agent Mode runs tasks on a separate remote computer. It suits longer tasks and repeated improvement: build an approach, test it, compare alternatives, and refine. Agents can use parallel previews to compare results; this is not a guarantee of automatic quality ranking. Agent Mode costs $5 and includes 500 credits, with no subscription. Consumption will vary by task rather than a fixed price per app.",
+    `Agent Mode runs tasks on a separate remote computer. It suits longer tasks and repeated improvement: build an approach, test it, compare alternatives, and refine. Agents can use parallel previews to compare results; this is not a guarantee of automatic quality ranking. Agent Mode offers ${creditQuantity("monthly")} credits for ${formatPrice(pricing.monthly.price)} per month, or a ${formatPrice(pricing.topup.price)} one-time purchase of ${creditQuantity("topup")} credits. Monthly credits expire; one-time credits do not. Consumption will vary by task rather than a fixed price per app.`,
   ],
   [
     "Can I build an app for my business?",

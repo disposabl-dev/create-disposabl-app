@@ -8,7 +8,7 @@ import {
 import { cp, rm } from "node:fs/promises";
 import { serveDocs } from "../docs/dev";
 // docs:end
-import kitRouter from "@disposabl/disposabl-kit/client/vite.config";
+import kitRouter from "./routes.config";
 import {
   createPrerenderFilter,
   pageRoutes,

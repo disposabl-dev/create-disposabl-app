@@ -1,4 +1,8 @@
 export const marketingPages = {
+  "/pricing": {
+    title: "Pricing | Disposabl",
+    description: "Build locally for free or explore Agent Mode credit options.",
+  },
   "/stack": {
     title: "App development tech stack | Disposabl",
     description:

@@ -15,11 +15,11 @@ const kitRoute = (file: string) =>
   );
 
 // Both Vite and `tsr generate` use this route tree.
-export const createRoutes = (enabled: boolean) =>
+export const createRoutes = (enabled: boolean, includePricing = true) =>
   rootRoute("__root.tsx", [
     layout("_providers", kitRoute("route.tsx"), [
       physical("."),
-      route("/pricing", kitRoute("pricing.tsx")),
+      ...(includePricing ? [route("/pricing", kitRoute("pricing.tsx"))] : []),
       route("/legal", kitRoute("legal/index.tsx")),
       route("/legal/privacy", kitRoute("legal/privacy.tsx")),
       route("/legal/terms", kitRoute("legal/terms.tsx")),

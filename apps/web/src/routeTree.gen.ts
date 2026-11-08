@@ -18,7 +18,7 @@ import { Route as DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPa
 import { Route as DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalIndexRouteImport } from './../../../packages/disposabl-kit/client/routes/legal/index'
 import { Route as DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesLoginRouteImport } from './../../../packages/disposabl-kit/client/routes/_auth-pages/login'
 import { Route as MobileLoginRouteImport } from './router/mobile-login'
-import { Route as DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesPricingRouteImport } from './../../../packages/disposabl-kit/client/routes/pricing'
+import { Route as PricingRouteImport } from './router/pricing'
 import { Route as DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesResetPasswordRouteImport } from './../../../packages/disposabl-kit/client/routes/_auth-pages/reset-password'
 import { Route as DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesSignUpRouteImport } from './../../../packages/disposabl-kit/client/routes/_auth-pages/signUp'
 import { Route as StackRouteImport } from './router/stack'
@@ -102,15 +102,12 @@ const MobileLoginRoute = MobileLoginRouteImport.update({
   getParentRoute: () =>
     DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRoute,
 } as any)
-const DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesPricingRoute =
-  DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesPricingRouteImport.update(
-    {
-      id: '/pricing',
-      path: '/pricing',
-      getParentRoute: () =>
-        DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRoute,
-    } as any,
-  )
+const PricingRoute = PricingRouteImport.update({
+  id: '/pricing',
+  path: '/pricing',
+  getParentRoute: () =>
+    DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRoute,
+} as any)
 const DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesResetPasswordRoute =
   DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesResetPasswordRouteImport.update(
     {
@@ -221,7 +218,7 @@ export interface FileRoutesByFullPath {
   '/forgot-password': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesForgotPasswordRoute
   '/login': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesLoginRoute
   '/mobile-login': typeof MobileLoginRoute
-  '/pricing': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesPricingRoute
+  '/pricing': typeof PricingRoute
   '/reset-password': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesResetPasswordRoute
   '/signup': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesSignUpRoute
   '/stack': typeof StackRoute
@@ -244,7 +241,7 @@ export interface FileRoutesByTo {
   '/forgot-password': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesForgotPasswordRoute
   '/login': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesLoginRoute
   '/mobile-login': typeof MobileLoginRoute
-  '/pricing': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesPricingRoute
+  '/pricing': typeof PricingRoute
   '/reset-password': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesResetPasswordRoute
   '/signup': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesSignUpRoute
   '/stack': typeof StackRoute
@@ -269,7 +266,7 @@ export interface FileRoutesById {
   '/_providers/forgot-password': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesForgotPasswordRoute
   '/_providers/login': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesLoginRoute
   '/_providers/mobile-login': typeof MobileLoginRoute
-  '/_providers/pricing': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesPricingRoute
+  '/_providers/pricing': typeof PricingRoute
   '/_providers/reset-password': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesResetPasswordRoute
   '/_providers/signup': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesSignUpRoute
   '/_providers/stack': typeof StackRoute
@@ -433,7 +430,7 @@ declare module '@tanstack/react-router' {
       id: '/_providers/pricing'
       path: '/pricing'
       fullPath: '/pricing'
-      preLoaderRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesPricingRouteImport
+      preLoaderRoute: typeof PricingRouteImport
       parentRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRoute
     }
     '/_providers/reset-password': {
@@ -572,7 +569,7 @@ interface DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRouteChil
   DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesForgotPasswordRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesForgotPasswordRoute
   DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesLoginRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesLoginRoute
   MobileLoginRoute: typeof MobileLoginRoute
-  DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesPricingRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesPricingRoute
+  PricingRoute: typeof PricingRoute
   DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesResetPasswordRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesResetPasswordRoute
   DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesSignUpRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesSignUpRoute
   StackRoute: typeof StackRoute
@@ -598,8 +595,7 @@ const DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRouteChildren
     DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesLoginRoute:
       DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesLoginRoute,
     MobileLoginRoute: MobileLoginRoute,
-    DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesPricingRoute:
-      DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesPricingRoute,
+    PricingRoute: PricingRoute,
     DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesResetPasswordRoute:
       DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesResetPasswordRoute,
     DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesSignUpRoute:

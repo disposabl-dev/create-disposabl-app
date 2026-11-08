@@ -32,7 +32,7 @@ const portal = makeFunctionReference<
   { url: string }
 >("billing:portal");
 
-function Pricing() {
+export function Pricing() {
   if (!paymentsEnabled)
     return (
       <main className="mx-auto max-w-5xl p-8">

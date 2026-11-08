@@ -164,7 +164,7 @@ test(
       .getByText("Is Disposabl really free?", { exact: true })
       .tap();
     await expect(browser.locator("#faq details[open] p")).toContainText(
-      "$5 and includes 500 credits",
+      "500 credits for $5 per month",
     );
     await screen.getByRole("button", "Open menu").tap();
     await browser.locator('#marketing-links a[href="/build"]').tap();
@@ -213,7 +213,7 @@ test(
         () => document.documentElement.scrollWidth === innerWidth,
       ),
     ).toBe(true);
-    for (const path of ["/stack", "/build", "/why-disposabl"]) {
+    for (const path of ["/stack", "/build", "/why-disposabl", "/pricing"]) {
       await browser.setViewport({ width: 320, height: 800 });
       await app.open(path);
       await expect(browser.locator("main h1")).toBeVisible();
@@ -342,7 +342,13 @@ test(
         await screen.getByRole("button", "Toggle light and dark mode").tap();
       for (const width of [320, 390, 768, 1440]) {
         await browser.setViewport({ width, height: 900 });
-        for (const path of ["/", "/stack", "/build", "/why-disposabl"]) {
+        for (const path of [
+          "/",
+          "/stack",
+          "/build",
+          "/why-disposabl",
+          "/pricing",
+        ]) {
           await app.open(path);
           await expect(browser.locator(`html.${theme}`)).toHaveCount(1);
           await expect(browser.locator("main h1")).toBeVisible();
@@ -453,9 +459,23 @@ test(
   { platforms: ["web"], tags: ["landing"] },
   async ({ app, browser, screen }) => {
     await app.open("/");
-    await browser.locator('#pricing a[href="/build#agent-mode"]').tap();
-    await expect(browser.locator("#agent-mode[open]")).toBeVisible();
-    await expect(browser.locator("#agent-mode")).toContainText("500 credits");
+    await browser.locator('#pricing a[href="/pricing"]').tap();
+    await expect(browser).toHaveURL("/pricing");
+    await expect(screen.getByRole("heading", "Build your way.")).toBeVisible();
+    await app.open("/pricing");
+    await expect(browser.locator(".pricing-grid")).toContainText(
+      "500 credits each month",
+    );
+    await expect(browser.locator(".pricing-grid")).toContainText(
+      "Monthly credits expire",
+    );
+    await expect(browser.locator(".pricing-grid")).toContainText(
+      "Credits do not expire",
+    );
+    await expect(browser.locator(".pricing-availability")).toBeVisible();
+    await app.open("/");
+    await browser.locator('.marketing-links a[href="/pricing"]').tap();
+    await expect(browser).toHaveURL("/pricing");
     await app.open("/");
     await screen
       .getByRole("link", "Build times and publishing guide", { exact: true })

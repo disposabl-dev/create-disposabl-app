@@ -328,7 +328,8 @@ body:has(.start-dialog[open]) {
   align-items: flex-start;
   flex-direction: column;
 }
-.launch-site .price-card h3 {
+.launch-site .price-card :is(h2, h3) {
+  margin-bottom: 0;
   font-size: 24px;
   letter-spacing: -0.025em;
 }
@@ -360,17 +361,34 @@ body:has(.start-dialog[open]) {
 .price-card .text-link {
   margin-top: auto;
 }
-.local-price {
-  background: #162b26;
-  color: #f5f8f4;
-  border-color: #162b26;
+.pricing-page .pricing-section {
+  padding-block: 112px;
 }
-.local-price .primary-link {
-  background: #e4f4df;
-  color: #162b26 !important;
+.pricing-page .pricing-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
-.agent-price {
-  background: var(--surface);
+.pricing-page .price-card {
+  padding: 36px;
+}
+.pricing-page .price-number {
+  font-size: clamp(36px, 3vw, 48px);
+}
+.pricing-availability {
+  margin-top: 32px !important;
+  color: var(--muted);
+}
+.pricing-intro {
+  max-width: 680px;
+  margin-bottom: 48px;
+}
+.pricing-intro p {
+  margin-top: 20px;
+  color: var(--muted);
+}
+@media (max-width: 900px) {
+  .pricing-page .pricing-grid {
+    grid-template-columns: 1fr;
+  }
 }
 .faq-section {
   display: grid;

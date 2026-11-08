@@ -110,7 +110,7 @@ export function MarketingShell({
           >
             <a href="/build">How it works</a>
             <a href="/why-disposabl">Why Disposabl</a>
-            <a href="/#pricing">Pricing</a>
+            <a href="/pricing">Pricing</a>
             <a href="/stack">Tech stack</a>
             {docsEnabled && <a href="/docs/">Docs</a>}
             <a
@@ -175,7 +175,7 @@ export function MarketingShell({
               <a href="/build">How it works</a>
               <a href="/stack">Tech stack</a>
               <a href="/why-disposabl">Why Disposabl</a>
-              <a href="/#pricing">Pricing</a>
+              <a href="/pricing">Pricing</a>
             </nav>
             <nav aria-label="Footer navigation">
               <a href="/legal/privacy">Privacy</a>
