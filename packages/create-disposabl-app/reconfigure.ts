@@ -118,6 +118,10 @@ export async function reconfigureApp(
   try {
     const before = join(temp, "before");
     const after = join(temp, "after");
+    const expandedBefore =
+      combined.platforms.length === oldPlatforms.length
+        ? before
+        : join(temp, "expanded-before");
     await createApp(template, before, name, {
       ...existing,
       desktopId: config.desktopId,
@@ -125,6 +129,13 @@ export async function reconfigureApp(
       features: oldFeatures,
     });
     await createApp(template, after, name, combined);
+    if (expandedBefore !== before)
+      await createApp(template, expandedBefore, name, {
+        ...existing,
+        desktopId: config.desktopId,
+        platforms: combined.platforms,
+        features: oldFeatures,
+      });
     if (
       oldFeatures.includes("payments") &&
       !config.features.includes("payments")
@@ -157,11 +168,20 @@ export async function reconfigureApp(
     for (const path of nextFiles) {
       if (path === configPath) continue;
       const next = await readFile(join(after, path));
-      const prior = oldFiles.has(path)
+      let prior = oldFiles.has(path)
         ? await readFile(join(before, path))
         : undefined;
-      if (prior?.equals(next)) continue;
       const current = await safeRead(directory, path);
+      // A previously disabled platform may still have its generated files.
+      // Compare them against the old features before restoring new ones.
+      if (!prior && current)
+        prior = await readFile(join(expandedBefore, path)).catch(
+          (error: NodeJS.ErrnoException) => {
+            if (error.code === "ENOENT") return undefined;
+            throw error;
+          },
+        );
+      if (prior?.equals(next)) continue;
       if (!current) {
         if (prior)
           throw new Error(

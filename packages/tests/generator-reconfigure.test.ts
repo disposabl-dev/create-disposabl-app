@@ -221,6 +221,14 @@ test(
       ]);
       assert.equal(config.appId, "test-id");
       assert.deepEqual(config.platforms, ["web", "android", "ios"]);
+      const customMobile = JSON.parse(
+        await read(app, "apps/mobile/package.json"),
+      );
+      customMobile.dependencies["custom-example"] = "1.2.3";
+      await writeFile(
+        join(app, "apps/mobile/package.json"),
+        JSON.stringify(customMobile, null, 2) + "\n",
+      );
       await reconfigureApp(template, app, version, {
         features: "none",
         platforms: "web",
@@ -231,6 +239,22 @@ test(
         features: "payments,analytics",
         platforms: "web,android,ios",
       });
+      const mobile = JSON.parse(await read(app, "apps/mobile/package.json"));
+      assert.equal(mobile.dependencies["custom-example"], "1.2.3");
+      for (const name of [
+        "react-native-purchases",
+        "react-native-purchases-ui",
+      ])
+        assert.ok(mobile.dependencies[name]);
+      assert.match(
+        await read(app, "apps/mobile/src/app/index.tsx"),
+        /HomeScreen/,
+      );
+      assert.doesNotMatch(
+        await read(app, "apps/mobile/src/app/index.tsx"),
+        /PublicHomeScreen/,
+      );
+      assert.ok(await read(app, "packages/tests/native-billing.test.ts"));
       const before = await read(app, "disposabl.json");
       await reconfigureApp(template, app, version, {
         features: "payments,analytics",
