@@ -2,17 +2,19 @@ import { v } from "convex/values";
 import { makeFunctionReference } from "convex/server";
 import { platform } from "./validator";
 import { httpAction, internalAction } from "./_generated/server";
-import { getActiveSessionUserId as getSessionUserId } from "./users/deletion";
 import {
+  getActiveSessionUserId as getSessionUserId,
+  requireNotDeleting,
+} from "./users/deletion";
+import {
+  createClaimIdentity,
   captureTelemetry,
   hashTelemetryIdentity,
   telemetryEnabled,
 } from "@disposabl/disposabl-kit/server/lib/telemetry";
 
-export {
-  claimIdentity,
-  expireIdentity,
-} from "@disposabl/disposabl-kit/server/lib/telemetry";
+export { expireIdentity } from "@disposabl/disposabl-kit/server/lib/telemetry";
+export const claimIdentity = createClaimIdentity(requireNotDeleting);
 
 const claimIdentityRef = makeFunctionReference<
   "mutation",

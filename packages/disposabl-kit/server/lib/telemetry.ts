@@ -1,7 +1,10 @@
 import config from "../../../../disposabl.json";
 import { makeFunctionReference } from "convex/server";
 import { v } from "convex/values";
-import { internalMutation } from "../../../backend/convex/_generated/server";
+import {
+  internalMutation,
+  type MutationCtx,
+} from "../../../backend/convex/_generated/server";
 
 export type TelemetryEvent =
   | "api_operation"
@@ -82,63 +85,69 @@ const expireIdentityRef = makeFunctionReference<
   null
 >("telemetry:expireIdentity");
 
-export const claimIdentity = internalMutation({
-  args: {
-    hash: v.optional(v.string()),
-    newHash: v.string(),
-    userId: v.optional(v.string()),
-  },
-  returns: v.union(v.boolean(), v.null()),
-  handler: async (ctx, { hash, newHash, userId }) => {
-    const row = hash
-      ? await ctx.db
-          .query("telemetryIdentities")
-          .withIndex("by_hash", (q) => q.eq("hash", hash))
-          .unique()
-      : null;
-    if (
-      row &&
-      row.expiresAt > Date.now() &&
-      (!row.userId || row.userId === userId)
-    ) {
-      if (userId && !row.userId)
-        await ctx.db.patch("telemetryIdentities", row._id, { userId });
-      return true;
-    }
-    const now = Date.now();
-    const bucket = await ctx.db
-      .query("telemetryIssuance")
-      .withIndex("by_key", (q) => q.eq("key", "global"))
-      .unique();
-    const tokens = bucket
-      ? Math.min(
-          issuanceBurst,
-          bucket.tokens +
-            Math.max(0, now - bucket.updatedAt) / issuanceRefillMs,
-        )
-      : issuanceBurst;
-    if (tokens < 1) return null;
-    if (bucket) {
-      await ctx.db.patch("telemetryIssuance", bucket._id, {
-        tokens: tokens - 1,
-        updatedAt: now,
+export const createClaimIdentity = (
+  checkUser?: (ctx: MutationCtx, userId: string) => Promise<void>,
+) =>
+  internalMutation({
+    args: {
+      hash: v.optional(v.string()),
+      newHash: v.string(),
+      userId: v.optional(v.string()),
+    },
+    returns: v.union(v.boolean(), v.null()),
+    handler: async (ctx, { hash, newHash, userId }) => {
+      if (userId !== undefined) await checkUser?.(ctx, userId);
+      const row = hash
+        ? await ctx.db
+            .query("telemetryIdentities")
+            .withIndex("by_hash", (q) => q.eq("hash", hash))
+            .unique()
+        : null;
+      if (
+        row &&
+        row.expiresAt > Date.now() &&
+        (!row.userId || row.userId === userId)
+      ) {
+        if (userId && !row.userId)
+          await ctx.db.patch("telemetryIdentities", row._id, { userId });
+        return true;
+      }
+      const now = Date.now();
+      const bucket = await ctx.db
+        .query("telemetryIssuance")
+        .withIndex("by_key", (q) => q.eq("key", "global"))
+        .unique();
+      const tokens = bucket
+        ? Math.min(
+            issuanceBurst,
+            bucket.tokens +
+              Math.max(0, now - bucket.updatedAt) / issuanceRefillMs,
+          )
+        : issuanceBurst;
+      if (tokens < 1) return null;
+      if (bucket) {
+        await ctx.db.patch("telemetryIssuance", bucket._id, {
+          tokens: tokens - 1,
+          updatedAt: now,
+        });
+      } else {
+        await ctx.db.insert("telemetryIssuance", {
+          key: "global",
+          tokens: tokens - 1,
+          updatedAt: now,
+        });
+      }
+      const id = await ctx.db.insert("telemetryIdentities", {
+        hash: newHash,
+        expiresAt: Date.now() + identityTtl,
+        ...(userId ? { userId } : {}),
       });
-    } else {
-      await ctx.db.insert("telemetryIssuance", {
-        key: "global",
-        tokens: tokens - 1,
-        updatedAt: now,
-      });
-    }
-    const id = await ctx.db.insert("telemetryIdentities", {
-      hash: newHash,
-      expiresAt: Date.now() + identityTtl,
-      ...(userId ? { userId } : {}),
-    });
-    await ctx.scheduler.runAfter(identityTtl, expireIdentityRef, { id });
-    return false;
-  },
-});
+      await ctx.scheduler.runAfter(identityTtl, expireIdentityRef, { id });
+      return false;
+    },
+  });
+
+export const claimIdentity = createClaimIdentity();
 
 export const expireIdentity = internalMutation({
   args: { id: v.id("telemetryIdentities") },
