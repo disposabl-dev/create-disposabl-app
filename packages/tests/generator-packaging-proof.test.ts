@@ -18,6 +18,8 @@ const excluded = [
   "packages/tests/generator-architecture-setup.test.ts",
   "packages/tests/architecture-token.test.ts",
   "packages/tests/components/architecture-token.test.mjs",
+  "packages/tests/mobile-architecture-settings.test.ts",
+  "packages/tests/components/mobile-architecture-settings.test.mjs",
   "packages/tests/generator-packaging-proof.test.ts",
   "packages/tests/compute-provider-http.test.ts",
   "packages/tests/billing-web.config.ts",
