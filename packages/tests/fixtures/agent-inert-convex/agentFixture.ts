@@ -95,9 +95,15 @@ const paidScheduler = (ctx: any) => ({
         "agent/actions/run:tick",
         "agent/compute:uncertain",
         "agent/actions/compute:stop",
+        "agent/actions/compute:notice",
       ];
       if (!allowed.includes(getFunctionName(ref)))
         throw new Error("Unexpected paid fixture schedule");
+      return ctx.scheduler.runAfter(0, anyApi.agentFixture.noop, {});
+    },
+    runAt: async (_time: number, ref: any) => {
+      if (getFunctionName(ref) !== "agent/compute:boundary")
+        throw new Error("Unexpected paid fixture scheduled boundary");
       return ctx.scheduler.runAfter(0, anyApi.agentFixture.noop, {});
     },
   },
@@ -168,7 +174,10 @@ export const paidSend = fixtureAction({
     ),
 });
 export const paidClaim = internalMutationGeneric({
-  args: { sessionId: v.id("computeSessions") },
+  args: {
+    sessionId: v.id("computeSessions"),
+    expectedDebit: v.optional(v.id("computeDebits")),
+  },
   returns: v.any(),
   handler: (ctx, args) => claimWindow(paidScheduler(ctx) as any, args, true),
 });
@@ -214,4 +223,33 @@ export const paidUser = internalMutationGeneric({
   args: {},
   returns: v.id("users"),
   handler: (ctx) => ctx.db.insert("users", {}),
+});
+
+export const paidConfirm = internalMutationGeneric({
+  args: { debitId: v.id("computeDebits") },
+  returns: v.any(),
+  handler: (ctx, args) =>
+    (settle as any)._handler(paidScheduler(ctx), {
+      ...args,
+      outcome: "confirmed",
+      responseBalance: 10,
+    }),
+});
+export const paidAllowedAt = internalMutationGeneric({
+  args: {
+    userId: v.string(),
+    sessionId: v.id("computeSessions"),
+    now: v.number(),
+  },
+  returns: v.boolean(),
+  handler: (ctx, args) =>
+    sessionAllows(ctx as any, args.sessionId, args.userId, args.now, true),
+});
+export const paidExpire = internalMutationGeneric({
+  args: { sessionId: v.id("computeSessions") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.sessionId, { paidUntil: Date.now() - 1 });
+    return null;
+  },
 });

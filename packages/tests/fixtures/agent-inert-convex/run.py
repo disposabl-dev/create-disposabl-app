@@ -1,4 +1,4 @@
-import os, subprocess, secrets, tempfile, time, urllib.request, sys, socket, pathlib
+import os, subprocess, secrets, tempfile, time, urllib.request, sys, socket, pathlib, json
 root=str(pathlib.Path(__file__).resolve().parent.parents[3])
 for port in (3540, 3541):
  with socket.socket() as probe:
@@ -27,6 +27,11 @@ try:
  run([cli,'env','set','E2E_TELEMETRY_DISABLED','1'])
  run([cli,'env','set','BOAT_API_KEY',''])
  run([cli,'env','get','E2E_TELEMETRY_DISABLED'])
+ for setting in ('E2E_TELEMETRY_DISABLED','BOAT_API_KEY','R2_ACCOUNT_ID','R2_BUCKET_NAME','R2_ACCESS_KEY_ID','R2_SECRET_ACCESS_KEY','AUTUMN_SECRET_KEY','POSTHOG_PROJECT_TOKEN','RESEND_API_KEY','AUTH_GOOGLE_CLIENT_SECRET','REVENUECAT_WEBHOOK_AUTH'):
+  request=urllib.request.Request('http://127.0.0.1:3540/api/query',data=json.dumps({'path':'_system/cli/queryEnvironmentVariables:get','args':{'name':setting},'format':'json'}).encode(),headers={'Content-Type':'application/json','Authorization':'Convex '+key})
+  response=json.load(urllib.request.urlopen(request))
+  value=(response.get('value') or {}).get('value') or ''
+  if response.get('status')!='success' or value.strip()!=('1' if setting=='E2E_TELEMETRY_DISABLED' else ''): raise RuntimeError('Unsafe local fixture setting: '+setting)
  print('Fresh isolated database; provider credentials absent, BOAT_API_KEY empty; payments feature disabled in disposabl.json.',flush=True)
  run([cli,'dev','--once','--typecheck','disable'])
  print('Product backend synchronized with inert fixture',flush=True)
