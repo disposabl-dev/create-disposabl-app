@@ -145,14 +145,61 @@ export const settle = internalMutation({
   returns: v.null(),
   handler: async (ctx, { debitId, outcome, responseBalance }) => {
     const debit = await ctx.db.get("computeDebits", debitId);
-    if (!debit || debit.state !== "dispatching") return null;
-    const session = await ctx.db.get("computeSessions", debit.sessionId);
-    if (!session || session.debitId !== debitId) return null;
+    if (!debit) return null;
     if (
       responseBalance !== undefined &&
       (!Number.isFinite(responseBalance) || outcome !== "confirmed")
     )
       throw new Error("Invalid debit response balance.");
+    const session = await ctx.db.get("computeSessions", debit.sessionId);
+    const superseded = !session || session.debitId !== debitId;
+    if (debit.state !== "dispatching" || superseded) {
+      if (
+        outcome !== "confirmed" ||
+        debit.state === "confirmed" ||
+        debit.lateConfirmation
+      )
+        return null;
+      const current =
+        session &&
+        (await ctx.db
+          .query("computeSessions")
+          .withIndex("by_userId", (q) => q.eq("userId", session.userId))
+          .order("desc")
+          .first());
+      const conflict =
+        superseded ||
+        debit.state === "denied" ||
+        debit.resolution?.outcome === "denied" ||
+        Boolean(
+          current &&
+          current._id !== session?._id &&
+          debit.resolution?.outcome !== "confirmed",
+        );
+      await ctx.db.patch("computeDebits", debitId, {
+        lateConfirmation: {
+          observedAt: Date.now(),
+          ...(responseBalance !== undefined ? { responseBalance } : {}),
+        },
+        ...(conflict ? { reconciliationConflict: true } : {}),
+      });
+      if (conflict || !debit.resolution) {
+        if (current) {
+          await ctx.db.patch("computeSessions", current._id, {
+            state: "hold",
+            ...(conflict ? { reconciliationConflict: true } : {}),
+          });
+          if (!current.stopConfirmed)
+            await ctx.scheduler.runAfter(
+              0,
+              internal.agent.actions.compute.stop,
+              { sessionId: current._id },
+            );
+        }
+      }
+      return null;
+    }
+    if (!session || session.debitId !== debitId) return null;
     await ctx.db.patch("computeDebits", debitId, {
       state: outcome,
       ...(responseBalance !== undefined ? { responseBalance } : {}),
@@ -179,7 +226,7 @@ export const settle = internalMutation({
     } else {
       await ctx.db.patch("computeSessions", session._id, {
         state:
-          outcome !== "denied"
+          outcome !== "denied" || session.reconciliationConflict
             ? "hold"
             : session.stopConfirmed
               ? "stopped"

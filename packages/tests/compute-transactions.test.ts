@@ -468,3 +468,135 @@ test(
     }
   },
 );
+
+test(
+  "timeout, operator denial and late confirmation serialize without erasing evidence",
+  { skip: !url },
+  async () => {
+    for (const ordering of [
+      "confirm-first",
+      "denial-first",
+      "race",
+      "new-session",
+      "new-session-dispatch",
+    ]) {
+      const userId = randomUUID();
+      const sessionId = await call("admit", { userId });
+      const appId = await call("app", {
+        userId,
+        sessionId,
+        threadId: randomUUID(),
+      });
+      const debit = await call("claim", { sessionId });
+      await call("crash", { debitId: debit._id });
+      await call("stop", { sessionId, token: "stop" });
+      await call("setStatus", { appId, status: "idle" });
+      await call("stoppedResult", { sessionId, token: "stop", archived: true });
+      const denial = {
+        sessionId,
+        debitId: debit._id,
+        outcome: "denied",
+        operator: "fixture",
+        evidence: "provider denial reference",
+      };
+      const confirm = {
+        debitId: debit._id,
+        outcome: "confirmed",
+        responseBalance: 3,
+      };
+      let next: string | undefined;
+      let nextDebitId: string | undefined;
+      if (ordering === "confirm-first") {
+        await call("settleDebit", confirm);
+        await assert.rejects(
+          call("resolveHold", denial),
+          /cannot be resolved as denied/,
+        );
+      } else if (ordering === "race") {
+        await Promise.allSettled([
+          call("settleDebit", confirm),
+          call("resolveHold", denial),
+        ]);
+      } else {
+        await call("resolveHold", denial);
+        if (ordering === "new-session" || ordering === "new-session-dispatch") {
+          next = await call("admit", { userId });
+          await call("app", {
+            userId,
+            sessionId: next,
+            threadId: randomUUID(),
+          });
+          const nextDebit = await call("claim", { sessionId: next });
+          nextDebitId = nextDebit._id;
+          if (ordering === "new-session") {
+            await call("settleDebit", {
+              debitId: nextDebitId,
+              outcome: "confirmed",
+            });
+            assert.equal(
+              (await call("get", { sessionId: next }, true)).state,
+              "active",
+            );
+          }
+        }
+        await call("settleDebit", confirm);
+      }
+      const before = (await call("debits", { sessionId }, true))[0];
+      assert.equal(before.state, "unknown");
+      assert.equal(before.lateConfirmation.responseBalance, 3);
+      assert.ok(before.lateConfirmation.observedAt);
+      const conflict = Boolean(before.resolution);
+      if (conflict) {
+        assert.equal(before.resolution.outcome, "denied");
+        assert.equal(before.resolution.evidence, denial.evidence);
+        assert.equal(before.reconciliationConflict, true);
+        const current = await call(
+          "get",
+          { sessionId: next ?? sessionId },
+          true,
+        );
+        assert.equal(current.state, "hold");
+        assert.equal(current.reconciliationConflict, true);
+        if (ordering === "new-session-dispatch") {
+          await call("settleDebit", {
+            debitId: nextDebitId,
+            outcome: "denied",
+          });
+          assert.equal(
+            (await call("get", { sessionId: next }, true)).state,
+            "hold",
+          );
+        }
+        assert.equal(
+          await call(
+            "allowed",
+            { sessionId: next ?? sessionId, userId, now: Date.now() },
+            true,
+          ),
+          false,
+        );
+        await assert.rejects(call("admit", { userId }), /reconciliation/);
+        if (!next)
+          await assert.rejects(
+            call("resolveHold", { ...denial, outcome: "confirmed" }),
+            /already resolved|contradictory/,
+          );
+      } else {
+        assert.equal(before.reconciliationConflict, undefined);
+        assert.equal((await call("get", { sessionId }, true)).state, "hold");
+        await assert.rejects(
+          call("resolveHold", denial),
+          /cannot be resolved as denied/,
+        );
+      }
+      await Promise.all(
+        Array.from({ length: 5 }, () =>
+          call("settleDebit", { ...confirm, responseBalance: 99 }),
+        ),
+      );
+      const after = (await call("debits", { sessionId }, true))[0];
+      assert.deepEqual(after.lateConfirmation, before.lateConfirmation);
+      assert.deepEqual(after.resolution, before.resolution);
+    }
+  },
+);

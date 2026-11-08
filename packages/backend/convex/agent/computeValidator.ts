@@ -13,6 +13,7 @@ export const computeSessionFields = {
   debitId: v.optional(v.id("computeDebits")),
   stopConfirmed: v.optional(v.boolean()),
   stopLease: v.optional(v.object({ token: v.string(), until: v.number() })),
+  reconciliationConflict: v.optional(v.boolean()),
 };
 export const computeDebitFields = {
   sessionId: v.id("computeSessions"),
@@ -25,6 +26,13 @@ export const computeDebitFields = {
   paidUntil: v.number(),
   noticeComplete: v.optional(v.boolean()),
   responseBalance: v.optional(v.number()),
+  lateConfirmation: v.optional(
+    v.object({
+      observedAt: v.number(),
+      responseBalance: v.optional(v.number()),
+    }),
+  ),
+  reconciliationConflict: v.optional(v.boolean()),
   noticeOutcome: v.optional(
     v.union(
       v.literal("queued"),
