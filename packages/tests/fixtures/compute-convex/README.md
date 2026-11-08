@@ -1,0 +1,5 @@
+# Isolated compute transaction fixture
+
+`fixtures/compute-convex` is a separate, disposable Convex project with the app schema and real compute mutation handlers. Its public fixture functions are for local tests only; never deploy it remotely or to the app backend. Provider-facing scheduled actions are inert, and its explicit `true` arguments exercise the paid state machine without enabling product payments or contacting providers. It does not prove provider behavior.
+
+From `packages/tests/fixtures/compute-convex`, start `CONVEX_AGENT_MODE=anonymous bunx convex dev --local-cloud-port 3420 --local-site-port 3421 --typecheck disable --codegen disable`. With that process running, from the repository root run `COMPUTE_FIXTURE_URL=http://127.0.0.1:3420 E2E_TELEMETRY_DISABLED=1 bun test packages/tests/compute-transactions.test.ts`. Use a fresh disposable local deployment and do not point the fixture at any existing backend. The test refuses other URLs. It verifies Convex transaction contention and state fences, not scheduling reliability, provider transactions, or deployed app behavior.
