@@ -379,3 +379,108 @@ test("monthly paywall permits only a verified current offering and fresh custome
   );
   assert.equal(shown, 1);
 });
+
+// Consumable top-ups share the session lease but do not depend on monthly checkout.
+test("native top-up fails closed and checks identity at purchase", async () => {
+  const { nativeTopupRoutes } =
+    await import("../disposabl-kit/server/billing-native-capability");
+  const { loadTopup, matchingTopupRoute, purchaseTopup } =
+    await import("../disposabl-kit/mobile/billing/topup");
+  const env = {
+    REVENUECAT_CONSUMABLE_OWNER: "custom",
+    REVENUECAT_CONSUMABLE_INTEGRATION_VERIFIED: "true",
+    REVENUECAT_WEBHOOK_AUTH: "auth",
+    REVENUECAT_PROJECT_ID: "project",
+    AUTUMN_SECRET_KEY: "key",
+    REVENUECAT_ENVIRONMENT: "SANDBOX",
+    REVENUECAT_ROUTES: JSON.stringify([
+      { app: "apple", store: "APP_STORE", product: "coins" },
+    ]),
+  };
+  assert.deepEqual(nativeTopupRoutes(false, env), []);
+  for (const change of [
+    { REVENUECAT_CONSUMABLE_OWNER: "managed" },
+    { REVENUECAT_CONSUMABLE_INTEGRATION_VERIFIED: "false" },
+    { REVENUECAT_ROUTES: "[]" },
+    { REVENUECAT_WEBHOOK_AUTH: "" },
+  ])
+    assert.deepEqual(nativeTopupRoutes(true, { ...env, ...change }), []);
+  const snapshot = {
+    customerId: "user",
+    nativeTopupRoutes: nativeTopupRoutes(true, env),
+  };
+  assert.equal(matchingTopupRoute(snapshot, "ios", "apple", "coins"), true);
+  assert.equal(
+    matchingTopupRoute(snapshot, "android", "apple", "coins"),
+    false,
+  );
+  const product = {
+    identifier: "coins",
+    productCategory: "NON_SUBSCRIPTION",
+    productType: "CONSUMABLE",
+    priceString: "$5.00",
+  };
+  let purchases = 0;
+  const sdk = {
+    PRODUCT_CATEGORY: { NON_SUBSCRIPTION: "NON_SUBSCRIPTION" },
+    getProducts: async () => [product],
+    getAppUserID: async () => "user",
+    canMakePayments: async () => true,
+    purchaseStoreProduct: async () => {
+      purchases++;
+    },
+  };
+  for (const bad of [
+    { ...product, identifier: "other" },
+    { ...product, productCategory: "SUBSCRIPTION" },
+    { ...product, productType: "UNKNOWN" },
+  ])
+    assert.equal(
+      await loadTopup(
+        { ...sdk, getProducts: async () => [bad] } as never,
+        "ios",
+        "coins",
+      ),
+      null,
+    );
+  assert.ok(
+    await loadTopup(
+      {
+        ...sdk,
+        getProducts: async () => [{ ...product, productType: "UNKNOWN" }],
+      } as never,
+      "android",
+      "coins",
+    ),
+  );
+  const run = (overrides = {}, state = snapshot, current = () => true) =>
+    purchaseTopup(
+      { ...sdk, ...overrides } as never,
+      async () => state,
+      current,
+      "user",
+      "ios",
+      "apple",
+      "coins",
+    );
+  await assert.rejects(run({ getAppUserID: async () => "other" }));
+  await assert.rejects(run({ canMakePayments: async () => false }));
+  await assert.rejects(run({}, { ...snapshot, nativeTopupRoutes: [] }));
+  await assert.rejects(run({}, snapshot, () => false));
+  let current = true;
+  await assert.rejects(
+    run(
+      {
+        getProducts: async () => {
+          current = false;
+          return [product];
+        },
+      },
+      snapshot,
+      () => current,
+    ),
+  );
+  assert.equal(purchases, 0);
+  await run();
+  assert.equal(purchases, 1);
+});

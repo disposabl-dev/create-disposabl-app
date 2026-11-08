@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState, Platform, Text, View } from "react-native";
 import { billingSession } from "../../../../../packages/disposabl-kit/mobile/billing/session";
 import { useWebCheckout } from "../../../../../packages/disposabl-kit/mobile/billing/web-checkout";
+import { useTopup } from "../../../../../packages/disposabl-kit/mobile/billing/use-topup";
+import { creditQuantity } from "../../../../../packages/disposabl-kit/payments/config";
 import { Action } from "../studio/ui";
 import {
   presentMonthlyPaywall,
@@ -20,7 +22,7 @@ export function PaymentGate({
   cancel,
 }: {
   customerId: string;
-  data: BillingSnapshot | null;
+  data: (BillingSnapshot & { monthlyCheckoutPending?: boolean }) | null;
   refresh: () => Promise<number | null>;
   proceed: () => void;
   cancel: () => void;
@@ -57,13 +59,16 @@ export function PaymentGate({
       : process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_MONTHLY_PRODUCT;
   const webSnapshot = useCallback(() => snapshot({}), [snapshot]);
   const web = useWebCheckout(customerId, version, key, productId, webSnapshot);
+  const topup = useTopup(customerId, version, key, webSnapshot, refresh);
   async function purchase() {
     if (
       !key ||
       !productId ||
       !data?.nativeSubscriptionsEnabled ||
       data.hasMonthlyPlan !== false ||
-      busy
+      data.monthlyCheckoutPending !== false ||
+      busy ||
+      topup.busy
     )
       return;
     if (!billingSession.beginTransaction()) return;
@@ -79,8 +84,14 @@ export function PaymentGate({
         ),
       );
       await refresh();
-    } catch {
-      setError("Store purchase is unavailable. Please try again later.");
+    } catch (error) {
+      setError(
+        error instanceof Error &&
+          error.message ===
+            "Finish or cancel your website checkout before subscribing here."
+          ? error.message
+          : "Store purchase is unavailable. Please try again later.",
+      );
     } finally {
       billingSession.endTransaction();
       setBusy(false);
@@ -92,9 +103,13 @@ export function PaymentGate({
         Credits: {data?.balance ?? "unavailable"}
       </Text>
       <Text className="text-muted-foreground">
-        At least 10 credits are needed to start. Native top-ups are not
-        available yet.
+        At least 10 credits are needed to start.
       </Text>
+      {data?.monthlyCheckoutPending && (
+        <Text className={"text-muted-foreground"}>
+          Finish or cancel your website checkout before subscribing here.
+        </Text>
+      )}
       {data?.nativeSubscriptionsEnabled &&
       data.hasMonthlyPlan === false &&
       key &&
@@ -102,7 +117,12 @@ export function PaymentGate({
         <Action
           label="View subscription"
           onPress={() => void purchase()}
-          disabled={busy || web.busy}
+          disabled={
+            busy ||
+            web.busy ||
+            topup.busy ||
+            data.monthlyCheckoutPending !== false
+          }
         />
       ) : (
         <Text className="text-muted-foreground">
@@ -118,8 +138,20 @@ export function PaymentGate({
               if (!opened) awaitingReturn.current = false;
             });
           }}
-          disabled={busy || web.busy}
+          disabled={busy || web.busy || topup.busy}
         />
+      )}
+      {topup.product && (
+        <Action
+          label={`Buy ${creditQuantity("topup")} credits · ${topup.product.priceString}`}
+          onPress={() => void topup.purchase()}
+          disabled={busy || web.busy || topup.busy}
+        />
+      )}
+      {!!topup.message && (
+        <Text accessibilityRole="alert" className="text-muted-foreground">
+          {topup.message}
+        </Text>
       )}
       <Action
         label="Refresh credits"

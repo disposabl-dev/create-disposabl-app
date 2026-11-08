@@ -9,12 +9,15 @@ import { presentMonthlyPaywall, validMonthlyOffering } from "./paywall";
 import { creditQuantity, monthlyLabel } from "../../payments/config";
 import { paymentOptions, storeEligibility } from "./policy";
 import { useWebCheckout } from "./web-checkout";
+import { useTopup } from "./use-topup";
+import type { TopupRoute } from "./topup";
 
 type Snapshot = {
   balance: number | null;
   hasMonthlyPlan: boolean | null;
-  nativeSubscriptionsEnabled: boolean;
   monthlyCheckoutPending: boolean;
+  nativeSubscriptionsEnabled: boolean;
+  nativeTopupRoutes: TopupRoute[];
   mobileWebCheckoutEnabled: boolean;
   customerId: string;
 };
@@ -123,8 +126,26 @@ export function AccountBilling({ customerId }: { customerId: string }) {
     webSnapshot,
   );
 
+  const refreshBalance = useCallback(
+    () => refresh(generation.current),
+    [refresh],
+  );
+  const topup = useTopup(
+    customerId,
+    generation,
+    key,
+    webSnapshot,
+    refreshBalance,
+  );
+
   async function transact(restore: boolean) {
-    if (operation.current || !key || !billingSession.beginTransaction()) return;
+    if (
+      operation.current ||
+      topup.busy ||
+      !key ||
+      !billingSession.beginTransaction()
+    )
+      return;
     operation.current = true;
     const version = generation.current;
     setBusy(true);
@@ -162,9 +183,13 @@ export function AccountBilling({ customerId }: { customerId: string }) {
           (error as { userCancelled?: boolean })?.userCancelled
             ? "Purchase cancelled."
             : error instanceof Error &&
-                error.message === "existing_subscription"
-              ? "You already have a subscription. Manage it where you purchased it."
-              : "Could not complete the store request. Refresh before trying again.",
+                error.message ===
+                  "Finish or cancel your website checkout before subscribing here."
+              ? error.message
+              : error instanceof Error &&
+                  error.message === "existing_subscription"
+                ? "You already have a subscription. Manage it where you purchased it."
+                : "Could not complete the store request. Refresh before trying again.",
         );
     } finally {
       operation.current = false;
@@ -196,10 +221,21 @@ export function AccountBilling({ customerId }: { customerId: string }) {
           Your monthly plan is active or scheduled.
         </Text>
       )}
+      {data?.monthlyCheckoutPending && (
+        <Text className={authClasses.body}>
+          Finish or cancel your website checkout before subscribing here.
+        </Text>
+      )}
       {monthly ? (
         <AuthButton
           title={`${monthly.product.priceString} / month`}
-          disabled={busy || web.busy || data?.hasMonthlyPlan !== false}
+          disabled={
+            busy ||
+            web.busy ||
+            topup.busy ||
+            data?.hasMonthlyPlan !== false ||
+            data?.monthlyCheckoutPending !== false
+          }
           onPress={() => void transact(false)}
         />
       ) : (
@@ -210,13 +246,22 @@ export function AccountBilling({ customerId }: { customerId: string }) {
       {web.available && (
         <AuthButton
           title="Buy monthly on website"
-          disabled={busy || web.busy}
+          disabled={busy || web.busy || topup.busy}
           onPress={() => void web.open()}
         />
       )}
-      <Text className={authClasses.body}>
-        Native top-ups are not available yet. Existing credits work here.
-      </Text>
+      {topup.product && (
+        <AuthButton
+          title={`Buy ${creditQuantity("topup")} credits · ${topup.product.priceString}`}
+          disabled={busy || web.busy || topup.busy}
+          onPress={() => void topup.purchase()}
+        />
+      )}
+      {!!topup.message && (
+        <Text accessibilityRole="alert" className={authClasses.body}>
+          {topup.message}
+        </Text>
+      )}
       <AuthButton
         title="Refresh credits"
         disabled={busy}

@@ -8,6 +8,7 @@ import {
 } from "../../backend/convex/_generated/server";
 import { paymentsEnabled } from "../features";
 import { setupBilling } from "./billing-setup";
+import { nativeTopupRoutes } from "./billing-native-capability";
 import {
   balanceFromCustomer,
   monthlyPlanFromCustomer,
@@ -209,6 +210,9 @@ export const snapshot = action({
     balance: v.union(v.number(), v.null()),
     hasMonthlyPlan: v.union(v.boolean(), v.null()),
     nativeSubscriptionsEnabled: v.boolean(),
+    nativeTopupRoutes: v.array(
+      v.object({ app: v.string(), store: v.string(), product: v.string() }),
+    ),
     mobileWebCheckoutEnabled: v.boolean(),
     checkoutNeedsReview: v.boolean(),
     monthlyCheckoutPending: v.boolean(),
@@ -225,6 +229,7 @@ export const snapshot = action({
         hasMonthlyPlan: monthlyPlanFromCustomer(customer),
         nativeSubscriptionsEnabled:
           process.env.REVENUECAT_SYNC_ENABLED === "true",
+        nativeTopupRoutes: nativeTopupRoutes(paymentsEnabled, process.env),
         mobileWebCheckoutEnabled: mobileWebCheckoutConfigured(
           paymentsEnabled,
           process.env,
