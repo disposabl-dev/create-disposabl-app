@@ -18,6 +18,7 @@ import { v } from "convex/values";
 import {
   requestDeletion,
   deletionStatus,
+  ensureDeletionReceipt,
 } from "../../../../backend/convex/users/index";
 import {
   deletionPending,
@@ -213,4 +214,46 @@ export const owned = query({
       .withIndex("by_userId_owner", (q) => q.eq("userId", a.userId))
       .take(100),
   }),
+});
+
+import {
+  lookup as receiptLookup,
+  pending as receiptPending,
+} from "../../../../backend/convex/users/receipts";
+export const ensureReceipt = mutation({
+  args: { userId: v.union(v.id("users"), v.null()) },
+  handler: (ctx, args) =>
+    (ensureDeletionReceipt as any)._handler(identity(ctx, args.userId), {}),
+});
+export const legacyRequest = mutation({
+  args: { userId: v.id("users"), requestedAt: v.number() },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.userId, { deletionRequestedAt: args.requestedAt });
+  },
+});
+export const removeUser = mutation({
+  args: { userId: v.id("users") },
+  handler: async (ctx, { userId }) => {
+    await ctx.db.delete(userId);
+  },
+});
+export const lookupReceipt = query({
+  args: { reference: v.string() },
+  handler: (ctx, args) => (receiptLookup as any)._handler(ctx, args),
+});
+export const receiptQueue = query({
+  args: {},
+  handler: (ctx) =>
+    (receiptPending as any)._handler(ctx, {
+      paginationOpts: { numItems: 100, cursor: null },
+    }),
+});
+export const requestRollback = mutation({
+  args: { userId: v.id("users") },
+  handler: async (ctx, args) => {
+    await (requestDeletion as any)._handler(identity(ctx, args.userId), {
+      confirmation: "DELETE",
+    });
+    throw new Error("synthetic receipt rollback");
+  },
 });

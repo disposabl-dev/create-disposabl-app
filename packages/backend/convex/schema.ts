@@ -33,6 +33,13 @@ import {
 } from "./connections/validator";
 
 export default defineSchema({
+  deletionReceipts: defineTable({
+    reference: v.string(),
+    ownerId: v.string(),
+    requestedAt: v.number(),
+  })
+    .index("by_owner", ["ownerId"])
+    .index("by_reference", ["reference"]),
   telemetryIssuance: defineTable({
     key: v.literal("global"),
     tokens: v.number(),

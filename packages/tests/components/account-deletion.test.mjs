@@ -11,6 +11,7 @@ let authenticated = false,
 let mutation = mock(async () => ({
   status: "requested",
   requestedAt: 1700000000000,
+  reference: "fixture-reference",
 }));
 mock.module("../../disposabl-kit/features", () => ({
   authenticationEnabled: authEnabled,
@@ -49,6 +50,7 @@ afterEach(async () => {
   mutation = mock(async () => ({
     status: "requested",
     requestedAt: 1700000000000,
+    reference: "fixture-reference",
   }));
 });
 
@@ -71,11 +73,23 @@ test("loading and recorded status preserve access without claiming completion", 
   status = undefined;
   await refresh();
   expect(text()).toContain("Loading deletion request status");
-  status = { status: "requested", requestedAt: 1700000000000 };
+  status = {
+    status: "requested",
+    requestedAt: 1700000000000,
+    reference: "fixture-reference",
+  };
   await refresh();
   expect(text()).toContain("Account deletion requested on");
   expect(text()).toContain("deletion is not confirmed");
   expect(buttons()).toHaveLength(0);
+  const link = renderer.root.findByType("a");
+  expect(link.props.download).toBe("deletion-request-fixture-reference.txt");
+  const receipt = decodeURIComponent(link.props.href.split(",")[1]);
+  expect(receipt).toContain("Reference: fixture-reference");
+  expect(receipt).toContain("Publisher: Yast AI");
+  expect(receipt).toContain("Support: vivek@yast.ai");
+  expect(receipt).toContain("Status: requested");
+  expect(receipt).toContain("Deletion is not confirmed.");
 });
 
 test("confirmation, cancel, in-flight lock and mutation response survive stale query", async () => {
@@ -108,7 +122,11 @@ test("confirmation, cancel, in-flight lock and mutation response survive stale q
   expect(text()).toContain("Submitting your request");
   expect(buttons().every((button) => button.props.disabled)).toBe(true);
   await act(async () =>
-    resolve({ status: "requested", requestedAt: 1700000000000 }),
+    resolve({
+      status: "requested",
+      requestedAt: 1700000000000,
+      reference: "fixture-reference",
+    }),
   );
   expect(text()).toContain("deletion is not confirmed");
   await refresh();
@@ -130,7 +148,11 @@ test("ambiguous mutation failure asks to check status; later query wins", async 
   );
   await act(async () => buttons()[0].props.onClick());
   expect(text()).toContain("could not confirm your request");
-  status = { status: "requested", requestedAt: 1700000000000 };
+  status = {
+    status: "requested",
+    requestedAt: 1700000000000,
+    reference: "fixture-reference",
+  };
   await refresh();
   expect(text()).toContain("Account deletion requested on");
 });
@@ -148,4 +170,15 @@ test("query failure does not offer a request", async () => {
   }
   expect(text()).toContain("could not load your deletion request status");
   expect(buttons()).toHaveLength(0);
+});
+
+test("legacy request can create a receipt without a new request", async () => {
+  if (!authEnabled) return;
+  authenticated = true;
+  status = { status: "requested", requestedAt: 1700000000000, reference: null };
+  await render();
+  expect(text()).toContain("Create request receipt");
+  await act(async () => buttons()[0].props.onClick());
+  expect(mutation).toHaveBeenCalledWith({});
+  expect(text()).toContain("fixture-reference");
 });

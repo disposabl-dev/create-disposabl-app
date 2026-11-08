@@ -2,6 +2,7 @@ import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { Component, useRef, useState, type ReactNode } from "react";
 import { api } from "../../../backend/convex/_generated/api";
 import { authenticationEnabled } from "../../features";
+import { publisher } from "../../legal/publisher";
 
 export function AccountDeletion() {
   return authenticationEnabled ? <AuthenticatedDeletion /> : null;
@@ -49,11 +50,16 @@ class StatusBoundary extends Component<
   }
 }
 
-type Requested = { status: "requested"; requestedAt: number };
+type Requested = {
+  status: "requested";
+  requestedAt: number;
+  reference: string | null;
+};
 
 function DeletionRequest() {
   const status = useQuery(api.users.index.deletionStatus, {});
   const requestDeletion = useMutation(api.users.index.requestDeletion);
+  const ensureReceipt = useMutation(api.users.index.ensureDeletionReceipt);
   const [submitted, setSubmitted] = useState<Requested | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [confirmation, setConfirmation] = useState("");
@@ -74,7 +80,21 @@ function DeletionRequest() {
       setSending(false);
     }
   };
-  const requested = status || submitted;
+  const requested = status?.reference ? status : submitted || status;
+  const backfill = async () => {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    setSending(true);
+    setFailed(false);
+    try {
+      setSubmitted(await ensureReceipt({}));
+    } catch {
+      setFailed(true);
+    } finally {
+      inFlight.current = false;
+      setSending(false);
+    }
+  };
   if (requested)
     return (
       <section className="mt-8" role="status">
@@ -86,6 +106,34 @@ function DeletionRequest() {
           The request is recorded; deletion is not confirmed. Connected services
           or running work may still require attention.
         </p>
+        {requested.reference ? (
+          <>
+            <p>Request reference: {requested.reference}</p>
+            <a
+              className="underline"
+              download={`deletion-request-${requested.reference}.txt`}
+              href={`data:text/plain;charset=utf-8,${encodeURIComponent(
+                `Account deletion request receipt\nReference: ${requested.reference}\nRequested at: ${new Date(requested.requestedAt).toISOString()}\nPublisher: ${publisher.operatorName}\nSupport: ${publisher.privacyEmail}\nStatus: requested\nDeletion is not confirmed.\n`,
+              )}`}
+            >
+              Download request receipt
+            </a>
+          </>
+        ) : (
+          <button
+            type="button"
+            className="underline"
+            disabled={sending}
+            onClick={() => void backfill()}
+          >
+            {sending ? "Preparing receipt..." : "Create request receipt"}
+          </button>
+        )}
+        {failed && (
+          <p role="alert">
+            We could not prepare your receipt. Please try again.
+          </p>
+        )}
       </section>
     );
   if (status === undefined)

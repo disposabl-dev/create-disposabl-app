@@ -38,22 +38,36 @@ test(
     assert.ok(
       results.every(
         (x) =>
-          x.status === "requested" && x.requestedAt === results[0].requestedAt,
+          x.status === "requested" &&
+          x.requestedAt === results[0].requestedAt &&
+          x.reference === results[0].reference,
       ),
     );
     assert.deepEqual(await call("status", { userId: alice }, true), results[0]);
     assert.equal(await call("status", { userId: bob }, true), null);
+    await assert.rejects(
+      call("requestRollback", { userId: bob }),
+      /synthetic receipt rollback/,
+    );
+    assert.equal(await call("status", { userId: bob }, true), null);
+    assert.ok(
+      !(await call("receiptQueue", {}, true)).page.some(
+        (receipt: any) => receipt.ownerId === bob,
+      ),
+    );
+    const otherReceipt = await call("request", {
+      userId: bob,
+      confirmation: "DELETE",
+    });
+    assert.notEqual(otherReceipt.reference, results[0].reference);
     assert.equal(await call("pending", { userId: alice }, true), true);
-    assert.equal(await call("pending", { userId: bob }, true), false);
+    assert.equal(await call("pending", { userId: bob }, true), true);
     const queue = await call("queue", {}, true);
     assert.equal(
       queue.page.filter((row: any) => row.userId === alice).length,
       1,
     );
-    assert.equal(
-      queue.page.some((row: any) => row.userId === bob),
-      false,
-    );
+    assert.equal(queue.page.filter((row: any) => row.userId === bob).length, 1);
   },
 );
 
@@ -186,5 +200,51 @@ test(
     await assert.rejects(call("registerFile", { userId }), /Account deletion/);
     const rows = await call("owned", { userId }, true);
     assert.equal(rows.files.length, results[1].status === "fulfilled" ? 1 : 0);
+  },
+);
+
+test(
+  "receipts backfill legacy requests and survive synthetic user removal",
+  { skip: !url },
+  async () => {
+    const owner = await call("create", { label: randomUUID() });
+    const other = await call("create", { label: randomUUID() });
+    await assert.rejects(call("ensureReceipt", { userId: null }), /Sign in/);
+    await assert.rejects(call("ensureReceipt", { userId: other }), /not found/);
+    await call("legacyRequest", { userId: owner, requestedAt: 123456 });
+    assert.deepEqual(await call("status", { userId: owner }, true), {
+      status: "requested",
+      requestedAt: 123456,
+      reference: null,
+    });
+    const receipts = await Promise.all(
+      Array.from({ length: 5 }, () => call("ensureReceipt", { userId: owner })),
+    );
+    assert.ok(
+      receipts.every(
+        (receipt) =>
+          receipt.reference === receipts[0].reference &&
+          receipt.requestedAt === 123456,
+      ),
+    );
+    const ref = receipts[0].reference;
+    assert.equal(await call("status", { userId: other }, true), null);
+    assert.deepEqual(await call("lookupReceipt", { reference: ref }, true), {
+      reference: ref,
+      ownerId: owner,
+      requestedAt: 123456,
+    });
+    await call("removeUser", { userId: owner });
+    assert.equal(await call("status", { userId: owner }, true), null);
+    assert.deepEqual(await call("lookupReceipt", { reference: ref }, true), {
+      reference: ref,
+      ownerId: owner,
+      requestedAt: 123456,
+    });
+    assert.ok(
+      (await call("receiptQueue", {}, true)).page.some(
+        (receipt: any) => receipt.reference === ref,
+      ),
+    );
   },
 );

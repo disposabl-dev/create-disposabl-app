@@ -1,6 +1,13 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 export default defineSchema({
+  deletionReceipts: defineTable({
+    reference: v.string(),
+    ownerId: v.string(),
+    requestedAt: v.number(),
+  })
+    .index("by_owner", ["ownerId"])
+    .index("by_reference", ["reference"]),
   users: defineTable({
     deletionRequestedAt: v.optional(v.number()),
     deletionStop: v.optional(

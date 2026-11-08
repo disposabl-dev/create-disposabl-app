@@ -12,6 +12,7 @@ import {
 } from "../create-disposabl-app/options";
 
 const excluded = [
+  "packages/backend/convex/users/receipts.ts",
   "packages/tests/legal-product-providers.test.ts",
   "packages/tests/fixtures/file-deletion-convex",
   "packages/backend/convex/users/fileDeletion.ts",
