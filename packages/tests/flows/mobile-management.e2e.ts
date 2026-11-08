@@ -155,6 +155,12 @@ test(
       ).toBeVisible();
       await screen.getByRole("button", "Back to idea").tap();
       await expect(idea).toHaveValue(draft);
+      await screen.getByRole("button", "Send message", { exact: true }).tap();
+      await expect(
+        screen.getByRole("button", "Connect accounts"),
+      ).toBeVisible();
+      await screen.getByRole("button", "Back to idea").tap();
+      await expect(idea).toHaveValue(draft);
       await screen.getByRole("button", "Close create app").tap();
     }
     await expect(
@@ -207,6 +213,11 @@ test(
     await expect(
       screen.getByRole("button", "Create app", { exact: true }),
     ).toBeVisible();
+    await screen.getByRole("button", "Settings", { exact: true }).tap();
+    await expect(
+      screen.getByRole("button", "Sign in", { exact: true }),
+    ).toBeVisible();
+    await openMobile({ app, device, screen }, true);
     await screen.getByRole("button", "Settings", { exact: true }).tap();
     await expect(
       screen.getByRole("button", "Sign in", { exact: true }),
