@@ -1,7 +1,7 @@
 import { useAction } from "convex/react";
 import { api } from "../../../../../packages/backend/convex/_generated/api";
 import { useEffect, useRef, useState } from "react";
-import { Platform, Text, View } from "react-native";
+import { AppState, Platform, Text, View } from "react-native";
 import { billingSession } from "../../../../../packages/disposabl-kit/mobile/billing/session";
 import { Action } from "../studio/ui";
 import {
@@ -29,10 +29,16 @@ export function PaymentGate({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   useEffect(() => {
-    const selected = billingSession.select(customerId);
+    const selected = billingSession.acquire(customerId);
     version.current = selected;
     return () => billingSession.release(customerId, selected);
   }, [customerId]);
+  useEffect(() => {
+    const listener = AppState.addEventListener("change", (state) => {
+      if (state === "active") void refresh();
+    });
+    return () => listener.remove();
+  }, [refresh]);
   const key =
     Platform.OS === "ios"
       ? process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY
@@ -50,6 +56,7 @@ export function PaymentGate({
       busy
     )
       return;
+    if (!billingSession.beginTransaction()) return;
     setBusy(true);
     setError("");
     try {
@@ -65,6 +72,7 @@ export function PaymentGate({
     } catch {
       setError("Store purchase is unavailable. Please try again later.");
     } finally {
+      billingSession.endTransaction();
       setBusy(false);
     }
   }

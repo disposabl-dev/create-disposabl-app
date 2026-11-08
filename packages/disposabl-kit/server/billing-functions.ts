@@ -34,6 +34,7 @@ export const snapshot = action({
     balance: v.union(v.number(), v.null()),
     hasMonthlyPlan: v.union(v.boolean(), v.null()),
     nativeSubscriptionsEnabled: v.boolean(),
+    mobileWebCheckoutEnabled: v.boolean(),
   }),
   handler: async (ctx) => {
     const { key, userId } = await context(ctx);
@@ -46,6 +47,9 @@ export const snapshot = action({
         hasMonthlyPlan: monthlyPlanFromCustomer(customer),
         nativeSubscriptionsEnabled:
           process.env.REVENUECAT_SYNC_ENABLED === "true",
+        // Attach may charge a saved card before returning a URL. Keep this
+        // closed until a confirm-first checkout is verified end to end.
+        mobileWebCheckoutEnabled: false,
       };
     } catch {
       throw new Error("Billing is temporarily unavailable.");

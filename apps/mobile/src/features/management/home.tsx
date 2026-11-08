@@ -1,7 +1,7 @@
 import { useConvexAuth, useAction, useMutation, useQuery } from "convex/react";
 import { ConvexError } from "convex/values";
 import { router, useLocalSearchParams } from "expo-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ActivityIndicator, Text, View } from "react-native";
 import { api } from "../../../../../packages/backend/convex/_generated/api";
 import {
@@ -96,13 +96,15 @@ function Composer() {
   const handoff = useMutation(api.browserHandoff.create);
   const [phase, setPhase] = useState<"payment" | "connections" | null>(null);
   const [billing, setBilling] = useState<BillingSnapshot | null>(null);
+  const billingSequence = useRef(0);
   const c = useTheme();
   async function refreshBalance() {
+    const sequence = ++billingSequence.current;
     try {
       const data = await snapshot({});
-      if (isActive()) setBilling(data);
+      if (isActive() && sequence === billingSequence.current) setBilling(data);
     } catch {
-      if (isActive()) setBilling(null);
+      if (isActive() && sequence === billingSequence.current) setBilling(null);
     }
   }
   async function submit(text: string) {
@@ -113,17 +115,18 @@ function Composer() {
     let started = false;
     try {
       if (paymentsEnabled) {
+        const sequence = ++billingSequence.current;
         let data: BillingSnapshot;
         try {
           data = await snapshot({});
         } catch {
-          if (isActive()) {
+          if (isActive() && sequence === billingSequence.current) {
             setBilling(null);
             setPhase("payment");
           }
           return;
         }
-        if (!isActive()) return;
+        if (!isActive() || sequence !== billingSequence.current) return;
         setBilling(data);
         if (
           nextSubmissionStep(true, data.balance, true, false, false) ===

@@ -93,12 +93,14 @@ function Chat({ appId }: { appId: string }) {
   const user = useQuery(api.users.index.current, {});
   const [payment, setPayment] = useState(false);
   const [billing, setBilling] = useState<BillingSnapshot | null>(null);
+  const billingSequence = useRef(0);
   async function refreshBalance() {
+    const sequence = ++billingSequence.current;
     try {
       const value = await snapshot({});
-      if (isActive()) setBilling(value);
+      if (isActive() && sequence === billingSequence.current) setBilling(value);
     } catch {
-      if (isActive()) setBilling(null);
+      if (isActive() && sequence === billingSequence.current) setBilling(null);
     }
   }
   const [prompt, setPrompt] = useState("");
@@ -112,17 +114,18 @@ function Chat({ appId }: { appId: string }) {
     let started = false;
     try {
       if (paymentsEnabled) {
+        const sequence = ++billingSequence.current;
         let data: BillingSnapshot;
         try {
           data = await snapshot({});
         } catch {
-          if (isActive()) {
+          if (isActive() && sequence === billingSequence.current) {
             setBilling(null);
             setPayment(true);
           }
           return;
         }
-        if (!isActive()) return;
+        if (!isActive() || sequence !== billingSequence.current) return;
         setBilling(data);
         if (
           nextSubmissionStep(true, data.balance, true, false, false) ===

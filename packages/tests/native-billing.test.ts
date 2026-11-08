@@ -3,6 +3,10 @@ import assert from "node:assert/strict";
 import { BillingSession } from "../disposabl-kit/mobile/billing/session";
 import { pricing } from "../disposabl-kit/payments/config";
 import { monthlyPlanFromCustomer } from "../disposabl-kit/server/billing";
+import {
+  paymentOptions,
+  storeEligibility,
+} from "../disposabl-kit/mobile/billing/policy";
 
 function deferred() {
   let resolve!: () => void;
@@ -13,6 +17,104 @@ function deferred() {
     resolve: () => resolve(),
   };
 }
+
+test("retained gate and account keep separate leases across focus and in-flight work", async () => {
+  const started = deferred();
+  const finish = deferred();
+  const session = new BillingSession(async () => ({ configure() {} }) as never);
+  const gate = session.acquire("alice");
+  const purchase = session.run("alice", gate, "key", async () => {
+    started.resolve();
+    await finish.promise;
+    return "result";
+  });
+  await started.promise;
+  const account = session.acquire("alice");
+  assert.equal(session.current("alice", gate), true);
+  assert.equal(session.current("alice", account), true);
+  assert.equal(session.beginTransaction(), true);
+  assert.equal(session.beginTransaction(), false);
+  session.endTransaction();
+  session.release("alice", account);
+  assert.equal(session.current("alice", gate), true);
+  finish.resolve();
+  assert.equal(await purchase, "result");
+  const returnedAccount = session.acquire("alice");
+  const pending = session.run("alice", returnedAccount, "key", async () => {
+    await finish.promise;
+    return true;
+  });
+  session.release("alice", returnedAccount);
+  await assert.rejects(pending, /account changed/);
+  assert.equal(session.current("alice", gate), true);
+  const bob = session.acquire("bob");
+  assert.equal(session.current("alice", gate), false);
+  session.release("alice", gate);
+  assert.equal(session.current("bob", bob), true);
+});
+
+test("account switch invalidates all retained views while work is in flight", async () => {
+  const started = deferred();
+  const finish = deferred();
+  const session = new BillingSession(async () => ({ configure() {} }) as never);
+  const gate = session.acquire("alice");
+  const account = session.acquire("alice");
+  const pending = session.run("alice", gate, "key", async () => {
+    started.resolve();
+    await finish.promise;
+  });
+  const rejected = assert.rejects(pending, /account changed/);
+  await started.promise;
+  const bob = session.acquire("bob");
+  assert.equal(session.current("alice", account), false);
+  finish.resolve();
+  await rejected;
+  assert.equal(session.current("bob", bob), true);
+});
+
+test("storefront policy fails closed and Android never offers web", async () => {
+  const base = {
+    platform: "ios",
+    storefront: "USA",
+    paymentsEnabled: true,
+    webCheckoutEnabled: true,
+    nativeReady: true,
+    canMakePayments: true,
+  };
+  assert.deepEqual(paymentOptions(base), { native: true, web: true });
+  for (const change of [
+    { storefront: null },
+    { storefront: "CAN" },
+    { platform: "android" },
+    { webCheckoutEnabled: false },
+    { nativeReady: false },
+    { canMakePayments: false },
+    { paymentsEnabled: false },
+  ])
+    assert.equal(paymentOptions({ ...base, ...change }).web, false);
+  assert.deepEqual(
+    await storeEligibility(
+      {
+        canMakePayments: async () => true,
+        getStorefront: async () => ({ countryCode: "USA" }),
+      } as never,
+      "ios",
+    ),
+    { canMakePayments: true, storefront: "USA" },
+  );
+  assert.deepEqual(
+    await storeEligibility(
+      {
+        canMakePayments: async () => true,
+        getStorefront: async () => {
+          throw new Error("unknown");
+        },
+      } as never,
+      "ios",
+    ),
+    { canMakePayments: true, storefront: null },
+  );
+});
 
 test("monthly state includes scheduled plans and fails closed for unknown responses", () => {
   assert.equal(monthlyPlanFromCustomer({ subscriptions: [] }), false);
@@ -158,6 +260,7 @@ test("monthly paywall permits only a verified current offering and fresh custome
   });
   let shown = 0;
   const sdk = {
+    canMakePayments: async () => true,
     getCustomerInfo: async () => ({ activeSubscriptions: [] }),
     getOfferings: async () => ({ current: { availablePackages: [monthly] } }),
   };
@@ -176,6 +279,16 @@ test("monthly paywall permits only a verified current offering and fresh custome
     "cancelled",
   );
   assert.equal(shown, 1);
+  await assert.rejects(
+    presentMonthlyPaywall(
+      { ...sdk, canMakePayments: async () => false } as never,
+      snapshot,
+      () => true,
+      "monthly",
+      show,
+    ),
+    /restricted/,
+  );
   await assert.rejects(
     presentMonthlyPaywall(
       sdk as never,

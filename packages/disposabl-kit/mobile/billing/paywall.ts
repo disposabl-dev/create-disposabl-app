@@ -7,7 +7,10 @@ export type BillingSnapshot = {
   nativeSubscriptionsEnabled: boolean;
 };
 
-type Store = Pick<typeof Purchases, "getCustomerInfo" | "getOfferings">;
+type Store = Pick<
+  typeof Purchases,
+  "getCustomerInfo" | "getOfferings" | "canMakePayments"
+>;
 type Outcome = "purchased" | "restored" | "cancelled";
 
 /** Reject mixed offerings until top-up synchronization is verified. */
@@ -42,6 +45,9 @@ export async function presentMonthlyPaywall(
   check();
   if (!snapshot.nativeSubscriptionsEnabled || snapshot.hasMonthlyPlan !== false)
     throw new Error("existing_subscription");
+  if (!(await sdk.canMakePayments()))
+    throw new Error("Payments are restricted.");
+  check();
   const info = await sdk.getCustomerInfo();
   check();
   if (info.activeSubscriptions.length) throw new Error("existing_subscription");

@@ -6,6 +6,8 @@ type SDK = typeof Purchases;
 export class BillingSession {
   private generation = 0;
   private owner: string | null = null;
+  private leases = new Set<number>();
+  private transaction = false;
   private queue: Promise<unknown> = Promise.resolve();
   private sdk: SDK | undefined;
   private configuredKey: string | undefined;
@@ -15,15 +17,41 @@ export class BillingSession {
 
   select(owner: string | null) {
     this.owner = owner;
-    return ++this.generation;
+    this.leases.clear();
+    const generation = ++this.generation;
+    if (owner) this.leases.add(generation);
+    return generation;
+  }
+
+  acquire(owner: string) {
+    if (this.owner !== owner) {
+      this.owner = owner;
+      this.leases.clear();
+    }
+    const generation = ++this.generation;
+    this.leases.add(generation);
+    return generation;
   }
 
   current(owner: string, generation: number) {
-    return this.owner === owner && this.generation === generation;
+    return this.owner === owner && this.leases.has(generation);
+  }
+
+  beginTransaction() {
+    if (this.transaction) return false;
+    this.transaction = true;
+    return true;
+  }
+
+  endTransaction() {
+    this.transaction = false;
   }
 
   release(owner: string, generation: number) {
-    if (this.current(owner, generation)) this.select(null);
+    if (this.current(owner, generation)) {
+      this.leases.delete(generation);
+      if (!this.leases.size) this.owner = null;
+    }
   }
 
   run<T>(

@@ -7,11 +7,13 @@ import { AuthButton, authClasses } from "../components/auth-ui";
 import { billingSession } from "./session";
 import { presentMonthlyPaywall, validMonthlyOffering } from "./paywall";
 import { creditQuantity } from "../../payments/config";
+import { paymentOptions, storeEligibility } from "./policy";
 
 type Snapshot = {
   balance: number | null;
   hasMonthlyPlan: boolean | null;
   nativeSubscriptionsEnabled: boolean;
+  mobileWebCheckoutEnabled: boolean;
 };
 const snapshot = makeFunctionReference<
   "action",
@@ -50,25 +52,37 @@ export function AccountBilling({ customerId }: { customerId: string }) {
       const sequence = ++refreshSequence.current;
       const latest = () =>
         current(version) && sequence === refreshSequence.current;
+      if (latest()) setMonthly(null);
       try {
         const result = await getSnapshot({});
         if (!latest()) return;
         setData(result);
         if (key && productId && result.nativeSubscriptionsEnabled) {
-          const offerings = await billingSession.run(
+          const store = await billingSession.run(
             customerId,
             version,
             key,
-            (sdk) => sdk.getOfferings(),
+            async (sdk) => ({
+              eligibility: await storeEligibility(sdk, Platform.OS),
+              offerings: await sdk.getOfferings(),
+            }),
           );
+          const options = paymentOptions({
+            platform: Platform.OS,
+            ...store.eligibility,
+            paymentsEnabled: true,
+            nativeReady: result.nativeSubscriptionsEnabled,
+            webCheckoutEnabled: result.mobileWebCheckoutEnabled,
+          });
           if (latest())
             setMonthly(
-              offerings.current &&
+              options.native &&
+                store.offerings.current &&
                 validMonthlyOffering(
-                  offerings.current.availablePackages,
+                  store.offerings.current.availablePackages,
                   productId,
                 )
-                ? (offerings.current.availablePackages[0] ?? null)
+                ? (store.offerings.current.availablePackages[0] ?? null)
                 : null,
             );
         } else setMonthly(null);
@@ -84,7 +98,7 @@ export function AccountBilling({ customerId }: { customerId: string }) {
   );
 
   useEffect(() => {
-    const version = billingSession.select(customerId);
+    const version = billingSession.acquire(customerId);
     generation.current = version;
     const update = () => void refresh(version);
     update();
@@ -98,7 +112,7 @@ export function AccountBilling({ customerId }: { customerId: string }) {
   }, [customerId, current, refresh]);
 
   async function transact(restore: boolean) {
-    if (operation.current || !key) return;
+    if (operation.current || !key || !billingSession.beginTransaction()) return;
     operation.current = true;
     const version = generation.current;
     setBusy(true);
@@ -142,6 +156,7 @@ export function AccountBilling({ customerId }: { customerId: string }) {
         );
     } finally {
       operation.current = false;
+      billingSession.endTransaction();
       if (current(version)) setBusy(false);
     }
     if (completed && current(version)) {
