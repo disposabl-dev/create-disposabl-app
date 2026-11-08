@@ -15,13 +15,35 @@ if (System.getenv("DISPOSABL_ANDROID_CHANNEL") == "production") {
     android {
         signingConfigs {
             disposablRelease {
-                storeFile file(System.getenv("ANDROID_KEYSTORE_PATH"))
+                def storePath = System.getenv("ANDROID_KEYSTORE_PATH")
+                if (storePath) storeFile file(storePath)
                 storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
                 keyAlias System.getenv("ANDROID_KEY_ALIAS")
                 keyPassword System.getenv("ANDROID_KEY_PASSWORD")
             }
         }
         buildTypes.release.signingConfig = signingConfigs.disposablRelease
+    }
+    // AGP omits its signing validator when any input is missing. Gate actual
+    // release packaging task types so a production artifact cannot be unsigned.
+    def signingCheck = tasks.register("validateDisposablProductionSigning") {
+        doLast {
+            def required = ["ANDROID_KEYSTORE_PATH", "ANDROID_KEYSTORE_PASSWORD", "ANDROID_KEY_ALIAS", "ANDROID_KEY_PASSWORD"]
+            if (required.any { !System.getenv(it) }) {
+                throw new GradleException("Production Android signing inputs are required.")
+            }
+        }
+    }
+    def releaseVariants = [] as Set
+    androidComponents.onVariants(androidComponents.selector().withBuildType("release")) { variant ->
+        releaseVariants.add(variant.name)
+    }
+    [com.android.build.gradle.tasks.PackageAndroidArtifact,
+     com.android.build.gradle.internal.tasks.PackageBundleTask,
+     com.android.build.gradle.internal.tasks.FinalizeBundleTask].each { taskType ->
+        tasks.withType(taskType).configureEach { task ->
+            task.dependsOn(providers.provider { releaseVariants.contains(task.variantName) ? [signingCheck] : [] })
+        }
     }
 }
 `;
