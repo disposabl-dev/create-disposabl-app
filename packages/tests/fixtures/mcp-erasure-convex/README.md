@@ -1,6 +1,6 @@
 # MCP component erasure candidate
 
-This is a synthetic, local-only fixture for `patches/convex-mcp-account-erasure-alpha7.patch`. It is not an application endpoint. Do not deploy these public fixture wrappers or `component/fixtureProbe.ts` outside a disposable backend. The product must explicitly integrate the component API; applying the patch alone does not initiate deletion. Root integration must exclude this fixture and `packages/tests/mcp-erasure-component.test.ts` from generated starters.
+This is a synthetic, local-only fixture for `patches/convex-mcp-account-erasure-alpha7.patch`, selected through the root Bun patched dependency. It is not an application endpoint. Do not deploy these public fixture wrappers or `component/fixtureProbe.ts` outside a disposable backend. The product must explicitly integrate the component API; applying the patch alone does not initiate deletion. Reset excludes this fixture and `packages/tests/mcp-erasure-component.test.ts` from generated starters.
 
 ## Contract and limits
 

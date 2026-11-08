@@ -11,6 +11,7 @@ import {
 } from "../create-disposabl-app/options";
 
 const excluded = [
+  "packages/tests/mobile-theme-identity.test.ts",
   "packages/tests/mcp-erasure-component.test.ts",
   "packages/tests/fixtures/mcp-erasure-convex",
   "packages/tests/mcp-deletion-guard.test.ts",
