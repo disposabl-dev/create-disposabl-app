@@ -4,6 +4,62 @@ import { getFunctionName } from "convex/server";
 import { boat } from "../backend/convex/agent/boat";
 import { stopForDeletion } from "../backend/convex/agent/actions/compute";
 import { credential } from "../backend/convex/connections/actions/credentials";
+import {
+  claimDeletionStop,
+  finishDeletionStop,
+  deletionRequests,
+} from "../backend/convex/users/internal";
+
+test("expired stop is reported unknown and one explicit retry replaces its lease", async () => {
+  let user: any = {
+    _id: "owner",
+    deletionRequestedAt: 1,
+    deletionStop: {
+      state: "running",
+      token: "old",
+      attempt: 1,
+      updatedAt: 1,
+      leaseUntil: 1,
+    },
+  };
+  const ctx = {
+    db: {
+      get: async () => user,
+      patch: async (_table: string, _id: string, patch: object) => {
+        user = { ...user, ...patch };
+      },
+      query: () => ({
+        withIndex: () => ({
+          paginate: async () => ({
+            page: [user],
+            isDone: true,
+            continueCursor: "",
+          }),
+        }),
+      }),
+    },
+  };
+  const queue = () =>
+    (deletionRequests as any)._handler(ctx, {
+      paginationOpts: { numItems: 10, cursor: null },
+    });
+  assert.equal((await queue()).page[0].stop, "unknown");
+  const claim = (token: string) =>
+    (claimDeletionStop as any)._handler(ctx, { userId: "owner", token });
+  assert.equal(await claim("new"), true);
+  assert.equal(user.deletionStop.attempt, 2);
+  assert.equal((await queue()).page[0].stop, "running");
+  assert.equal(await claim("duplicate"), false);
+  const finish = (token: string) =>
+    (finishDeletionStop as any)._handler(ctx, {
+      userId: "owner",
+      token,
+      outcome: "archived_observed",
+    });
+  assert.equal(await finish("old"), false);
+  assert.equal(await finish("new"), true);
+  assert.equal((await queue()).page[0].stop, "archived_observed");
+});
 
 test("stop stage only confirms an archived provider response", async () => {
   const originalRefresh = boat.refresh,

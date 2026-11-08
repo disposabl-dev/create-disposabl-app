@@ -138,7 +138,11 @@ export const deletionRequests = internalQuery({
         userId: user._id,
         requestedAt: user.deletionRequestedAt!,
         status: "requested" as const,
-        stop: user.deletionStop?.state ?? ("pending" as const),
+        stop:
+          user.deletionStop?.state === "running" &&
+          (user.deletionStop.leaseUntil ?? 0) <= Date.now()
+            ? ("unknown" as const)
+            : (user.deletionStop?.state ?? ("pending" as const)),
         ...(user.deletionStop
           ? {
               stopAttempt: user.deletionStop.attempt,
@@ -165,7 +169,7 @@ export const deletionPending = internalQuery({
   handler: (ctx, { userId }) => isDeletionPending(ctx, userId),
 });
 
-/** Operator-initiated attempt; an expired attempt becomes unknown before retry. */
+/** One explicit operator invocation can replace an expired attempt. */
 export const claimDeletionStop = internalMutation({
   args: { userId: v.id("users"), token: v.string() },
   returns: v.boolean(),
@@ -174,17 +178,8 @@ export const claimDeletionStop = internalMutation({
     if (!user?.deletionRequestedAt || !token)
       throw new ConvexError("Deletion request not found.");
     const stop = user.deletionStop;
-    if (stop?.state === "running") {
-      if ((stop.leaseUntil ?? 0) > Date.now()) return false;
-      await ctx.db.patch("users", userId, {
-        deletionStop: {
-          state: "unknown",
-          attempt: stop.attempt,
-          updatedAt: Date.now(),
-        },
-      });
+    if (stop?.state === "running" && (stop.leaseUntil ?? 0) > Date.now())
       return false;
-    }
     await ctx.db.patch("users", userId, {
       deletionStop: {
         state: "running",

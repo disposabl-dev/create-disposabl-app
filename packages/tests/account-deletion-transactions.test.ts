@@ -100,13 +100,20 @@ test(
       await call("finishStop", { userId, token, outcome: "archived_observed" }),
       false,
     );
-    assert.equal(await call("claimStop", { userId, token: "retry" }), false);
     let queue = await call("queue", {}, true);
     assert.equal(
       queue.page.find((row: any) => row.userId === userId).stop,
       "unknown",
     );
     assert.equal(await call("claimStop", { userId, token: "retry" }), true);
+    assert.equal(
+      await call("claimStop", { userId, token: "duplicate" }),
+      false,
+    );
+    assert.equal(
+      await call("finishStop", { userId, token, outcome: "archived_observed" }),
+      false,
+    );
     assert.equal(
       await call("finishStop", { userId, token: "retry", outcome: "failed" }),
       true,
