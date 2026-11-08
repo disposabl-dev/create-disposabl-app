@@ -147,3 +147,23 @@ test("Google sign-in stores provider identity and excludes unverified email", as
     );
   }
 });
+
+test("handoff destination preserves only the mobile requirement", async () => {
+  const { mobileConnectionsDestination } =
+    await import("../../apps/web/src/components/connections/mobile-destination");
+  assert.equal(
+    mobileConnectionsDestination("?mobile=1"),
+    "/dashboard/connections?origin=mobile&mobile=1",
+  );
+  for (const search of [
+    "",
+    "?mobile=0",
+    "?mobile=https://example.com",
+    "?next=https://example.com",
+  ]) {
+    assert.equal(
+      mobileConnectionsDestination(search),
+      "/dashboard/connections?origin=mobile",
+    );
+  }
+});

@@ -23,7 +23,7 @@ export async function handoffCall(
   });
   return response.json();
 }
-export async function handoffFixture() {
+export async function handoffFixture(mobile = false) {
   const username = `handoff${randomUUID().replaceAll("-", "")}`;
   const signed = await handoffCall(
     "mutation",
@@ -39,7 +39,7 @@ export async function handoffFixture() {
   const started = await handoffCall(
     "mutation",
     "browserHandoff:create",
-    {},
+    mobile ? { mobile: true } : {},
     token,
   );
   if (started.status !== "success") throw new Error("Could not create handoff");
@@ -49,7 +49,7 @@ export async function handoffFixture() {
     token,
     refreshToken: signed.value.tokens.refreshToken as string,
     code: url.hash.slice(1),
-    path: url.pathname + url.hash,
+    path: url.pathname + url.search + url.hash,
     userId: signed.value.tokens.userId as string,
   };
 }

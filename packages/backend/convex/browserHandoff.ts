@@ -31,9 +31,9 @@ async function lookup(ctx: QueryCtx, code: string) {
 
 /** A verified mobile session authorizes one browser sign-in, never a shared refresh token. */
 export const create = mutation({
-  args: {},
+  args: { mobile: v.optional(v.boolean()) },
   returns: v.string(),
-  handler: async (ctx) => {
+  handler: async (ctx, { mobile }) => {
     const userId = await getAuthUserId(ctx);
     const identity = await ctx.auth.getUserIdentity();
     const id = userId ? ctx.db.normalizeId("users", userId) : null;
@@ -53,6 +53,7 @@ export const create = mutation({
       },
     });
     const url = new URL("/mobile-login", connectionsUrl());
+    if (mobile) url.searchParams.set("mobile", "1");
     url.hash = code;
     return url.href;
   },

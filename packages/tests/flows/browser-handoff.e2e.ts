@@ -128,3 +128,32 @@ webTest(
     );
   },
 );
+
+webTest(
+  "mobile handoff keeps Expo required through sign-in",
+  { platforms: ["web"] },
+  async ({ app, screen, browser }) => {
+    webTest.skip(
+      !local(),
+      "Requires isolated loopback authentication fixtures",
+    );
+    const fixture = await handoffFixture(true);
+    await app.open(fixture.path);
+    await expect(
+      screen.getByRole("button", `Continue as @${fixture.username}`, {
+        exact: true,
+      }),
+    ).toBeVisible();
+    // The credential and option are removed from browser history before redemption.
+    await expect(browser).toHaveURL("/mobile-login");
+    await screen
+      .getByRole("button", `Continue as @${fixture.username}`, { exact: true })
+      .tap();
+    await expect(
+      screen.getByText("Your mobile app also needs Expo.", { exact: false }),
+    ).toBeVisible();
+    await expect(browser).toHaveURL(
+      "/dashboard/connections?origin=mobile&mobile=1",
+    );
+  },
+);

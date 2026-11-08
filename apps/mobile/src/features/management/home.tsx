@@ -204,12 +204,16 @@ function Composer() {
           expoRequired={selected.some((p) => p === "android" || p === "ios")}
           busy={busy}
           onConnect={() =>
-            void handoff({})
+            void handoff({
+              mobile: selected.some((p) => p === "android" || p === "ios"),
+            })
               .then(openURL)
               .catch(() => setError("Could not open connections."))
           }
           onProvider={() =>
-            void handoff({})
+            void handoff({
+              mobile: selected.some((p) => p === "android" || p === "ios"),
+            })
               .then(openURL)
               .catch(() => setError("Could not open connections."))
           }

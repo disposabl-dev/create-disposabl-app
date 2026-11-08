@@ -4,6 +4,7 @@ import { useAuthActions } from "@convex-dev/auth/react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../../packages/backend/convex/_generated/api";
 import { PasswordPage } from "../../../../packages/disposabl-kit/client/components/password-page";
+import { mobileConnectionsDestination } from "../components/connections/mobile-destination";
 import { Button } from "@disposabl/disposabl-kit/client/components/ui/button";
 
 export const Route = createFileRoute("/_providers/mobile-login")({
@@ -13,6 +14,11 @@ export const Route = createFileRoute("/_providers/mobile-login")({
 function MobileLogin() {
   const [framed] = useState(
     () => typeof window !== "undefined" && window.top !== window.self,
+  );
+  const [destination] = useState(() =>
+    mobileConnectionsDestination(
+      typeof window === "undefined" ? "" : window.location.search,
+    ),
   );
   const [code] = useState(() =>
     typeof window === "undefined" ? "" : window.location.hash.slice(1),
@@ -39,7 +45,7 @@ function MobileLogin() {
     try {
       const session = await redeem({ code });
       await setSession(session);
-      window.location.replace("/dashboard/connections?origin=mobile");
+      window.location.replace(destination);
     } catch {
       setError(
         "This link could not sign you in. Open connections again from the app.",
