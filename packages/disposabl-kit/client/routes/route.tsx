@@ -3,6 +3,7 @@ import { appName } from "../../lib/app-name";
 import { LegalFooter } from "../components/legal-page";
 import { LogOut } from "../components/ui/log-out";
 import { useState } from "react";
+import { ThemeProvider } from "../lib/theme";
 import {
   createFileRoute,
   Outlet,
@@ -36,11 +37,18 @@ function Providers() {
   });
 
   return (
-    <AuthProvider client={client} enabled={authenticationEnabled}>
-      <SiteHeader />
-      <Outlet />
-      <LegalFooter />
-    </AuthProvider>
+    <ThemeProvider
+      attribute="class"
+      defaultTheme="system"
+      enableSystem
+      disableTransitionOnChange
+    >
+      <AuthProvider client={client} enabled={authenticationEnabled}>
+        <SiteHeader />
+        <Outlet />
+        <LegalFooter />
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 

@@ -8,7 +8,7 @@ import {
 import { cp, rm } from "node:fs/promises";
 import { serveDocs } from "../docs/dev";
 // docs:end
-import kitRouter from "@disposabl/disposabl-kit/client/vite.config";
+import kitRouter from "./routes.config";
 import {
   createPrerenderFilter,
   pageRoutes,
@@ -57,6 +57,7 @@ const config = defineConfig(({ mode }) => {
     throw new Error("VITE_PUBLIC_SITE_URL must be an HTTP(S) origin");
   const siteUrl = publicUrl.origin;
   const indexable = isProductionSite(mode, url.origin, site);
+  const prerenderFilter = createPrerenderFilter();
   const productionBackend =
     (app as { productionConvexSiteUrl?: string }).productionConvexSiteUrl ||
     site.backendOrigin;
@@ -105,7 +106,14 @@ const config = defineConfig(({ mode }) => {
           autoStaticPathsDiscovery: true,
           crawlLinks: true,
           failOnError: true,
-          filter: createPrerenderFilter(),
+          filter: (page) => {
+            // Section links are useful navigation, not separate indexed pages.
+            if (new URL(page.path, siteUrl).hash) {
+              page.sitemap = { ...page.sitemap, exclude: true };
+              return false;
+            }
+            return prerenderFilter(page);
+          },
         },
         sitemap: { enabled: true, host: siteUrl },
       }),

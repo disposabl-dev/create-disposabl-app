@@ -14,7 +14,11 @@ import { paymentsEnabled } from "../../features";
 import { pricing, creditQuantity, formatPrice } from "../../payments/config";
 
 export const Route = createFileRoute("/_providers/pricing")({
-  component: Pricing,
+  component: () => (
+    <main>
+      <Pricing />
+    </main>
+  ),
 });
 const snapshot = makeFunctionReference<
   "action",
@@ -32,13 +36,13 @@ const portal = makeFunctionReference<
   { url: string }
 >("billing:portal");
 
-function Pricing() {
+export function Pricing() {
   if (!paymentsEnabled)
     return (
-      <main className="mx-auto max-w-5xl p-8">
+      <section className="mx-auto max-w-5xl p-8">
         <h1>Payments are unavailable</h1>
         <SubscriptionHelp />
-      </main>
+      </section>
     );
   return <SessionPricing />;
 }
@@ -152,7 +156,7 @@ function PurchasePage({ session }: { session: string | null }) {
     }
   }
   return (
-    <main className="mx-auto max-w-5xl space-y-8 p-8">
+    <section className="mx-auto max-w-5xl space-y-8 p-8">
       <div>
         <h1 className="text-3xl font-semibold">Pricing</h1>
         <p>
@@ -221,6 +225,6 @@ function PurchasePage({ session }: { session: string | null }) {
       <SubscriptionHelp />
       {refreshError && <p role="status">{refreshError}</p>}
       {message && <p role="status">{message}</p>}
-    </main>
+    </section>
   );
 }

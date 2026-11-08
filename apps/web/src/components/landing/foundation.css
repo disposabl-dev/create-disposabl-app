@@ -1,0 +1,218 @@
+.app-foundation {
+  padding: 112px 0;
+  border-top: 1px solid var(--line);
+}
+.app-foundation h2 {
+  margin: 0 0 40px;
+  font: 500 clamp(32px, 4vw, 48px)/1.12 var(--display);
+  letter-spacing: -0.035em;
+}
+.foundation-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.foundation-feature {
+  min-width: 0;
+  overflow: hidden;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 32px;
+}
+.foundation-copy h3,
+.foundation-feature-extra h3 {
+  margin: 0;
+  font: 500 25px/1.2 var(--display);
+  letter-spacing: -0.025em;
+}
+.foundation-copy p,
+.foundation-feature-extra p {
+  color: var(--muted);
+  font-size: 17px;
+  line-height: 1.5;
+  margin: 12px 0 0;
+  max-width: 45ch;
+}
+.foundation-feature-large,
+.foundation-feature-checks {
+  display: flex;
+  flex-direction: column;
+}
+.foundation-account-visual {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+  margin-top: 28px;
+}
+.foundation-signin,
+.foundation-saved {
+  flex: 1;
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.foundation-signin strong,
+.foundation-signin span,
+.foundation-saved strong,
+.foundation-saved span {
+  display: block;
+}
+.foundation-signin strong,
+.foundation-saved strong {
+  font-size: 18px;
+  font-weight: 500;
+}
+.foundation-signin span {
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 16px;
+}
+.foundation-signin div {
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 16px;
+  overflow: hidden;
+}
+.foundation-signin b {
+  display: block;
+  margin-top: 12px;
+  padding: 8px;
+  border-radius: 6px;
+  background: #1a4be0;
+  color: white;
+  text-align: center;
+  font-weight: 500;
+}
+.foundation-saved > div:first-child {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  color: var(--muted);
+}
+.foundation-saved strong {
+  margin-top: 24px;
+}
+.foundation-saved span {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 16px;
+}
+.foundation-platforms {
+  display: flex;
+  gap: 14px;
+  margin-top: 25px;
+}
+.foundation-platforms .brand-icon {
+  width: 22px;
+  height: 22px;
+}
+.foundation-pipeline {
+  margin-top: 28px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  padding: 4px 16px;
+}
+.foundation-pipeline div {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 16px;
+}
+.foundation-pipeline div:last-child {
+  border-bottom: 0;
+}
+.foundation-pipeline svg,
+.foundation-feature-extra svg,
+.foundation-docs svg {
+  color: var(--accent);
+  flex: none;
+}
+.foundation-feature-content {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.foundation-docs {
+  display: flex;
+  min-width: 0;
+  gap: 20px;
+  padding: 20px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.foundation-docs nav {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 0 0 150px;
+  border-right: 1px solid var(--line);
+  padding-right: 16px;
+  color: var(--muted);
+  font-size: 16px;
+}
+.foundation-docs nav strong {
+  color: var(--text);
+}
+.foundation-docs div {
+  min-width: 0;
+}
+.foundation-docs strong {
+  display: block;
+  font-weight: 500;
+}
+.foundation-docs div strong {
+  margin-top: 8px;
+}
+.foundation-docs div p {
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1.4;
+  margin: 8px 0 0;
+}
+.foundation-feature-extra {
+  display: flex;
+  align-items: center;
+}
+.foundation-feature-extra svg {
+  margin-bottom: 14px;
+}
+@media (max-width: 850px) {
+  .foundation-layout {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 560px) {
+  .foundation-account-visual {
+    flex-direction: column;
+  }
+  .foundation-docs nav {
+    display: none;
+  }
+  .app-foundation {
+    padding: 72px 0;
+  }
+  .foundation-feature {
+    padding: 24px;
+  }
+  .foundation-signin,
+  .foundation-saved {
+    padding: 12px;
+  }
+  .foundation-docs {
+    gap: 12px;
+    padding: 14px;
+  }
+  .foundation-docs nav {
+    flex-basis: 110px;
+    padding-right: 10px;
+  }
+}
