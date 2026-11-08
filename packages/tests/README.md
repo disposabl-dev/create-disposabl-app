@@ -71,3 +71,9 @@ Both `bun run test` and `bun run e2e ...` set `E2E_TELEMETRY_DISABLED=1`. Keep u
 Upstream telemetry otherwise sends command/engine/runtime versions, environment categories, durations, test counts, error codes, and AI/cache usage to the maintainers' PostHog project. It excludes test titles, source, URLs, screenshots, prompts, credentials, and error messages. See [the event inventory](https://github.com/tester-army/e2e/blob/main/docs/telemetry.mdx) and [transport source](https://github.com/tester-army/e2e/blob/main/packages/e2e/src/telemetry/posthog.ts).
 
 AI is optional. To add it later, read `bun run e2e guide setup` and configure a provider or the upstream Codex/Claude Code ACP adapter. Keep model-backed flows separate from the required deterministic suite; an AI key appearing in the environment must not silently change the build gate or start spending.
+
+## Isolated compute transaction fixture
+
+`fixtures/compute-convex` is a separate, disposable Convex project with the app schema and real compute mutation handlers. Its public fixture functions are for local tests only; never deploy it remotely or to the app backend. Provider-facing scheduled actions are inert, and its explicit `true` arguments exercise the paid state machine without enabling product payments or contacting providers. It does not prove provider behavior.
+
+From `packages/tests/fixtures/compute-convex`, start `CONVEX_AGENT_MODE=anonymous bunx convex dev --local-cloud-port 3420 --local-site-port 3421 --typecheck disable --codegen disable`. With that process running, from the repository root run `COMPUTE_FIXTURE_URL=http://127.0.0.1:3420 E2E_TELEMETRY_DISABLED=1 bun test packages/tests/compute-transactions.test.ts`. Use a fresh disposable local deployment and do not point the fixture at any existing backend. The test refuses other URLs. It verifies Convex transaction contention and state fences, not scheduling reliability, provider transactions, or deployed app behavior.

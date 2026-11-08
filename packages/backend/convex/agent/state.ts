@@ -9,7 +9,11 @@ import { sessionAllows } from "./compute";
 
 async function locked(ctx: MutationCtx, args: { id: string; token: string }) {
   const current = await getThread(ctx, args.id);
-  if (!current || current.lease?.token !== args.token)
+  if (
+    !current ||
+    current.lease?.token !== args.token ||
+    current.lease.expiresAt <= Date.now()
+  )
     throw new Error("Agent worker lease expired.");
   return current;
 }
