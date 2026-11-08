@@ -1,9 +1,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { requireCredits } from "../backend/convex/agent/credits";
+import {
+  requireCredits,
+  requireCurrentClient,
+} from "../backend/convex/agent/credits";
 import { guardedEnqueue } from "../backend/convex/agent/internal";
 import { createPlatforms } from "../disposabl-kit/server/lib/platform-spec";
 import * as agent from "../backend/convex/agent/internal";
+import * as agentNative from "../backend/convex/agent/index";
+import * as appsNative from "../backend/convex/apps/index";
+import * as appsInternal from "../backend/convex/apps/internal";
 
 const customer =
   (remaining: unknown) =>
@@ -93,6 +99,31 @@ test("ownership and credits precede enqueue, with no public unchecked endpoint",
   assert.ok(
     !platform.spec.some(
       (entry: any) => entry.name === "agent/internal:enqueueMessage",
+    ),
+  );
+});
+
+test("legacy mutations remain callable only before payments are enabled", () => {
+  assert.doesNotThrow(() => requireCurrentClient(false));
+  assert.throws(
+    () => requireCurrentClient(true),
+    (error: any) => error.data?.code === "update_required",
+  );
+  assert.equal((agentNative.sendMessage as any).isMutation, true);
+  assert.equal((agentNative.sendMessageChecked as any).isAction, true);
+  assert.equal((appsNative.requestConfiguration as any).isMutation, true);
+  assert.equal((appsNative.requestConfigurationChecked as any).isAction, true);
+  const platform = createPlatforms({ "apps/internal": appsInternal });
+  assert.ok(
+    platform.spec.some(
+      (entry) =>
+        entry.name === "apps/internal:requestConfiguration" &&
+        entry.type === "action",
+    ),
+  );
+  assert.ok(
+    !platform.spec.some(
+      (entry) => entry.name === "apps/internal:requestConfigurationLegacy",
     ),
   );
 });

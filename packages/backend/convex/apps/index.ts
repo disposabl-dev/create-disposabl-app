@@ -8,6 +8,7 @@ import { ConvexError, v, type Infer } from "convex/values";
 import { internal } from "../_generated/api";
 import {
   action,
+  mutation,
   query,
   type QueryCtx,
   type MutationCtx,
@@ -15,6 +16,7 @@ import {
 } from "../_generated/server";
 import { result as agentResult } from "../agent/validator";
 import { appResult, feature, platform } from "../validator";
+import { requireCurrentClient } from "../agent/credits";
 
 async function requireUser(ctx: QueryCtx | MutationCtx | ActionCtx) {
   const userId = await getSessionUserId(ctx);
@@ -48,7 +50,7 @@ export const get = query({
     });
   },
 });
-export const requestConfiguration = action({
+export const requestConfigurationChecked = action({
   args: {
     appId: v.string(),
     platforms: v.array(platform),
@@ -60,4 +62,21 @@ export const requestConfiguration = action({
       ...args,
       userId: await requireUser(ctx),
     }),
+});
+
+export const requestConfiguration = mutation({
+  args: {
+    appId: v.string(),
+    platforms: v.array(platform),
+    features: v.array(feature),
+  },
+  returns: agentResult,
+  handler: async (ctx, args): Promise<Infer<typeof agentResult>> => {
+    const userId = await requireUser(ctx);
+    requireCurrentClient();
+    return ctx.runMutation(internal.apps.internal.requestConfigurationLegacy, {
+      ...args,
+      userId,
+    });
+  },
 });

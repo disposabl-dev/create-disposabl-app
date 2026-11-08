@@ -19,6 +19,7 @@ import { githubConnection } from "../validator";
 import type { Doc } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 import { result as agentResult } from "../agent/validator";
+import { requireCurrentClient } from "../agent/credits";
 type AppResult = Infer<typeof appResult>;
 
 export { create } from "./actions/create";
@@ -142,28 +143,53 @@ export const applyConfiguration = internalMutation({
   },
 });
 
+const configurationArgs = {
+  ...identityFields,
+  appId: v.string(),
+  platforms: v.array(platform),
+  features: v.array(feature),
+};
+function configurationPrompt(
+  appId: string,
+  platforms: string[],
+  features: string[],
+) {
+  const selected = validatePlatforms(platforms);
+  const selectedFeatures = resolveFeatures(features);
+  return `Apply this configuration change to the existing app repository. Requested platforms: ${selected.join(",")}. Requested features: ${selectedFeatures.join(",") || "none"}.
+Read the generator version from this app's disposabl.json. Use that exact version (not latest) with the existing-project reconfiguration flow from /home/user/apps: bun create disposabl-app@<matching-version> ${appId} --platforms ${selected.join(",")} --features ${selectedFeatures.join(",") || "none"} --yes.
+Preserve this app ID, source customizations and user data. Restore newly selected platform/auth files using the generator; do not scaffold a replacement. Complete its existing setup/provisioning flow and run the selected-platform checks. If a template conflict or account connection blocks setup, explain the exact blocker and stop. Report applied files, setup outcome and test evidence; a queued request or metadata update alone is not completion.`;
+}
+
 /** Queue repository changes; applied selections are synchronized by generator setup. */
 export const requestConfiguration = internalAction({
   platforms: true,
-  args: {
-    ...identityFields,
-    appId: v.string(),
-    platforms: v.array(platform),
-    features: v.array(feature),
-  },
+  args: configurationArgs,
   returns: agentResult,
-  handler: async (
+  handler: (
+    ctx,
+    { userId, appId, platforms, features },
+  ): Promise<Infer<typeof agentResult>> =>
+    ctx.runAction(internal.agent.internal.sendMessage, {
+      userId,
+      appId,
+      prompt: configurationPrompt(appId, platforms, features),
+    }),
+});
+
+/** Only the guarded legacy public mutation calls this while payments are disabled. */
+export const requestConfigurationLegacy = internalMutation({
+  args: configurationArgs,
+  returns: agentResult,
+  handler: (
     ctx,
     { userId, appId, platforms, features },
   ): Promise<Infer<typeof agentResult>> => {
-    const selected = validatePlatforms(platforms);
-    const selectedFeatures = resolveFeatures(features);
-    return ctx.runAction(internal.agent.internal.sendMessage, {
+    requireCurrentClient();
+    return ctx.runMutation(internal.agent.internal.enqueueMessage, {
       userId,
       appId,
-      prompt: `Apply this configuration change to the existing app repository. Requested platforms: ${selected.join(",")}. Requested features: ${selectedFeatures.join(",") || "none"}.
-Read the generator version from this app's disposabl.json. Use that exact version (not latest) with the existing-project reconfiguration flow from /home/user/apps: bun create disposabl-app@<matching-version> ${appId} --platforms ${selected.join(",")} --features ${selectedFeatures.join(",") || "none"} --yes.
-Preserve this app ID, source customizations and user data. Restore newly selected platform/auth files using the generator; do not scaffold a replacement. Complete its existing setup/provisioning flow and run the selected-platform checks. If a template conflict or account connection blocks setup, explain the exact blocker and stop. Report applied files, setup outcome and test evidence; a queued request or metadata update alone is not completion.`,
+      prompt: configurationPrompt(appId, platforms, features),
     });
   },
 });

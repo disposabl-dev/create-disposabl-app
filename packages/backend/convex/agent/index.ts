@@ -10,13 +10,14 @@ import {
   type ActionCtx,
 } from "../_generated/server";
 import { history, historyArgs, result, sendArgs } from "./validator";
+import { requireCurrentClient } from "./credits";
 
 async function requireUser(ctx: QueryCtx | MutationCtx | ActionCtx) {
   const userId = await getSessionUserId(ctx);
   if (!userId) throw new ConvexError("Sign in to use the agent.");
   return userId;
 }
-export const sendMessage = action({
+export const sendMessageChecked = action({
   args: sendArgs,
   returns: result,
   handler: async (ctx, args): Promise<Infer<typeof result>> =>
@@ -24,6 +25,18 @@ export const sendMessage = action({
       ...args,
       userId: await requireUser(ctx),
     }),
+});
+export const sendMessage = mutation({
+  args: sendArgs,
+  returns: result,
+  handler: async (ctx, args): Promise<Infer<typeof result>> => {
+    const userId = await requireUser(ctx);
+    requireCurrentClient();
+    return ctx.runMutation(internal.agent.internal.enqueueMessage, {
+      ...args,
+      userId,
+    });
+  },
 });
 export const abortMessage = mutation({
   args: { appId: v.string() },

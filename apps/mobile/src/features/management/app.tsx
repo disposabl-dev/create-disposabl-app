@@ -84,7 +84,7 @@ function Chat({ appId }: { appId: string }) {
     appId,
     paginationOpts: { numItems: 20, cursor },
   });
-  const send = useAction(api.agent.index.sendMessage);
+  const send = useAction(api.agent.index.sendMessageChecked);
   const abort = useMutation(api.agent.index.abortMessage);
   const [prompt, setPrompt] = useState("");
   const [busy, setBusy] = useState(false);

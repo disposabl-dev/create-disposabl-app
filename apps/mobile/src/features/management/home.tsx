@@ -85,7 +85,7 @@ function Composer() {
   );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const send = useAction(api.agent.index.sendMessage);
+  const send = useAction(api.agent.index.sendMessageChecked);
   const c = useTheme();
   async function submit(text: string) {
     const fileIds = attachmentIds(attachments);

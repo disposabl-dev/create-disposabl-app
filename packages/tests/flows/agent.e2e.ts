@@ -92,7 +92,7 @@ test(
     expect(
       (
         await call(
-          "agent/index:sendMessage",
+          "agent/index:sendMessageChecked",
           { prompt: "fixture" },
           { action: true },
         )
@@ -429,7 +429,7 @@ test(
         ).status,
       ).toBe("error");
       const sent = await value(
-        "agent/index:sendMessage",
+        "agent/index:sendMessageChecked",
         { appId, prompt: "Queued fixture prompt", fileIds: [attachmentId] },
         { token: owner.token, action: true },
       );
@@ -437,7 +437,7 @@ test(
       expect(
         (
           await call(
-            "agent/index:sendMessage",
+            "agent/index:sendMessageChecked",
             { appId, prompt: "Forbidden" },
             { token: other.token, action: true },
           )

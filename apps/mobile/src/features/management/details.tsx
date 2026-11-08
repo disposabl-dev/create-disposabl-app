@@ -63,7 +63,7 @@ function Selection({
   const [chosen, setChosen] = useState(initialFeatures);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
-  const update = useAction(api.apps.index.requestConfiguration);
+  const update = useAction(api.apps.index.requestConfigurationChecked);
   async function save() {
     setBusy(true);
     setMessage("");

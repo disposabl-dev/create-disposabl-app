@@ -5,6 +5,7 @@ import { create } from "../backend/convex/previews/token/actions/create";
 import {
   applyConfiguration,
   requestConfiguration,
+  requestConfigurationLegacy,
 } from "../backend/convex/apps/internal";
 import { registerPageRoutes } from "../disposabl-kit/server/lib/static";
 import config from "../../disposabl.json";
@@ -101,6 +102,21 @@ test("configuration requests persist in the conversation before account setup", 
   });
   assert.match(prompt, /Requested platforms: web,ios/);
   assert.match(prompt, /Requested features: authentication,analytics/);
+});
+
+test("legacy configuration mutation queues the same request when payments are disabled", async () => {
+  let queued: any;
+  await (requestConfigurationLegacy as any)._handler(
+    {
+      runMutation: async (_ref: unknown, args: unknown) => {
+        queued = args;
+        return { appId, threadId: "thread", status: "processing" };
+      },
+    },
+    { userId: "owner", appId, platforms: ["web", "android"], features: [] },
+  );
+  assert.equal(queued.userId, "owner");
+  assert.match(queued.prompt, /Requested platforms: web,android/);
 });
 
 test("disabled docs cannot be served from retained static assets", async () => {
