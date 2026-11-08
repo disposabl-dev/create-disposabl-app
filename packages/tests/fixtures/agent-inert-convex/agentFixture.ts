@@ -35,3 +35,41 @@ export const seedLease = internalMutationGeneric({
     return null;
   },
 });
+
+import { getFunctionName } from "convex/server";
+import {
+  enqueueMessageHandler,
+  abortMessage,
+} from "../../../../backend/convex/agent/internal";
+
+// Fixture-only adapter: only the product worker tick may be substituted.
+function inertDispatch(ctx: any) {
+  return {
+    ...ctx,
+    scheduler: {
+      ...ctx.scheduler,
+      runAfter: async (_delay: number, ref: any) => {
+        if (getFunctionName(ref) !== "agent/actions/run:tick")
+          throw new Error("Unexpected scheduled function in agent fixture");
+        return ctx.scheduler.runAfter(0, anyApi.agentFixture.noop, {});
+      },
+    },
+  };
+}
+export const enqueue = internalMutationGeneric({
+  args: {
+    userId: v.string(),
+    appId: v.string(),
+    prompt: v.string(),
+    fileIds: v.array(v.id("files")),
+  },
+  returns: v.any(),
+  handler: (ctx, args) =>
+    enqueueMessageHandler(inertDispatch(ctx), args, () => true),
+});
+export const stop = internalMutationGeneric({
+  args: { userId: v.string(), appId: v.string() },
+  returns: v.any(),
+  handler: (ctx, args) =>
+    (abortMessage as any)._handler(inertDispatch(ctx), args),
+});

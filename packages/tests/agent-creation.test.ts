@@ -103,3 +103,30 @@ test("deletion request blocks new agent admission before any side effect", async
   );
   assert.equal(touched, false);
 });
+
+test("production admission rejects an absent Boat configuration before writes", async () => {
+  const previous = process.env.BOAT_API_KEY;
+  delete process.env.BOAT_API_KEY;
+  let writes = 0;
+  try {
+    await assert.rejects(
+      (enqueueMessage as any)._handler(
+        {
+          db: {
+            normalizeId: () => "owner",
+            get: async () => ({}),
+            insert: async () => {
+              writes++;
+            },
+          },
+        },
+        { userId: "owner", prompt: "fixture" },
+      ),
+      /Remote agents are not configured/,
+    );
+    assert.equal(writes, 0);
+  } finally {
+    if (previous === undefined) delete process.env.BOAT_API_KEY;
+    else process.env.BOAT_API_KEY = previous;
+  }
+});

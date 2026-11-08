@@ -76,9 +76,12 @@ test(
       process.env.E2E_AGENT_INERT_FIXTURE !== "1",
       "Requires the disposable provider-inert agent fixture",
     );
-    if (url.origin !== "http://127.0.0.1:3550")
+    if (
+      url.origin !== "http://127.0.0.1:3540" ||
+      siteUrl() !== "http://127.0.0.1:3541"
+    )
       throw new Error(
-        "Agent inert fixture requires the isolated port 3550 backend.",
+        "Agent inert fixture requires the isolated ports 3540/3541.",
       );
     for (const name of [
       "BOAT_API_KEY",
@@ -275,23 +278,15 @@ test(
         },
         { token: owner.token, action: true },
       );
-      try {
-        expect(
-          (
-            await call(
-              "agent/attachments:get",
-              { userId: other.id, ids: [attachmentId] },
-              { admin: true },
-            )
-          ).status,
-        ).toBe("error");
-      } finally {
-        await value(
-          "files/index:remove",
-          { id: attachmentId },
-          { token: owner.token, action: true },
-        );
-      }
+      expect(
+        (
+          await call(
+            "agent/attachments:get",
+            { userId: other.id, ids: [attachmentId] },
+            { admin: true },
+          )
+        ).status,
+      ).toBe("error");
       const grant = () =>
         value(
           "agent/access:issue",
@@ -471,10 +466,94 @@ test(
         cursor: "cursor-1",
         lease: { token },
       });
+      const queueArgs = {
+        appId,
+        prompt: "Queued fixture prompt",
+        fileIds: [attachmentId],
+      };
+      expect(
+        (
+          await call(
+            "agentFixture:enqueue",
+            { ...queueArgs, userId: other.id, fileIds: [] },
+            { admin: true },
+          )
+        ).status,
+      ).toBe("error");
+      const otherAttachment = await value(
+        "files/index:upload",
+        {
+          filename: "other.txt",
+          mediaType: "text/plain",
+          bytes: {
+            $bytes: Buffer.from("other user fixture").toString("base64"),
+          },
+        },
+        { token: other.token, action: true },
+      );
+      expect(
+        (
+          await call(
+            "agentFixture:enqueue",
+            { ...queueArgs, userId: owner.id, fileIds: [otherAttachment] },
+            { admin: true },
+          )
+        ).status,
+      ).toBe("error");
+      await value(
+        "files/index:remove",
+        { id: otherAttachment },
+        { token: other.token, action: true },
+      );
+      expect(
+        await value(
+          "agentFixture:enqueue",
+          { ...queueArgs, userId: owner.id },
+          { admin: true },
+        ),
+      ).toMatchObject({ appId, threadId: id, status: "processing" });
+      expect(
+        (
+          await call(
+            "agentFixture:stop",
+            { appId, userId: other.id },
+            { admin: true },
+          )
+        ).status,
+      ).toBe("error");
+      expect(
+        await value(
+          "agentFixture:stop",
+          { appId, userId: owner.id },
+          { admin: true },
+        ),
+      ).toMatchObject({ status: "stopping" });
+      expect((await rest("apps/get", { appId })).status).toBe(401);
+      const queuedHistory = await value(
+        "agent/index:getMessages",
+        { appId },
+        { token: owner.token },
+      );
+      const queued = queuedHistory.page.find(
+        (m: { content: string }) => m.content === "Queued fixture prompt",
+      );
+      expect(queued.status).toBe("failed");
+      expect(queued.attachments).toEqual([
+        {
+          id: attachmentId,
+          filename: "reference.txt",
+          mediaType: "text/plain",
+        },
+      ]);
       await value(
         "agent/state:finish",
         { id, token, stopped: true },
         { admin: true },
+      );
+      await value(
+        "files/index:remove",
+        { id: attachmentId },
+        { token: owner.token, action: true },
       );
       claimed = false;
       expect((await rest("apps/get", { appId })).status).toBe(401);

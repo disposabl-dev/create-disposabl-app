@@ -23,7 +23,7 @@ For an isolated preview or CI deployment, set `E2E_CONVEX_URL` and `E2E_CONVEX_S
 
 The initial flows check the public web page, the dashboard's authentication boundary, an anonymous backend auth query, the API contract when enabled, and the mobile home screen. They do not create users or modify data. Add product-specific flows here as behavior changes, including login and saved-state checks using dedicated test users. Keep required flows deterministic; an agent can write and debug tests without adding model calls to their execution.
 
-The provider-inert agent fixture in `fixtures/agent-inert-convex/` exercises ownership, history, access-token rotation, and CLI status using real product handlers without Boat credentials. It requires an explicitly enabled disposable backend and local admin key; see its README. It does not test remote admission or queued workers.
+The provider-inert agent fixture in `fixtures/agent-inert-convex/` exercises queued messages, ownership, history, access-token rotation, and CLI status using real product handlers without Boat credentials. Its isolated adapter substitutes the scheduled worker with a no-op; see its README. It does not test real provider dispatch or remote stop.
 
 The storage fallback flow (`flows/files.e2e.ts`) uses the same loopback/admin restriction to confirm R2 is not configured before uploading. It checks downloaded bytes, anonymous and cross-user rejection, and owner deletion, removing only its own new file. It makes no R2 requests and skips when R2 is fully configured.
 
