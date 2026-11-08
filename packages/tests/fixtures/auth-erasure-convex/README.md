@@ -8,7 +8,7 @@ The selected archive is `vendor/convex-auth-437831bd-disposabl.7.tgz`. Preserve 
 - `password-seed.ts.txt` to `authpkg/src/components/password/public.ts`.
 - `core-seed.ts.txt` to `authpkg/src/component/public.ts`.
 
-Synchronize only this fixture's `convex/` directory to the disposable backend, then run `python3 core-test.py`, `python3 identity-test.py`, and `python3 product-test.py` from this directory. Stop the owned backend afterward. The core test intentionally leaves a synthetic historical orphan to verify that the reported erasure limit is truthful. The Google bridge creates encrypted synthetic tickets without contacting Google.
+Synchronize only this fixture's `convex/` directory to the disposable backend, then run `python3 core-test.py` and `python3 identity-test.py` from this directory. The product handler now requires `.8` username and email components; use the combined product fixture in `../auth-identity-erasure-convex/` for that proof. Stop the owned backend afterward. The core test intentionally leaves a synthetic historical orphan to verify that the reported erasure limit is truthful. The Google bridge creates encrypted synthetic tickets without contacting Google.
 
 The product test calls the actual operator handler through `_handler`. It checks rollback, concurrent batches and counters, stale requests, another user, authenticated-session and password denial, linked cleanup, identity cutoff retention, and repeat completion. Source fixtures do not independently prove compiled-runtime parity. The separate packaged-runtime qualification and retained identity limits are documented in `vendor/README.md`.
 

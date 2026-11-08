@@ -12,10 +12,24 @@ export const runBatch = internalMutation({
     if (!user || user.deletionRequestedAt !== expectedRequestedAt)
       throw new ConvexError("Matching deletion request not found.");
     const previous = user.authDeletion;
-    if (previous?.state === "linked_auth_cleared") return previous;
+    if (
+      previous?.state === "linked_auth_cleared" &&
+      previous.usernameCleared &&
+      previous.attributedEmailsCleared &&
+      previous.unattributedEmailChallengesUnverified
+    )
+      return previous;
     await ctx.runMutation(components.auth.public.beginUserErasure, { userId });
     const passwords = await ctx.runMutation(
       components.authPassword.public.eraseUserPasswords,
+      { userId },
+    );
+    const username = await ctx.runMutation(
+      components.authUsername.public.eraseUser,
+      { userId },
+    );
+    const email = await ctx.runMutation(
+      components.authEmail.verifiedEmails.eraseUserBatch,
       { userId },
     );
     const core = await ctx.runMutation(
@@ -24,11 +38,19 @@ export const runBatch = internalMutation({
     );
     const progress = {
       state:
-        passwords.complete && core.linkedRowsCleared
+        passwords.complete && core.linkedRowsCleared && email.complete
           ? ("linked_auth_cleared" as const)
           : ("in_progress" as const),
       batches: (previous?.batches ?? 0) + 1,
       passwordsDeleted: (previous?.passwordsDeleted ?? 0) + passwords.deleted,
+      usernamesDeleted:
+        (previous?.usernamesDeleted ?? 0) + Number(username.deleted),
+      emailsDeleted: (previous?.emailsDeleted ?? 0) + email.emailsDeleted,
+      emailChallengesDeleted:
+        (previous?.emailChallengesDeleted ?? 0) + email.challengesDeleted,
+      usernameCleared: true,
+      attributedEmailsCleared: email.complete,
+      unattributedEmailChallengesUnverified: true as const,
       accountsDeleted: (previous?.accountsDeleted ?? 0) + core.deletedAccounts,
       sessionsDeleted: (previous?.sessionsDeleted ?? 0) + core.deletedSessions,
       refreshTokensDeleted:
