@@ -12,7 +12,9 @@ Make the design distinctive through choices that suit the product, rather than a
 
 Use concise copy and real visuals suited to the product. Prioritize useful task UI over decorative filler; do not impose a fixed palette.
 
-For native screens, preserve the starter's shared appearance preference. Use `useTheme` from `packages/disposabl-kit/mobile/design/use-theme.ts`, or derive a product-specific light/dark palette with `useResolvedColorScheme` from the adjacent `theme-provider.tsx`. Apply it to custom screen backgrounds, headers, cards, text, and inputs, with readable status and navigation bars. Reuse the existing provider; fixed light surfaces can become unreadable when Settings switches the system chrome to Dark.
+For native screens, use NativeWind `className` utilities and the shared theme tokens, such as `bg-background`, `text-foreground`, and `border-border`. Do not introduce StyleSheet definitions or inline layout styles. Pass measured values through NativeWind CSS variables. Keep product-specific light/dark colors in the existing theme system and preserve its appearance preference.
+
+Use `useTheme` from `packages/disposabl-kit/mobile/design/use-theme.ts` only where native APIs need resolved colors, such as navigation headers, symbols, and status bars. Reuse the existing provider; fixed light surfaces can become unreadable when Settings switches the system chrome to Dark.
 
 When the app exposes Light, Dark, and System settings, verify the rendered guest and signed-in screens in those modes, including after restart and an OS appearance change in System mode. A changed selector label does not prove the screen changed. Add behavior coverage for the visible colors and preference persistence in `packages/tests`.
 
