@@ -158,6 +158,34 @@ test(
         platforms: ["web", "android"],
         features: ["authentication"],
       });
+      const nativeConfig = () =>
+        JSON.parse(
+          execFileSync(
+            process.execPath,
+            [
+              "-e",
+              `const c = require("./apps/mobile/app.config.js")({ config: { scheme: ["custom"], extra: { preserved: true } } }); console.log(JSON.stringify({ scheme: c.scheme, extra: c.extra }));`,
+            ],
+            {
+              cwd: app,
+              env: {
+                PATH: process.env.PATH,
+                NODE_ENV: "test",
+                DISPOSABL_MOBILE_CHANNEL: "preview",
+              },
+              encoding: "utf8",
+            },
+          ),
+        );
+      const before = nativeConfig();
+      assert.deepEqual(before.scheme.slice(0, 1), ["custom"]);
+      assert.equal(
+        before.scheme.some((s: string) =>
+          /^disposabl-billing-[a-f0-9]{12}-/.test(s),
+        ),
+        false,
+      );
+      assert.equal(before.extra.billingReturnChannel, undefined);
       let manifest = JSON.parse(await read(app, manifestPath));
       assert.equal(manifest.dependencies["react-native-purchases"], undefined);
       assert.equal(
@@ -179,10 +207,19 @@ test(
         assert.ok(
           existsSync(join(app, "apps/mobile/src/app/+native-intent.ts")),
         );
-        assert.match(
-          await read(app, "apps/mobile/app.config.js"),
-          /disposabl-billing-/,
+        const native = nativeConfig();
+        assert.equal(
+          native.scheme.some((s: string) =>
+            /^disposabl-billing-[a-f0-9]{12}-preview$/.test(s),
+          ),
+          features === "payments",
         );
+        assert.equal(
+          native.extra.billingReturnChannel,
+          features === "payments" ? "preview" : undefined,
+        );
+        assert.ok(native.scheme.includes(before.scheme[1]));
+        assert.equal(native.extra.preserved, true);
         manifest = JSON.parse(await read(app, manifestPath));
         assert.equal(manifest.dependencies["custom-example"], "1.2.3");
         assert.equal(

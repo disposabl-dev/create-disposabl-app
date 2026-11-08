@@ -1,5 +1,6 @@
 import { authReturnPath } from "../disposabl-kit/mobile/lib/auth-return";
 import { test } from "node:test";
+import projectFeatures from "../../disposabl.json";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { spawnSync } from "node:child_process";
@@ -88,11 +89,15 @@ test(
         "another",
         new URL(mobileAuthReturnUrl).protocol.slice(0, -1),
       ]);
-      assert.match(
-        config.scheme[3],
-        /^disposabl-billing-[a-f0-9]{12}-[a-z][a-z0-9-]{0,62}$/,
+      if (config.scheme.length === 4)
+        assert.match(
+          config.scheme[3],
+          /^disposabl-billing-[a-f0-9]{12}-[a-z][a-z0-9-]{0,62}$/,
+        );
+      assert.equal(
+        config.scheme.length,
+        projectFeatures.features.includes("payments") ? 4 : 3,
       );
-      assert.equal(config.scheme.length, 4);
     } finally {
       keys.forEach((key, index) => {
         if (saved[index] === undefined) delete process.env[key];

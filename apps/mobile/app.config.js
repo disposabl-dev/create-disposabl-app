@@ -1,4 +1,6 @@
 const { createHash } = require("node:crypto");
+const { readFileSync } = require("node:fs");
+const { join } = require("node:path");
 const project = require("../../package.json");
 
 module.exports = ({ config }) => {
@@ -16,6 +18,9 @@ module.exports = ({ config }) => {
     .update(project.name)
     .digest("hex")
     .slice(0, 12);
+  const paymentsEnabled = JSON.parse(
+    readFileSync(join(__dirname, "../../disposabl.json"), "utf8"),
+  ).features.includes("payments");
   const billingScheme = `disposabl-billing-${suffix}-${channel}`;
   const basePackage = config.android?.package || `app.disposabl.a${suffix}`;
   const versionCode = Number(process.env.DISPOSABL_ANDROID_VERSION_CODE || 1);
@@ -50,10 +55,12 @@ module.exports = ({ config }) => {
             ...new Set([
               ...[config.scheme || []].flat(),
               `disposabl-${project.name.replace(/[^a-z0-9.-]/g, "-")}`,
-              billingScheme,
+              ...(paymentsEnabled ? [billingScheme] : []),
             ]),
           ],
-    extra: { ...config.extra, billingReturnChannel: channel },
+    ...(paymentsEnabled
+      ? { extra: { ...config.extra, billingReturnChannel: channel } }
+      : {}),
     owner: process.env.EXPO_OWNER || config.owner,
     slug: process.env.EXPO_SLUG || config.slug,
     ios: {
@@ -101,7 +108,7 @@ module.exports = ({ config }) => {
           runtimeVersion: { policy: "fingerprint" },
           extra: {
             ...config.extra,
-            billingReturnChannel: channel,
+            ...(paymentsEnabled ? { billingReturnChannel: channel } : {}),
             eas: { ...config.extra?.eas, projectId },
           },
         }

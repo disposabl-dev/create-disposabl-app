@@ -1,6 +1,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
+import {
+  mkdtempSync,
+  mkdirSync,
+  writeFileSync,
+  copyFileSync,
+  rmSync,
+} from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { redirectSystemPath } from "../../../../apps/mobile/src/app/+native-intent";
 import {
   handoffReturnClaim,
@@ -8,12 +17,30 @@ import {
 } from "../../../disposabl-kit/payments/checkout-attempt";
 
 const require = createRequire(import.meta.url);
-const configure = require("../../../../apps/mobile/app.config.js");
 const base = require("../../../../apps/mobile/app.json").expo;
 
 test("billing schemes are channel-specific and preserve existing sign-in schemes", () => {
   const old = process.env.DISPOSABL_MOBILE_CHANNEL;
+  const temp = mkdtempSync(join(tmpdir(), "billing-config-"));
+  mkdirSync(join(temp, "apps/mobile"), { recursive: true });
+  copyFileSync(
+    require.resolve("../../../../apps/mobile/app.config.js"),
+    join(temp, "apps/mobile/app.config.cjs"),
+  );
+  writeFileSync(
+    join(temp, "package.json"),
+    JSON.stringify({ name: "disposabl-dev" }),
+  );
+  const select = (features: string[]) =>
+    writeFileSync(join(temp, "disposabl.json"), JSON.stringify({ features }));
+  const configure = require(join(temp, "apps/mobile/app.config.cjs"));
   try {
+    select(["authentication"]);
+    process.env.DISPOSABL_MOBILE_CHANNEL = "production";
+    const off = configure({ config: base });
+    assert.deepEqual(off.scheme, ["mobile", "disposabl-disposabl-dev"]);
+    assert.equal(off.extra?.billingReturnChannel, undefined);
+    select(["authentication", "payments"]);
     process.env.DISPOSABL_MOBILE_CHANNEL = "production";
     const prod = configure({ config: base });
     process.env.DISPOSABL_MOBILE_CHANNEL = "preview";
@@ -33,6 +60,10 @@ test("billing schemes are channel-specific and preserve existing sign-in schemes
     }
     assert.equal(prod.extra.billingReturnChannel, "production");
     assert.equal(preview.extra.billingReturnChannel, "preview");
+    select(["authentication"]);
+    const disabledAgain = configure({ config: base });
+    assert.deepEqual(disabledAgain.scheme, off.scheme);
+    assert.equal(disabledAgain.extra?.billingReturnChannel, undefined);
     assert.equal(
       redirectSystemPath({ path: `${p}://billing-return`, initial: false }),
       null,
@@ -54,6 +85,7 @@ test("billing schemes are channel-specific and preserve existing sign-in schemes
   } finally {
     if (old === undefined) delete process.env.DISPOSABL_MOBILE_CHANNEL;
     else process.env.DISPOSABL_MOBILE_CHANNEL = old;
+    rmSync(temp, { recursive: true, force: true });
   }
 });
 
