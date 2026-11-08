@@ -8,7 +8,7 @@ import config from "../../disposabl.json";
 // Compile the actual CSS: component defaults must not hide colors or sizes
 // supplied by a screen, including destructive actions in Settings.
 test(
-  "NativeWind utilities override shared text defaults",
+  "NativeWind preserves text overrides and native serif fonts",
   {
     skip: !config.platforms.some((platform) =>
       ["android", "ios"].includes(platform),
@@ -26,9 +26,28 @@ test(
       { from: path },
     );
     type Rule = { s: number[]; d: (Record<string, unknown> | unknown[])[] };
-    const rules = new Map<string, Rule[]>(
-      compile(result.css, { inlineVariables: false }).stylesheet().s,
-    );
+    const stylesheet = compile(result.css, {
+      inlineVariables: false,
+    }).stylesheet();
+    const rules = new Map<string, Rule[]>(stylesheet.s);
+    const variables = new Map<string, [unknown, unknown?][]>(stylesheet.vr);
+    for (const [platform, family] of [
+      ["android", "serif"],
+      ["ios", "Georgia"],
+    ]) {
+      const resolved = variables
+        .get("font-serif")
+        ?.find(
+          ([, conditions]) =>
+            JSON.stringify(conditions) ===
+            JSON.stringify([["=", "platform", platform]]),
+        );
+      assert.equal(
+        resolved?.[0],
+        family,
+        `${platform} retains its native serif font`,
+      );
+    }
     for (const [utility, base, property, value] of [
       ["text-[#71717a]", "themed-text", "color", "#71717a"],
       ["text-[#dc2626]", "themed-text", "color", "#dc2626"],

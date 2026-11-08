@@ -58,6 +58,13 @@
   --destructive-foreground: #ffffff;
 }
 
+/* NativeWind's Android default currently maps font-serif to sans-serif. */
+@media android {
+  :root {
+    --font-serif: serif;
+  }
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #101a32;
