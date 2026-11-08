@@ -274,9 +274,17 @@ test(
         ).toBeVisible();
         await app.screenshot("chat-stop-unconfirmed");
         await screen.getByRole("button", "Back", { exact: true }).tap();
-        await screen
-          .getByRole("button", "Open Chat proof", { exact: true })
-          .tap();
+        const openChat = screen.getByRole("button", "Open Chat proof", {
+          exact: true,
+        });
+        await expect(openChat).toBeVisible();
+        if (platform === "ios")
+          await device.unstable_raw.client.command.wait({
+            stable: true,
+            quietMs: 500,
+            timeoutMs: 5000,
+          });
+        await openChat.tap();
         await expect(
           screen.getByRole("button", "Stop generating", { exact: true }),
         ).toBeVisible();
