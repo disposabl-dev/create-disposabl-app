@@ -11,6 +11,7 @@ import {
 } from "../create-disposabl-app/options";
 
 const excluded = [
+  "packages/tests/account-deletion-active.test.ts",
   "packages/tests/flows/account-deletion.e2e.ts",
   "packages/tests/account-deletion-stop.test.ts",
   "packages/tests/account-deletion-transactions.test.ts",
