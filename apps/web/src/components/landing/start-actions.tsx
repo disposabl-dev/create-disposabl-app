@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, Copy, ArrowUpRight, Terminal } from "lucide-react";
+import { Check, Copy, ArrowUpRight } from "lucide-react";
 import { useHydrated } from "@tanstack/react-router";
 import { StoreDownloads } from "./store-downloads";
 import { setupPrompt } from "../agent-onboarding";
@@ -7,21 +7,17 @@ import codex from "../agent-onboarding/assets/codex.png";
 import claude from "../agent-onboarding/assets/claude.svg";
 import cursor from "../agent-onboarding/assets/cursor.svg";
 
-export const setupCommand = "npx create-disposabl-app@latest";
-
 export function StartActions({ onDetails }: { onDetails: () => void }) {
   const hydrated = useHydrated();
   const [failed, setFailed] = useState<string | null>(null);
-  const [copied, setCopied] = useState<"prompt" | "command" | null>(null);
-  async function copy(kind: "prompt" | "command") {
+  const [copied, setCopied] = useState(false);
+  async function copy() {
     try {
-      await navigator.clipboard.writeText(
-        kind === "prompt" ? setupPrompt : setupCommand,
-      );
-      setCopied(kind);
+      await navigator.clipboard.writeText(setupPrompt);
+      setCopied(true);
       setFailed(null);
     } catch {
-      setFailed(kind === "prompt" ? setupPrompt : setupCommand);
+      setFailed(setupPrompt);
     }
   }
   return (
@@ -33,10 +29,10 @@ export function StartActions({ onDetails }: { onDetails: () => void }) {
             id="start"
             disabled={!hydrated}
             className="copy-start"
-            onClick={() => void copy("prompt")}
+            onClick={() => void copy()}
           >
-            {copied === "prompt" ? <Check size={21} /> : <Copy size={21} />}
-            {copied === "prompt" ? "Copied" : "Copy prompt"}
+            {copied ? <Check size={21} /> : <Copy size={21} />}
+            {copied ? "Copied" : "Copy prompt"}
           </button>
           <div
             className="start-agent-logos"
@@ -64,16 +60,6 @@ export function StartActions({ onDetails }: { onDetails: () => void }) {
         </div>
       </div>
       <StoreDownloads />
-      <button
-        className="command-start"
-        disabled={!hydrated}
-        onClick={() => void copy("command")}
-        aria-label="Copy npx command"
-      >
-        <Terminal size={17} />
-        <code>{setupCommand}</code>
-        {copied === "command" ? <Check size={17} /> : <Copy size={17} />}
-      </button>
       {failed && (
         <div className="copy-fallback" role="status">
           <p>Copy this text:</p>
@@ -81,9 +67,7 @@ export function StartActions({ onDetails }: { onDetails: () => void }) {
         </div>
       )}
       <span className="sr-only" aria-live="polite">
-        {copied
-          ? `${copied === "prompt" ? "Prompt" : "Command"} copied to clipboard.`
-          : ""}
+        {copied ? "Prompt copied to clipboard." : ""}
       </span>
     </div>
   );

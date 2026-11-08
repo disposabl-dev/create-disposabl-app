@@ -68,19 +68,22 @@
   flex: none;
 }
 .store-buttons {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: center;
-  flex-wrap: wrap;
-  gap: 20px;
+  gap: 12px;
+  width: 100%;
+  max-width: 360px;
 }
 .store-control {
   position: relative;
-  flex: none;
+  min-width: 0;
 }
 .store-button {
   display: flex;
   align-items: center;
-  width: auto;
+  justify-content: center;
+  width: 100%;
   height: 64px;
   padding: 0;
   border: 0;
@@ -89,8 +92,10 @@
 }
 .store-button img {
   display: block;
-  height: 56px;
+  height: 48px;
   width: auto;
+  max-width: 100%;
+  object-fit: contain;
 }
 .footer-invitation .store-buttons {
   flex-shrink: 0;
@@ -113,28 +118,6 @@
 .store-control:hover .store-tooltip {
   visibility: visible;
   opacity: 1;
-}
-.command-start {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 10px;
-  border: 0;
-  background: none;
-  color: var(--muted);
-  min-height: 44px;
-  padding: 6px 0;
-  text-align: left;
-  font-size: 16px;
-  max-width: 100%;
-}
-.command-start code {
-  font-family: var(--font-mono);
-  font-size: 16px;
-  white-space: nowrap;
-}
-.command-start svg {
-  flex: none;
 }
 .copy-fallback {
   border: 1px solid var(--line);
@@ -188,15 +171,6 @@
   .start-agent-logos {
     display: none;
   }
-  .command-start {
-    gap: 8px;
-  }
-  .command-start code {
-    letter-spacing: -0.065em;
-  }
-  .command-start > svg:first-child {
-    display: none;
-  }
 }
 
 @media (max-width: 600px) {
@@ -204,16 +178,9 @@
     height: 56px;
   }
   .store-button img {
-    height: 48px;
+    height: 40px;
   }
   .store-buttons {
-    gap: 12px;
-  }
-}
-@media (max-width: 380px) {
-  .store-buttons {
-    flex-direction: column;
-    align-items: flex-start;
     gap: 12px;
   }
 }

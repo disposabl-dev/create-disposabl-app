@@ -58,6 +58,25 @@ test(
   { platforms: ["web"], tags: ["landing"] },
   async ({ app, browser, screen }) => {
     await app.open("/");
+    for (const width of [320, 390]) {
+      await browser.setViewport({ width, height: 844 });
+      const aligned = await browser.evaluate(() =>
+        [...document.querySelectorAll(".store-buttons")].every((row) => {
+          const [a, b] = [...row.querySelectorAll(".store-button")].map(
+            (button) => button.getBoundingClientRect(),
+          );
+          return (
+            a &&
+            b &&
+            Math.abs(a.top - b.top) < 1 &&
+            Math.abs(a.width - b.width) < 1 &&
+            a.height === b.height &&
+            b.right <= window.innerWidth
+          );
+        }),
+      );
+      expect(aligned).toBe(true);
+    }
     for (const [index, name] of [
       "Download on the App Store",
       "Get it on Google Play",
@@ -95,10 +114,7 @@ test(
       });
     });
     await app.open("/");
-    await browser.locator(".maker-hero .command-start").tap();
-    await expect(browser.locator(".maker-hero .copy-fallback")).toContainText(
-      "npx create-disposabl-app@latest",
-    );
+    await expect(browser.locator(".maker-hero .command-start")).toHaveCount(0);
     await browser.locator("#start").tap();
     await expect(browser.locator(".maker-hero .copy-fallback")).toContainText(
       "Help me build an app with Disposabl. Read https://github.com/disposabl-dev/create-disposabl-app, then ask me what I want to make and where it should run.",
@@ -743,10 +759,7 @@ test(
     await expect(browser.locator(".maker-hero .copy-start")).toContainText(
       "Copied",
     );
-    await browser.locator(".maker-hero .command-start").tap();
-    expect(
-      await browser.evaluate(() => (window as any).__copied as string),
-    ).toBe("npx create-disposabl-app@latest");
+    await expect(browser.locator(".maker-hero .command-start")).toHaveCount(0);
     await expect(browser.locator("footer .store-button")).toHaveCount(2);
     await expect(
       browser.locator("footer .store-button").nth(0),
