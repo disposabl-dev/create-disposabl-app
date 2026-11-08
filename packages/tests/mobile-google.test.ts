@@ -12,6 +12,8 @@ import {
   mobileAuthReturnUrl,
 } from "../disposabl-kit/lib/mobile-auth";
 
+const selectedFeatures: readonly string[] = projectFeatures.features;
+
 test("mobile Google browser lifecycle", () => {
   const result = spawnSync(
     process.execPath,
@@ -96,7 +98,7 @@ test(
         );
       assert.equal(
         config.scheme.length,
-        projectFeatures.features.includes("payments") ? 4 : 3,
+        selectedFeatures.includes("payments") ? 4 : 3,
       );
     } finally {
       keys.forEach((key, index) => {
