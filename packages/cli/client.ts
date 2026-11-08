@@ -18,6 +18,7 @@ import {
   loginAccessToken,
   logout,
   withCredentialSession,
+  credentialRevision,
 } from "./auth";
 
 export type Schema = {
@@ -97,7 +98,7 @@ export function createProgram(
         base === "https://www.disposabl.dev" &&
         installedRelease(version);
       const enabled = central && telemetryConfig(version);
-      const { attempt, token } = await credentialSession(
+      const { attempt, token, revision } = await credentialSession(
         base,
         async (session) => {
           let attempt: string | undefined;
@@ -108,13 +109,16 @@ export function createProgram(
           await session.login(options.browser);
           return {
             attempt,
+            revision: enabled
+              ? await credentialRevision().catch(() => undefined)
+              : undefined,
             token: enabled
               ? await session.loginAccessToken().catch(() => undefined)
               : undefined,
           };
         },
       );
-      if (enabled && token) {
+      if (enabled && token && revision) {
         try {
           const response = await fetch(`${base}/api/users/current`, {
             headers: { Authorization: `Bearer ${token}` },
@@ -127,6 +131,7 @@ export function createProgram(
               (await response.json())?.id,
               path(),
               attempt,
+              revision,
             );
         } catch {
           /* identity lookup is optional */
@@ -143,7 +148,13 @@ export function createProgram(
         centralAnalytics &&
         base === "https://www.disposabl.dev" &&
         telemetryConfig(version);
-      let snapshot: { token: string; attempt: string | undefined } | undefined;
+      let snapshot:
+        | {
+            token: string;
+            attempt: string | undefined;
+            revision: string | undefined;
+          }
+        | undefined;
       try {
         snapshot = await credentialSession(base, async (session) => {
           if (!(await session.hasCredentials())) {
@@ -152,7 +163,14 @@ export function createProgram(
           }
           const attempt = enabled ? await prepareLogin(path()) : undefined;
           try {
-            return { token: await session.accessToken(), attempt };
+            const token = await session.accessToken();
+            return {
+              token,
+              attempt,
+              revision: enabled
+                ? await credentialRevision().catch(() => undefined)
+                : undefined,
+            };
           } catch (error) {
             if (enabled && attempt) await resetIdentity(path(), attempt);
             throw error;
@@ -182,9 +200,18 @@ export function createProgram(
           const refreshed = await credentialSession(base, async (session) => {
             if ((await session.loginAccessToken()) !== snapshot!.token)
               return undefined;
-            return session.accessToken(true);
+            const token = await session.accessToken(true);
+            return {
+              token,
+              revision: enabled
+                ? await credentialRevision().catch(() => undefined)
+                : undefined,
+            };
           });
-          if (refreshed) response = await send(refreshed);
+          if (refreshed) {
+            snapshot.revision = refreshed.revision;
+            response = await send(refreshed.token);
+          }
         } catch (error) {
           if (!(error instanceof NotAuthenticated)) throw error;
         }
@@ -198,8 +225,14 @@ export function createProgram(
       if (!response.ok)
         throw new Error(`Login status failed (${response.status}).`);
       const currentUser = await response.json();
-      if (enabled)
-        await identify(version, currentUser?.id, path(), snapshot.attempt);
+      if (enabled && snapshot.revision)
+        await identify(
+          version,
+          currentUser?.id,
+          path(),
+          snapshot.attempt,
+          snapshot.revision,
+        );
       console.log(JSON.stringify({ currentUser }));
     });
   program.command("logout").action(async () => {

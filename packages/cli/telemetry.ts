@@ -4,8 +4,14 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { lock } from "proper-lockfile";
+import { credentialRevision } from "./auth";
 
-type State = { anonymousId: string; userId?: string; loginAttempt?: string };
+type State = {
+  anonymousId: string;
+  credentialRevision: string;
+  userId?: string;
+  loginAttempt?: string;
+};
 type Product = "cli" | "generator";
 type Outcome = "started" | "success" | "failure" | "cancelled";
 
@@ -69,7 +75,10 @@ async function state(path: string): Promise<State> {
     /* create a fresh anonymous ID */
   }
   await mkdir(join(path, ".."), { recursive: true, mode: 0o700 });
-  const fresh = { anonymousId: randomUUID() };
+  const fresh = {
+    anonymousId: randomUUID(),
+    credentialRevision: await credentialRevision(),
+  };
   try {
     await writeFile(path, JSON.stringify(fresh), { mode: 0o600, flag: "wx" });
     return fresh;
@@ -131,6 +140,8 @@ export async function capture(
   if (!config) return;
   try {
     const current = await synchronized(path, () => state(path));
+    // A failed rotation must not preserve a prior account after credentials change.
+    if (current.credentialRevision !== (await credentialRevision())) return;
     const allowed = [
       "agent",
       "login",
@@ -178,6 +189,7 @@ export async function prepareLogin(path: string): Promise<string | undefined> {
             ? randomUUID()
             : current.anonymousId,
         loginAttempt,
+        credentialRevision: await credentialRevision(),
       };
       await writeFile(path, JSON.stringify(next), { mode: 0o600 });
       return loginAttempt;
@@ -192,6 +204,7 @@ export async function identify(
   userId: unknown,
   path: string,
   attempt: string | undefined,
+  revision: string | undefined = undefined,
 ) {
   const config = telemetryConfig(version);
   if (
@@ -202,11 +215,14 @@ export async function identify(
   )
     return;
   try {
+    // Direct callers also bind to a snapshot taken before waiting for the lock.
+    const expectedRevision = revision ?? (await credentialRevision());
     await synchronized(path, async () => {
       // Do not recreate state after logout or a later login.
       const current = JSON.parse(await readFile(path, "utf8")) as State;
       if (
         current.loginAttempt !== attempt ||
+        expectedRevision !== (await credentialRevision()) ||
         current.userId ||
         !/^[0-9a-f-]{36}$/.test(current.anonymousId)
       )
@@ -224,6 +240,7 @@ export async function identify(
           JSON.stringify({
             anonymousId: current.anonymousId,
             userId: opaqueId,
+            credentialRevision: expectedRevision,
           }),
           { mode: 0o600 },
         );

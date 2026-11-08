@@ -78,6 +78,13 @@ async function load(url: string): Promise<Session> {
     throw error;
   }
 }
+// Local-only binding. Never send this credential fingerprint to analytics.
+export async function credentialRevision() {
+  const session = await load("https://www.disposabl.dev");
+  return createHash("sha256")
+    .update(session.tokens?.access_token ?? "anonymous")
+    .digest("hex");
+}
 async function save(url: string, session: Session) {
   await mkdir(directory(), { recursive: true, mode: 0o700 });
   await chmod(directory(), 0o700);

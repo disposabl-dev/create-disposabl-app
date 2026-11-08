@@ -15,7 +15,11 @@ import { homedir, tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import { telemetryBuildDefine } from "../cli/telemetry-build";
 import { createProgram } from "../cli/client";
-import { login as oauthLogin, withCredentialSession } from "../cli/auth";
+import {
+  credentialRevision,
+  login as oauthLogin,
+  withCredentialSession,
+} from "../cli/auth";
 import {
   capture,
   identify,
@@ -75,6 +79,89 @@ afterEach(async () => {
   process.argv[1] = originalEntry;
   globalThis.fetch = originalFetch;
   await rm(home, { recursive: true, force: true });
+});
+
+test(
+  "credential changes suppress stale identities when telemetry rotation times out",
+  { timeout: 10_000 },
+  async () => {
+    const origin = "https://www.disposabl.dev";
+    const credentials = join(
+      process.env.DISPOSABL_CONFIG_DIR!,
+      `${createHash("sha256").update(origin).digest("hex")}.json`,
+    );
+    await mkdir(process.env.DISPOSABL_CONFIG_DIR!, { recursive: true });
+    const save = (token: string) =>
+      writeFile(
+        credentials,
+        JSON.stringify({
+          tokens: { access_token: token, token_type: "Bearer" },
+          expiresAt: Date.now() + 3600_000,
+        }),
+      );
+    await save("account-a-token");
+    const attempt = await prepareLogin(path());
+    await identify("1.2.3", "account_a", path(), attempt);
+    const oldIdentity = requests.at(-1)!.distinct_id;
+    const transport = globalThis.fetch;
+    globalThis.fetch = (async (url, init) => {
+      if (String(url).endsWith("/api/users/current"))
+        return Response.json({ id: "account_b" });
+      if (String(url).endsWith("/mcp/oauth/revoke"))
+        return new Response(null, { status: 200 });
+      return transport(url, init);
+    }) as typeof fetch;
+    const program = () =>
+      createProgram(origin, true, {
+        version: "1.2.3",
+        telemetryPath: path(),
+        credentialSession: (url, run) =>
+          withCredentialSession(url, (session) =>
+            run({
+              ...session,
+              login: () => save("account-b-token"),
+            }),
+          ),
+      });
+    await mkdir(`${path()}.lock`);
+    await program().parseAsync(["node", "cli", "login", "--no-browser"]);
+    await rm(`${path()}.lock`, { recursive: true });
+    const afterLogin = requests.length;
+    await capture("1.2.3", "cli", "agent", "success", path());
+    expect(requests).toHaveLength(afterLogin);
+    expect(
+      JSON.parse(await readFile(credentials, "utf8")).tokens.access_token,
+    ).toBe("account-b-token");
+    await program().parseAsync(["node", "cli", "login", "status"]);
+    await capture("1.2.3", "cli", "agent", "success", path());
+    expect(requests.at(-1)!.distinct_id).not.toBe(oldIdentity);
+    const afterRecovery = requests.length;
+    await mkdir(`${path()}.lock`);
+    await program().parseAsync(["node", "cli", "logout"]);
+    await rm(`${path()}.lock`, { recursive: true });
+    await capture("1.2.3", "cli", "agent", "success", path());
+    expect(requests).toHaveLength(afterRecovery);
+    await expect(readFile(credentials)).rejects.toMatchObject({
+      code: "ENOENT",
+    });
+    expect(JSON.stringify(requests)).not.toContain("account-a-token");
+    expect(JSON.stringify(requests)).not.toContain("account-b-token");
+  },
+);
+
+test("an old verified snapshot cannot bind after credentials change without rotation", async () => {
+  const oldRevision = await credentialRevision();
+  const attempt = await prepareLogin(path());
+  await mkdir(process.env.DISPOSABL_CONFIG_DIR!, { recursive: true });
+  await writeFile(
+    join(
+      process.env.DISPOSABL_CONFIG_DIR!,
+      `${createHash("sha256").update("https://www.disposabl.dev").digest("hex")}.json`,
+    ),
+    JSON.stringify({ tokens: { access_token: "new-token" } }),
+  );
+  await identify("1.2.3", "old_user", path(), attempt, oldRevision);
+  expect(requests).toHaveLength(0);
 });
 
 test("source, development, tests, opt out and missing or unsafe config emit nothing", async () => {
