@@ -28,6 +28,23 @@ export const authDeletionProgress = v.object({
   updatedAt: v.number(),
 });
 
+export const fileDeletionProgress = v.object({
+  state: v.union(
+    v.literal("in_progress"),
+    v.literal("blocked"),
+    v.literal("known_convex_cleared"),
+  ),
+  cursor: v.union(v.string(), v.null()),
+  batches: v.number(),
+  blobsDeleted: v.number(),
+  missingBlobs: v.number(),
+  sharedInScan: v.number(),
+  r2Present: v.boolean(),
+  knownConvexCleared: v.boolean(),
+  untrackedStorageUnverified: v.literal(true),
+  updatedAt: v.number(),
+});
+
 export const profile = v.object({
   name: v.optional(v.string()),
   email: v.optional(v.string()),

@@ -9,6 +9,7 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 import {
   authDeletionProgress,
+  fileDeletionProgress,
   mcpDeletionProgress,
   profile,
 } from "./users/validator";
@@ -94,7 +95,9 @@ export default defineSchema({
         bucket: v.string(),
       }),
     ),
-  }),
+  })
+    .index("by_owner_provider", ["owner", "location.provider"])
+    .index("by_storageId", ["location.storageId"]),
   agentEvents: defineTable(eventFields)
     .index("by_messageId", ["messageId"])
     .index("by_threadId_taskId", ["threadId", "taskId"])
@@ -111,6 +114,7 @@ export default defineSchema({
     deletionRequestedAt: v.optional(v.number()),
     mcpDeletion: v.optional(mcpDeletionProgress),
     authDeletion: v.optional(authDeletionProgress),
+    fileDeletion: v.optional(fileDeletionProgress),
     deletionStop: v.optional(
       v.object({
         state: v.union(

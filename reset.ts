@@ -25,6 +25,7 @@ if (
 // Product-only proof harnesses must not enter generated apps. Keep the same
 // paths in the symlink validation and removal inventories.
 const productProofTests = [
+  "packages/tests/fixtures/file-deletion-convex",
   "packages/tests/fixtures/auth-identity-erasure-convex",
   "packages/tests/fixtures/agent-inert-convex",
   "packages/tests/fixtures/auth-erasure-convex",
@@ -71,6 +72,7 @@ const productProofTests = [
 const touched = [
   ...productProofTests,
   "packages/backend/convex/users/authDeletion.ts",
+  "packages/backend/convex/users/fileDeletion.ts",
   "packages/backend/convex",
   "packages/backend/generated",
   "packages/backend/package.json",
@@ -285,6 +287,7 @@ for (const entry of await readdir(convex)) {
 for (const path of [
   ...productProofTests,
   "packages/backend/convex/users/authDeletion.ts",
+  "packages/backend/convex/users/fileDeletion.ts",
   "packages/tests/generator-service-origin.test.ts",
   "packages/tests/mobile-attachment-lifecycle.test.ts",
   "packages/tests/components/mobile-attachment-lifecycle.test.mjs",
