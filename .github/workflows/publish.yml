@@ -13,6 +13,12 @@ on:
 permissions:
   contents: read
 
+env:
+  # Public ingestion configuration, embedded in the published CLI binaries.
+  DISPOSABL_CLI_POSTHOG_PROJECT_TOKEN: ${{ vars.DISPOSABL_CLI_POSTHOG_PROJECT_TOKEN }}
+  DISPOSABL_CLI_POSTHOG_HOST: ${{ vars.DISPOSABL_CLI_POSTHOG_HOST }}
+  DISPOSABL_CLI_TELEMETRY_REQUIRED: "1"
+
 jobs:
   cli:
     if: github.repository == 'disposabl-dev/create-disposabl-app' && github.ref == 'refs/heads/main' && inputs.recovery_version == ''
