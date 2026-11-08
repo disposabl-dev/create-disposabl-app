@@ -70,6 +70,7 @@ const touched = [
   "apps/mobile/package.json",
   "apps/mobile/app.json",
   "packages/disposabl-kit/package.json",
+  "packages/disposabl-kit/legal/publisher.ts",
   "packages/disposabl-kit/mobile/components/use-dictation.ts",
   "packages/tests/mobile-dictation.test.ts",
   "packages/tests/components/mobile-dictation.test.mjs",
@@ -214,6 +215,7 @@ for (const path of [
   await readFile(join(root, "starter/backend", path));
 
 const starterCopies = [
+  ["starter/legal/publisher.ts", "packages/disposabl-kit/legal/publisher.ts"],
   ["starter/web/index.tsx", "apps/web/src/router/index.tsx"],
   ["starter/cli/README.md", "packages/cli/README.md"],
   ["starter/cli/commands.ts", "packages/cli/commands.ts"],

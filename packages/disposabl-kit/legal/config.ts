@@ -1,13 +1,14 @@
 import project from "../../../package.json";
 import { authenticationEnabled, analyticsEnabled } from "../features";
+import { publisher } from "./publisher";
 
 // Public draft details. Each app publisher must review these before launch.
 export const legalConfig = {
   appName: project.name === "disposabl-dev" ? "Disposabl" : project.name,
-  operatorName: "",
+  operatorName: publisher.operatorName,
   operatorAddress: "",
   country: "",
-  privacyEmail: "",
+  privacyEmail: publisher.privacyEmail,
   effectiveDate: "",
   reviewed: false,
   retention: "",

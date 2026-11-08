@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
-import { mkdtemp, readdir, rm } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createApp } from "../create-disposabl-app/scaffold";
@@ -63,6 +63,13 @@ test("packaged starter and both generated profiles exclude product proof fixture
       roots.push(destination);
     }
     for (const root of roots) {
+      const publisher = await readFile(
+        join(root, "packages/disposabl-kit/legal/publisher.ts"),
+        "utf8",
+      );
+      assert.match(publisher, /operatorName: ""/);
+      assert.match(publisher, /privacyEmail: ""/);
+      assert.doesNotMatch(publisher, /Yast AI|vivek@yast\.ai/);
       const fixtures = join(root, "packages/tests/fixtures");
       if (existsSync(fixtures)) assert.deepEqual(await readdir(fixtures), []);
       for (const path of excluded)

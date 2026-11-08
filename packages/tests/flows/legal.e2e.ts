@@ -33,9 +33,14 @@ test(
     ).toBeVisible();
     await app.open("/legal/delete-account");
     await expect(screen.getByRole("heading", "Privacy contact")).toBeVisible();
-    await expect(
-      screen.getByText("The publisher has not provided a privacy contact yet."),
-    ).toBeVisible();
+    if (legalConfig.privacyEmail)
+      await expect(
+        screen.getByRole("link", legalConfig.privacyEmail),
+      ).toBeVisible();
+    else
+      await expect(
+        screen.getByText("The publisher has not provided a privacy contact yet."),
+      ).toBeVisible();
   },
 );
 
