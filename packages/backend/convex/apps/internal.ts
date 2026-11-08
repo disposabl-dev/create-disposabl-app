@@ -23,7 +23,7 @@ import { internal } from "../_generated/api";
 import {
   defaultAndroidArchitectures,
   validateAndroidArchitectures,
-} from "@disposabl/disposabl-kit/android-architectures";
+} from "../../../disposabl-kit/android-architectures";
 import { validatePlatforms } from "@disposabl/disposabl-kit/platforms";
 import { githubConnection } from "../validator";
 import type { Doc } from "../_generated/dataModel";
@@ -187,13 +187,13 @@ function configurationPrompt(
   appId: string,
   platforms: string[],
   features: string[],
-  architectures: string[],
+  architectures: readonly string[],
 ) {
   const selected = validatePlatforms(platforms);
   const selectedFeatures = resolveFeatures(features);
   return `Apply this configuration change to the existing app repository. Requested platforms: ${selected.join(",")}. Requested features: ${selectedFeatures.join(",") || "none"}.
 Read the generator version from this app's disposabl.json. Use that exact version (not latest) with the existing-project reconfiguration flow from /home/user/apps: bun create disposabl-app@<matching-version> ${appId} --platforms ${selected.join(",")} --features ${selectedFeatures.join(",") || "none"} --android-architectures ${validateAndroidArchitectures(architectures).join(",")} --yes.
-Preserve this app ID, source customizations and user data. Restore newly selected platform/auth files using the generator; do not scaffold a replacement. Complete its existing setup/provisioning flow and run the selected-platform checks. If a template conflict or account connection blocks setup, explain the exact blocker and stop. Report applied files, setup outcome and test evidence; a queued request or metadata update alone is not completion.`;
+If the matching generator does not support --android-architectures, stop and report that a supported generator upgrade or migration is required; do not retry with latest or claim the change applied. Preserve this app ID, source customizations and user data. Restore newly selected platform/auth files using the generator; do not scaffold a replacement. Complete its existing setup/provisioning flow and run the selected-platform checks. If a template conflict or account connection blocks setup, explain the exact blocker and stop. Report applied files, setup outcome and test evidence; a queued request or metadata update alone is not completion.`;
 }
 
 /** Queue repository changes; applied selections are synchronized by generator setup. */
@@ -276,8 +276,9 @@ function presentApp(app: Doc<"apps">): AppResult {
     appId: app.appId,
     name: app.name,
     platforms: app.platforms,
-    androidArchitectures:
+    androidArchitectures: validateAndroidArchitectures(
       app.androidArchitectures ?? defaultAndroidArchitectures,
+    ),
     features: app.features ?? [],
     ...(app.githubOwner ? { githubOwner: app.githubOwner } : {}),
     ...(app.githubRepo ? { githubRepo: app.githubRepo } : {}),

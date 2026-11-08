@@ -8,7 +8,7 @@ import { resolveFeatures } from "@disposabl/disposabl-kit/feature-options";
 import {
   defaultAndroidArchitectures,
   validateAndroidArchitectures,
-} from "@disposabl/disposabl-kit/android-architectures";
+} from "../../../../../disposabl-kit/android-architectures";
 import { validatePlatforms } from "@disposabl/disposabl-kit/platforms";
 import { v } from "convex/values";
 import { internal } from "../../../_generated/api";

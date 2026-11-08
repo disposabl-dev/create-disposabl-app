@@ -21,6 +21,8 @@ export const platform = v.union(
 export const androidArchitecture = v.union(
   v.literal("arm64-v8a"),
   v.literal("x86_64"),
+  v.literal("armeabi-v7a"),
+  v.literal("x86"),
 );
 export const githubConnection = v.object({
   owner: v.string(),

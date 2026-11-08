@@ -1,9 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { getFunctionName, httpRouter } from "convex/server";
+import { requestConfigurationChecked } from "../backend/convex/apps/index";
 import { create } from "../backend/convex/previews/token/actions/create";
 import {
   applyConfiguration,
+  get,
   requestConfiguration,
   requestConfigurationLegacy,
 } from "../backend/convex/apps/internal";
@@ -87,6 +89,68 @@ test("only the current unexpired setup lease can commit selections", async () =>
   });
 });
 
+test("applied architectures read back only after a valid owner lease", async () => {
+  const until = Date.now() + 10000;
+  let row: any = { ...app, operation: { kind: "setup", until } };
+  const ctx = {
+    db: db(row, async (_table, _id, value) => {
+      row = { ...row, ...(value as object) };
+    }),
+  };
+  const args = {
+    userId: "owner",
+    appId,
+    until,
+    platforms: ["web", "android"],
+    features: [],
+    androidArchitectures: ["x86_64"],
+  };
+  await assert.rejects(
+    (applyConfiguration as any)._handler(ctx, { ...args, userId: "other" }),
+    /App not found/,
+  );
+  await assert.rejects(
+    (applyConfiguration as any)._handler(ctx, {
+      ...args,
+      androidArchitectures: [],
+    }),
+  );
+  await assert.rejects(
+    (applyConfiguration as any)._handler(ctx, {
+      ...args,
+      androidArchitectures: ["bogus"],
+    }),
+  );
+  await assert.rejects(
+    (applyConfiguration as any)._handler(ctx, {
+      ...args,
+      androidArchitectures: ["x86_64", "x86_64"],
+    }),
+  );
+  assert.deepEqual(row.androidArchitectures, ["arm64-v8a"]);
+  await (applyConfiguration as any)._handler(ctx, args);
+  const readCtx = { db: db(row, () => {}) };
+  assert.deepEqual(
+    (await (get as any)._handler(readCtx, { userId: "owner", appId }))
+      .androidArchitectures,
+    ["x86_64"],
+  );
+  await assert.rejects(
+    (get as any)._handler(readCtx, { userId: "other", appId }),
+    /App not found/,
+  );
+  const legacy = { ...row, androidArchitectures: undefined };
+  assert.deepEqual(
+    (
+      await (get as any)._handler(
+        { db: db(legacy, () => {}) },
+        { userId: "owner", appId },
+      )
+    ).androidArchitectures,
+    ["arm64-v8a", "x86_64"],
+  );
+});
+
 test("configuration requests persist in the conversation before account setup", async () => {
   let prompt = "";
   const ctx = {
@@ -108,6 +172,19 @@ test("configuration requests persist in the conversation before account setup", 
   assert.match(prompt, /Requested platforms: web,ios/);
   assert.match(prompt, /Requested features: authentication,analytics/);
   assert.match(prompt, /--android-architectures arm64-v8a/);
+  assert.match(
+    prompt,
+    /matching generator does not support --android-architectures/,
+  );
+  assert.match(prompt, /do not retry with latest or claim the change applied/);
+  await (requestConfiguration as any)._handler(ctx, {
+    userId: "owner",
+    appId,
+    platforms: ["web", "android"],
+    features: [],
+    androidArchitectures: ["x86_64"],
+  });
+  assert.match(prompt, /--android-architectures x86_64/);
   await assert.rejects(
     (requestConfiguration as any)._handler(ctx, {
       userId: "owner",
@@ -116,6 +193,33 @@ test("configuration requests persist in the conversation before account setup", 
       features: [],
       androidArchitectures: [],
     }),
+  );
+});
+
+test("settings action authenticates and forwards selected architectures", async () => {
+  let forwarded: any;
+  const ctx = {
+    auth: { getUserIdentity: async () => ({ subject: "session" }) },
+    runQuery: async () => ({ userId: "owner" }),
+    runAction: async (_ref: unknown, args: unknown) => {
+      forwarded = args;
+      return { queued: true };
+    },
+  };
+  const payload = {
+    appId,
+    platforms: ["web", "android"],
+    features: [],
+    androidArchitectures: ["x86_64"],
+  };
+  await (requestConfigurationChecked as any)._handler(ctx, payload);
+  assert.deepEqual(forwarded, { ...payload, userId: "owner" });
+  await assert.rejects(
+    (requestConfigurationChecked as any)._handler(
+      { ...ctx, auth: { getUserIdentity: async () => null } },
+      payload,
+    ),
+    /Sign in/,
   );
 });
 

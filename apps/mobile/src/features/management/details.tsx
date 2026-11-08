@@ -1,7 +1,7 @@
 import {
   defaultAndroidArchitectures,
   type AndroidArchitecture,
-} from "@disposabl/disposabl-kit/android-architectures";
+} from "../../../../../packages/disposabl-kit/android-architectures";
 import {
   features,
   resolveFeatures,
@@ -70,10 +70,12 @@ function Selection({
   appId: string;
   initialPlatforms: Platform[];
   initialFeatures: Feature[];
-  initialArchitectures: AndroidArchitecture[];
+  initialArchitectures: readonly AndroidArchitecture[];
 }) {
   const [selected, setSelected] = useState(initialPlatforms);
-  const [architectures, setArchitectures] = useState(initialArchitectures);
+  const [architectures, setArchitectures] = useState<AndroidArchitecture[]>([
+    ...initialArchitectures,
+  ]);
   const [chosen, setChosen] = useState(initialFeatures);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -140,6 +142,8 @@ function Selection({
               [
                 ["arm64-v8a", "Modern phones (ARM64)"],
                 ["x86_64", "Emulators (x86_64)"],
+                ["armeabi-v7a", "Older phones (ARM32)"],
+                ["x86", "Older emulators (x86)"],
               ] as const
             ).map(([id, label]) => (
               <Pressable
