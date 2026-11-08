@@ -45,7 +45,7 @@ The root [pipeline](../../.github/workflows/pipeline.yml) selects enabled target
 
 The build helper temporarily sets version `1.<workflow run number>.<run attempt>`, creates the installers, restores `package.json`, and collects outputs in `dist/release`. Build jobs upload artifacts; the separate publisher checks the source commit and publishes Windows/Linux releases from trusted `main` scripts. Main release tags include the platform and workflow run. Forge itself does not publish.
 
-Windows and Linux installers are unsigned. macOS uses ad hoc signing and provides a DMG as a workflow artifact retained for three days. The pipeline does not currently configure Developer ID signing, notarization, or macOS GitHub releases. The signed macOS update lane still requires separate configuration described below.
+Windows and Linux installers are unsigned. Without signing credentials, macOS uses ad hoc signing and provides a DMG as a workflow artifact retained for three days; updates remain blocked. With the signing configuration below, the production workflow signs, notarizes, verifies and publishes the macOS release and update feed.
 
 The desktop window uses `http://localhost:3000` during development and the deployed `CONVEX_SITE_URL` in packaged builds. It shares the website and authentication flow; if the site is unavailable, it shows the bundled starter page.
 
@@ -65,6 +65,17 @@ Each scaffolded app receives a random persistent `desktopId` in `disposabl.json`
 
 After building and verifying Windows artifacts, CI uses the same production `CONVEX_DEPLOY_KEY` already used for backend deployment to upload the full package to Convex file storage and atomically publish its feed record. The website's static-hosting component is not modified. Each release has an immutable versioned filename; existing packages remain in storage so in-flight clients can finish. Feed records are scoped to the app identity, channel, platform and architecture, and reject older workflow runs and attempts. Feed metadata is served without caching; package requests redirect to Convex storage, avoiding the HTTP action response limit. Failed or stale publications leave the previous feed in place. The publisher discards its uploaded blob only if no published feed references it; a lost cleanup response may still require manual storage reconciliation. Storage and egress are billable and retained versions require an explicit future retention policy. Convex upload URLs have a two-minute timeout; a slow or failed upload leaves the prior release available.
 
-macOS also produces a ZIP for Squirrel.Mac. A properly Developer ID signed and notarized build with `MACOS_NOTARIZE=true`, Apple API credentials and a matching signing identity can use the same upload path. Successive releases must retain the same signing identity and bundle identifier. The current CI lane has no signing credentials and creates only ad-hoc signed workflow artifacts, so it deliberately does not publish a macOS update feed. Signature verification remains enabled. Configure signing and notarization before expecting installed macOS updates to work. The existing Linux DEB/RPM artifacts do not configure an apt or RPM repository, so Linux native updates are unavailable until such a repository is provided.
+macOS also produces a ZIP for Squirrel.Mac. To enable signed production releases, set the GitHub Actions secret `MACOS_SIGNING_CONFIG` to a JSON object with these string fields:
+
+- `certificateBase64`: base64-encoded `.p12` containing the Developer ID Application certificate and private key.
+- `certificatePassword`: password for that `.p12`.
+- `identity`: the full signing identity, for example `Developer ID Application: Example, Inc. (ABCDE12345)`.
+- `teamId`: the ten-character Apple team ID matching that identity.
+- `apiKeyBase64`: base64-encoded App Store Connect API `.p8` key for notarization.
+- `apiKeyId` and `apiIssuer`: the API key ID and issuer ID.
+
+Encode the base64 values on one line. Do not commit this JSON or its source files.
+
+The workflow imports the certificate into a temporary keychain, builds and notarizes, then verifies the signed ZIP's app and its stapled ticket before publishing. A shell trap and an always-run cleanup step remove the keychain and temporary files on normal failures and cancellation; forced termination can prevent cleanup, so self-hosted runners must also clean their temporary directory. Keep the signing identity and bundle identifier stable across releases. A valid Apple Developer ID certificate, notarization access and a macOS runner are required; configuring the secret alone does not prove delivery. The existing Linux DEB/RPM artifacts do not configure an apt or RPM repository, so Linux native updates are unavailable until such a repository is provided.
 
 Verify delivery using two installed versions on each supported OS, checking no-update, download, restart, signature rejection and recovery from a failed feed. Building or staging an artifact alone does not prove update delivery. See [Electron's updater documentation](https://www.electronjs.org/docs/latest/api/auto-updater) and [static feed format](https://www.electronjs.org/docs/latest/tutorial/updates).

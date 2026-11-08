@@ -403,7 +403,14 @@ jobs:
           echo "DISPOSABL_DESKTOP_ID=$id" >> "$GITHUB_ENV"
           echo "DISPOSABL_DESKTOP_UPDATE_URL=${CONVEX_SITE_URL}/desktop/updates/$id" >> "$GITHUB_ENV"
       - name: Build
+        if: matrix.platform != 'macos'
         run: bun run --cwd apps/desktop preview
+      - name: Build macOS
+        if: matrix.platform == 'macos'
+        shell: bash
+        env:
+          MACOS_SIGNING_CONFIG: ${{ secrets.MACOS_SIGNING_CONFIG }}
+        run: bash .github/scripts/macos-release.sh
       - *publish
       - name: Publish desktop update feed
         if: matrix.platform == 'windows' || (matrix.platform == 'macos' && env.MACOS_NOTARIZE == 'true')
@@ -414,7 +421,7 @@ jobs:
           test "$(gh api "repos/$GH_REPO/git/ref/heads/main" --jq .object.sha)" = "$SOURCE"
           node apps/desktop/publish-update.mjs
       - name: Upload desktop release artifacts
-        if: matrix.platform != 'macos'
+        if: matrix.platform != 'macos' || env.MACOS_NOTARIZE == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: release-${{ env.PLATFORM }}
@@ -431,7 +438,7 @@ jobs:
           retention-days: 3
           if-no-files-found: error
       - name: Upload unsigned macOS artifact
-        if: matrix.platform == 'macos'
+        if: matrix.platform == 'macos' && env.MACOS_NOTARIZE != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: macos-unsigned
@@ -442,13 +449,17 @@ jobs:
           compression-level: 0
           if-no-files-found: error
       - name: Report macOS artifact
-        if: matrix.platform == 'macos'
+        if: matrix.platform == 'macos' && env.MACOS_NOTARIZE != 'true'
         run: |
           echo 'macOS DMG is ad-hoc signed, not Developer ID signed or notarized. Download it from this workflow run’s artifacts.' >> "$GITHUB_STEP_SUMMARY"
           node .github/scripts/disposabl.mjs report macos blocked 'Ad-hoc signed DMG available in workflow artifacts; Developer ID signing and notarization are not configured.'
       - name: Report desktop failure
         if: failure() || cancelled()
         run: node .github/scripts/disposabl.mjs report "$PLATFORM" failed
+      - name: Clean up macOS signing
+        if: always() && matrix.platform == 'macos'
+        shell: bash
+        run: bash .github/scripts/macos-release.sh cleanup
   packages:
     name: Package / ${{ matrix.package }}
     needs: [changes, web]

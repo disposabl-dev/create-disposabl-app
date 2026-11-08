@@ -31,7 +31,9 @@ if (
   signedRelease &&
   (!process.env.APPLE_API_KEY ||
     !process.env.APPLE_API_KEY_ID ||
-    !process.env.APPLE_API_ISSUER)
+    !process.env.APPLE_API_ISSUER ||
+    !process.env.MACOS_SIGNING_IDENTITY ||
+    !process.env.MACOS_KEYCHAIN)
 )
   throw new Error('macOS releases require Apple notarization credentials');
 
@@ -51,7 +53,10 @@ const config: ForgeConfig = {
     ...(process.platform === 'darwin'
       ? {
           osxSign: signedRelease
-            ? {}
+            ? {
+                identity: process.env.MACOS_SIGNING_IDENTITY!,
+                keychain: process.env.MACOS_KEYCHAIN!,
+              }
             : {
                 identity: '-',
                 identityValidation: false,
