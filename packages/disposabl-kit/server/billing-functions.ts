@@ -43,7 +43,7 @@ const attemptArgs = {
 const beginRef = makeFunctionReference<
   "mutation",
   { userId: string; purchase: "monthly" | "topup"; requestId: string },
-  string | null
+  string | null | { retryAllowed: true }
 >("billing:beginAttempt");
 const finishRef = makeFunctionReference<
   "mutation",
@@ -63,7 +63,11 @@ const pendingRef = makeFunctionReference<"query", { userId: string }, boolean>(
 // reconciliation; an automatic retry could charge the same customer twice.
 export const beginAttempt = internalMutation({
   args: attemptArgs,
-  returns: v.union(v.string(), v.null()),
+  returns: v.union(
+    v.string(),
+    v.null(),
+    v.object({ retryAllowed: v.literal(true) }),
+  ),
   handler: async (ctx, args) => {
     const same = await ctx.db
       .query("billingAttempts")
@@ -72,12 +76,10 @@ export const beginAttempt = internalMutation({
       )
       .unique();
     if (same) {
-      if (
-        same.purchase !== args.purchase ||
-        same.resolvedAt !== undefined ||
-        !same.url
-      )
+      if (same.purchase !== args.purchase)
         throw new Error("A previous checkout needs review.");
+      if (same.resolvedAt !== undefined) return { retryAllowed: true as const };
+      if (!same.url) throw new Error("A previous checkout needs review.");
       return same.url;
     }
     const prior = await ctx.db
@@ -181,6 +183,26 @@ export const hasUnknownAttempt = internalQuery({
   },
 });
 
+export const hasPendingMonthlyAttempt = internalQuery({
+  args: { userId: v.string() },
+  returns: v.boolean(),
+  handler: async (ctx, { userId }) =>
+    !!(await ctx.db
+      .query("billingAttempts")
+      .withIndex("by_userId_purchase_resolvedAt_url", (q) =>
+        q
+          .eq("userId", userId)
+          .eq("purchase", "monthly")
+          .eq("resolvedAt", undefined),
+      )
+      .first()),
+});
+const monthlyPendingRef = makeFunctionReference<
+  "query",
+  { userId: string },
+  boolean
+>("billing:hasPendingMonthlyAttempt");
+
 export const snapshot = action({
   args: {},
   returns: v.object({
@@ -189,6 +211,7 @@ export const snapshot = action({
     nativeSubscriptionsEnabled: v.boolean(),
     mobileWebCheckoutEnabled: v.boolean(),
     checkoutNeedsReview: v.boolean(),
+    monthlyCheckoutPending: v.boolean(),
     customerId: v.string(),
   }),
   handler: async (ctx) => {
@@ -207,6 +230,9 @@ export const snapshot = action({
           process.env,
         ),
         checkoutNeedsReview: await ctx.runQuery(pendingRef, { userId }),
+        monthlyCheckoutPending: await ctx.runQuery(monthlyPendingRef, {
+          userId,
+        }),
         customerId: userId,
       };
     } catch {
@@ -217,7 +243,10 @@ export const snapshot = action({
 
 export const checkout = action({
   args: { purchase: purchaseValidator, requestId: v.string() },
-  returns: v.object({ url: v.union(v.string(), v.null()) }),
+  returns: v.object({
+    url: v.union(v.string(), v.null()),
+    retryAllowed: v.optional(v.literal(true)),
+  }),
   handler: async (ctx, { purchase, requestId }) => {
     if (!/^[0-9a-f-]{36}$/.test(requestId))
       throw new Error("Invalid checkout request.");
@@ -239,7 +268,9 @@ export const checkout = action({
       purchase,
       requestId,
     });
-    if (existing) return { url: existing };
+    if (typeof existing === "string") return { url: existing };
+    if (existing?.retryAllowed)
+      return { url: null, retryAllowed: true as const };
     try {
       const result = await billingRequest(
         key,

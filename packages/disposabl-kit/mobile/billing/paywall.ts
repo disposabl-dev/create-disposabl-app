@@ -5,6 +5,7 @@ export type BillingSnapshot = {
   balance: number | null;
   hasMonthlyPlan: boolean | null;
   nativeSubscriptionsEnabled: boolean;
+  monthlyCheckoutPending: boolean;
 };
 
 type Store = Pick<
@@ -43,6 +44,10 @@ export async function presentMonthlyPaywall(
   };
   const snapshot = await getSnapshot();
   check();
+  if (snapshot.monthlyCheckoutPending !== false)
+    throw new Error(
+      "Finish or cancel your website checkout before subscribing here.",
+    );
   if (!snapshot.nativeSubscriptionsEnabled || snapshot.hasMonthlyPlan !== false)
     throw new Error("existing_subscription");
   if (!(await sdk.canMakePayments()))

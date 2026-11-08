@@ -4,6 +4,7 @@ import {
   beginAttempt,
   finishAttempt,
   hasUnknownAttempt,
+  hasPendingMonthlyAttempt,
   resolveAttempt,
 } from "../disposabl-kit/server/billing-functions";
 
@@ -59,7 +60,12 @@ test("uncertain checkout persists and prevents replay without blocking a differe
     });
   const pending = () =>
     (hasUnknownAttempt as any)._handler(ctx, { userId: "alice" });
+  const monthlyPending = (userId = "alice") =>
+    (hasPendingMonthlyAttempt as any)._handler(ctx, { userId });
+  assert.equal(await monthlyPending(), false);
   assert.equal(await begin("monthly", "one"), null);
+  assert.equal(await monthlyPending(), true);
+  assert.equal(await monthlyPending("bob"), false);
   await assert.rejects(begin("monthly", "one"), /review/);
   await assert.rejects(begin("monthly", "two"), /review/);
   assert.equal(await begin("topup", "three"), null);
@@ -78,6 +84,7 @@ test("uncertain checkout persists and prevents replay without blocking a differe
     url: "https://checkout.example/one",
   });
   assert.equal(await pending(), false);
+  assert.equal(await monthlyPending(), true);
   assert.equal(await begin("monthly", "one"), "https://checkout.example/one");
   assert.equal(await begin("monthly", "two"), "https://checkout.example/one");
   assert.equal(
@@ -101,6 +108,49 @@ test("uncertain checkout persists and prevents replay without blocking a differe
     evidence: "Provider fixture confirms checkout cancellation",
   });
   assert.ok(rows[0].resolvedAt);
+  assert.equal(await monthlyPending(), false);
+  assert.deepEqual(await begin("monthly", "one"), { retryAllowed: true });
+  assert.equal(rows.length, 2);
   assert.equal(await begin("monthly", "two"), null);
-  await assert.rejects(begin("monthly", "one"), /review/);
+  await assert.rejects(begin("topup", "one"), /review/);
+});
+
+test("browser retains unknown checkout identity and releases only a confirmed closed attempt", async () => {
+  const { requestCheckout } =
+    await import("../disposabl-kit/payments/checkout-attempt");
+  const values = new Map<string, string>();
+  const storage = {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => {
+      values.set(key, value);
+    },
+    removeItem: (key: string) => {
+      values.delete(key);
+    },
+  };
+  const ids: string[] = [];
+  let serial = 0;
+  const run = (result: "unknown" | "closed" | "url" | "pending") =>
+    requestCheckout(
+      storage,
+      "alice",
+      "monthly",
+      async ({ requestId }) => {
+        ids.push(requestId);
+        if (result === "unknown") throw new Error("Response lost");
+        if (result === "closed") return { url: null, retryAllowed: true };
+        return {
+          url: result === "url" ? "https://checkout.example/new" : null,
+        };
+      },
+      () => String(++serial),
+    );
+  await assert.rejects(run("unknown"), /Response lost/);
+  await run("pending");
+  await run("closed");
+  assert.deepEqual(ids, ["1", "1", "1"]);
+  assert.equal(values.size, 0);
+  await run("url");
+  assert.deepEqual(ids, ["1", "1", "1", "2"]);
+  assert.equal(values.size, 0);
 });

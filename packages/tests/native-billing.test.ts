@@ -74,6 +74,7 @@ test("web monthly preflight rechecks storefront, account, and both subscription 
     balance: 0,
     hasMonthlyPlan: false,
     nativeSubscriptionsEnabled: true,
+    monthlyCheckoutPending: false,
     mobileWebCheckoutEnabled: true,
     customerId: "alice",
   });
@@ -301,6 +302,7 @@ test("monthly paywall permits only a verified current offering and fresh custome
     balance: 0,
     hasMonthlyPlan: false,
     nativeSubscriptionsEnabled: true,
+    monthlyCheckoutPending: false,
   });
   let shown = 0;
   const sdk = {
@@ -323,6 +325,19 @@ test("monthly paywall permits only a verified current offering and fresh custome
     "cancelled",
   );
   assert.equal(shown, 1);
+  for (const monthlyCheckoutPending of [true, undefined]) {
+    await assert.rejects(
+      presentMonthlyPaywall(
+        sdk as never,
+        async () =>
+          ({ ...(await snapshot()), monthlyCheckoutPending }) as never,
+        () => true,
+        "monthly",
+        show,
+      ),
+      /website checkout/,
+    );
+  }
   await assert.rejects(
     presentMonthlyPaywall(
       { ...sdk, canMakePayments: async () => false } as never,

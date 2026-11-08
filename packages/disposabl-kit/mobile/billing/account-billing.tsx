@@ -14,6 +14,7 @@ type Snapshot = {
   balance: number | null;
   hasMonthlyPlan: boolean | null;
   nativeSubscriptionsEnabled: boolean;
+  monthlyCheckoutPending: boolean;
   mobileWebCheckoutEnabled: boolean;
   customerId: string;
 };

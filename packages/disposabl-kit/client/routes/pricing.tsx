@@ -12,6 +12,10 @@ import { useAuthToken } from "@convex-dev/auth/react";
 import { sessionId } from "../../lib/auth-session";
 import { paymentsEnabled } from "../../features";
 import {
+  requestCheckout,
+  type CheckoutResult,
+} from "../../payments/checkout-attempt";
+import {
   pricing,
   creditQuantity,
   formatPrice,
@@ -38,7 +42,7 @@ const snapshot = makeFunctionReference<
 const checkout = makeFunctionReference<
   "action",
   { purchase: "monthly" | "topup"; requestId: string },
-  { url: string | null }
+  CheckoutResult
 >("billing:checkout");
 const portal = makeFunctionReference<
   "action",
@@ -146,13 +150,19 @@ function PurchasePage({ session }: { session: string | null }) {
     setBusy(true);
     setMessage("");
     try {
-      const storageKey = `billing-attempt:${customerId}:${kind}`;
-      const requestId = localStorage.getItem(storageKey) ?? crypto.randomUUID();
-      localStorage.setItem(storageKey, requestId);
-      const result = await start({ purchase: kind, requestId });
+      const result = await requestCheckout(
+        localStorage,
+        customerId,
+        kind,
+        start,
+      );
       if (version !== generation.current) return;
-      localStorage.removeItem(storageKey);
-      if (result.url) window.location.assign(result.url);
+      if (result.retryAllowed) {
+        setMessage(
+          "Your previous checkout is closed. Choose Buy again to start a new checkout.",
+        );
+        await refresh();
+      } else if (result.url) window.location.assign(result.url);
       else {
         setMessage(
           "Your purchase is being processed. Refresh the balance to check for confirmation.",

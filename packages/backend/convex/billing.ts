@@ -7,4 +7,5 @@ export {
   finishAttempt,
   resolveAttempt,
   hasUnknownAttempt,
+  hasPendingMonthlyAttempt,
 } from "@disposabl/disposabl-kit/server/billing-functions";
