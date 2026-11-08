@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -41,6 +41,14 @@ export function verifyMetadata(manifest) {
 
 if (
   process.argv[1] &&
-  import.meta.url === pathToFileURL(resolve(process.argv[1])).href
+  import.meta.url === pathToFileURL(realpathSync(resolve(process.argv[1]))).href
 )
-  verifyMetadata(JSON.parse(readFileSync("package.json", "utf8")));
+  try {
+    verifyMetadata(
+      JSON.parse(readFileSync(process.argv[2] ?? "package.json", "utf8")),
+    );
+  } catch (error) {
+    if (error instanceof SyntaxError)
+      throw new Error("Invalid package metadata JSON");
+    throw error;
+  }

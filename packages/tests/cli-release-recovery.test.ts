@@ -2,7 +2,14 @@ import { test } from "node:test";
 // @ts-expect-error bun:test is not included in this workspace's Node type set.
 import { expect } from "bun:test";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdtempSync,
+  mkdirSync,
+  readFileSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -22,8 +29,9 @@ const workflow = JSON.parse(
   ),
 );
 const steps = workflow.jobs.cli.steps;
-const step = (name: string) =>
-  steps.find((s: { name?: string }) => s.name === name).run as string;
+const step = (name: string, job = "cli") =>
+  workflow.jobs[job].steps.find((s: { name?: string }) => s.name === name)
+    .run as string;
 
 test("conflicting recovery inputs run validation and fail visibly", () => {
   const shouldRun = new Function(
@@ -75,6 +83,21 @@ function fixture() {
     "base",
   );
   git("tag", "@disposabl/cli@1.0.0");
+  const guard = "packages/disposabl-kit/server/release/verify-metadata.mjs";
+  mkdirSync(join(dir, "packages/disposabl-kit/server/release"), {
+    recursive: true,
+  });
+  writeFileSync(
+    join(dir, guard),
+    readFileSync(
+      resolve(
+        import.meta.dirname,
+        "..",
+        "disposabl-kit/server/release/verify-metadata.mjs",
+      ),
+    ),
+  );
+  git("add", guard);
   git(
     "-c",
     "user.name=test",
@@ -91,26 +114,43 @@ function fixture() {
     });
   script(
     "npm",
-    `case "$1" in view) [[ "\${NPM_FAIL:-}" != 1 ]] || exit 1; echo "\${LATEST:-1.0.0}";; version) :;; pack) echo '[{"name":"@disposabl/cli","version":"'"$VERSION"'","filename":"package.tgz","integrity":"sha512-test","files":[{"path":"dist/index.js"}]}]';; publish) echo publish >> "$RUNNER_TEMP/published";; *) exit 1;; esac`,
+    `case "$1" in
+      view) [[ "\${NPM_FAIL:-}" != 1 ]] || exit 1; echo "\${LATEST:-1.0.0}";;
+      version) :;;
+      pack)
+        mkdir -p "$RUNNER_TEMP/pack-source/dist"
+        node -e 'const fs=require("node:fs"); const d=process.env; let m={name:d.PACKAGE_NAME || "@disposabl/cli",version:d.VERSION,repository:{type:"git",url:"https://github.com/example/app"}}; if(d.PACK_CASE==="userinfo") m.repository.url="https://user:synthetic-secret@example.test/repo"; if(d.PACK_CASE==="query") m.homepage="https://example.test/?token=synthetic-secret"; if(d.PACK_CASE==="invalid") m.bugs={url:"https://synthetic-secret@"}; fs.writeFileSync(d.RUNNER_TEMP+"/pack-source/package.json",JSON.stringify(m)); fs.writeFileSync(d.RUNNER_TEMP+"/pack-source/dist/index.js","// fixture");'
+        "$REAL_NPM" pack "$RUNNER_TEMP/pack-source" --json --ignore-scripts --pack-destination "$PWD" > "$RUNNER_TEMP/real-pack.json" || exit 1
+        node -e 'const p=require(process.argv[1]);p[0].integrity="sha512-test";process.stdout.write(JSON.stringify(p))' "$RUNNER_TEMP/real-pack.json";;
+      publish) echo publish >> "$RUNNER_TEMP/published";; *) exit 1;; esac`,
   );
   script(
     "curl",
-    `[[ "\${CURL_FAIL:-}" != 1 ]] || exit 7; printf '{"name":"@disposabl/cli","version":"%s","dist":{"integrity":"%s"}}' "\${REGISTRY_VERSION:-$VERSION}" "\${INTEGRITY:-sha512-test}" > "$3"; printf '%s' "\${STATUS:-404}"`,
+    `[[ "\${CURL_FAIL:-}" != 1 ]] || exit 7; printf '{"name":"%s","version":"%s","dist":{"integrity":"%s"}}' "\${PACKAGE_NAME:-@disposabl/cli}" "\${REGISTRY_VERSION:-$VERSION}" "\${INTEGRITY:-sha512-test}" > "$3"; printf '%s' "\${STATUS:-404}"`,
   );
+  script("gh", "exit 0");
   script("bun", "exit 0");
-  const run = (name: string, env: Record<string, string | undefined> = {}) =>
-    spawnSync("bash", ["-c", step(name)], {
+  const run = (
+    name: string,
+    env: Record<string, string | undefined> = {},
+    job = "cli",
+  ) =>
+    spawnSync("bash", ["-c", step(name, job)], {
       cwd: dir,
       encoding: "utf8",
       env: {
         ...process.env,
         PATH: `${bin}:${process.env.PATH}`,
         RUNNER_TEMP: dir,
+        GITHUB_WORKSPACE: dir,
+        REAL_NPM: execFileSync("which", ["npm"], { encoding: "utf8" }).trim(),
+        npm_config_userconfig: join(dir, "empty-npmrc"),
         VERSION: "1.1.0",
         GENERATOR_RECOVERY: "",
         ...env,
       },
     });
+  expect(run("Preserve recovery metadata guard").status).toBe(0);
   return { dir, git, run };
 }
 
@@ -141,6 +181,104 @@ test("recovery publishes only a 404 and safely replays a matching version", () =
       INTEGRITY: "sha512-wrong",
     }).status,
   ).not.toBe(0);
+});
+
+test(
+  "historical recovery checks packed metadata before either package publishes",
+  { timeout: 30000 },
+  () => {
+    for (const [job, recovery, packageName] of [
+      ["cli", "Recover tagged CLI release", "@disposabl/cli"],
+      ["publish", "Recover tagged release", "create-disposabl-app"],
+    ]) {
+      const f = fixture();
+      const order = workflow.jobs[job].steps.map(
+        (s: { name?: string }) => s.name,
+      );
+      expect(order.indexOf("Preserve recovery metadata guard")).toBeLessThan(
+        order.indexOf(
+          job === "cli" ? "Verify CLI recovery tag" : "Verify recovery tag",
+        ),
+      );
+      f.git("tag", job === "cli" ? "@disposabl/cli@1.1.0" : "v1.1.0", "HEAD~1");
+      expect(f.run("Preserve recovery metadata guard", {}, job).status).toBe(0);
+      expect(
+        f.run(
+          job === "cli" ? "Verify CLI recovery tag" : "Verify recovery tag",
+          {},
+          job,
+        ).status,
+      ).toBe(0);
+      expect(
+        existsSync(
+          join(
+            f.dir,
+            "packages/disposabl-kit/server/release/verify-metadata.mjs",
+          ),
+        ),
+      ).toBe(false);
+      for (const packCase of ["userinfo", "query", "invalid"]) {
+        const result = f.run(
+          recovery,
+          { PACKAGE_NAME: packageName, PACK_CASE: packCase },
+          job,
+        );
+        expect(result.status).not.toBe(0);
+        expect(result.stderr).toContain("URL in package metadata");
+        expect(result.stdout + result.stderr).not.toContain("synthetic-secret");
+        expect(() => readFileSync(join(f.dir, "published"))).toThrow();
+      }
+      expect(f.run(recovery, { PACKAGE_NAME: packageName }, job).status).toBe(
+        0,
+      );
+      expect(readFileSync(join(f.dir, "published"), "utf8")).toBe("publish\n");
+    }
+  },
+);
+
+test("generator recovery retains registry and version gates", () => {
+  const f = fixture();
+  const args = { PACKAGE_NAME: "create-disposabl-app" };
+  expect(
+    f.run("Recover tagged release", { ...args, STATUS: "200" }, "publish")
+      .status,
+  ).toBe(0);
+  for (const override of [
+    { STATUS: "401" },
+    { STATUS: "500" },
+    { CURL_FAIL: "1" },
+    { NPM_FAIL: "1" },
+    { LATEST: "2.0.0" },
+  ])
+    expect(
+      f.run("Recover tagged release", { ...args, ...override }, "publish")
+        .status,
+    ).not.toBe(0);
+  expect(existsSync(join(f.dir, "published"))).toBe(false);
+});
+
+test("metadata guard runs through symlinks and redacts malformed JSON", () => {
+  const dir = mkdtempSync(join(tmpdir(), "metadata-guard-link-"));
+  const original = resolve(
+    import.meta.dirname,
+    "../disposabl-kit/server/release/verify-metadata.mjs",
+  );
+  const alias = join(dir, "guard.mjs");
+  const input = join(dir, "package.json");
+  symlinkSync(original, alias);
+  for (const [contents, diagnostic] of [
+    [
+      '{"homepage":"https://synthetic-secret@"}',
+      "Invalid URL in package metadata",
+    ],
+    ['{"homepage":"synthetic-secret', "Invalid package metadata JSON"],
+  ]) {
+    writeFileSync(input, contents);
+    const result = spawnSync("node", [alias, input], { encoding: "utf8" });
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain(diagnostic);
+    expect(result.stdout + result.stderr).not.toContain("synthetic-secret");
+  }
 });
 
 test("rejects wrong, non-ancestor, and older recovery tags", () => {

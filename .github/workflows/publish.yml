@@ -42,6 +42,9 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      - name: Preserve recovery metadata guard
+        if: inputs.cli_recovery_version != ''
+        run: cp "$GITHUB_WORKSPACE/packages/disposabl-kit/server/release/verify-metadata.mjs" "$RUNNER_TEMP/release-metadata-guard.mjs"
       - name: Verify CLI recovery tag
         if: inputs.cli_recovery_version != ''
         env:
@@ -114,11 +117,13 @@ jobs:
           bun run build
           npm pack --json > "$RUNNER_TEMP/cli-pack.json"
           node -e 'const p=require(process.argv[1])[0]; if(p.name!=="@disposabl/cli" || p.version!==process.argv[2] || !p.files.some(f=>f.path==="dist/index.js")) process.exit(1)' "$RUNNER_TEMP/cli-pack.json" "$VERSION"
+          tarball=$(node -p 'require(process.argv[1])[0].filename' "$RUNNER_TEMP/cli-pack.json")
+          tar -xOzf "$tarball" package/package.json > "$RUNNER_TEMP/cli-packed-manifest.json"
+          node "$RUNNER_TEMP/release-metadata-guard.mjs" "$RUNNER_TEMP/cli-packed-manifest.json"
           if [[ "$status" == 200 ]]; then
             node -e 'const p=require(process.argv[1]), t=require(process.argv[2])[0]; if(p.name!=="@disposabl/cli" || p.version!==process.argv[3] || p.dist?.integrity!==t.integrity) process.exit(1)' "$RUNNER_TEMP/cli-version.json" "$RUNNER_TEMP/cli-pack.json" "$VERSION"
             echo 'Matching CLI version already exists; leaving it untouched.'
           else
-            tarball=$(node -p 'require(process.argv[1])[0].filename' "$RUNNER_TEMP/cli-pack.json")
             npm publish "$tarball" --provenance --access public --tag latest
           fi
 
@@ -141,6 +146,9 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      - name: Preserve recovery metadata guard
+        if: inputs.recovery_version != ''
+        run: cp "$GITHUB_WORKSPACE/packages/disposabl-kit/server/release/verify-metadata.mjs" "$RUNNER_TEMP/release-metadata-guard.mjs"
       - name: Validate recovery version
         if: inputs.recovery_version != ''
         env:
@@ -196,7 +204,12 @@ jobs:
             node -e 'const [a,b]=process.argv.slice(1).map(v=>v.split(".").map(Number)); if(a.length!==3 || a.some(Number.isNaN) || a.some((n,i)=>n!==b[i] && a.slice(0,i).every((x,j)=>x===b[j]) && n>b[i])) process.exit(1)' "$latest" "$VERSION"
             npm version "$VERSION" --no-git-tag-version --workspaces=false
             bun run build
-            npm publish --provenance --access public --tag latest
+            npm pack --json > "$RUNNER_TEMP/generator-pack.json"
+            node -e 'const p=require(process.argv[1])[0]; if(p.name!=="create-disposabl-app" || p.version!==process.argv[2]) process.exit(1)' "$RUNNER_TEMP/generator-pack.json" "$VERSION"
+            tarball=$(node -p 'require(process.argv[1])[0].filename' "$RUNNER_TEMP/generator-pack.json")
+            tar -xOzf "$tarball" package/package.json > "$RUNNER_TEMP/generator-packed-manifest.json"
+            node "$RUNNER_TEMP/release-metadata-guard.mjs" "$RUNNER_TEMP/generator-packed-manifest.json"
+            npm publish "$tarball" --provenance --access public --tag latest
           elif [[ "$status" == 200 ]]; then
             node -e 'const p=require(process.argv[1]); if(p.name!=="create-disposabl-app" || p.version!==process.argv[2]) process.exit(1)' "$RUNNER_TEMP/npm-version.json" "$VERSION"
             echo "npm version already exists; leaving it untouched."
