@@ -7,6 +7,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createApp } from "../create-disposabl-app/scaffold";
 import { reconfigureApp } from "../create-disposabl-app/reconfigure";
+import { version as generatorVersion } from "../create-disposabl-app/package.json";
 
 const template = resolve(
   import.meta.dirname,
@@ -20,6 +21,76 @@ if (!existsSync(template)) {
 }
 const version = "test-version";
 const read = (dir: string, path: string) => readFile(join(dir, path), "utf8");
+
+test(
+  "code-only CLI reconfiguration preserves identity and installs both skills without setup",
+  { timeout: 30000 },
+  async () => {
+    const temp = await mkdtemp(join(tmpdir(), "reconfigure-cli-"));
+    const app = join(temp, "app");
+    const cli = resolve(
+      import.meta.dirname,
+      "../create-disposabl-app/dist/index.js",
+    );
+    try {
+      await createApp(template, app, "my-app", {
+        version: generatorVersion,
+        appId: "existing-app",
+        platforms: ["web"],
+        features: [],
+      });
+      await writeFile(join(app, "custom.txt"), "preserve my app");
+      const result = execFileSync(
+        process.execPath,
+        [
+          cli,
+          "app",
+          "--reconfigure-only",
+          "--features",
+          "payments",
+          "--skip-install",
+          "--json",
+        ],
+        {
+          cwd: temp,
+          // Any accidental setup call must fail instead of using a real account.
+          env: { ...process.env, DISPOSABL_API_ORIGIN: "http://127.0.0.1:1" },
+          encoding: "utf8",
+          timeout: 20000,
+        },
+      );
+      assert.equal(JSON.parse(result.trim()).status, "reconfigured");
+      const config = JSON.parse(await read(app, "disposabl.json"));
+      assert.deepEqual(config.features, ["authentication", "payments"]);
+      assert.equal(config.appId, "existing-app");
+      assert.equal(await read(app, "custom.txt"), "preserve my app");
+      assert.equal(existsSync(join(app, ".git")), false);
+      for (const agent of [".agents", ".claude"]) {
+        for (const skill of ["disposabl-app", "disposabl-reconfigure"]) {
+          assert.ok(await read(app, `${agent}/skills/${skill}/SKILL.md`));
+        }
+      }
+      assert.throws(() =>
+        execFileSync(
+          process.execPath,
+          [
+            cli,
+            "new-app",
+            "--reconfigure-only",
+            "--features",
+            "none",
+            "--skip-install",
+            "--json",
+          ],
+          { cwd: temp, stdio: "pipe", timeout: 10000 },
+        ),
+      );
+      assert.equal(existsSync(join(temp, "new-app")), false);
+    } finally {
+      await rm(temp, { recursive: true, force: true });
+    }
+  },
+);
 
 test("native payments selection adds and removes the SDK without replacing custom dependencies", async () => {
   const temp = await mkdtemp(join(tmpdir(), "payments-selection-"));

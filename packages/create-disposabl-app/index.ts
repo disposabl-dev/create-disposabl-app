@@ -30,6 +30,7 @@ type Options = {
   platforms?: string;
   features?: string;
   skipInstall?: boolean;
+  reconfigureOnly?: boolean;
   json?: boolean;
   listOptions?: boolean;
 };
@@ -51,6 +52,10 @@ const program = new Command("create-disposabl-app")
     "Skip app options prompts; include Web and authentication by default",
   )
   .option("--skip-install", "Create files without running bun install")
+  .option(
+    "--reconfigure-only",
+    "Change an existing app's code and selections without login or provider setup",
+  )
   .option(
     "--app-id <uuid>",
     "Set up an existing Disposabl app in this directory",
@@ -131,6 +136,14 @@ async function main() {
   program.parse();
   const options = program.opts<Options>();
   if (options.listOptions) return showOptions(Boolean(options.json));
+  if (options.reconfigureOnly && options.appId)
+    throw new Error("--reconfigure-only cannot be combined with --app-id.");
+  if (
+    options.reconfigureOnly &&
+    options.platforms === undefined &&
+    options.features === undefined
+  )
+    throw new Error("--reconfigure-only requires --platforms or --features.");
   const interactive = Boolean(
     process.stdin.isTTY &&
     process.stdout.isTTY &&
@@ -184,6 +197,14 @@ async function main() {
       await reconfigureApp(template, directory, version, options);
       if (!options.skipInstall) await install(directory, false);
     }
+    if (options.reconfigureOnly) {
+      console.log(
+        options.json
+          ? JSON.stringify({ status: "reconfigured", directory })
+          : "App code updated. Provider setup and deployment were not run.",
+      );
+      return;
+    }
     const appId = await setupApp(directory, name);
     if (
       spawnSync("git", ["rev-parse", "--verify", "HEAD"], {
@@ -199,6 +220,10 @@ async function main() {
     );
     return;
   }
+  if (options.reconfigureOnly)
+    throw new Error(
+      "--reconfigure-only requires an existing app with disposabl.json.",
+    );
   let overwrite = false;
   if (pathExists(directory)) {
     overwrite =

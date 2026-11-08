@@ -58,7 +58,17 @@ bunx create-disposabl-app@latest my-app --platforms web,ios,android --yes
 
 CLI and TypeScript SDK include API support automatically. Backend authentication and access checks remain installed even with `--features none`.
 
-## If setup stops
+## Change an existing app's features
+
+The generated `disposabl-reconfigure` skill handles code changes separately from account setup. From the app's parent directory, use the version in its `disposabl.json`:
+
+```sh
+npx create-disposabl-app@<version> my-app --reconfigure-only --features authentication,payments --skip-install --json
+```
+
+Supply the complete desired feature list. Add `--platforms` with a complete list to change platforms too. Omitted lists stay unchanged. Run `bun install` in the app afterward, review the diff, and test affected platforms. The code-only command does not log in, provision providers, commit, or deploy. Store and payment-provider configuration is a separate step.
+
+## Resume setup
 
 Your files are saved. Follow the error's instructions, then run the same command from the parent folder:
 

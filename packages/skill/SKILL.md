@@ -31,6 +31,8 @@ Use command help and the current API contract for other operations. If login is 
 
 ## Implement and deliver
 
+For an existing app's platform or feature changes, use the separately installed `disposabl-reconfigure` skill. It applies local code changes without repeating account setup or publishing.
+
 Choose a visual direction suited to the product. Read the `frontend-design` skill when available and read [app branding and visual design](references/design.md). If that skill is unavailable, proceed with the user's brief and report the limitation without blocking development.
 
 Read [delivery checks](references/delivery.md) before native builds or delivery repairs. Aim to show a usable web preview early; first native builds can take longer. Do not promise a build deadline.

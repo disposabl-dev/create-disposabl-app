@@ -33,7 +33,12 @@ export async function createApp(
   };
   const folders = selectedFolders(config);
   const skill = join(template, "packages/skill");
-  if (!existsSync(join(skill, "SKILL.md")))
+  const reconfigureSkill = join(template, "packages/reconfigure-skill");
+  if (
+    ![skill, reconfigureSkill].every((path) =>
+      existsSync(join(path, "SKILL.md")),
+    )
+  )
     throw new Error(
       "The bundled starter is missing the Disposabl skill. Rebuild the CLI.",
     );
@@ -64,12 +69,15 @@ export async function createApp(
       const skills = join(destination, agent, "skills");
       await mkdir(skills, { recursive: true });
       await cp(skill, join(skills, "disposabl-app"), { recursive: true });
+      await cp(reconfigureSkill, join(skills, "disposabl-reconfigure"), {
+        recursive: true,
+      });
     }
     const instructions = join(destination, "AGENTS.md");
     await writeFile(
       instructions,
       (await readFile(instructions, "utf8")) +
-        "\n## Disposabl\n\nFor Disposabl development and delivery, read [.agents/skills/disposabl-app/SKILL.md](.agents/skills/disposabl-app/SKILL.md). Work in this generated app; create another app only when requested.\n",
+        "\n## Disposabl\n\nFor Disposabl development and delivery, read [.agents/skills/disposabl-app/SKILL.md](.agents/skills/disposabl-app/SKILL.md). For adding or removing platforms and features, use [.agents/skills/disposabl-reconfigure/SKILL.md](.agents/skills/disposabl-reconfigure/SKILL.md). Work in this generated app; create another app only when requested.\n",
     );
     for (const entry of await readdir(join(destination, "apps"))) {
       if (!folders.includes("apps/" + entry))
