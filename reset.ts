@@ -25,6 +25,8 @@ if (
 // Product-only proof harnesses must not enter generated apps. Keep the same
 // paths in the symlink validation and removal inventories.
 const productProofTests = [
+  "packages/tests/mcp-erasure-component.test.ts",
+  "packages/tests/fixtures/mcp-erasure-convex",
   "packages/tests/mcp-deletion-guard.test.ts",
   "packages/tests/account-deletion-active.test.ts",
   "packages/tests/flows/account-deletion.e2e.ts",

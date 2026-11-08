@@ -11,6 +11,8 @@ import {
 } from "../create-disposabl-app/options";
 
 const excluded = [
+  "packages/tests/mcp-erasure-component.test.ts",
+  "packages/tests/fixtures/mcp-erasure-convex",
   "packages/tests/mcp-deletion-guard.test.ts",
   "packages/tests/account-deletion-active.test.ts",
   "packages/tests/flows/account-deletion.e2e.ts",
