@@ -48,6 +48,9 @@ import type {
   PreviewsListData,
   PreviewsListErrors,
   PreviewsListResponses,
+  PreviewsTokenCompleteData,
+  PreviewsTokenCompleteErrors,
+  PreviewsTokenCompleteResponses,
   PreviewsTokenCreateData,
   PreviewsTokenCreateErrors,
   PreviewsTokenCreateResponses,
@@ -303,6 +306,27 @@ export const previewsList = <ThrowOnError extends boolean = false>(
     security: [{ scheme: "bearer", type: "http" }],
     url: "/api/previews/list",
     ...options,
+  });
+
+export const previewsTokenComplete = <ThrowOnError extends boolean = false>(
+  options: Options<PreviewsTokenCompleteData, ThrowOnError>,
+): RequestResult<
+  PreviewsTokenCompleteResponses,
+  PreviewsTokenCompleteErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    PreviewsTokenCompleteResponses,
+    PreviewsTokenCompleteErrors,
+    ThrowOnError
+  >({
+    security: [{ scheme: "bearer", type: "http" }],
+    url: "/api/previews/token/complete",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
   });
 
 export const previewsTokenCreate = <ThrowOnError extends boolean = false>(

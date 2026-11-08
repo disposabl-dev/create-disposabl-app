@@ -4,6 +4,10 @@
     "authenticated": false
   },
   {
+    "path": "/billing-login",
+    "authenticated": false
+  },
+  {
     "path": "/build",
     "authenticated": false
   },

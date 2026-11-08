@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Application API",
-    "version": "12.0.0"
+    "version": "13.0.0"
   },
   "security": [
     {
@@ -429,6 +429,12 @@
                         "analytics"
                       ]
                     }
+                  },
+                  "androidArchitectures": {
+                    "type": "array",
+                    "items": {
+                      "enum": ["arm64-v8a", "x86_64", "armeabi-v7a", "x86"]
+                    }
                   }
                 },
                 "required": ["prompt"],
@@ -518,6 +524,12 @@
                         "analytics"
                       ]
                     }
+                  },
+                  "androidArchitectures": {
+                    "type": "array",
+                    "items": {
+                      "enum": ["arm64-v8a", "x86_64", "armeabi-v7a", "x86"]
+                    }
                   }
                 },
                 "required": ["name", "platforms"],
@@ -567,6 +579,12 @@
                           "payments",
                           "analytics"
                         ]
+                      }
+                    },
+                    "androidArchitectures": {
+                      "type": "array",
+                      "items": {
+                        "enum": ["arm64-v8a", "x86_64", "armeabi-v7a", "x86"]
                       }
                     },
                     "githubOwner": {
@@ -711,6 +729,12 @@
                         ]
                       }
                     },
+                    "androidArchitectures": {
+                      "type": "array",
+                      "items": {
+                        "enum": ["arm64-v8a", "x86_64", "armeabi-v7a", "x86"]
+                      }
+                    },
                     "githubOwner": {
                       "type": "string"
                     },
@@ -841,6 +865,17 @@
                                 "authentication",
                                 "payments",
                                 "analytics"
+                              ]
+                            }
+                          },
+                          "androidArchitectures": {
+                            "type": "array",
+                            "items": {
+                              "enum": [
+                                "arm64-v8a",
+                                "x86_64",
+                                "armeabi-v7a",
+                                "x86"
                               ]
                             }
                           },
@@ -1008,6 +1043,12 @@
                         "analytics"
                       ]
                     }
+                  },
+                  "androidArchitectures": {
+                    "type": "array",
+                    "items": {
+                      "enum": ["arm64-v8a", "x86_64", "armeabi-v7a", "x86"]
+                    }
                   }
                 },
                 "required": ["appId", "platforms", "features"],
@@ -1097,6 +1138,12 @@
                         "analytics"
                       ]
                     }
+                  },
+                  "androidArchitectures": {
+                    "type": "array",
+                    "items": {
+                      "enum": ["arm64-v8a", "x86_64", "armeabi-v7a", "x86"]
+                    }
                   }
                 },
                 "required": ["appId", "platforms"],
@@ -1146,6 +1193,12 @@
                           "payments",
                           "analytics"
                         ]
+                      }
+                    },
+                    "androidArchitectures": {
+                      "type": "array",
+                      "items": {
+                        "enum": ["arm64-v8a", "x86_64", "armeabi-v7a", "x86"]
                       }
                     },
                     "githubOwner": {
@@ -1829,6 +1882,56 @@
         }
       }
     },
+    "/api/previews/token/complete": {
+      "post": {
+        "operationId": "previewsTokenComplete",
+        "x-convex-function": "previews/token/internal:complete",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "appId": {
+                    "type": "string"
+                  },
+                  "until": {
+                    "type": "number"
+                  }
+                },
+                "required": ["appId", "until"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "null"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid arguments"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient scope"
+          },
+          "500": {
+            "description": "Internal error"
+          }
+        }
+      }
+    },
     "/api/previews/token/create": {
       "post": {
         "operationId": "previewsTokenCreate",
@@ -1874,6 +1977,15 @@
                         "analytics"
                       ]
                     }
+                  },
+                  "androidArchitectures": {
+                    "type": "array",
+                    "items": {
+                      "enum": ["arm64-v8a", "x86_64", "armeabi-v7a", "x86"]
+                    }
+                  },
+                  "configurationLease": {
+                    "type": "boolean"
                   }
                 },
                 "required": ["appId", "reference"],
@@ -1929,6 +2041,9 @@
                       },
                       "required": ["projectId", "projectToken", "host"],
                       "additionalProperties": false
+                    },
+                    "configurationLeaseUntil": {
+                      "type": "number"
                     }
                   },
                   "required": [

@@ -154,6 +154,9 @@ export type AgentSendMessageData = {
     features?: Array<
       "faster-ci" | "docs" | "authentication" | "payments" | "analytics"
     >;
+    androidArchitectures?: Array<
+      "arm64-v8a" | "x86_64" | "armeabi-v7a" | "x86"
+    >;
   };
   path?: never;
   query?: never;
@@ -211,6 +214,9 @@ export type AppsCreateData = {
     features?: Array<
       "faster-ci" | "docs" | "authentication" | "payments" | "analytics"
     >;
+    androidArchitectures?: Array<
+      "arm64-v8a" | "x86_64" | "armeabi-v7a" | "x86"
+    >;
   };
   path?: never;
   query?: never;
@@ -257,6 +263,9 @@ export type AppsCreateResponses = {
     >;
     features?: Array<
       "faster-ci" | "docs" | "authentication" | "payments" | "analytics"
+    >;
+    androidArchitectures?: Array<
+      "arm64-v8a" | "x86_64" | "armeabi-v7a" | "x86"
     >;
     githubOwner?: string;
     githubRepo?: string;
@@ -354,6 +363,9 @@ export type AppsGetResponses = {
     features?: Array<
       "faster-ci" | "docs" | "authentication" | "payments" | "analytics"
     >;
+    androidArchitectures?: Array<
+      "arm64-v8a" | "x86_64" | "armeabi-v7a" | "x86"
+    >;
     githubOwner?: string;
     githubRepo?: string;
     createdAt: number;
@@ -419,6 +431,9 @@ export type AppsListResponses = {
       >;
       features?: Array<
         "faster-ci" | "docs" | "authentication" | "payments" | "analytics"
+      >;
+      androidArchitectures?: Array<
+        "arm64-v8a" | "x86_64" | "armeabi-v7a" | "x86"
       >;
       githubOwner?: string;
       githubRepo?: string;
@@ -492,6 +507,9 @@ export type AppsRequestConfigurationData = {
     features: Array<
       "faster-ci" | "docs" | "authentication" | "payments" | "analytics"
     >;
+    androidArchitectures?: Array<
+      "arm64-v8a" | "x86_64" | "armeabi-v7a" | "x86"
+    >;
   };
   path?: never;
   query?: never;
@@ -549,6 +567,9 @@ export type AppsUpdateData = {
     features?: Array<
       "faster-ci" | "docs" | "authentication" | "payments" | "analytics"
     >;
+    androidArchitectures?: Array<
+      "arm64-v8a" | "x86_64" | "armeabi-v7a" | "x86"
+    >;
   };
   path?: never;
   query?: never;
@@ -595,6 +616,9 @@ export type AppsUpdateResponses = {
     >;
     features?: Array<
       "faster-ci" | "docs" | "authentication" | "payments" | "analytics"
+    >;
+    androidArchitectures?: Array<
+      "arm64-v8a" | "x86_64" | "armeabi-v7a" | "x86"
     >;
     githubOwner?: string;
     githubRepo?: string;
@@ -828,6 +852,45 @@ export type PreviewsListResponses = {
 export type PreviewsListResponse =
   PreviewsListResponses[keyof PreviewsListResponses];
 
+export type PreviewsTokenCompleteData = {
+  body: {
+    appId: string;
+    until: number;
+  };
+  path?: never;
+  query?: never;
+  url: "/api/previews/token/complete";
+};
+
+export type PreviewsTokenCompleteErrors = {
+  /**
+   * Invalid arguments
+   */
+  400: unknown;
+  /**
+   * Authentication required
+   */
+  401: unknown;
+  /**
+   * Insufficient scope
+   */
+  403: unknown;
+  /**
+   * Internal error
+   */
+  500: unknown;
+};
+
+export type PreviewsTokenCompleteResponses = {
+  /**
+   * Success
+   */
+  200: null;
+};
+
+export type PreviewsTokenCompleteResponse =
+  PreviewsTokenCompleteResponses[keyof PreviewsTokenCompleteResponses];
+
 export type PreviewsTokenCreateData = {
   body: {
     appId: string;
@@ -847,6 +910,10 @@ export type PreviewsTokenCreateData = {
     features?: Array<
       "faster-ci" | "docs" | "authentication" | "payments" | "analytics"
     >;
+    androidArchitectures?: Array<
+      "arm64-v8a" | "x86_64" | "armeabi-v7a" | "x86"
+    >;
+    configurationLease?: boolean;
   };
   path?: never;
   query?: never;
@@ -890,6 +957,7 @@ export type PreviewsTokenCreateResponses = {
       projectToken: string;
       host: string;
     };
+    configurationLeaseUntil?: number;
   };
 };
 
