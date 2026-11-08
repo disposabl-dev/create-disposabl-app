@@ -9,6 +9,7 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
+import { validateAndroidArchitectures } from "../disposabl-kit/android-architectures";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import {
   selectFeatures,
@@ -65,7 +66,11 @@ export async function reconfigureApp(
   template: string,
   directory: string,
   version: string,
-  options: { platforms?: string; features?: string },
+  options: {
+    platforms?: string;
+    features?: string;
+    androidArchitectures?: string;
+  },
 ): Promise<DisposablConfig> {
   const configPath = "disposabl.json";
   const raw = await safeRead(directory, configPath);
@@ -97,6 +102,11 @@ export async function reconfigureApp(
       options.features === undefined
         ? oldFeatures
         : selectFeatures(options.features),
+    androidArchitectures: validateAndroidArchitectures(
+      options.androidArchitectures === undefined
+        ? existing.androidArchitectures
+        : options.androidArchitectures.split(",").map((value) => value.trim()),
+    ),
   };
   // Deselected mobile files remain on disk and still need feature migrations.
   const comparisonPlatforms =

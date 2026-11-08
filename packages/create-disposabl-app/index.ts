@@ -24,12 +24,14 @@ import { projectSetup } from "./project-setup";
 import { createApp } from "./scaffold";
 import { reconfigureApp } from "./reconfigure";
 import { commitApp, install, setupApp } from "./setup";
+import { validateAndroidArchitectures } from "../disposabl-kit/android-architectures";
 
 type Options = {
   appId?: string;
   yes?: boolean;
   platforms?: string;
   features?: string;
+  androidArchitectures?: string;
   skipInstall?: boolean;
   reconfigureOnly?: boolean;
   json?: boolean;
@@ -47,6 +49,10 @@ const program = new Command("create-disposabl-app")
   .option(
     "--features <ids>",
     "Comma-separated feature IDs, or none (default: authentication)",
+  )
+  .option(
+    "--android-architectures <ids>",
+    "Android ABIs (default: arm64-v8a,x86_64; optional: armeabi-v7a,x86)",
   )
   .option(
     "-y, --yes",
@@ -142,9 +148,12 @@ async function main() {
   if (
     options.reconfigureOnly &&
     options.platforms === undefined &&
-    options.features === undefined
+    options.features === undefined &&
+    options.androidArchitectures === undefined
   )
-    throw new Error("--reconfigure-only requires --platforms or --features.");
+    throw new Error(
+      "--reconfigure-only requires --platforms, --features or --android-architectures.",
+    );
   const interactive = Boolean(
     process.stdin.isTTY &&
     process.stdout.isTTY &&
@@ -155,6 +164,11 @@ async function main() {
   // Validate explicit selections before prompting or creating any files.
   let chosenPlatforms = selectPlatforms(options.platforms);
   let chosenFeatures = selectFeatures(options.features);
+  const chosenAndroidArchitectures = validateAndroidArchitectures(
+    options.androidArchitectures === undefined
+      ? undefined
+      : options.androidArchitectures.split(",").map((value) => value.trim()),
+  );
   let name: string | undefined = program.args[0];
   if (interactive) {
     if (!name)
@@ -191,7 +205,11 @@ async function main() {
           "This directory belongs to a different app. Choose a new directory.",
         );
     }
-    if (options.platforms !== undefined || options.features !== undefined) {
+    if (
+      options.platforms !== undefined ||
+      options.features !== undefined ||
+      options.androidArchitectures !== undefined
+    ) {
       const template = fileURLToPath(
         new URL("./templates/default", import.meta.url),
       );
@@ -274,6 +292,7 @@ async function main() {
     version: version,
     platforms: chosenPlatforms,
     features: chosenFeatures,
+    androidArchitectures: chosenAndroidArchitectures,
   };
   const setup = options.json ? undefined : projectSetup(name, config);
   let installationStarted = false;

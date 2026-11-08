@@ -1,10 +1,31 @@
 const {
   withAppBuildGradle,
   withAndroidManifest,
+  withGradleProperties,
 } = require("expo/config-plugins");
+const { validateAndroidArchitectures } = require("../android-architectures.ts");
 
 // RN's default bundle inputs cover the app directory, not workspace packages.
 module.exports = (config) => {
+  const architectures = validateAndroidArchitectures(
+    require("../../../disposabl.json").androidArchitectures,
+  );
+  config.extra = {
+    ...config.extra,
+    disposablAndroidArchitectures: architectures,
+  };
+  config = withGradleProperties(config, (mod) => {
+    mod.modResults = mod.modResults.filter(
+      (item) =>
+        item.type !== "property" || item.key !== "reactNativeArchitectures",
+    );
+    mod.modResults.push({
+      type: "property",
+      key: "reactNativeArchitectures",
+      value: architectures.join(","),
+    });
+    return mod;
+  });
   if (require("../../../disposabl.json").features.includes("payments")) {
     config = withAndroidManifest(config, (mod) => {
       const application = mod.modResults.manifest.application?.[0];

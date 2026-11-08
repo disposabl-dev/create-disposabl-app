@@ -47,14 +47,15 @@ For example, create a web and mobile app with sign-in:
 bunx create-disposabl-app@latest my-app --platforms web,ios,android --yes
 ```
 
-| Option              | What it does                                                                                                                                                          |
-| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--platforms <ids>` | Choose `web`, `ios`, `android`, `macos`, `windows`, `linux`, `mcp`, `api`, `cli`, or `typescript-sdk`. Separate multiple choices with commas. Web is always included. |
-| `--features <ids>`  | Choose features from `--list-options`, such as `authentication` and `docs`. The default is `authentication`. Use `--features none` to omit optional features.         |
-| `--yes`             | Skip the name, platform, and feature questions. Supply an app name in the command.                                                                                    |
-| `--list-options`    | Show available platforms and features without creating an app.                                                                                                        |
-| `--skip-install`    | Create files without installing dependencies. Account setup still runs.                                                                                               |
-| `--json`            | Return a result coding agents can read. Supply an app name. Account setup still runs.                                                                                 |
+| Option                          | What it does                                                                                                                                                          |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--platforms <ids>`             | Choose `web`, `ios`, `android`, `macos`, `windows`, `linux`, `mcp`, `api`, `cli`, or `typescript-sdk`. Separate multiple choices with commas. Web is always included. |
+| `--android-architectures <ids>` | Choose Android ABIs for one APK. Defaults to `arm64-v8a,x86_64`; `armeabi-v7a` and `x86` are also supported.                                                          |
+| `--features <ids>`              | Choose features from `--list-options`, such as `authentication` and `docs`. The default is `authentication`. Use `--features none` to omit optional features.         |
+| `--yes`                         | Skip the name, platform, and feature questions. Supply an app name in the command.                                                                                    |
+| `--list-options`                | Show available platforms and features without creating an app.                                                                                                        |
+| `--skip-install`                | Create files without installing dependencies. Account setup still runs.                                                                                               |
+| `--json`                        | Return a result coding agents can read. Supply an app name. Account setup still runs.                                                                                 |
 
 CLI and TypeScript SDK include API support automatically. Backend authentication and access checks remain installed even with `--features none`.
 
@@ -67,6 +68,8 @@ npx create-disposabl-app@<version> my-app --reconfigure-only --features authenti
 ```
 
 Supply the complete desired feature list. Add `--platforms` with a complete list to change platforms too. Omitted lists stay unchanged. Run `bun install` in the app afterward, review the diff, and test affected platforms. The code-only command does not log in, provision providers, commit, or deploy. Store and payment-provider configuration is a separate step.
+
+Use `--android-architectures arm64-v8a,x86_64` to change the Android ABI selection. This replaces the list and requires a compatible new native build; it does not create separate APKs.
 
 ## Resume setup
 

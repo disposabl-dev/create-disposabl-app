@@ -11,6 +11,7 @@ import { existsSync } from "node:fs";
 import { basename, join, normalize } from "node:path";
 import { randomUUID } from "node:crypto";
 import { omitMobilePayments } from "./mobile-payments";
+import { validateAndroidArchitectures } from "../disposabl-kit/android-architectures";
 import {
   selectedFolders,
   selectFeatures,
@@ -39,6 +40,9 @@ export async function createApp(
     desktopId: config.desktopId ?? randomUUID().replaceAll("-", ""),
     platforms: selectPlatforms(config.platforms.join(",")),
     features: selectFeatures(config.features.join(",") || "none"),
+    androidArchitectures: validateAndroidArchitectures(
+      config.androidArchitectures,
+    ),
   };
   const folders = selectedFolders(config);
   const skill = join(template, "packages/skill");

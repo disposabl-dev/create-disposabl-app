@@ -12,7 +12,7 @@ import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 
 test("OTA selection accepts only source tags supported by the trusted publisher", () => {
-  for (const [channel, tag, reusable] of [
+  for (const [channel, tag, reusable, architectures] of [
     ["pr-1", "app-pr-1-android", true],
     ["production", "app-production-android", true],
     ["production", "app-production-android-8-1", true],
@@ -22,6 +22,8 @@ test("OTA selection accepts only source tags supported by the trusted publisher"
     ["production", "app-production-android-invalid", false],
     ["pr-1", "app-pr-2-android", false],
     ["pr-1", "app-pr-1-windows", false],
+    ["production", "app-production-android-8-1", false, ["arm64-v8a"]],
+    ["production", "app-production-android-8-1", false, null],
   ] as const) {
     const cwd = mkdtempSync(join(tmpdir(), "android-ota-selection-"));
     try {
@@ -33,6 +35,9 @@ test("OTA selection accepts only source tags supported by the trusted publisher"
         projectId: "project",
         applicationId: "app.fixture",
         runtimeVersion: runtime,
+        ...(architectures === null
+          ? {}
+          : { androidArchitectures: architectures ?? ["arm64-v8a", "x86_64"] }),
         sha256: hash,
       };
       const release = {
@@ -62,7 +67,7 @@ if(args[0]==="-e") {
   const child=Bun.spawnSync([process.execPath,...args],{stdout:"inherit",stderr:"inherit"});
   process.exit(child.exitCode);
 }
-if(args.includes("config")) console.log(JSON.stringify({android:{package:"app.fixture"},extra:{eas:{projectId:"project"}}}));
+if(args.includes("config")) console.log(JSON.stringify({android:{package:"app.fixture"},extra:{eas:{projectId:"project"},disposablAndroidArchitectures:["arm64-v8a","x86_64"]}}));
 else if(args.includes("runtimeversion:resolve")) console.log(JSON.stringify({runtimeVersion:"${runtime}",fingerprintSources:[]}));
 else process.exit(1);
 `,

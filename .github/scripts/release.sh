@@ -68,6 +68,7 @@ for platform in android linux windows macos; do
       if (release.draft !== false || !prior || wanted.channel !== process.env.CHANNEL
         || !/^[a-f0-9]{40,64}$/.test(wanted.runtimeVersion || "") || !/^[a-f0-9]{64}$/.test(wanted.sha256 || "")
         || !fields.every(k => typeof wanted[k] === "string" && wanted[k].trim() && prior[k] === wanted[k])
+        || !Array.isArray(wanted.androidArchitectures) || !wanted.androidArchitectures.length || JSON.stringify(prior.androidArchitectures) !== JSON.stringify(wanted.androidArchitectures)
         || !release.assets?.some(a => a.name === "android.apk" && a.state === "uploaded" && a.size > 0 && a.digest === `sha256:${wanted.sha256}`)) {
         throw new Error("Android source release does not match the OTA manifest.");
       }

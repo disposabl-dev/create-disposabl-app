@@ -3,7 +3,7 @@ set -euo pipefail
 manifest() {
   bun x --no-install expo config --json | jq -ce --arg channel "${CHANNEL:-}" --arg runtime "${RUNTIME:-}" '
     def required($name): if type == "string" and (test("[^[:space:]]")) then . else error("Missing or invalid " + $name) end;
-    {channel: ($channel | required("channel")), projectId: (.extra.eas.projectId | required("projectId")), applicationId: (.android.package | required("applicationId")), runtimeVersion: ($runtime | required("runtimeVersion") | if test("^[a-f0-9]{40,64}$") then . else error("Invalid runtimeVersion") end)}
+    {channel: ($channel | required("channel")), projectId: (.extra.eas.projectId | required("projectId")), applicationId: (.android.package | required("applicationId")), runtimeVersion: ($runtime | required("runtimeVersion") | if test("^[a-f0-9]{40,64}$") then . else error("Invalid runtimeVersion") end), androidArchitectures: (.extra.disposablAndroidArchitectures | if type == "array" and length > 0 then . else error("Missing Android architectures") end)}
   '
 }
 case "${1:?operation required}" in
@@ -78,7 +78,7 @@ bun -e '
   const wanted = JSON.parse(process.env.MANIFEST);
   const release = await Bun.file(`${process.env.RUNNER_TEMP}/release.json`).json();
   const prior = JSON.parse(/<!-- android (\{[^\n]+\}) -->/.exec(release.body || "")?.[1] || "null");
-  const reusable = prior && Object.keys(wanted).every(k => prior[k] === wanted[k]) && /^[a-f0-9]{64}$/.test(prior.sha256 || "") && release.assets.some(a => a.name === process.env.artifact && a.state === "uploaded" && a.size > 0 && a.digest === `sha256:${prior.sha256}`);
+  const reusable = prior && Object.keys(wanted).every(k => JSON.stringify(prior[k]) === JSON.stringify(wanted[k])) && /^[a-f0-9]{64}$/.test(prior.sha256 || "") && release.assets.some(a => a.name === process.env.artifact && a.state === "uploaded" && a.size > 0 && a.digest === `sha256:${prior.sha256}`);
   const blocked = !reusable && process.env.CHANNEL === "production" && process.env.ANDROID_SIGNING_READY !== "true";
   if (blocked) {
     const reason = "Configure Android production signing credentials before building a production APK.";
@@ -131,6 +131,7 @@ binary=android/app/build/outputs/apk/release/app-release.apk
 fingerprint=assets/fingerprint
 
 (cd android && bash ../../../.github/scripts/android-runner.sh build)
+node ../../.github/scripts/verify-android-abis.mjs "$binary" "$MANIFEST"
 test "$(unzip -p "$binary" "$fingerprint")" = "$RUNTIME"
 test "$(bun x --no-install expo-updates runtimeversion:resolve --platform android --workflow managed | jq -er .runtimeVersion)" = "$RUNTIME"
 mkdir -p ../../dist/release

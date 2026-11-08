@@ -1,5 +1,6 @@
 {
   "version": "0.1.0",
   "platforms": ["web", "android", "ios", "api", "mcp", "cli", "typescript-sdk"],
-  "features": ["authentication", "docs", "analytics"]
+  "features": ["authentication", "docs", "analytics"],
+  "androidArchitectures": ["arm64-v8a", "x86_64"]
 }

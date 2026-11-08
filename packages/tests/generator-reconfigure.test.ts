@@ -64,6 +64,57 @@ test(
       assert.deepEqual(config.features, ["authentication", "payments"]);
       assert.equal(config.appId, "existing-app");
       assert.equal(await read(app, "custom.txt"), "preserve my app");
+      execFileSync(
+        process.execPath,
+        [
+          cli,
+          "app",
+          "--reconfigure-only",
+          "--android-architectures",
+          "arm64-v8a",
+          "--skip-install",
+          "--json",
+        ],
+        { cwd: temp, encoding: "utf8", timeout: 20000 },
+      );
+      assert.deepEqual(
+        JSON.parse(await read(app, "disposabl.json")).androidArchitectures,
+        ["arm64-v8a"],
+      );
+      execFileSync(
+        process.execPath,
+        [
+          cli,
+          "app",
+          "--reconfigure-only",
+          "--features",
+          "authentication",
+          "--skip-install",
+          "--json",
+        ],
+        { cwd: temp, encoding: "utf8", timeout: 20000 },
+      );
+      assert.deepEqual(
+        JSON.parse(await read(app, "disposabl.json")).androidArchitectures,
+        ["arm64-v8a"],
+      );
+      const beforeInvalid = await read(app, "disposabl.json");
+      assert.throws(() =>
+        execFileSync(
+          process.execPath,
+          [
+            cli,
+            "app",
+            "--reconfigure-only",
+            "--android-architectures",
+            "bad",
+            "--skip-install",
+            "--json",
+          ],
+          { cwd: temp, stdio: "pipe", timeout: 10000 },
+        ),
+      );
+      assert.equal(await read(app, "disposabl.json"), beforeInvalid);
       assert.equal(existsSync(join(app, ".git")), false);
       for (const agent of [".agents", ".claude"]) {
         for (const skill of ["disposabl-app", "disposabl-reconfigure"]) {

@@ -9,6 +9,8 @@ Use this skill in the existing generated app, including an app already published
 
 Read `disposabl.json`, the Git diff, and the affected workspace instructions. Record the current selections and the user's intended complete selections. `--features` and `--platforms` replace their respective lists; omit a flag to keep that list. Dependencies are resolved by the generator, including Authentication for Payments and Analytics, API for CLI/SDK, and Web for every app.
 
+`--android-architectures` replaces the Android ABI list. The default is `arm64-v8a,x86_64`; `armeabi-v7a` and `x86` are available when needed. A change requires a compatible native build and produces one APK containing the selected ABIs.
+
 ## Apply code changes
 
 Use the generator version recorded in `disposabl.json`, not `latest`. From the parent directory, run the following with the actual version, directory, and complete desired lists:

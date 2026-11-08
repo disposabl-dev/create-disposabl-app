@@ -13,6 +13,7 @@ import {
   resolveFeatures,
   type Feature,
 } from "../disposabl-kit/feature-options";
+import type { AndroidArchitecture } from "../disposabl-kit/android-architectures";
 export {
   features,
   featureDependencies,
@@ -26,6 +27,7 @@ export type DisposablConfig = {
   version: string;
   platforms: Platform[];
   features: Feature[];
+  androidArchitectures?: AndroidArchitecture[];
 };
 
 const parseList = (input: string): string[] =>

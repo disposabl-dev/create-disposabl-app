@@ -31,6 +31,7 @@ function publish(
       projectId: "project",
       applicationId: "app.fixture",
       runtimeVersion: "b".repeat(40),
+      androidArchitectures: ["arm64-v8a", "x86_64"],
       sha256,
       action: options.native ? "build" : "update",
       sourceTag,
@@ -40,6 +41,8 @@ function publish(
     if (options.fault === "channel") prior.channel = "pr-2";
     if (options.fault === "project") prior.projectId = "different";
     if (options.fault === "application") prior.applicationId = "app.different";
+    if (options.fault === "architectures")
+      prior.androidArchitectures = ["arm64-v8a"];
     if (options.fault === "tag") manifest.sourceTag = "app-pr-2-android";
     writeFileSync(
       join(cwd, "artifacts/release-android/android.json"),
@@ -204,6 +207,7 @@ test("OTA reuse rejects mismatched, missing, corrupt and stale inputs before pub
     "channel",
     "project",
     "application",
+    "architectures",
     "tag",
     "draft",
     "missing",
@@ -261,7 +265,7 @@ else writeFileSync(join(args[args.indexOf("--dir")+1],"android.apk"),${JSON.stri
         `#!${process.execPath}
 import {writeFileSync,mkdirSync} from "node:fs";
 const args=process.argv.slice(2);
-if(args.includes("config")) console.log(JSON.stringify({android:{package:"app.fixture"},extra:{eas:{projectId:"project"}}}));
+if(args.includes("config")) console.log(JSON.stringify({android:{package:"app.fixture"},extra:{eas:{projectId:"project"},disposablAndroidArchitectures:["arm64-v8a","x86_64"]}}));
 else if(args.includes("runtimeversion:resolve")) console.log(JSON.stringify({runtimeVersion:"${"b".repeat(40)}"}));
 else if(args.includes("export")) mkdirSync("dist/update",{recursive:true});
 else if(args.includes("update")) writeFileSync("../../published-update","yes");
