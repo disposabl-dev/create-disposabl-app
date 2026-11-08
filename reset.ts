@@ -199,12 +199,12 @@ const keep = new Set([
   "auth.config.ts",
   "mcp.ts",
   "tsconfig.json",
-  "users",
   "files",
   "desktopUpdates",
   "desktopUpdates.ts",
 ]);
 for (const entry of keep) await lstat(join(convex, entry));
+await lstat(join(convex, "users"));
 for (const path of [
   "README.md",
   "convex/schema.ts",
@@ -212,6 +212,9 @@ for (const path of [
   "convex/convex.config.ts",
   "convex/_generated/api.d.ts",
   "convex/_generated/server.d.ts",
+  "convex/users/index.ts",
+  "convex/users/internal.ts",
+  "convex/users/validator.ts",
   "generated/platforms.ts",
   "generated/openapi.json",
   "generated/pages.json",

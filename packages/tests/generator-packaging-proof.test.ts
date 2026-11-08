@@ -70,11 +70,32 @@ test("packaged starter and both generated profiles exclude product proof fixture
         "utf8",
       );
       const deletion = await readFile(
-        join(root, "packages/disposabl-kit/client/components/account-deletion.tsx"),
+        join(
+          root,
+          "packages/disposabl-kit/client/components/account-deletion.tsx",
+        ),
         "utf8",
       );
       assert.doesNotMatch(deletion, /api\.users\.index/);
       assert.match(deletion, /Account deletion requests are not available yet/);
+      const users = join(root, "packages/backend/convex/users");
+      assert.deepEqual((await readdir(users)).sort(), [
+        "index.ts",
+        "internal.ts",
+        "validator.ts",
+      ]);
+      for (const file of await readdir(users)) {
+        const source = await readFile(join(users, file), "utf8");
+        assert.doesNotMatch(
+          source,
+          /requestDeletion|deletionStatus|deletionRequestedAt/,
+        );
+      }
+      const index = await readFile(join(users, "index.ts"), "utf8");
+      const internal = await readFile(join(users, "internal.ts"), "utf8");
+      assert.match(index, /export const current = query/);
+      for (const name of ["current", "createUser", "onSignIn"])
+        assert.match(internal, new RegExp(`export const ${name} =`));
       assert.match(publisher, /operatorName: ""/);
       assert.match(publisher, /privacyEmail: ""/);
       assert.doesNotMatch(publisher, /Yast AI|vivek@yast\.ai/);
