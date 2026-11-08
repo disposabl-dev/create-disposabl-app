@@ -73,3 +73,145 @@ export const stop = internalMutationGeneric({
   handler: (ctx, args) =>
     (abortMessage as any)._handler(inertDispatch(ctx), args),
 });
+
+import {
+  internalActionGeneric as fixtureAction,
+  componentsGeneric,
+} from "convex/server";
+import { guardedEnqueue } from "../../../../backend/convex/agent/internal";
+import { requireCredits } from "../../../../backend/convex/agent/credits";
+import {
+  claimWindow,
+  sessionAllows,
+  settle,
+} from "../../../../backend/convex/agent/compute";
+
+const paidScheduler = (ctx: any) => ({
+  ...ctx,
+  scheduler: {
+    ...ctx.scheduler,
+    runAfter: async (_delay: number, ref: any) => {
+      const allowed = [
+        "agent/actions/run:tick",
+        "agent/compute:uncertain",
+        "agent/actions/compute:stop",
+      ];
+      if (!allowed.includes(getFunctionName(ref)))
+        throw new Error("Unexpected paid fixture schedule");
+      return ctx.scheduler.runAfter(0, anyApi.agentFixture.noop, {});
+    },
+  },
+});
+export const paidApp = internalMutationGeneric({
+  args: { userId: v.string(), appId: v.string() },
+  returns: v.string(),
+  handler: async (ctx, args) => {
+    const thread = await ctx.runMutation(
+      componentsGeneric().agent.threads.createThread,
+      { userId: args.userId, title: "Synthetic paid fixture" },
+    );
+    await ctx.db.insert("apps", {
+      appId: args.appId,
+      userId: args.userId,
+      name: "Synthetic paid fixture",
+      platforms: ["web"],
+      features: [],
+      agent: {
+        threadId: thread._id,
+        status: "idle",
+        pending: [],
+        updatedAt: Date.now(),
+      },
+    });
+    return thread._id;
+  },
+});
+export const paidEnqueue = internalMutationGeneric({
+  args: { userId: v.string(), appId: v.string(), prompt: v.string() },
+  returns: v.any(),
+  handler: (ctx, args) =>
+    enqueueMessageHandler(paidScheduler(ctx), args, () => true, true),
+});
+export const paidSend = fixtureAction({
+  args: {
+    userId: v.string(),
+    appId: v.string(),
+    prompt: v.string(),
+    balance: v.number(),
+  },
+  returns: v.any(),
+  handler: (ctx, { balance, ...args }) =>
+    guardedEnqueue(
+      {
+        ...ctx,
+        runMutation: (ref: any, values: any) => {
+          if (getFunctionName(ref) !== "agent/internal:enqueueMessage")
+            throw new Error("Unexpected paid fixture mutation");
+          return ctx.runMutation(anyApi.agentFixture.paidEnqueue, values);
+        },
+      } as any,
+      args,
+      (userId) =>
+        requireCredits(
+          userId,
+          true,
+          "fixture-only-noncredential",
+          async (_unused, method, body) => {
+            if (
+              method !== "customers.get_or_create" ||
+              body.customer_id !== userId
+            )
+              throw new Error("Unexpected inert credit lookup");
+            return { balances: { credits: { remaining: balance } } };
+          },
+        ),
+    ),
+});
+export const paidClaim = internalMutationGeneric({
+  args: { sessionId: v.id("computeSessions") },
+  returns: v.any(),
+  handler: (ctx, args) => claimWindow(paidScheduler(ctx) as any, args, true),
+});
+export const paidUnknown = internalMutationGeneric({
+  args: { debitId: v.id("computeDebits") },
+  returns: v.any(),
+  handler: (ctx, args) =>
+    (settle as any)._handler(paidScheduler(ctx), {
+      ...args,
+      outcome: "unknown",
+    }),
+});
+export const paidAllowed = internalMutationGeneric({
+  args: { userId: v.string(), sessionId: v.id("computeSessions") },
+  returns: v.boolean(),
+  handler: (ctx, args) =>
+    sessionAllows(ctx as any, args.sessionId, args.userId, Date.now(), true),
+});
+export const paidInspect = internalMutationGeneric({
+  args: { userId: v.string(), appId: v.string() },
+  returns: v.any(),
+  handler: async (ctx, args) => {
+    const app = await ctx.db
+      .query("apps")
+      .withIndex("by_appId", (q: any) => q.eq("appId", args.appId))
+      .unique();
+    const sessions = await ctx.db
+      .query("computeSessions")
+      .withIndex("by_userId", (q: any) => q.eq("userId", args.userId))
+      .take(20);
+    const debits = sessions[0]
+      ? await ctx.db
+          .query("computeDebits")
+          .withIndex("by_sessionId", (q: any) =>
+            q.eq("sessionId", sessions[0]._id),
+          )
+          .take(20)
+      : [];
+    return { app, sessions, debits };
+  },
+});
+export const paidUser = internalMutationGeneric({
+  args: {},
+  returns: v.id("users"),
+  handler: (ctx) => ctx.db.insert("users", {}),
+});

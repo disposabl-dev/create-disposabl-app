@@ -18,7 +18,7 @@ def run(args, **kw):
  print('RUN', ' '.join(args),flush=True); return subprocess.run(args,cwd=kw.get('cwd',cwd),env=env,check=True)
 try:
  source=pathlib.Path(root,'packages/tests/fixtures/agent-inert-convex/agentFixture.ts').read_text()
- pathlib.Path(fixture).write_text(source.replace('../../../../backend/convex/agent/internal','./agent/internal'))
+ pathlib.Path(fixture).write_text(source.replace('../../../../backend/convex/agent/','./agent/'))
  for _ in range(100):
   if proc.poll() is not None: raise RuntimeError('isolated backend exited before readiness')
   try: urllib.request.urlopen('http://127.0.0.1:3540/version',timeout=1);break
@@ -33,6 +33,7 @@ try:
  result=subprocess.run(['bun','run','e2e','run','agent.e2e.ts','--target','backend','--retries','0'],cwd=root,env=env)
  print('SCOPED_SUITE_EXIT',result.returncode,flush=True)
  if result.returncode: sys.exit(result.returncode)
+ run(['python3',os.path.join(root,'packages/tests/fixtures/agent-inert-convex/paid-test.py')],cwd=root)
 finally:
  proc.terminate()
  try: proc.wait(timeout=10)

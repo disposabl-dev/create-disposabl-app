@@ -1,3 +1,4 @@
+import { paymentsEnabled } from "@disposabl/disposabl-kit/features";
 import { requireNotDeleting } from "../users/deletion";
 import { listMessages, saveMessage } from "@convex-dev/agent";
 import {
@@ -35,6 +36,7 @@ export async function enqueueMessageHandler(
     fileIds = [],
   }: Infer<typeof enqueueArgs>,
   remoteConfigured: () => boolean,
+  paid = paymentsEnabled,
 ): Promise<Infer<typeof result>> {
   await requireNotDeleting(ctx, userId);
   prompt = prompt.trim();
@@ -121,7 +123,7 @@ export async function enqueueMessageHandler(
       ],
     },
   });
-  const computeSessionId = await admitSession(ctx, userId);
+  const computeSessionId = await admitSession(ctx, userId, paid);
   assertSessionRebind(current, computeSessionId);
   await patchThread(ctx, current, {
     computeSessionId,
