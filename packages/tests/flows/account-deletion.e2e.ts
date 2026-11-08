@@ -2,6 +2,8 @@ import { test } from "@e2e-dev/web";
 import { expect, test as backendTest } from "e2e";
 import { randomUUID } from "node:crypto";
 import { backendUrl, siteUrl } from "../project";
+import { ConvexHttpClient } from "convex/browser";
+import { makeFunctionReference } from "convex/server";
 
 test(
   "account deletion request survives reload and a fresh password session",
@@ -66,6 +68,101 @@ test(
     await expect(pending).toHaveText(receipt!);
     await expect(request).not.toBeVisible();
     await app.screenshot("account-deletion-restored");
+  },
+);
+
+backendTest(
+  "pending deletion denies uploads but permits removal of an owned local file",
+  { platforms: ["backend"], timeout: 90_000 },
+  async () => {
+    backendTest.skip(
+      process.env.E2E_ACCOUNT_DELETION !== "1",
+      "Explicit local deletion qualification only",
+    );
+    if (
+      backendUrl() !== "http://127.0.0.1:3310" ||
+      siteUrl() !== "http://127.0.0.1:3311" ||
+      process.env.E2E_TELEMETRY_DISABLED !== "1"
+    )
+      throw new Error(
+        "File deletion proof requires the isolated local backend.",
+      );
+    const adminKey = process.env.E2E_CONVEX_ADMIN_KEY;
+    backendTest.skip(
+      !adminKey,
+      "Admin access must establish local-only storage",
+    );
+    for (const name of [
+      "R2_ACCOUNT_ID",
+      "R2_BUCKET_NAME",
+      "R2_ACCESS_KEY_ID",
+      "R2_SECRET_ACCESS_KEY",
+      "E2E_TELEMETRY_DISABLED",
+    ]) {
+      const response = await fetch(`${backendUrl()}/api/query`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Convex ${adminKey}`,
+        },
+        body: JSON.stringify({
+          path: "_system/cli/queryEnvironmentVariables:get",
+          args: { name },
+          format: "json",
+        }),
+        signal: AbortSignal.timeout(15_000),
+      });
+      const result = await response.json();
+      expect(result.status).toBe("success");
+      expect(result.value?.value?.trim() ?? "").toBe(
+        name === "E2E_TELEMETRY_DISABLED" ? "1" : "",
+      );
+    }
+    const client = new ConvexHttpClient(backendUrl());
+    const signup = await client.mutation(
+      makeFunctionReference<"mutation">("auth:signUpWithUsernamePassword"),
+      {
+        username: `deletefile${randomUUID().replaceAll("-", "")}`,
+        password: `Test-${randomUUID()}!`,
+      },
+    );
+    expect(signup.status).toBe("complete");
+    client.setAuth(signup.tokens.accessToken);
+    const upload = makeFunctionReference<"action">("files/index:upload");
+    const remove = makeFunctionReference<"action">("files/index:remove");
+    const args = {
+      filename: "deletion-proof.txt",
+      mediaType: "text/plain",
+      bytes: new TextEncoder().encode("Disposable local deletion proof").buffer,
+    };
+    const id = await client.action(upload, args);
+    let unexpectedId: string | undefined;
+    try {
+      await client.mutation(
+        makeFunctionReference<"mutation">("users/index:requestDeletion"),
+        { confirmation: "DELETE" },
+      );
+      let denied = false;
+      try {
+        unexpectedId = await client.action(upload, args);
+      } catch (error) {
+        denied = String(error).includes("Account deletion has been requested");
+      }
+      expect(denied).toBe(true);
+    } finally {
+      if (unexpectedId) await client.action(remove, { id: unexpectedId });
+      await client.action(remove, { id });
+    }
+    let removed = false;
+    try {
+      await client.action(
+        makeFunctionReference<"action">("files/index:getDownload"),
+        { id },
+      );
+    } catch (error) {
+      removed = String(error).includes("File not found.");
+    }
+    expect(removed).toBe(true);
   },
 );
 

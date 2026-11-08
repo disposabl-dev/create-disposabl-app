@@ -64,6 +64,7 @@ import type * as downloads_http from "../downloads/http.js";
 import type * as downloads_index from "../downloads/index.js";
 import type * as downloads_internal from "../downloads/internal.js";
 import type * as emails from "../emails.js";
+import type * as files_guard from "../files/guard.js";
 import type * as files_index from "../files/index.js";
 import type * as files_internal from "../files/internal.js";
 import type * as github_actions_http from "../github/actions/http.js";
@@ -156,6 +157,7 @@ declare const fullApi: ApiFromModules<{
   "downloads/index": typeof downloads_index;
   "downloads/internal": typeof downloads_internal;
   emails: typeof emails;
+  "files/guard": typeof files_guard;
   "files/index": typeof files_index;
   "files/internal": typeof files_internal;
   "github/actions/http": typeof github_actions_http;
