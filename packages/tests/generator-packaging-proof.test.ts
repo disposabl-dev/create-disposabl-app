@@ -69,6 +69,12 @@ test("packaged starter and both generated profiles exclude product proof fixture
         join(root, "packages/disposabl-kit/legal/publisher.ts"),
         "utf8",
       );
+      const deletion = await readFile(
+        join(root, "packages/disposabl-kit/client/components/account-deletion.tsx"),
+        "utf8",
+      );
+      assert.doesNotMatch(deletion, /api\.users\.index/);
+      assert.match(deletion, /Account deletion requests are not available yet/);
       assert.match(publisher, /operatorName: ""/);
       assert.match(publisher, /privacyEmail: ""/);
       assert.doesNotMatch(publisher, /Yast AI|vivek@yast\.ai/);

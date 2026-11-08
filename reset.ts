@@ -73,6 +73,8 @@ const touched = [
   "apps/mobile/app.json",
   "packages/disposabl-kit/package.json",
   "packages/disposabl-kit/legal/publisher.ts",
+  "packages/disposabl-kit/client/components/account-deletion.tsx",
+  "packages/tests/components/account-deletion.test.mjs",
   "packages/disposabl-kit/mobile/components/use-dictation.ts",
   "packages/tests/mobile-dictation.test.ts",
   "packages/tests/components/mobile-dictation.test.mjs",
@@ -217,6 +219,14 @@ for (const path of [
   await readFile(join(root, "starter/backend", path));
 
 const starterCopies = [
+  [
+    "starter/client/account-deletion.tsx",
+    "packages/disposabl-kit/client/components/account-deletion.tsx",
+  ],
+  [
+    "starter/client/account-deletion-check.mjs",
+    "packages/tests/components/account-deletion.test.mjs",
+  ],
   ["starter/legal/publisher.ts", "packages/disposabl-kit/legal/publisher.ts"],
   ["starter/web/index.tsx", "apps/web/src/router/index.tsx"],
   ["starter/cli/README.md", "packages/cli/README.md"],
