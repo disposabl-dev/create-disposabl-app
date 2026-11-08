@@ -8,12 +8,14 @@ import { billingSession } from "./session";
 import { presentMonthlyPaywall, validMonthlyOffering } from "./paywall";
 import { creditQuantity } from "../../payments/config";
 import { paymentOptions, storeEligibility } from "./policy";
+import { useWebCheckout } from "./web-checkout";
 
 type Snapshot = {
   balance: number | null;
   hasMonthlyPlan: boolean | null;
   nativeSubscriptionsEnabled: boolean;
   mobileWebCheckoutEnabled: boolean;
+  customerId: string;
 };
 const snapshot = makeFunctionReference<
   "action",
@@ -111,6 +113,15 @@ export function AccountBilling({ customerId }: { customerId: string }) {
     };
   }, [customerId, current, refresh]);
 
+  const webSnapshot = useCallback(() => getSnapshot({}), [getSnapshot]);
+  const web = useWebCheckout(
+    customerId,
+    generation,
+    key,
+    productId,
+    webSnapshot,
+  );
+
   async function transact(restore: boolean) {
     if (operation.current || !key || !billingSession.beginTransaction()) return;
     operation.current = true;
@@ -186,13 +197,20 @@ export function AccountBilling({ customerId }: { customerId: string }) {
       {monthly ? (
         <AuthButton
           title={`${monthly.product.priceString} / month`}
-          disabled={busy || data?.hasMonthlyPlan !== false}
+          disabled={busy || web.busy || data?.hasMonthlyPlan !== false}
           onPress={() => void transact(false)}
         />
       ) : (
         <Text className={authClasses.body}>
           Store subscriptions are unavailable.
         </Text>
+      )}
+      {web.available && (
+        <AuthButton
+          title="Buy monthly on website"
+          disabled={busy || web.busy}
+          onPress={() => void web.open()}
+        />
       )}
       <Text className={authClasses.body}>
         Native top-ups are not available yet. Existing credits work here.
@@ -242,6 +260,11 @@ export function AccountBilling({ customerId }: { customerId: string }) {
       {!!message && (
         <Text accessibilityRole="alert" className={authClasses.body}>
           {message}
+        </Text>
+      )}
+      {!!web.error && (
+        <Text accessibilityRole="alert" className={authClasses.body}>
+          {web.error}
         </Text>
       )}
     </View>

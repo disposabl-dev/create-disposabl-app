@@ -98,10 +98,14 @@ function Chat({ appId }: { appId: string }) {
     const sequence = ++billingSequence.current;
     try {
       const value = await snapshot({});
-      if (isActive() && sequence === billingSequence.current) setBilling(value);
+      if (isActive() && sequence === billingSequence.current) {
+        setBilling(value);
+        return value.balance;
+      }
     } catch {
       if (isActive() && sequence === billingSequence.current) setBilling(null);
     }
+    return null;
   }
   const [prompt, setPrompt] = useState("");
   const [busy, setBusy] = useState(false);

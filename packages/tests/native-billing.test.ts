@@ -6,6 +6,7 @@ import { monthlyPlanFromCustomer } from "../disposabl-kit/server/billing";
 import {
   paymentOptions,
   storeEligibility,
+  preflightWebMonthly,
 } from "../disposabl-kit/mobile/billing/policy";
 
 function deferred() {
@@ -51,6 +52,49 @@ test("retained gate and account keep separate leases across focus and in-flight 
   assert.equal(session.current("alice", gate), false);
   session.release("alice", gate);
   assert.equal(session.current("bob", bob), true);
+});
+
+test("web monthly preflight rechecks storefront, account, and both subscription sources", async () => {
+  let current = true;
+  let country = "USA";
+  let active: string[] = [];
+  const sdk = {
+    canMakePayments: async () => true,
+    getStorefront: async () => ({ countryCode: country }),
+    getCustomerInfo: async () => ({ activeSubscriptions: active }),
+    getOfferings: async () => ({
+      current: {
+        availablePackages: [
+          { product: { identifier: "monthly", subscriptionPeriod: "P1M" } },
+        ],
+      },
+    }),
+  };
+  const snapshot = async () => ({
+    balance: 0,
+    hasMonthlyPlan: false,
+    nativeSubscriptionsEnabled: true,
+    mobileWebCheckoutEnabled: true,
+    customerId: "alice",
+  });
+  const run = () =>
+    preflightWebMonthly(
+      sdk as never,
+      "ios",
+      "monthly",
+      "alice",
+      snapshot,
+      () => current,
+    );
+  await run();
+  country = "CAN";
+  await assert.rejects(run(), /unavailable/);
+  country = "USA";
+  active = ["monthly"];
+  await assert.rejects(run(), /existing_subscription/);
+  active = [];
+  current = false;
+  await assert.rejects(run(), /Account changed/);
 });
 
 test("account switch invalidates all retained views while work is in flight", async () => {

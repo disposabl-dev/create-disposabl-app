@@ -23,11 +23,16 @@ export const Route = createFileRoute("/_providers/pricing")({
 const snapshot = makeFunctionReference<
   "action",
   Record<string, never>,
-  { balance: number | null; hasMonthlyPlan: boolean | null }
+  {
+    balance: number | null;
+    hasMonthlyPlan: boolean | null;
+    checkoutNeedsReview: boolean;
+    customerId: string;
+  }
 >("billing:snapshot");
 const checkout = makeFunctionReference<
   "action",
-  { purchase: "monthly" | "topup" },
+  { purchase: "monthly" | "topup"; requestId: string },
   { url: string | null }
 >("billing:checkout");
 const portal = makeFunctionReference<
@@ -76,12 +81,20 @@ function SubscriptionHelp() {
   );
 }
 function PurchasePage({ session }: { session: string | null }) {
+  const [fromIos] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      (new URLSearchParams(window.location.search).get("source") === "ios" ||
+        window.sessionStorage.getItem("billing-from-ios") === "1"),
+  );
   const { isLoading } = useConvexAuth();
   const getSnapshot = useAction(snapshot);
   const start = useAction(checkout);
   const openPortal = useAction(portal);
   const [balance, setBalance] = useState<number | null>(null);
   const [hasMonthlyPlan, setHasMonthlyPlan] = useState<boolean | null>(null);
+  const [checkoutNeedsReview, setCheckoutNeedsReview] = useState(false);
+  const [customerId, setCustomerId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [refreshError, setRefreshError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -106,6 +119,8 @@ function PurchasePage({ session }: { session: string | null }) {
         return;
       setBalance(result.balance);
       setHasMonthlyPlan(result.hasMonthlyPlan);
+      setCheckoutNeedsReview(result.checkoutNeedsReview);
+      setCustomerId(result.customerId);
       setRefreshError("");
     } catch {
       if (
@@ -121,13 +136,17 @@ function PurchasePage({ session }: { session: string | null }) {
     if (session) void refresh();
   }, [session, refresh]);
   async function purchase(kind: "monthly" | "topup") {
-    if (!session || busy) return;
+    if (!session || !customerId || busy) return;
     const version = generation.current;
     setBusy(true);
     setMessage("");
     try {
-      const result = await start({ purchase: kind });
+      const storageKey = `billing-attempt:${customerId}:${kind}`;
+      const requestId = localStorage.getItem(storageKey) ?? crypto.randomUUID();
+      localStorage.setItem(storageKey, requestId);
+      const result = await start({ purchase: kind, requestId });
       if (version !== generation.current) return;
+      localStorage.removeItem(storageKey);
       if (result.url) window.location.assign(result.url);
       else {
         setMessage(
@@ -137,7 +156,10 @@ function PurchasePage({ session }: { session: string | null }) {
       }
     } catch {
       if (version === generation.current)
-        setMessage("Unable to start checkout. Please try again.");
+        setMessage(
+          "Checkout status could not be confirmed. Refresh and contact support before retrying if it needs review.",
+        );
+      await refresh();
     } finally {
       if (version === generation.current) setBusy(false);
     }
@@ -185,6 +207,15 @@ function PurchasePage({ session }: { session: string | null }) {
             After checkout, credits appear when payment is confirmed. Refresh if
             the balance has not updated yet.
           </p>
+          {fromIos && (
+            <p>After checkout, return to the app and refresh your credits.</p>
+          )}
+          {checkoutNeedsReview && (
+            <p role="alert">
+              A previous checkout needs review. Contact support before retrying
+              that purchase.
+            </p>
+          )}
           <button
             className="underline"
             disabled={busy}
@@ -204,7 +235,9 @@ function PurchasePage({ session }: { session: string | null }) {
           </p>
           <button
             className="mt-4 rounded bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50"
-            disabled={!session || busy || hasMonthlyPlan !== false}
+            disabled={
+              !session || !customerId || busy || hasMonthlyPlan !== false
+            }
             onClick={() => void purchase("monthly")}
           >
             {hasMonthlyPlan
@@ -212,18 +245,20 @@ function PurchasePage({ session }: { session: string | null }) {
               : "Choose monthly"}
           </button>
         </section>
-        <section className="rounded-lg border p-6">
-          <h2 className="text-xl font-semibold">Top-up</h2>
-          <p>{formatPrice(pricing.topup.price)} once</p>
-          <p>{creditQuantity("topup")} credits that do not expire.</p>
-          <button
-            className="mt-4 rounded bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50"
-            disabled={!session || busy}
-            onClick={() => void purchase("topup")}
-          >
-            Buy top-up
-          </button>
-        </section>
+        {!fromIos && (
+          <section className="rounded-lg border p-6">
+            <h2 className="text-xl font-semibold">Top-up</h2>
+            <p>{formatPrice(pricing.topup.price)} once</p>
+            <p>{creditQuantity("topup")} credits that do not expire.</p>
+            <button
+              className="mt-4 rounded bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50"
+              disabled={!session || !customerId || busy}
+              onClick={() => void purchase("topup")}
+            >
+              Buy top-up
+            </button>
+          </section>
+        )}
       </div>
       <SubscriptionHelp />
       {refreshError && <p role="status">{refreshError}</p>}

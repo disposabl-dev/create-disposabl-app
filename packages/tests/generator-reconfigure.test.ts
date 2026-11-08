@@ -137,6 +137,15 @@ test("native payments selection adds and removes the SDK without replacing custo
         features === "payments",
       );
       assert.equal(
+        existsSync(
+          join(app, "packages/disposabl-kit/mobile/billing/web-checkout.ts"),
+        ),
+        features === "payments",
+      );
+      assert.ok(
+        existsSync(join(app, "packages/backend/convex/billingHandoff.ts")),
+      );
+      assert.equal(
         existsSync(join(app, "packages/tests/native-billing.test.ts")),
         features === "payments",
       );

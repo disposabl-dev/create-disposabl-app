@@ -4,6 +4,20 @@ import { v } from "convex/values";
 import { profile } from "./users/validator";
 
 export default defineSchema({
+  billingHandoffs: defineTable({
+    hash: v.string(),
+    userId: v.string(),
+    sessionId: v.string(),
+    expiresAt: v.number(),
+  }).index("by_hash", ["hash"]),
+  billingAttempts: defineTable({
+    userId: v.string(),
+    purchase: v.string(),
+    requestId: v.string(),
+    url: v.optional(v.string()),
+  })
+    .index("by_userId_purchase_url", ["userId", "purchase", "url"])
+    .index("by_userId_requestId", ["userId", "requestId"]),
   desktopUpdates: desktopUpdateTable,
   files: defineTable({
     owner: v.string(),

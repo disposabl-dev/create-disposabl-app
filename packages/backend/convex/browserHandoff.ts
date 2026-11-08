@@ -2,19 +2,15 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { ConvexError, v } from "convex/values";
 import { components } from "./_generated/api";
 import { mutation, query, type QueryCtx } from "./_generated/server";
-import { sessionTtl } from "./authSetup";
+import {
+  hashBrowserCode as hash,
+  exchangeBrowserSession,
+} from "@disposabl/disposabl-kit/server/browser-session";
 import { connectionsUrl } from "./connections/config";
 
 const lifetime = 2 * 60_000;
 const invalid = () =>
   new ConvexError("This link expired. Open connections again from the app.");
-const hash = async (value: string) =>
-  Array.from(
-    new Uint8Array(
-      await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)),
-    ),
-    (byte) => byte.toString(16).padStart(2, "0"),
-  ).join("");
 async function lookup(ctx: QueryCtx, code: string) {
   if (!/^[A-Za-z0-9_-]{43}$/.test(code)) throw invalid();
   const digest = await hash(code);
@@ -100,13 +96,10 @@ export const redeem = mutation({
   }),
   handler: async (ctx, { code }) => {
     const user = await lookup(ctx, code);
-    const tokens = await ctx.runMutation(
-      components.auth.public.exchangeSession,
-      {
-        sessionId: user.browserHandoff!.sessionId,
-        userId: user._id,
-        ...sessionTtl,
-      },
+    const tokens = await exchangeBrowserSession(
+      ctx,
+      user.browserHandoff!.sessionId,
+      user._id,
     );
     // The component call and consumption commit atomically; replay cannot mint another session.
     await ctx.db.patch("users", user._id, { browserHandoff: undefined });

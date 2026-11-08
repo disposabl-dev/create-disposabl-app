@@ -1,8 +1,9 @@
 import { useAction } from "convex/react";
 import { api } from "../../../../../packages/backend/convex/_generated/api";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState, Platform, Text, View } from "react-native";
 import { billingSession } from "../../../../../packages/disposabl-kit/mobile/billing/session";
+import { useWebCheckout } from "../../../../../packages/disposabl-kit/mobile/billing/web-checkout";
 import { Action } from "../studio/ui";
 import {
   presentMonthlyPaywall,
@@ -20,12 +21,13 @@ export function PaymentGate({
 }: {
   customerId: string;
   data: BillingSnapshot | null;
-  refresh: () => Promise<void>;
+  refresh: () => Promise<number | null>;
   proceed: () => void;
   cancel: () => void;
 }) {
   const snapshot = useAction(api.billing.snapshot);
   const version = useRef(0);
+  const awaitingReturn = useRef(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   useEffect(() => {
@@ -35,10 +37,16 @@ export function PaymentGate({
   }, [customerId]);
   useEffect(() => {
     const listener = AppState.addEventListener("change", (state) => {
-      if (state === "active") void refresh();
+      if (state === "active")
+        void refresh().then((balance) => {
+          if (awaitingReturn.current && balance !== null && balance >= 10) {
+            awaitingReturn.current = false;
+            proceed();
+          }
+        });
     });
     return () => listener.remove();
-  }, [refresh]);
+  }, [refresh, proceed]);
   const key =
     Platform.OS === "ios"
       ? process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY
@@ -47,6 +55,8 @@ export function PaymentGate({
     Platform.OS === "ios"
       ? process.env.EXPO_PUBLIC_REVENUECAT_IOS_MONTHLY_PRODUCT
       : process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_MONTHLY_PRODUCT;
+  const webSnapshot = useCallback(() => snapshot({}), [snapshot]);
+  const web = useWebCheckout(customerId, version, key, productId, webSnapshot);
   async function purchase() {
     if (
       !key ||
@@ -92,12 +102,24 @@ export function PaymentGate({
         <Action
           label="View subscription"
           onPress={() => void purchase()}
-          disabled={busy}
+          disabled={busy || web.busy}
         />
       ) : (
         <Text className="text-muted-foreground">
           Store purchases are unavailable for this account.
         </Text>
+      )}
+      {web.available && (
+        <Action
+          label="Buy monthly on website"
+          onPress={() => {
+            awaitingReturn.current = true;
+            void web.open().then((opened) => {
+              if (!opened) awaitingReturn.current = false;
+            });
+          }}
+          disabled={busy || web.busy}
+        />
       )}
       <Action
         label="Refresh credits"
@@ -111,6 +133,11 @@ export function PaymentGate({
       {!!error && (
         <Text accessibilityRole="alert" className="text-destructive">
           {error}
+        </Text>
+      )}
+      {!!web.error && (
+        <Text accessibilityRole="alert" className="text-muted-foreground">
+          {web.error}
         </Text>
       )}
     </View>

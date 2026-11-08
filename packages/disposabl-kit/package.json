@@ -47,6 +47,8 @@
     "./client/components/ui/*": "./client/components/ui/*.tsx",
     "./server/http": "./server/http.ts",
     "./server/billing-functions": "./server/billing-functions.ts",
+    "./server/billing-handoff": "./server/billing-handoff.ts",
+    "./server/browser-session": "./server/browser-session.ts",
     "./server/billing": "./server/billing.ts",
     "./server/google": "./server/google.ts",
     "./server/lib/telemetry": "./server/lib/telemetry.ts",

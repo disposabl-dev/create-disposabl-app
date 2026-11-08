@@ -1,7 +1,11 @@
-import type { Auth } from "convex/server";
+import { makeFunctionReference, type Auth } from "convex/server";
 import { getSessionUserId, internalAction } from "./lib/functions";
 import { v } from "convex/values";
-import { action } from "../../backend/convex/_generated/server";
+import {
+  action,
+  internalMutation,
+  internalQuery,
+} from "../../backend/convex/_generated/server";
 import { paymentsEnabled } from "../features";
 import { setupBilling } from "./billing-setup";
 import {
@@ -10,6 +14,8 @@ import {
   billingContext,
   billingRequest,
   purchaseRequest,
+  mobileWebCheckoutConfigured,
+  checkoutUrl,
 } from "./billing";
 
 export const setup = internalAction({
@@ -28,6 +34,116 @@ async function context(ctx: { auth: Auth }) {
   );
 }
 
+const purchaseValidator = v.union(v.literal("monthly"), v.literal("topup"));
+const attemptArgs = {
+  userId: v.string(),
+  purchase: purchaseValidator,
+  requestId: v.string(),
+};
+const beginRef = makeFunctionReference<
+  "mutation",
+  { userId: string; purchase: "monthly" | "topup"; requestId: string },
+  string | null
+>("billing:beginAttempt");
+const finishRef = makeFunctionReference<
+  "mutation",
+  {
+    userId: string;
+    purchase: "monthly" | "topup";
+    requestId: string;
+    url: string;
+  },
+  null
+>("billing:finishAttempt");
+const pendingRef = makeFunctionReference<"query", { userId: string }, boolean>(
+  "billing:hasUnknownAttempt",
+);
+
+// Persist before the provider call. A crash or lost response requires operator
+// reconciliation; an automatic retry could charge the same customer twice.
+export const beginAttempt = internalMutation({
+  args: attemptArgs,
+  returns: v.union(v.string(), v.null()),
+  handler: async (ctx, args) => {
+    const same = await ctx.db
+      .query("billingAttempts")
+      .withIndex("by_userId_requestId", (q) =>
+        q.eq("userId", args.userId).eq("requestId", args.requestId),
+      )
+      .unique();
+    if (same) {
+      if (same.purchase !== args.purchase || !same.url)
+        throw new Error("A previous checkout needs review.");
+      return same.url;
+    }
+    const prior = await ctx.db
+      .query("billingAttempts")
+      .withIndex("by_userId_purchase_url", (q) =>
+        q
+          .eq("userId", args.userId)
+          .eq("purchase", args.purchase)
+          .eq("url", undefined),
+      )
+      .first();
+    if (prior) throw new Error("A previous checkout needs review.");
+    await ctx.db.insert("billingAttempts", args);
+    return null;
+  },
+});
+export const finishAttempt = internalMutation({
+  args: { ...attemptArgs, url: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const prior = await ctx.db
+      .query("billingAttempts")
+      .withIndex("by_userId_requestId", (q) =>
+        q.eq("userId", args.userId).eq("requestId", args.requestId),
+      )
+      .unique();
+    if (!prior || prior.purchase !== args.purchase || prior.url)
+      throw new Error("Invalid checkout attempt.");
+    await ctx.db.patch("billingAttempts", prior._id, { url: args.url });
+    return null;
+  },
+});
+// An operator may clear only an uncertain attempt after checking the provider.
+export const resolveAttempt = internalMutation({
+  args: { userId: v.string(), requestId: v.string() },
+  returns: v.null(),
+  handler: async (ctx, { userId, requestId }) => {
+    const row = await ctx.db
+      .query("billingAttempts")
+      .withIndex("by_userId_requestId", (q) =>
+        q.eq("userId", userId).eq("requestId", requestId),
+      )
+      .unique();
+    if (!row || row.url) throw new Error("Unknown attempt not found.");
+    await ctx.db.delete("billingAttempts", row._id);
+    return null;
+  },
+});
+export const hasUnknownAttempt = internalQuery({
+  args: { userId: v.string() },
+  returns: v.boolean(),
+  handler: async (ctx, { userId }) => {
+    for (const purchase of ["monthly", "topup"]) {
+      if (
+        await ctx.db
+          .query("billingAttempts")
+          .withIndex("by_userId_purchase_url", (q) =>
+            q
+              .eq("userId", userId)
+              .eq("purchase", purchase)
+              .eq("url", undefined),
+          )
+          .first()
+      )
+        return true;
+    }
+    return false;
+  },
+});
+
 export const snapshot = action({
   args: {},
   returns: v.object({
@@ -35,6 +151,8 @@ export const snapshot = action({
     hasMonthlyPlan: v.union(v.boolean(), v.null()),
     nativeSubscriptionsEnabled: v.boolean(),
     mobileWebCheckoutEnabled: v.boolean(),
+    checkoutNeedsReview: v.boolean(),
+    customerId: v.string(),
   }),
   handler: async (ctx) => {
     const { key, userId } = await context(ctx);
@@ -47,9 +165,12 @@ export const snapshot = action({
         hasMonthlyPlan: monthlyPlanFromCustomer(customer),
         nativeSubscriptionsEnabled:
           process.env.REVENUECAT_SYNC_ENABLED === "true",
-        // Attach may charge a saved card before returning a URL. Keep this
-        // closed until a confirm-first checkout is verified end to end.
-        mobileWebCheckoutEnabled: false,
+        mobileWebCheckoutEnabled: mobileWebCheckoutConfigured(
+          paymentsEnabled,
+          process.env,
+        ),
+        checkoutNeedsReview: await ctx.runQuery(pendingRef, { userId }),
+        customerId: userId,
       };
     } catch {
       throw new Error("Billing is temporarily unavailable.");
@@ -58,9 +179,11 @@ export const snapshot = action({
 });
 
 export const checkout = action({
-  args: { purchase: v.union(v.literal("monthly"), v.literal("topup")) },
+  args: { purchase: purchaseValidator, requestId: v.string() },
   returns: v.object({ url: v.union(v.string(), v.null()) }),
-  handler: async (ctx, { purchase }) => {
+  handler: async (ctx, { purchase, requestId }) => {
+    if (!/^[0-9a-f-]{36}$/.test(requestId))
+      throw new Error("Invalid checkout request.");
     const { key, userId, returnUrl } = await context(ctx);
     if (purchase === "monthly") {
       const customer = await billingRequest(key, "customers.get_or_create", {
@@ -74,17 +197,26 @@ export const checkout = action({
             : "Could not check your current plan. Please refresh and try again.",
         );
     }
+    const existing = await ctx.runMutation(beginRef, {
+      userId,
+      purchase,
+      requestId,
+    });
+    if (existing) return { url: existing };
     try {
       const result = await billingRequest(
         key,
         "billing.attach",
         purchaseRequest(userId, purchase, returnUrl),
       );
-      return {
-        url: typeof result.payment_url === "string" ? result.payment_url : null,
-      };
+      const url = checkoutUrl(result);
+      if (!url) throw new Error("Checkout response is unknown.");
+      await ctx.runMutation(finishRef, { userId, purchase, requestId, url });
+      return { url };
     } catch {
-      throw new Error("Unable to start checkout. Please try again.");
+      throw new Error(
+        "Checkout status is unknown. Contact support before retrying.",
+      );
     }
   },
 });

@@ -7,6 +7,8 @@ import {
   billingRequest,
   purchaseRequest,
   monthlyPlanFromCustomer,
+  mobileWebCheckoutConfigured,
+  checkoutUrl,
 } from "../disposabl-kit/server/billing";
 import {
   pricing,
@@ -17,6 +19,41 @@ import {
 import { resolveFeatures } from "../disposabl-kit/feature-options";
 
 describe("billing boundary", () => {
+  test("unusable checkout responses are treated as unknown", () => {
+    assert.equal(
+      checkoutUrl({ payment_url: "https://checkout.example/pay" }),
+      "https://checkout.example/pay",
+    );
+    for (const result of [
+      {},
+      { payment_url: null },
+      { payment_url: "http://example.com" },
+      { payment_url: "https://user:pass@example.com" },
+      { payment_url: "invalid" },
+    ])
+      assert.equal(checkoutUrl(result), null);
+  });
+  test("mobile checkout capability requires a configured secure pricing origin and native sync", () => {
+    const env = {
+      AUTUMN_SECRET_KEY: "key",
+      BILLING_RETURN_URL: "https://example.com/pricing",
+      MOBILE_WEB_CHECKOUT_ENABLED: "true",
+      REVENUECAT_SYNC_ENABLED: "true",
+    };
+    assert.equal(mobileWebCheckoutConfigured(true, env), true);
+    assert.equal(mobileWebCheckoutConfigured(false, env), false);
+    for (const changes of [
+      { MOBILE_WEB_CHECKOUT_ENABLED: "false" },
+      { REVENUECAT_SYNC_ENABLED: "false" },
+      { BILLING_RETURN_URL: "http://localhost/pricing" },
+      { BILLING_RETURN_URL: "https://example.com/other" },
+      { AUTUMN_SECRET_KEY: "" },
+    ])
+      assert.equal(
+        mobileWebCheckoutConfigured(true, { ...env, ...changes }),
+        false,
+      );
+  });
   test("editable starter prices drive server quantities and displayed allowances", () => {
     const example: Pricing = {
       currency: "USD",

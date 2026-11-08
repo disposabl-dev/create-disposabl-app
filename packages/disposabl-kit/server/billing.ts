@@ -31,6 +31,25 @@ export function billingConfig(
   return { key, returnUrl: url.toString() };
 }
 
+export function mobileWebCheckoutConfigured(
+  enabled: boolean,
+  env: Record<string, string | undefined>,
+) {
+  if (
+    !enabled ||
+    env.MOBILE_WEB_CHECKOUT_ENABLED !== "true" ||
+    env.REVENUECAT_SYNC_ENABLED !== "true"
+  )
+    return false;
+  try {
+    const config = billingConfig(true, env)!;
+    const url = new URL(config.returnUrl);
+    return url.protocol === "https:" && url.pathname === "/pricing";
+  } catch {
+    return false;
+  }
+}
+
 export async function billingRequest(
   key: string,
   method: string,
@@ -53,6 +72,18 @@ export async function billingRequest(
   if (!result || typeof result !== "object" || Array.isArray(result))
     throw new Error("Billing is temporarily unavailable.");
   return result as Record<string, unknown>;
+}
+
+export function checkoutUrl(result: Record<string, unknown>): string | null {
+  if (typeof result.payment_url !== "string") return null;
+  try {
+    const url = new URL(result.payment_url);
+    return url.protocol === "https:" && !url.username && !url.password
+      ? url.href
+      : null;
+  } catch {
+    return null;
+  }
 }
 
 export function purchaseRequest(

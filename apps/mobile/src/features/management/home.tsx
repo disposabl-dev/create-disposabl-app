@@ -102,10 +102,14 @@ function Composer() {
     const sequence = ++billingSequence.current;
     try {
       const data = await snapshot({});
-      if (isActive() && sequence === billingSequence.current) setBilling(data);
+      if (isActive() && sequence === billingSequence.current) {
+        setBilling(data);
+        return data.balance;
+      }
     } catch {
       if (isActive() && sequence === billingSequence.current) setBilling(null);
     }
+    return null;
   }
   async function submit(text: string) {
     const fileIds = attachmentIds(attachments);

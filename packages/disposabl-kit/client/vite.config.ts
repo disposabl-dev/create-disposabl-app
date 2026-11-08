@@ -28,6 +28,7 @@ export const createRoutes = (enabled: boolean, includePricing = true) =>
       ...(enabled
         ? [
             route("/login", kitRoute("_auth-pages/login.tsx")),
+            route("/billing-login", kitRoute("billing-login.tsx")),
             route("/signup", kitRoute("_auth-pages/signUp.tsx")),
             route("/consent", kitRoute("consent.tsx")),
             route(

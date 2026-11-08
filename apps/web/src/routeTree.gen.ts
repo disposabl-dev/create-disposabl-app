@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './router/__root'
 import { Route as DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRouteImport } from './../../../packages/disposabl-kit/client/routes/route'
 import { Route as IndexRouteImport } from './router/index'
 import { Route as DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthenticatedRouteRouteImport } from './../../../packages/disposabl-kit/client/routes/_authenticated/route'
+import { Route as DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesBillingLoginRouteImport } from './../../../packages/disposabl-kit/client/routes/billing-login'
 import { Route as BuildRouteImport } from './router/build'
 import { Route as DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesConsentRouteImport } from './../../../packages/disposabl-kit/client/routes/consent'
 import { Route as DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesForgotPasswordRouteImport } from './../../../packages/disposabl-kit/client/routes/_auth-pages/forgot-password'
@@ -50,6 +51,15 @@ const DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthenticatedRoute
   DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthenticatedRouteRouteImport.update(
     {
       id: '/_authenticated',
+      getParentRoute: () =>
+        DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRoute,
+    } as any,
+  )
+const DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesBillingLoginRoute =
+  DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesBillingLoginRouteImport.update(
+    {
+      id: '/billing-login',
+      path: '/billing-login',
       getParentRoute: () =>
         DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRoute,
     } as any,
@@ -213,6 +223,7 @@ const AuthenticatedDashboardDotconnectionsRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/billing-login': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesBillingLoginRoute
   '/build': typeof BuildRoute
   '/consent': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesConsentRoute
   '/forgot-password': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesForgotPasswordRoute
@@ -236,6 +247,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/billing-login': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesBillingLoginRoute
   '/build': typeof BuildRoute
   '/consent': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesConsentRoute
   '/forgot-password': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesForgotPasswordRoute
@@ -261,6 +273,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_providers': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRouteWithChildren
   '/_providers/_authenticated': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthenticatedRouteRouteWithChildren
+  '/_providers/billing-login': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesBillingLoginRoute
   '/_providers/build': typeof BuildRoute
   '/_providers/consent': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesConsentRoute
   '/_providers/forgot-password': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesForgotPasswordRoute
@@ -287,6 +300,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/billing-login'
     | '/build'
     | '/consent'
     | '/forgot-password'
@@ -310,6 +324,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/billing-login'
     | '/build'
     | '/consent'
     | '/forgot-password'
@@ -334,6 +349,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/_providers'
     | '/_providers/_authenticated'
+    | '/_providers/billing-login'
     | '/_providers/build'
     | '/_providers/consent'
     | '/_providers/forgot-password'
@@ -382,6 +398,13 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthenticatedRouteRouteImport
+      parentRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRoute
+    }
+    '/_providers/billing-login': {
+      id: '/_providers/billing-login'
+      path: '/billing-login'
+      fullPath: '/billing-login'
+      preLoaderRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesBillingLoginRouteImport
       parentRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRoute
     }
     '/_providers/build': {
@@ -564,6 +587,7 @@ const DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthenticatedRoute
 
 interface DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRouteChildren {
   DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthenticatedRouteRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthenticatedRouteRouteWithChildren
+  DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesBillingLoginRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesBillingLoginRoute
   BuildRoute: typeof BuildRoute
   DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesConsentRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesConsentRoute
   DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesForgotPasswordRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesForgotPasswordRoute
@@ -587,6 +611,8 @@ const DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRouteChildren
   {
     DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthenticatedRouteRoute:
       DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthenticatedRouteRouteWithChildren,
+    DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesBillingLoginRoute:
+      DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesBillingLoginRoute,
     BuildRoute: BuildRoute,
     DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesConsentRoute:
       DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesConsentRoute,
@@ -629,12 +655,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}
