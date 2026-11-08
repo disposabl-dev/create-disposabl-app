@@ -76,3 +76,41 @@ test("pricing requires the redeemed selection and matching account for iOS", asy
     null,
   );
 });
+
+test("expired iOS selection stays restricted on a query-free pricing return", async () => {
+  const { handoffContext, handoffAllows } =
+    await import("../disposabl-kit/payments/checkout-attempt");
+  const stored = JSON.stringify({
+    userId: "alice",
+    purchase: "topup",
+    expiresAt: Date.now() - 1,
+  });
+  for (const value of [stored, "broken json", "1", "", "null"]) {
+    const returned = handoffContext(value, "");
+    assert.equal(returned.fromIos, true);
+    assert.equal(returned.handoff, null);
+    for (const purchase of ["monthly", "topup"] as const)
+      assert.equal(
+        handoffAllows(returned.fromIos, returned.handoff, "alice", purchase),
+        false,
+      );
+  }
+  const renewed = handoffContext(
+    JSON.stringify({
+      userId: "alice",
+      purchase: "topup",
+      expiresAt: Date.now() + 120000,
+    }),
+    "",
+  );
+  assert.equal(
+    handoffAllows(renewed.fromIos, renewed.handoff, "alice", "topup"),
+    true,
+  );
+  assert.equal(
+    handoffAllows(renewed.fromIos, renewed.handoff, "alice", "monthly"),
+    false,
+  );
+  assert.equal(handoffContext(null, "").fromIos, false);
+  assert.equal(handoffContext(null, "?source=ios").fromIos, true);
+});

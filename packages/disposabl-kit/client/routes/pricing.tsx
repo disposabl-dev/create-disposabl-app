@@ -13,7 +13,7 @@ import { sessionId } from "../../lib/auth-session";
 import { paymentsEnabled } from "../../features";
 import {
   requestCheckout,
-  handoffSelection,
+  handoffContext,
   handoffAllows,
   type CheckoutResult,
 } from "../../payments/checkout-attempt";
@@ -92,16 +92,13 @@ function SubscriptionHelp() {
   );
 }
 function PurchasePage({ session }: { session: string | null }) {
-  const [handoff] = useState(() =>
+  const [{ handoff, fromIos }] = useState(() =>
     typeof window === "undefined"
-      ? null
-      : handoffSelection(window.sessionStorage.getItem("billing-from-ios")),
-  );
-  const [fromIos] = useState(
-    () =>
-      typeof window !== "undefined" &&
-      (new URLSearchParams(window.location.search).get("source") === "ios" ||
-        !!handoff),
+      ? handoffContext(null, "")
+      : handoffContext(
+          window.sessionStorage.getItem("billing-from-ios"),
+          window.location.search,
+        ),
   );
   const { isLoading } = useConvexAuth();
   const getSnapshot = useAction(snapshot);

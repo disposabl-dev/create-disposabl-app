@@ -53,3 +53,12 @@ export function handoffAllows(
       selection.purchase === purchase)
   );
 }
+
+/** Preserve native origin even when its selected purchase has expired or is malformed. */
+export function handoffContext(stored: string | null, search: string) {
+  return {
+    handoff: handoffSelection(stored),
+    fromIos:
+      stored !== null || new URLSearchParams(search).get("source") === "ios",
+  };
+}
