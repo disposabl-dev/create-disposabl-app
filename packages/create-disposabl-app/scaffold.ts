@@ -159,6 +159,10 @@ export const Route = createFileRoute("/_providers/_authenticated/dashboard")({
       const folder = join(destination, "packages", kind);
       if (!folders.includes(`packages/${kind}`)) {
         await rm(folder, { recursive: true, force: true });
+        if (kind === "sdk")
+          await rm(join(destination, "packages/tests/sdk-analytics.test.ts"), {
+            force: true,
+          });
         continue;
       }
       const packagePath = join(folder, "package.json");

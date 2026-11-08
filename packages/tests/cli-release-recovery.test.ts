@@ -1,15 +1,24 @@
-import { test, expect } from "bun:test";
+import { test } from "node:test";
+// @ts-expect-error bun:test is not included in this workspace's Node type set.
+import { expect } from "bun:test";
 import { execFileSync, spawnSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { createRequire } from "node:module";
 
-const yaml = createRequire(import.meta.url)("js-yaml");
-const workflow = yaml.load(
-  readFileSync(
-    resolve(import.meta.dir, "../../../.github/workflows/publish.yml"),
-    "utf8",
+const workflow = JSON.parse(
+  execFileSync(
+    process.execPath,
+    [
+      "-e",
+      "console.log(JSON.stringify(Bun.YAML.parse(await Bun.stdin.text())))",
+    ],
+    {
+      input: readFileSync(
+        resolve(import.meta.dirname, "../../.github/workflows/publish.yml"),
+      ),
+      encoding: "utf8",
+    },
   ),
 );
 const steps = workflow.jobs.cli.steps;
@@ -57,7 +66,7 @@ function fixture() {
     `[[ "\${CURL_FAIL:-}" != 1 ]] || exit 7; printf '{"name":"@disposabl/cli","version":"%s","dist":{"integrity":"%s"}}' "\${REGISTRY_VERSION:-$VERSION}" "\${INTEGRITY:-sha512-test}" > "$3"; printf '%s' "\${STATUS:-404}"`,
   );
   script("bun", "exit 0");
-  const run = (name: string, env: Record<string, string> = {}) =>
+  const run = (name: string, env: Record<string, string | undefined> = {}) =>
     spawnSync("bash", ["-c", step(name)], {
       cwd: dir,
       encoding: "utf8",

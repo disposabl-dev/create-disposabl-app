@@ -355,7 +355,7 @@ test(
           ? Response.json({
               client_id: "fixture-client",
               token_endpoint_auth_method: "none",
-            redirect_uris: JSON.parse(String(init?.body)).redirect_uris,
+              redirect_uris: JSON.parse(String(init?.body)).redirect_uris,
             })
           : Response.json(
               { error: "invalid_client_metadata" },

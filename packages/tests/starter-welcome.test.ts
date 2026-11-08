@@ -71,6 +71,15 @@ test("reset welcome reflects selected platforms and hides disabled docs", async 
         existsSync(join(app, "packages/tests/app-telemetry.test.ts")),
         false,
       );
+      for (const name of [
+        "sdk-analytics",
+        "cli-telemetry",
+        "cli-release-recovery",
+      ])
+        assert.equal(
+          existsSync(join(app, `packages/tests/${name}.test.ts`)),
+          false,
+        );
       await symlink(
         resolve(import.meta.dirname, "../../node_modules"),
         join(app, "node_modules"),
