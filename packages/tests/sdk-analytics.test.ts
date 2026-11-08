@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createSdkAnalytics } from "../src/analytics";
+import { createSdkAnalytics } from "../sdk/src/analytics";
 
 test("SDK analytics is opt-in, production-only and disabled in E2E", async () => {
   const events: unknown[] = [];

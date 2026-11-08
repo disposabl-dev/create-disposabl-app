@@ -37,6 +37,7 @@ type View = {
 export function createPageTelemetry(
   storage: Storage,
   transport: typeof fetch = fetch,
+  exclusive: (work: () => Promise<void>) => Promise<void> = (work) => work(),
 ) {
   let state: State | undefined;
   let observed: string | null | undefined;
@@ -66,8 +67,9 @@ export function createPageTelemetry(
   async function save() {
     try {
       await storage.setItem(storageKey, JSON.stringify(state));
+      return true;
     } catch {
-      /* Best effort. */
+      return false;
     }
   }
 
@@ -75,57 +77,64 @@ export function createPageTelemetry(
     if (running) return;
     running = true;
     try {
-      await load();
       while (pending) {
         const view = pending;
         pending = undefined;
-        if (
-          (state!.session !== null && state!.session !== view.session) ||
-          appliedGeneration !== view.generation
-        ) {
-          state!.anonymousId = null;
-        }
-        appliedGeneration = view.generation;
-        state!.session = view.session;
-        // Persist the rotation before sending; a crash must not reuse an old identity.
-        await save();
-        if (view.generation !== generation) continue;
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 6500);
-        try {
-          const response = await transport(`${view.origin}/telemetry/page`, {
-            method: "POST",
-            signal: controller.signal,
-            headers: {
-              "Content-Type": "text/plain",
-              ...(view.token ? { Authorization: `Bearer ${view.token}` } : {}),
-            },
-            body: JSON.stringify({
-              platform: view.platform,
-              page: view.page,
-              ...(state!.anonymousId && { anonymousId: state!.anonymousId }),
-            }),
-          });
-          if (response.ok && view.generation === generation) {
-            const data: unknown = await response.json();
-            if (
-              data &&
-              typeof data === "object" &&
-              "anonymousId" in data &&
-              typeof data.anonymousId === "string" &&
-              view.generation === generation &&
-              uuid.test(data.anonymousId)
-            ) {
-              state!.anonymousId = data.anonymousId;
-              await save();
-            }
+        await exclusive(async () => {
+          // Reload under the shared lock: another tab may have changed identity.
+          state = undefined;
+          await load();
+          if (
+            (state!.session !== null && state!.session !== view.session) ||
+            appliedGeneration !== view.generation
+          ) {
+            state!.anonymousId = null;
           }
-        } catch {
-          /* Never interrupt the app or retry indefinitely. */
-        } finally {
-          clearTimeout(timer);
-        }
+          appliedGeneration = view.generation;
+          state!.session = view.session;
+          // Persist the rotation before sending; a crash must not reuse an old identity.
+          if (!(await save()) || view.generation !== generation) return;
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 6500);
+          try {
+            const response = await transport(`${view.origin}/telemetry/page`, {
+              method: "POST",
+              signal: controller.signal,
+              headers: {
+                "Content-Type": "text/plain",
+                ...(view.token
+                  ? { Authorization: `Bearer ${view.token}` }
+                  : {}),
+              },
+              body: JSON.stringify({
+                platform: view.platform,
+                page: view.page,
+                ...(state!.anonymousId && { anonymousId: state!.anonymousId }),
+              }),
+            });
+            if (response.ok && view.generation === generation) {
+              const data: unknown = await response.json();
+              if (
+                data &&
+                typeof data === "object" &&
+                "anonymousId" in data &&
+                typeof data.anonymousId === "string" &&
+                view.generation === generation &&
+                uuid.test(data.anonymousId)
+              ) {
+                state!.anonymousId = data.anonymousId;
+                await save();
+              }
+            }
+          } catch {
+            /* Never interrupt the app or retry indefinitely. */
+          } finally {
+            clearTimeout(timer);
+          }
+        });
       }
+    } catch {
+      // Lock and storage failures must not affect the app.
     } finally {
       running = false;
     }
