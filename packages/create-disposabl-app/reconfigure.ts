@@ -98,10 +98,17 @@ export async function reconfigureApp(
         ? oldFeatures
         : selectFeatures(options.features),
   };
+  // Deselected mobile files remain on disk and still need feature migrations.
+  const comparisonPlatforms =
+    JSON.stringify(oldFeatures) !== JSON.stringify(config.features) &&
+    !oldPlatforms.some((platform) => ["android", "ios"].includes(platform)) &&
+    (await safeRead(directory, join("apps", "mobile", "package.json")))
+      ? selectPlatforms([...oldPlatforms, "android"].join(","))
+      : oldPlatforms;
   const combined = {
     ...config,
     platforms: selectPlatforms(
-      [...oldPlatforms, ...config.platforms].join(","),
+      [...comparisonPlatforms, ...config.platforms].join(","),
     ),
     features: selectFeatures(
       [...oldFeatures, ...config.features].join(",") || "none",
@@ -119,13 +126,13 @@ export async function reconfigureApp(
     const before = join(temp, "before");
     const after = join(temp, "after");
     const expandedBefore =
-      combined.platforms.length === oldPlatforms.length
+      combined.platforms.length === comparisonPlatforms.length
         ? before
         : join(temp, "expanded-before");
     await createApp(template, before, name, {
       ...existing,
       desktopId: config.desktopId,
-      platforms: oldPlatforms,
+      platforms: comparisonPlatforms,
       features: oldFeatures,
     });
     const disableAuth =

@@ -380,6 +380,56 @@ test(
   },
 );
 
+test(
+  "feature changes migrate retained mobile files before mobile is re-enabled",
+  { timeout: 30000 },
+  async () => {
+    const temp = await mkdtemp(join(tmpdir(), "reconfigure-retained-auth-"));
+    const app = join(temp, "app");
+    try {
+      await createApp(template, app, "my-app", {
+        version,
+        platforms: ["web", "android"],
+        features: ["authentication"],
+      });
+      await reconfigureApp(template, app, version, { platforms: "web" });
+      const path = "apps/mobile/src/app/(auth)/login.tsx";
+      const original = await read(app, path);
+      const home = await read(app, "apps/mobile/src/app/index.tsx");
+      const config = await read(app, "disposabl.json");
+      await writeFile(join(app, path), "custom retained login\n");
+      await assert.rejects(
+        reconfigureApp(template, app, version, { features: "none" }),
+        /customized/,
+      );
+      assert.equal(await read(app, path), "custom retained login\n");
+      assert.equal(await read(app, "disposabl.json"), config);
+      assert.equal(await read(app, "apps/mobile/src/app/index.tsx"), home);
+      await writeFile(join(app, path), original);
+      await reconfigureApp(template, app, version, { features: "none" });
+      assert.equal(existsSync(join(app, path)), false);
+      assert.match(
+        await read(app, "apps/mobile/src/app/index.tsx"),
+        /PublicHomeScreen/,
+      );
+      assert.deepEqual(
+        JSON.parse(await read(app, "disposabl.json")).platforms,
+        ["web"],
+      );
+      await reconfigureApp(template, app, version, {
+        platforms: "web,android",
+      });
+      assert.equal(existsSync(join(app, path)), false);
+      assert.match(
+        await read(app, "apps/mobile/src/app/index.tsx"),
+        /PublicHomeScreen/,
+      );
+    } finally {
+      await rm(temp, { recursive: true, force: true });
+    }
+  },
+);
+
 test("restores docs integration", { timeout: 30000 }, async () => {
   const temp = await mkdtemp(join(tmpdir(), "reconfigure-docs-"));
   const app = join(temp, "app");
