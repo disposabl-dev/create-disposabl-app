@@ -25,6 +25,7 @@ if (
 // Product-only proof harnesses must not enter generated apps. Keep the same
 // paths in the symlink validation and removal inventories.
 const productProofTests = [
+  "packages/tests/generator-packaging-proof.test.ts",
   "packages/tests/compute-provider-http.test.ts",
   "packages/tests/billing-web.config.ts",
   "packages/tests/fixtures/billing-web",

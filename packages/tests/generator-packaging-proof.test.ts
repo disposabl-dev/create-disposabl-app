@@ -4,10 +4,14 @@ import { existsSync } from "node:fs";
 import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { createApp } from "../scaffold";
-import { selectFeatures, selectPlatforms } from "../options";
+import { createApp } from "../create-disposabl-app/scaffold";
+import {
+  selectFeatures,
+  selectPlatforms,
+} from "../create-disposabl-app/options";
 
 const excluded = [
+  "packages/tests/generator-packaging-proof.test.ts",
   "packages/tests/compute-provider-http.test.ts",
   "packages/tests/billing-web.config.ts",
   "packages/tests/fixtures/billing-web",
@@ -19,7 +23,10 @@ const excluded = [
   "packages/tests/low-credit-email-integration.test.ts",
   "packages/tests/fixtures/low-credit-convex",
 ];
-const template = resolve(import.meta.dir, "../dist/templates/default");
+const template = resolve(
+  import.meta.dirname,
+  "../create-disposabl-app/dist/templates/default",
+);
 
 test("packaged starter and both generated profiles exclude product proof fixtures", async () => {
   const temp = await mkdtemp(join(tmpdir(), "disposabl-packaging-proof-"));
