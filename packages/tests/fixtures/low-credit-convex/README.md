@@ -1,0 +1,7 @@
+# Low-credit transaction fixture
+
+This disposable loopback-only project invokes the product's real settlement and notice mutation handlers and the low-credit message helper. The scheduled notice action is inert. Its transactional email table is a test double, not Resend: it never sends email or contacts a provider. The fixture passes a synthetic verified profile and a synthetic balance to the notice mutation. Product payments remain off. It cannot prove the Autumn read, the actual Resend component, delivery, or production environment configuration.
+
+Start a cached `convex-local-backend` with a fresh database and storage in this directory, interface `127.0.0.1`, cloud port `3480`, site port `3481`, `--disable-beacon`, and no `SENTRY_DSN`. Use a disposable instance name and instance secret, then derive its local admin key with the binary's `keygen admin-key` command. These are fixture credentials only. Do not connect this fixture to a shared or remote deployment.
+
+With that backend running, in this directory run `CI=1 E2E_TELEMETRY_DISABLED=1 CONVEX_SELF_HOSTED_URL=http://127.0.0.1:3480 CONVEX_SELF_HOSTED_ADMIN_KEY=<local-key> bunx convex dev --once --typecheck disable --codegen disable`. Then from the repository root run `LOW_CREDIT_FIXTURE_URL=http://127.0.0.1:3480 E2E_TELEMETRY_DISABLED=1 bun test packages/tests/low-credit-email-integration.test.ts`. The test refuses other ports or hosts and skips when the URL is absent. Stop only the backend process you started.
