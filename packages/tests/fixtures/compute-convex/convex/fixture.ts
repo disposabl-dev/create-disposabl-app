@@ -56,6 +56,21 @@ export const claim = mutation({
   },
   handler: (ctx, a) => claimWindow(ctx as any, a, true),
 });
+// Models a renewal already dispatched by the previous implementation.
+export const inFlightRenewal = mutation({
+  args: { sessionId: v.id("computeSessions") },
+  handler: async (ctx, { sessionId }) => {
+    const session = await ctx.db.get(sessionId);
+    if (!session || session.state !== "active") throw new Error("Not active");
+    const debitId = await ctx.db.insert("computeDebits", {
+      sessionId,
+      state: "dispatching",
+      paidUntil: Date.now() + 600_000,
+    });
+    await ctx.db.patch(sessionId, { debitId });
+    return ctx.db.get(debitId);
+  },
+});
 export const boundary = mutation({
   args: {
     sessionId: v.id("computeSessions"),
@@ -66,6 +81,7 @@ export const boundary = mutation({
 export const settleDebit = mutation({
   args: {
     debitId: v.id("computeDebits"),
+    responseBalance: v.optional(v.number()),
     outcome: v.union(
       v.literal("confirmed"),
       v.literal("denied"),
@@ -92,7 +108,12 @@ export const stoppedResult = mutation({
 });
 export const expire = mutation({
   args: { sessionId: v.id("computeSessions") },
-  handler: (ctx, a) => ctx.db.patch(a.sessionId, { paidUntil: 0 }),
+  handler: (ctx, a) => ctx.db.patch(a.sessionId, { paidUntil: Date.now() - 1 }),
+});
+export const beginStop = mutation({
+  args: { sessionId: v.id("computeSessions") },
+  handler: (ctx, { sessionId }) =>
+    ctx.db.patch(sessionId, { state: "stopping" }),
 });
 export const get = query({
   args: { sessionId: v.id("computeSessions") },

@@ -92,7 +92,15 @@ export async function claimWindow(
   const session = await ctx.db.get("computeSessions", sessionId);
   if (!session || !["starting", "active"].includes(session.state)) return null;
   if (session.debitId !== expectedDebit) return null;
-  if (session.state === "active" && session.paidUntil > Date.now()) return null;
+  if (session.state === "active") {
+    if (session.paidUntil > Date.now()) return null;
+    // A debit dispatched after expiry cannot prove the balance existed at the deadline.
+    await ctx.db.patch("computeSessions", sessionId, { state: "stopping" });
+    await ctx.scheduler.runAfter(0, internal.agent.actions.compute.stop, {
+      sessionId,
+    });
+    return null;
+  }
   if (expectedDebit) {
     const previous = await ctx.db.get("computeDebits", expectedDebit);
     if (previous?.state !== "confirmed") return null;
@@ -152,6 +160,7 @@ export const settle = internalMutation({
     if (
       outcome === "confirmed" &&
       ["starting", "active"].includes(session.state) &&
+      (session.state === "starting" || session.paidUntil > Date.now()) &&
       debit.paidUntil > Date.now()
     ) {
       await ctx.db.patch("computeSessions", session._id, {
@@ -169,7 +178,12 @@ export const settle = internalMutation({
       });
     } else {
       await ctx.db.patch("computeSessions", session._id, {
-        state: outcome === "unknown" ? "hold" : "stopping",
+        state:
+          outcome !== "denied"
+            ? "hold"
+            : session.stopConfirmed
+              ? "stopped"
+              : "stopping",
       });
       await ctx.scheduler.runAfter(0, internal.agent.actions.compute.stop, {
         sessionId: session._id,
@@ -270,8 +284,14 @@ export const stopped = internalMutation({
       if (apps.length === 100 || apps.some((app) => app.agent?.lease))
         return null;
     }
+    const debit = session.debitId
+      ? await ctx.db.get("computeDebits", session.debitId)
+      : null;
     await ctx.db.patch("computeSessions", sessionId, {
-      state: session.state === "hold" ? "hold" : "stopped",
+      state:
+        session.state === "hold" || debit?.state === "dispatching"
+          ? "hold"
+          : "stopped",
       stopConfirmed: true,
     });
     return null;

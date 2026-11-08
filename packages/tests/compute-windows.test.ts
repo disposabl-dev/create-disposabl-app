@@ -129,12 +129,6 @@ test("two apps share a session; duplicate dispatch and renewal claims cannot cha
     false,
   );
   f.rows.get(f.sessionId).paidUntil = 0;
-  const second = await claimWindow(
-    f.ctx,
-    { sessionId: f.sessionId, expectedDebit: f.debit._id },
-    true,
-  );
-  assert.ok(second);
   assert.equal(
     await claimWindow(
       f.ctx,
@@ -143,9 +137,10 @@ test("two apps share a session; duplicate dispatch and renewal claims cannot cha
     ),
     null,
   );
+  assert.equal(f.rows.get(f.sessionId).state, "stopping");
   assert.equal(
     [...f.rows.values()].filter((r) => r.table === "computeDebits").length,
-    2,
+    1,
   );
 });
 
@@ -262,138 +257,33 @@ test("boundary recovery is armed before renewal; notices cannot replay after com
   assert.equal(empty.rows.size, 0);
 });
 
-test("loopback balance at renewal and late payment require a fresh message after denial", async () => {
-  const { createServer } = await import("node:http");
-  const { debitCompute } = await import("../backend/convex/agent/computeDebit");
-  const { billingRequest } = await import("../disposabl-kit/server/billing");
-  let balance = 10;
-  const server = createServer(async (req, res) => {
-    let raw = "";
-    for await (const chunk of req) raw += chunk;
-    const body = JSON.parse(raw);
-    const allowed = balance >= 10;
-    if (allowed) balance -= 10;
-    res.setHeader("content-type", "application/json");
-    res.end(
-      JSON.stringify({
-        customer_id: body.customer_id,
-        required_balance: 10,
-        allowed,
-        balance: {
-          feature_id: "credits",
-          unlimited: false,
-          overage_allowed: false,
-          remaining: balance,
-        },
-      }),
-    );
+test("an in-flight confirmed renewal after expiry is held without granting a window", async () => {
+  const f = await running();
+  await (settle as any)._handler(f.ctx, {
+    debitId: f.debit._id,
+    outcome: "confirmed",
   });
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
-  const address = server.address();
-  if (!address || typeof address === "string")
-    throw new Error("No loopback listener");
-  const request: typeof billingRequest = (key, method, body) =>
-    billingRequest(key, method, body, (_url, init) =>
-      fetch(`http://127.0.0.1:${address.port}/${method}`, init),
-    );
-  try {
-    const f = await running();
-    assert.deepEqual(await debitCompute("owner", true, "test", request), {
-      outcome: "confirmed",
-      responseBalance: 0,
-    });
-    await (settle as any)._handler(f.ctx, {
-      debitId: f.debit._id,
-      outcome: "confirmed",
-    });
-    f.rows.get(f.sessionId).paidUntil = 0;
-    balance += 10; // Provider reports payment before this simulated boundary check.
-    const renewal = await claimWindow(
-      f.ctx,
-      { sessionId: f.sessionId, expectedDebit: f.debit._id },
-      true,
-    );
-    assert.ok(renewal);
-    assert.deepEqual(await debitCompute("owner", true, "test", request), {
-      outcome: "confirmed",
-      responseBalance: 0,
-    });
-    await (settle as any)._handler(f.ctx, {
-      debitId: renewal._id,
-      outcome: "confirmed",
-    });
-    assert.equal(f.rows.get(f.sessionId).state, "active");
-    f.rows.get(f.sessionId).paidUntil = 0;
-    const next = await claimWindow(
-      f.ctx,
-      { sessionId: f.sessionId, expectedDebit: renewal._id },
-      true,
-    );
-    assert.ok(next);
-    assert.deepEqual(await debitCompute("owner", true, "test", request), {
-      outcome: "denied",
-    });
-    await (settle as any)._handler(f.ctx, {
-      debitId: next._id,
-      outcome: "denied",
-    });
-    balance += 10; // Payment after a definitive failed renewal cannot restart this session.
-    assert.equal(
-      await claimWindow(
-        f.ctx,
-        { sessionId: f.sessionId, expectedDebit: next._id },
-        true,
-      ),
-      null,
-    );
-    await (settle as any)._handler(f.ctx, {
-      debitId: renewal._id,
-      outcome: "confirmed",
-    });
-    assert.equal(f.rows.get(f.sessionId).state, "stopping");
-    await (stopping as any)._handler(f.ctx, {
-      sessionId: f.sessionId,
-      token: "stop",
-    });
-    await (stopped as any)._handler(f.ctx, {
-      sessionId: f.sessionId,
-      token: "stop",
-      archived: true,
-    });
-    const fresh = await admitSession(f.ctx, "owner", true);
-    assert.ok(fresh);
-    assert.notEqual(fresh, f.sessionId);
-    assert.equal(f.rows.get(fresh).state, "starting");
-
-    // Characterize the unresolved race: a provider credit arriving after the
-    // deadline but before its check is processed can fund the old session.
-    const race = await running();
-    await (settle as any)._handler(race.ctx, {
-      debitId: race.debit._id,
-      outcome: "confirmed",
-    });
-    race.rows.get(race.sessionId).paidUntil = 0;
-    const lateRenewal = await claimWindow(
-      race.ctx,
-      { sessionId: race.sessionId, expectedDebit: race.debit._id },
-      true,
-    );
-    assert.ok(lateRenewal);
-    balance = 10;
-    const lateOutcome = await debitCompute("owner", true, "test", request);
-    assert.deepEqual(lateOutcome, { outcome: "confirmed", responseBalance: 0 });
-    assert.equal(lateOutcome.outcome, "confirmed");
-    if (lateOutcome.outcome !== "confirmed")
-      throw new Error("Expected confirmed debit");
-    await (settle as any)._handler(race.ctx, {
-      debitId: lateRenewal._id,
-      outcome: lateOutcome.outcome,
-      responseBalance: lateOutcome.responseBalance,
-    });
-    assert.equal(race.rows.get(race.sessionId).state, "active");
-  } finally {
-    await new Promise<void>((resolve, reject) =>
-      server.close((err) => (err ? reject(err) : resolve())),
-    );
-  }
+  const oldDeadline = f.rows.get(f.sessionId).paidUntil;
+  const debitId = await f.ctx.db.insert("computeDebits", {
+    sessionId: f.sessionId,
+    state: "dispatching",
+    paidUntil: Date.now() + 600_000,
+  });
+  f.rows.get(f.sessionId).debitId = debitId;
+  f.rows.get(f.sessionId).paidUntil = 0;
+  await (settle as any)._handler(f.ctx, {
+    debitId,
+    outcome: "confirmed",
+    responseBalance: 0,
+  });
+  assert.equal(f.rows.get(debitId).state, "confirmed");
+  assert.equal(f.rows.get(debitId).responseBalance, 0);
+  assert.equal(f.rows.get(f.sessionId).state, "hold");
+  assert.equal(f.rows.get(f.sessionId).paidUntil, 0);
+  assert.ok(oldDeadline > 0);
+  assert.equal(
+    await sessionAllows(f.ctx, f.sessionId, "owner", Date.now(), true),
+    false,
+  );
+  await assert.rejects(admitSession(f.ctx, "owner", true), /reconciliation/);
 });

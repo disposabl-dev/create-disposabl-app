@@ -59,10 +59,12 @@ export const resolve = internalMutation({
     if (
       latest?._id !== session._id ||
       session.state !== "hold" ||
-      debit.state !== "unknown" ||
+      !["unknown", "confirmed"].includes(debit.state) ||
       debit.resolution
     )
       return fail("Hold is stale or already resolved.");
+    if (debit.state === "confirmed" && args.outcome !== "confirmed")
+      return fail("A confirmed debit cannot be resolved as denied.");
     if (!session.stopConfirmed || session.stopLease)
       return fail("Normal stop and stop lease drainage are required.");
     for (const status of [

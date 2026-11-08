@@ -4,9 +4,17 @@ import { randomUUID } from "node:crypto";
 
 // Only run against the separate, disposable fixture deployment; never the app backend.
 const url = process.env.COMPUTE_FIXTURE_URL;
-if (url && !["http://127.0.0.1:3420", "http://localhost:3420"].includes(url))
+if (
+  url &&
+  ![
+    "http://127.0.0.1:3420",
+    "http://localhost:3420",
+    "http://127.0.0.1:3520",
+    "http://localhost:3520",
+  ].includes(url)
+)
   throw new Error(
-    "Compute fixture requires the isolated loopback deployment on port 3420",
+    "Compute fixture requires the isolated loopback deployment on port 3420 or 3520",
   );
 async function call(name: string, args: object, query = false) {
   const response = await fetch(`${url}/api/${query ? "query" : "mutation"}`, {
@@ -46,19 +54,9 @@ test(
       ),
       false,
     );
+    const secondDebit = await call("inFlightRenewal", { sessionId });
+    const second = [secondDebit];
     await call("expire", { sessionId });
-    await Promise.all(
-      Array.from({ length: 12 }, () =>
-        call("boundary", { sessionId, expectedDebit: first[0]._id }),
-      ),
-    );
-    const renewals = await Promise.all(
-      Array.from({ length: 12 }, () =>
-        call("claim", { sessionId, expectedDebit: first[0]._id }),
-      ),
-    );
-    const second = renewals.filter(Boolean);
-    assert.equal(second.length, 1);
     assert.equal((await call("debits", { sessionId }, true)).length, 2);
     await call("crash", { debitId: second[0]._id });
     const resolution = {
@@ -324,5 +322,149 @@ test(
       call("suspendWorker", { id: app.threadId, token: "old" }),
       /lease expired/,
     );
+  },
+);
+
+test(
+  "late confirmed renewal holds old work through stop and manual recovery",
+  { skip: !url },
+  async () => {
+    const userId = randomUUID();
+    const sessionId = await call("admit", { userId });
+    const app = await call("queuedApp", { userId, sessionId });
+    const first = await call("claim", { sessionId });
+    await call("settleDebit", { debitId: first._id, outcome: "confirmed" });
+    const late = await call("inFlightRenewal", { sessionId });
+    await call("expire", { sessionId });
+    const expiredDeadline = (await call("get", { sessionId }, true)).paidUntil;
+    const results = await Promise.allSettled([
+      ...Array.from({ length: 8 }, () =>
+        call("settleDebit", {
+          debitId: late._id,
+          outcome: "confirmed",
+          responseBalance: 2,
+        }),
+      ),
+      ...Array.from({ length: 8 }, () =>
+        call("enqueueSameApp", { id: app.threadId }),
+      ),
+    ]);
+    assert.ok(results.slice(8).every((result) => result.status === "rejected"));
+    const held = await call("get", { sessionId }, true);
+    assert.equal(held.state, "hold");
+    assert.equal(held.paidUntil, expiredDeadline);
+    assert.equal(
+      await call("allowed", { sessionId, userId, now: Date.now() }, true),
+      false,
+    );
+    const debits = await call("debits", { sessionId }, true);
+    assert.equal(
+      debits.find((d: any) => d._id === late._id).state,
+      "confirmed",
+    );
+    assert.equal(
+      debits.find((d: any) => d._id === late._id).paidUntil,
+      late.paidUntil,
+    );
+    assert.equal(
+      debits.find((d: any) => d._id === late._id).responseBalance,
+      2,
+    );
+    const resolution = {
+      sessionId,
+      debitId: late._id,
+      outcome: "confirmed",
+      evidence: "Provider confirmed final debit, no dispatch remains",
+      operator: "fixture",
+    };
+    await assert.rejects(call("resolveHold", resolution), /Normal stop/);
+    await call("stop", { sessionId, token: "stop" });
+    await call("stoppedResult", { sessionId, token: "stop", archived: true });
+    await assert.rejects(
+      call("resolveHold", { ...resolution, outcome: "denied" }),
+      /cannot be resolved as denied/,
+    );
+    await assert.rejects(
+      call("resolveHold", resolution),
+      /Old work must finish/,
+    );
+    await call("claimWorkerLease", { id: app.threadId, token: "old" });
+    await call("suspendWorker", { id: app.threadId, token: "old" });
+    assert.equal(
+      (await call("messages", { ids: [app.messageId] }, true))[0].status,
+      "failed",
+    );
+    await call("resolveHold", resolution);
+    const fresh = await call("enqueueSameApp", { id: app.threadId });
+    assert.notEqual(fresh.sessionId, sessionId);
+    await call("settleDebit", {
+      debitId: late._id,
+      outcome: "confirmed",
+      responseBalance: 2,
+    });
+    const worker = await call("claimWorkerLease", {
+      id: app.threadId,
+      token: "new",
+    });
+    assert.equal(worker.computeSessionId, fresh.sessionId);
+    assert.deepEqual(worker.pending, [fresh.messageId]);
+    await assert.rejects(
+      call("suspendWorker", { id: app.threadId, token: "old" }),
+      /lease expired/,
+    );
+  },
+);
+
+test(
+  "expired active window stops without dispatching another debit",
+  { skip: !url },
+  async () => {
+    const userId = randomUUID();
+    const sessionId = await call("admit", { userId });
+    await call("app", { userId, sessionId, threadId: randomUUID() });
+    const first = await call("claim", { sessionId });
+    await call("settleDebit", { debitId: first._id, outcome: "confirmed" });
+    await call("expire", { sessionId });
+    const claims = await Promise.all(
+      Array.from({ length: 8 }, () =>
+        call("claim", { sessionId, expectedDebit: first._id }),
+      ),
+    );
+    assert.ok(claims.every((claim) => claim === null));
+    assert.equal((await call("debits", { sessionId }, true)).length, 1);
+    assert.equal((await call("get", { sessionId }, true)).state, "stopping");
+  },
+);
+
+test(
+  "stop confirmation cannot release an in-flight debit",
+  { skip: !url },
+  async () => {
+    for (const outcome of ["confirmed", "denied"] as const) {
+      const userId = randomUUID();
+      const sessionId = await call("admit", { userId });
+      const appId = await call("app", {
+        userId,
+        sessionId,
+        threadId: randomUUID(),
+      });
+      const debit = await call("claim", { sessionId });
+      await call("beginStop", { sessionId });
+      await call("stop", { sessionId, token: "stop" });
+      await call("setStatus", { appId, status: "idle" });
+      await call("stoppedResult", { sessionId, token: "stop", archived: true });
+      assert.equal((await call("get", { sessionId }, true)).state, "hold");
+      await assert.rejects(call("admit", { userId }), /reconciliation/);
+      await call("settleDebit", { debitId: debit._id, outcome });
+      const session = await call("get", { sessionId }, true);
+      assert.equal(session.state, outcome === "confirmed" ? "hold" : "stopped");
+      assert.equal(
+        (await call("debits", { sessionId }, true))[0].state,
+        outcome,
+      );
+      if (outcome === "confirmed")
+        await assert.rejects(call("admit", { userId }), /reconciliation/);
+      else assert.notEqual(await call("admit", { userId }), sessionId);
+    }
   },
 );
