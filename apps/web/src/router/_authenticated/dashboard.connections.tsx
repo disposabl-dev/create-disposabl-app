@@ -155,7 +155,7 @@ export function Connections({ onContinue }: { onContinue?: () => void } = {}) {
               <section
                 key={id}
                 aria-label={name}
-                className="rounded-2xl border bg-card p-5 shadow-sm sm:p-6"
+                className={`rounded-2xl border bg-card p-5 shadow-sm sm:p-6 ${id === "expo" && !mobile && !connected && !showExpo ? "opacity-80 hover:opacity-100 focus-within:opacity-100" : ""}`}
               >
                 <div className="flex flex-wrap items-center gap-4 sm:flex-nowrap">
                   <div className="flex size-12 shrink-0 items-center justify-center rounded-xl border bg-background">

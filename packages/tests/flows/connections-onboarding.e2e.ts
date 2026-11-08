@@ -128,7 +128,7 @@ test(
 );
 
 test(
-  "connected accounts continue to the composer and CLI setup stays on its completion page",
+  "connections lead to optional payment before local setup and CLI completion is preserved",
   { platforms: ["web"], tags: ["connections"] },
   async ({ app, screen, browser }) => {
     const origin = new URL(backendUrl());
@@ -184,7 +184,20 @@ test(
       screen.getByRole("button", "Continue", { exact: true }),
     ).toBeVisible();
     await screen.getByRole("button", "Continue", { exact: true }).tap();
+    await expect(
+      screen.getByText("Payment is optional. Local mode is free.", {
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(screen.getByTestId("agent-onboarding")).not.toBeVisible();
+    await browser.reload();
+    await screen.getByRole("button", "Continue locally", { exact: true }).tap();
     await expect(screen.getByTestId("agent-onboarding")).toBeVisible();
+    await browser.reload();
+    await expect(screen.getByTestId("agent-onboarding")).toBeVisible();
+    await expect(
+      screen.getByRole("button", "Continue locally", { exact: true }),
+    ).not.toBeVisible();
 
     await app.open("/dashboard/connections?origin=cli");
     await expect(

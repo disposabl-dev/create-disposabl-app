@@ -4,6 +4,8 @@ import {
   setupContext,
   completeConnections,
   connectionsSeen,
+  paymentSeen,
+  completePayment,
   sessionId,
 } from "../../apps/web/src/components/connections/flow-state";
 
@@ -28,6 +30,18 @@ const token = (sub: string, iat: number) =>
   `header.${btoa(JSON.stringify({ sub, iat }))}.signature`;
 
 describe("connection presentation", () => {
+  test("optional payment completion is separate from connections and scoped to the session", () => {
+    const store = storage();
+    completeConnections(store, "first-session");
+    assert.equal(connectionsSeen(store, "first-session"), true);
+    assert.equal(paymentSeen(store, "first-session"), false);
+    completePayment(store, "first-session");
+    assert.equal(paymentSeen(store, "first-session"), true);
+    assert.equal(paymentSeen(store, "second-session"), false);
+    assert.equal(paymentSeen(store, null), false);
+    completePayment(store, null);
+    assert.equal(paymentSeen(store, "first-session"), true);
+  });
   test("completion follows the auth session, including token refresh", () => {
     const store = storage();
     const first = sessionId(token("session-1", 1));

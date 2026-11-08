@@ -1,7 +1,14 @@
 export { sessionId } from "../../../../../packages/disposabl-kit/lib/auth-session";
 
 const completedKey = "disposabl.connectionsSession";
+const paymentKey = "disposabl.paymentSession";
 const originKey = "disposabl.setupOrigin";
+export function paymentSeen(storage: Storage, session: string | null) {
+  return Boolean(session && storage.getItem(paymentKey) === session);
+}
+export function completePayment(storage: Storage, session: string | null) {
+  if (session) storage.setItem(paymentKey, session);
+}
 export function connectionsSeen(storage: Storage, session: string | null) {
   return Boolean(session && storage.getItem(completedKey) === session);
 }

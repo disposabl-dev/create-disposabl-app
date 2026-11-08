@@ -62,7 +62,9 @@ export function PosthogConnection({
   }, [pending, list, select, attempt]);
 
   return (
-    <section className="rounded-2xl border bg-card p-5 shadow-sm sm:p-6">
+    <section
+      className={`rounded-2xl border bg-card p-5 shadow-sm sm:p-6 ${!required && !connected && !pending ? "opacity-80 hover:opacity-100 focus-within:opacity-100" : ""}`}
+    >
       <div className="flex flex-wrap items-center gap-4 sm:flex-nowrap">
         <div className="flex size-12 shrink-0 items-center justify-center rounded-xl border bg-background">
           <ProviderLogo provider="posthog" />

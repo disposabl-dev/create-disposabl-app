@@ -26,7 +26,7 @@ export function AutumnConnection({
   return (
     <section
       aria-label="Autumn"
-      className="rounded-2xl border bg-card p-5 shadow-sm sm:p-6"
+      className={`rounded-2xl border bg-card p-5 shadow-sm sm:p-6 ${!required && !connected && !editing ? "opacity-80 hover:opacity-100 focus-within:opacity-100" : ""}`}
     >
       <div className="flex flex-wrap items-center gap-4">
         <div className="flex-1">
