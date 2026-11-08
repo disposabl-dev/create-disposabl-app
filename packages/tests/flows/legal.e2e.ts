@@ -39,7 +39,9 @@ test(
       ).toBeVisible();
     else
       await expect(
-        screen.getByText("The publisher has not provided a privacy contact yet."),
+        screen.getByText(
+          "The publisher has not provided a privacy contact yet.",
+        ),
       ).toBeVisible();
   },
 );

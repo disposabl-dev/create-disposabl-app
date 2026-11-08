@@ -1,1 +1,7 @@
-{"name":"marker-fixture","private":true,"dependencies":{"convex":"^1.49.0"}}
+{
+  "name": "marker-fixture",
+  "private": true,
+  "dependencies": {
+    "convex": "^1.49.0"
+  }
+}
