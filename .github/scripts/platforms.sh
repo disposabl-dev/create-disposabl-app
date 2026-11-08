@@ -43,7 +43,7 @@ node --input-type=module -e '
   const mobile = /^(apps\/mobile\/|packages\/disposabl-kit\/|\.github\/scripts\/(mobile|apple|android-runner)\.sh$)/;
   for (const platform of ["android", "ios"]) console.log(`${platform}=${(platform === "ios" ? process.env.IOS_BUILDS_ENABLED !== "false" : process.env.EXPO_CONNECTED === "true") && affected(platform, mobile)}`);
   const production = process.env.GITHUB_EVENT_NAME === "push" && process.env.GITHUB_REF === "refs/heads/main";
-  const desktop = (production ? ["linux", "windows", "macos"] : []).filter(platform => affected(platform, /^apps\/desktop\//))
+  const desktop = (production ? ["linux", "windows", "macos"] : []).filter(platform => affected(platform, platform === "macos" ? /^(apps\/desktop\/|\.github\/scripts\/macos-release\.sh$)/ : /^apps\/desktop\//))
     .map(platform => ({platform, runner: runners[platform]}));
   console.log(`desktop=${JSON.stringify(desktop)}`);
   const packages = (production ? ["cli", "sdk"] : []).filter(name => {

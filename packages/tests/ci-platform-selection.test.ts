@@ -91,3 +91,57 @@ test("platform selection keeps iOS optional and sizes Android independently", ()
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("a macOS signing-script change selects only the enabled macOS build", () => {
+  const dir = mkdtempSync(join(tmpdir(), "disposabl-macos-selection-"));
+  try {
+    mkdirSync(join(dir, "bin"));
+    writeFileSync(join(dir, "bin/gh"), "#!/bin/sh\necho baseline\n", {
+      mode: 0o755,
+    });
+    writeFileSync(
+      join(dir, "bin/git"),
+      '#!/bin/sh\nif [ "$1" = diff ]; then echo .github/scripts/macos-release.sh; fi\n',
+      { mode: 0o755 },
+    );
+    writeFileSync(
+      join(dir, "disposabl.json"),
+      JSON.stringify({
+        platforms: ["macos", "windows", "linux", "android", "ios"],
+      }),
+    );
+    const out = join(dir, "output");
+    execFileSync(
+      "bash",
+      [resolve(import.meta.dirname, "../../.github/scripts/platforms.sh")],
+      {
+        cwd: dir,
+        env: {
+          ...process.env,
+          PATH: `${join(dir, "bin")}:${process.env.PATH}`,
+          PR: "",
+          SOURCE: "current",
+          GH_REPO: "fixture/app",
+          RUNNER_TEMP: dir,
+          GITHUB_OUTPUT: out,
+          GITHUB_EVENT_NAME: "push",
+          GITHUB_REF: "refs/heads/main",
+          EXPO_CONNECTED: "true",
+        },
+      },
+    );
+    const selected = Object.fromEntries(
+      readFileSync(out, "utf8")
+        .trim()
+        .split("\n")
+        .map((line) => line.split("=")),
+    );
+    assert.deepEqual(JSON.parse(selected.desktop), [
+      { platform: "macos", runner: "macos-26" },
+    ]);
+    assert.equal(selected.android, "false");
+    assert.equal(selected.ios, "false");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
