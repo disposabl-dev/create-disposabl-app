@@ -139,6 +139,35 @@ export const beginStop = mutation({
   handler: (ctx, { sessionId }) =>
     ctx.db.patch(sessionId, { state: "stopping" }),
 });
+
+// Test-only records representing old denied operations and a pre-association hold.
+export const seedDeniedDebits = mutation({
+  args: { sessionId: v.id("computeSessions"), count: v.number() },
+  handler: async (ctx, { sessionId, count }) => {
+    if (!Number.isInteger(count) || count < 1 || count > 101)
+      throw new Error("Invalid fixture count");
+    const ids = [];
+    for (let i = 0; i < count; i++)
+      ids.push(
+        await ctx.db.insert("computeDebits", {
+          sessionId,
+          state: "denied",
+          paidUntil: 1,
+        }),
+      );
+    return ids;
+  },
+});
+export const legacyConflictHold = mutation({
+  args: { sessionId: v.id("computeSessions") },
+  handler: (ctx, { sessionId }) =>
+    ctx.db.patch(sessionId, {
+      state: "hold",
+      reconciliationConflict: true,
+      conflictDebits: undefined,
+      untrackedConflicts: undefined,
+    }),
+});
 export const get = query({
   args: { sessionId: v.id("computeSessions") },
   handler: (ctx, a) => ctx.db.get(a.sessionId),
