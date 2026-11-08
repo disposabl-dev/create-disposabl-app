@@ -87,6 +87,7 @@ import type * as releases_index from "../releases/index.js";
 import type * as releases_internal from "../releases/internal.js";
 import type * as revenuecat from "../revenuecat.js";
 import type * as telemetry from "../telemetry.js";
+import type * as users_deletion from "../users/deletion.js";
 import type * as users_index from "../users/index.js";
 import type * as users_internal from "../users/internal.js";
 import type * as users_validator from "../users/validator.js";
@@ -178,6 +179,7 @@ declare const fullApi: ApiFromModules<{
   "releases/internal": typeof releases_internal;
   revenuecat: typeof revenuecat;
   telemetry: typeof telemetry;
+  "users/deletion": typeof users_deletion;
   "users/index": typeof users_index;
   "users/internal": typeof users_internal;
   "users/validator": typeof users_validator;
