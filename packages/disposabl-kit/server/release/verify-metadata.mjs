@@ -8,7 +8,12 @@ export function verifyMetadata(manifest) {
     if (typeof value === "string") {
       const candidate = value.replace(/^git\+/, "");
       if (/^[a-z][a-z\d+.-]*:\/\//i.test(candidate)) {
-        const url = new URL(candidate);
+        let url;
+        try {
+          url = new URL(candidate);
+        } catch {
+          throw new Error(`Invalid URL in package metadata: ${field}`);
+        }
         if (url.username || url.password || url.search || url.hash)
           throw new Error(`Unsafe URL in package metadata: ${field}`);
       } else if (/^[^/]+@[^/]+:/.test(candidate)) {

@@ -96,7 +96,12 @@ export function publicRepositoryUrl(original) {
     scp && !original.includes("://")
       ? `https://${scp[1]}/${scp[2]}`
       : original.replace(/^git\+/, "");
-  const url = new URL(input);
+  let url;
+  try {
+    url = new URL(input);
+  } catch {
+    throw new Error("Invalid repository URL");
+  }
   if (!["http:", "https:", "ssh:"].includes(url.protocol))
     throw new Error("Unsupported repository URL");
   if (url.protocol === "ssh:") return `git+https://${url.host}${url.pathname}`;

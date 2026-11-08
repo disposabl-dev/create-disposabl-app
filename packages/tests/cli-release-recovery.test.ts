@@ -220,6 +220,13 @@ test(
       expect(publicRepositoryUrl(original)).toBe(
         "git+https://github.com/example/app.git",
       );
+    try {
+      publicRepositoryUrl("https://synthetic-secret@");
+      throw new Error("Expected invalid repository URL to be rejected");
+    } catch (error) {
+      expect(String(error)).toBe("Error: Invalid repository URL");
+      expect(JSON.stringify(error)).not.toContain("synthetic-secret");
+    }
     const dir = mkdtempSync(join(tmpdir(), "release-metadata-"));
     const root = resolve(import.meta.dirname, "../..");
     const helper = join(dir, "packages/disposabl-kit/server/release");
@@ -291,6 +298,14 @@ test(
         expect(result.stderr).toContain("Unsafe URL in package metadata");
         expect(result.stderr).not.toContain("synthetic-secret");
       }
+      writeFileSync(
+        join(folder, "package.json"),
+        JSON.stringify({ ...packed, homepage: "https://synthetic-secret@" }),
+      );
+      result = pack();
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain("Invalid URL in package metadata");
+      expect(result.stderr).not.toContain("synthetic-secret");
     }
   },
 );
