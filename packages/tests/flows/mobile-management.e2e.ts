@@ -38,6 +38,12 @@ test(
     await openGuestSettings(screen);
     await expect(screen.getByRole("button", /Appearance:/)).toBeVisible();
     await screen.getByRole("button", "Close settings", { exact: true }).tap();
+    await expect(
+      screen.getByRole("button", "Close settings", { exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      screen.getByRole("button", "Settings", { exact: true }),
+    ).toBeVisible();
     await screen.getByRole("button", "Settings", { exact: true }).tap();
     await expect(screen.getByRole("button", /Appearance:/)).toBeVisible();
     await screen.getByRole("button", "Sign in", { exact: true }).tap();
