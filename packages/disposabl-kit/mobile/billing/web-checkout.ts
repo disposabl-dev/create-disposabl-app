@@ -30,53 +30,57 @@ export function useWebCheckout(
   const [available, setAvailable] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const sequence = useRef(0);
-  const refresh = useCallback(async () => {
-    const seq = ++sequence.current;
-    setAvailable(false);
-    const generation = version.current;
-    if (Platform.OS !== "ios" || !key || !productId) return;
-    try {
-      const latest = await snapshot();
-      if (latest.customerId !== customerId) return;
-      const value = await billingSession.run(
-        customerId,
-        generation,
-        key,
-        async (sdk) => {
-          const eligibility = await storeEligibility(sdk, Platform.OS);
-          const offering = (await sdk.getOfferings()).current;
-          return paymentOptions({
-            platform: Platform.OS,
-            ...eligibility,
-            paymentsEnabled: true,
-            webCheckoutEnabled: latest.mobileWebCheckoutEnabled,
-            nativeReady:
-              latest.nativeSubscriptionsEnabled &&
-              !!offering &&
-              validMonthlyOffering(offering.availablePackages, productId),
-          }).web;
-        },
-      );
-      if (
-        seq === sequence.current &&
-        billingSession.current(customerId, generation)
-      )
-        setAvailable(value && latest.hasMonthlyPlan === false);
-    } catch {
-      /* Fail closed until the next refresh. */
-    }
-  }, [customerId, key, productId, snapshot, version]);
+  const lifecycle = useRef({ sequence: 0 });
+  const refresh = useCallback(
+    async (generation: number) => {
+      const seq = ++lifecycle.current.sequence;
+      setAvailable(false);
+      if (Platform.OS !== "ios" || !key || !productId) return;
+      try {
+        const latest = await snapshot();
+        if (latest.customerId !== customerId) return;
+        const value = await billingSession.run(
+          customerId,
+          generation,
+          key,
+          async (sdk) => {
+            const eligibility = await storeEligibility(sdk, Platform.OS);
+            const offering = (await sdk.getOfferings()).current;
+            return paymentOptions({
+              platform: Platform.OS,
+              ...eligibility,
+              paymentsEnabled: true,
+              webCheckoutEnabled: latest.mobileWebCheckoutEnabled,
+              nativeReady:
+                latest.nativeSubscriptionsEnabled &&
+                !!offering &&
+                validMonthlyOffering(offering.availablePackages, productId),
+            }).web;
+          },
+        );
+        if (
+          seq === lifecycle.current.sequence &&
+          billingSession.current(customerId, generation)
+        )
+          setAvailable(value && latest.hasMonthlyPlan === false);
+      } catch {
+        /* Fail closed until the next refresh. */
+      }
+    },
+    [customerId, key, productId, snapshot],
+  );
   useEffect(() => {
-    void refresh();
+    const state = lifecycle.current;
+    const update = () => void refresh(version.current);
+    update();
     const listener = AppState.addEventListener("change", (state) => {
-      if (state === "active") void refresh();
+      if (state === "active") update();
     });
     return () => {
-      sequence.current++;
+      state.sequence++;
       listener.remove();
     };
-  }, [refresh]);
+  }, [refresh, version]);
   async function open() {
     if (!available || !key || !productId || !billingSession.beginTransaction())
       return false;
@@ -128,5 +132,11 @@ export function useWebCheckout(
       if (current()) setBusy(false);
     }
   }
-  return { available, busy, error, open, refresh };
+  return {
+    available,
+    busy,
+    error,
+    open,
+    refresh: () => refresh(version.current),
+  };
 }

@@ -48,6 +48,7 @@ type Env = {
   readonly DISPOSABL_ENVIRONMENT: string | undefined;
   readonly GITHUB_APP_SLUG: string | undefined;
   readonly GITHUB_CONNECTOR: string | undefined;
+  readonly MOBILE_WEB_CHECKOUT_ENABLED: string | undefined;
   readonly POSTHOG_ENABLED: string | undefined;
   readonly POSTHOG_HOST: string | undefined;
   readonly POSTHOG_PROJECT_TOKEN: string | undefined;
@@ -58,7 +59,12 @@ type Env = {
   readonly RESEND_API_KEY: string | undefined;
   readonly RESEND_FROM_EMAIL: string | undefined;
   readonly RESEND_WEBHOOK_SECRET: string | undefined;
+  readonly REVENUECAT_CONSUMABLE_OWNER: string | undefined;
+  readonly REVENUECAT_ENVIRONMENT: string | undefined;
+  readonly REVENUECAT_PROJECT_ID: string | undefined;
+  readonly REVENUECAT_ROUTES: string | undefined;
   readonly REVENUECAT_SYNC_ENABLED: string | undefined;
+  readonly REVENUECAT_WEBHOOK_AUTH: string | undefined;
   readonly VERCEL_PROJECT_ID: string | undefined;
   readonly VERCEL_TEAM_ID: string | undefined;
   readonly VERCEL_TOKEN: string | undefined;
