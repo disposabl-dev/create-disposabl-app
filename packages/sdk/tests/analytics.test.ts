@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createSdkAnalytics } from "../sdk/src/analytics";
+import { createSdkAnalytics } from "../src/analytics";
 
 test("SDK analytics is opt-in, production-only and disabled in E2E", async () => {
   const events: unknown[] = [];
@@ -80,5 +80,64 @@ test("sync and async capture failures never affect calls", async () => {
       capture,
     });
     assert.equal(await analytics.track("appsList", async () => 1), 1);
+  }
+});
+
+test("DO_NOT_TRACK blocks capture, including after creating the hook", async () => {
+  const events: unknown[] = [];
+  const analytics = createSdkAnalytics({
+    enabled: true,
+    environment: "production",
+    capture: (event) => {
+      events.push(event);
+    },
+  });
+  const previous = process.env.DO_NOT_TRACK;
+  process.env.DO_NOT_TRACK = "1";
+  try {
+    await analytics.track("appsList", async () => ({}));
+    assert.deepEqual(events, []);
+  } finally {
+    if (previous === undefined) delete process.env.DO_NOT_TRACK;
+    else process.env.DO_NOT_TRACK = previous;
+  }
+});
+
+test("generated SDK accepts only explicitly allowed safe operation IDs", async () => {
+  const events: unknown[] = [];
+  const analytics = createSdkAnalytics({
+    enabled: true,
+    environment: "production",
+    operations: ["notesList", "notesCreate", "https://private/path"] as const,
+    capture: (event) => {
+      events.push(event);
+    },
+  });
+  await analytics.track("notesList", async () => ({}));
+  await analytics.track("appsList" as never, async () => ({}));
+  await analytics.track("https://private/path", async () => ({}));
+  assert.deepEqual(events, [{ operation: "notesList", outcome: "success" }]);
+});
+
+test("browser doNotTrack blocks the owner sink", async () => {
+  const original = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+  const events: unknown[] = [];
+  Object.defineProperty(globalThis, "navigator", {
+    configurable: true,
+    value: { doNotTrack: "1" },
+  });
+  try {
+    const analytics = createSdkAnalytics({
+      enabled: true,
+      environment: "production",
+      capture: (event) => {
+        events.push(event);
+      },
+    });
+    await analytics.track("appsList", async () => ({}));
+    assert.deepEqual(events, []);
+  } finally {
+    if (original) Object.defineProperty(globalThis, "navigator", original);
+    else delete (globalThis as { navigator?: unknown }).navigator;
   }
 });

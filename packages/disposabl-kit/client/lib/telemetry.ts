@@ -2,7 +2,12 @@ import { useEffect, useRef } from "react";
 import { sessionId } from "../../lib/auth-session";
 import { analyticsEnabled } from "../../features";
 
-import { sendPageTelemetry } from "../../lib/telemetry";
+import { createPageTelemetry } from "../../lib/telemetry";
+
+const telemetry = createPageTelemetry({
+  getItem: (key) => localStorage.getItem(key),
+  setItem: (key, value) => localStorage.setItem(key, value),
+});
 
 export function usePageTelemetry(
   pathname: string,
@@ -22,7 +27,7 @@ export function usePageTelemetry(
     const key = JSON.stringify([pathname, sessionId(token)]);
     if (lastView.current === key) return;
     lastView.current = key;
-    void sendPageTelemetry(
+    telemetry.view(
       import.meta.env.VITE_CONVEX_SITE_URL,
       "web",
       pathname,

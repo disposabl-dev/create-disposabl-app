@@ -36,28 +36,43 @@ const operations = new Set<SdkOperation>([
   "usersCurrent",
 ]);
 
-export type SdkAnalyticsEvent = {
-  operation: SdkOperation;
+export type SdkAnalyticsEvent<Operation extends string = SdkOperation> = {
+  operation: Operation;
   outcome: "success" | "error";
 };
 
 /** Opt in explicitly; capture should send to the application owner's project. */
-export function createSdkAnalytics(config: {
+export function createSdkAnalytics<
+  const Operation extends string = SdkOperation,
+>(config: {
   enabled: boolean;
   environment: "production" | "development" | "test";
   e2e?: boolean;
-  capture: (event: SdkAnalyticsEvent) => void | Promise<void>;
+  /** Fixed SDK operation IDs, for APIs generated from the owner's contract. */
+  operations?: readonly Operation[];
+  capture: (event: SdkAnalyticsEvent<Operation>) => void | Promise<void>;
 }) {
-  const enabled =
-    config.enabled &&
-    config.environment === "production" &&
-    !config.e2e &&
-    !(
-      (globalThis as { process?: { env?: Record<string, string | undefined> } })
-        .process?.env?.E2E_TELEMETRY_DISABLED === "1"
-    );
-  function capture(operation: SdkOperation, outcome: "success" | "error") {
-    if (!enabled || !operations.has(operation)) return;
+  const allowed: ReadonlySet<string> = config.operations
+    ? new Set(
+        config.operations.filter((name) =>
+          /^[A-Za-z][A-Za-z0-9_]{0,79}$/.test(name),
+        ),
+      )
+    : operations;
+  function capture(operation: Operation, outcome: "success" | "error") {
+    const env = (
+      globalThis as { process?: { env?: Record<string, string | undefined> } }
+    ).process?.env;
+    if (
+      !config.enabled ||
+      config.environment !== "production" ||
+      config.e2e ||
+      env?.E2E_TELEMETRY_DISABLED === "1" ||
+      env?.DO_NOT_TRACK === "1" ||
+      (typeof navigator !== "undefined" && navigator.doNotTrack === "1") ||
+      !allowed.has(operation)
+    )
+      return;
     try {
       void Promise.resolve(config.capture({ operation, outcome })).catch(
         () => {},
@@ -68,10 +83,7 @@ export function createSdkAnalytics(config: {
   }
   return {
     /** Wrap a generated SDK call; handles both thrown and returned errors. */
-    async track<T>(
-      operation: SdkOperation,
-      call: () => Promise<T>,
-    ): Promise<T> {
+    async track<T>(operation: Operation, call: () => Promise<T>): Promise<T> {
       try {
         const result = await call();
         const failed =

@@ -4,7 +4,7 @@ import { httpAction, internalAction } from "./_generated/server";
 import { getSessionUserId } from "@disposabl/disposabl-kit/server/lib/functions";
 import {
   captureTelemetry,
-  scheduleTelemetry,
+  telemetryEnabled,
 } from "@disposabl/disposabl-kit/server/lib/telemetry";
 
 const pageNames = [
@@ -66,6 +66,8 @@ const headers = {
 export const options = httpAction(
   async () => new Response(null, { status: 204, headers }),
 );
+const anonymousIdPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 export const page = httpAction(async (ctx, request) => {
   try {
     const body: unknown = await request.json();
@@ -76,18 +78,33 @@ export const page = httpAction(async (ctx, request) => {
       !("page" in body) ||
       (body.platform !== "web" && body.platform !== "mobile") ||
       typeof body.page !== "string" ||
-      !pageNames.includes(body.page as (typeof pageNames)[number])
+      !pageNames.includes(body.page as (typeof pageNames)[number]) ||
+      ("anonymousId" in body &&
+        (typeof body.anonymousId !== "string" ||
+          !anonymousIdPattern.test(body.anonymousId)))
     )
       return new Response(null, { status: 400, headers });
+    if (!telemetryEnabled())
+      return new Response(null, { status: 204, headers });
     const userId = await getSessionUserId(ctx);
-    await scheduleTelemetry(
-      ctx,
+    if (request.headers.has("Authorization") && !userId)
+      return new Response(null, { status: 401, headers });
+    const anonymousId =
+      "anonymousId" in body
+        ? (body.anonymousId as string)
+        : crypto.randomUUID();
+    await captureTelemetry(
       body.platform === "web" ? "page_view" : "screen_view",
       { page: body.page as (typeof pageNames)[number] },
       userId ?? undefined,
+      undefined,
+      anonymousId,
     );
+    return new Response(JSON.stringify({ anonymousId }), {
+      status: 200,
+      headers: { ...headers, "Content-Type": "application/json" },
+    });
   } catch {
     return new Response(null, { status: 400, headers });
   }
-  return new Response(null, { status: 204, headers });
 });

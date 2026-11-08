@@ -7,7 +7,8 @@ import { analyticsEnabled, authenticationEnabled } from "../features";
 import { authClasses } from "./components/auth-ui";
 import { authStorage } from "./lib/auth-storage";
 import { api } from "./lib/convex";
-import { sendPageTelemetry } from "../lib/telemetry";
+import { createPageTelemetry } from "../lib/telemetry";
+import * as SecureStore from "expo-secure-store";
 import { sessionId } from "../lib/auth-session";
 import { UpdatePrompt } from "./updates/update-prompt";
 import { ThemeProvider, useResolvedColorScheme } from "./design/theme-provider";
@@ -201,6 +202,11 @@ export function PublicLayout() {
   );
 }
 
+const screenTelemetry = createPageTelemetry({
+  getItem: SecureStore.getItemAsync,
+  setItem: SecureStore.setItemAsync,
+});
+
 function AuthenticatedScreenTelemetry() {
   const token = useAuthToken();
   const { isLoading, isAuthenticated } = useConvexAuth();
@@ -227,13 +233,14 @@ function ScreenTelemetry({
       !analyticsEnabled ||
       __DEV__ ||
       process.env.EXPO_PUBLIC_DISPOSABL_ANALYTICS_ENABLED !== "true" ||
+      process.env.EXPO_PUBLIC_E2E === "true" ||
       !origin
     )
       return;
     const key = JSON.stringify([pathname, sessionId(token)]);
     if (lastView.current === key) return;
     lastView.current = key;
-    void sendPageTelemetry(origin, "mobile", pathname, token);
+    screenTelemetry.view(origin, "mobile", pathname, token);
   }, [pathname, token, ready]);
   return null;
 }

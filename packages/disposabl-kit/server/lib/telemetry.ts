@@ -83,68 +83,92 @@ export async function captureTelemetry(
   properties: TelemetryProperties,
   userId?: string,
   settingsOverride: AnalyticsConfig = settings,
+  anonymousId?: string,
 ) {
   if (!telemetryEnabled(settingsOverride)) return;
-  const token =
-    settingsOverride.analytics?.projectToken ??
-    process.env.POSTHOG_PROJECT_TOKEN!;
-  const host = settingsOverride.analytics?.host ?? process.env.POSTHOG_HOST!;
-  const identity = userId
-    ? await opaqueId(`disposabl:${token}:${userId}`)
-    : crypto.randomUUID();
-  const safe = {
-    ...(properties.app_id && {
-      app_id: await opaqueId(`disposabl:${token}:app:${properties.app_id}`),
-    }),
-    ...(["api", "cli", "sdk", "mcp"].includes(properties.source ?? "") && {
-      source: properties.source,
-    }),
-    ...(properties.operation &&
-      /^[A-Za-z0-9_./:-]{1,100}$/.test(properties.operation) && {
-        operation: properties.operation,
-      }),
-    ...(["success", "error"].includes(properties.outcome ?? "") && {
-      outcome: properties.outcome,
-    }),
-    ...([
-      "home",
-      "dashboard",
-      "connections",
-      "login",
-      "signup",
-      "account",
-      "other",
-    ].includes(properties.page ?? "") && { page: properties.page }),
-    ...([
-      "web",
-      "android",
-      "ios",
-      "macos",
-      "windows",
-      "linux",
-      "api",
-      "mcp",
-      "typescript-sdk",
-      "cli",
-    ].includes(properties.platform ?? "") && { platform: properties.platform }),
-    ...(["production", "preview"].includes(properties.channel ?? "") && {
-      channel: properties.channel,
-    }),
-    ...(Number.isFinite(properties.duration_ms) &&
-      properties.duration_ms! >= 0 &&
-      properties.duration_ms! <= Number.MAX_SAFE_INTEGER && {
-        duration_ms: Math.round(properties.duration_ms!),
-      }),
-    ...Object.fromEntries(
-      (["time_since_app_creation_ms", "run_number", "run_attempt"] as const)
-        .filter(
-          (key) =>
-            Number.isSafeInteger(properties[key]) && properties[key]! >= 0,
-        )
-        .map((key) => [key, properties[key]]),
-    ),
-  };
   try {
+    const token =
+      settingsOverride.analytics?.projectToken ??
+      process.env.POSTHOG_PROJECT_TOKEN!;
+    const host = settingsOverride.analytics?.host ?? process.env.POSTHOG_HOST!;
+    const identity = userId
+      ? await opaqueId(`disposabl:${token}:${userId}`)
+      : anonymousId
+        ? await opaqueId(`disposabl:${token}:anonymous:${anonymousId}`)
+        : crypto.randomUUID();
+    const safe = {
+      ...(properties.app_id && {
+        app_id: await opaqueId(`disposabl:${token}:app:${properties.app_id}`),
+      }),
+      ...(["api", "cli", "sdk", "mcp"].includes(properties.source ?? "") && {
+        source: properties.source,
+      }),
+      ...(properties.operation &&
+        /^[A-Za-z0-9_./:-]{1,100}$/.test(properties.operation) && {
+          operation: properties.operation,
+        }),
+      ...(["success", "error"].includes(properties.outcome ?? "") && {
+        outcome: properties.outcome,
+      }),
+      ...([
+        "home",
+        "dashboard",
+        "connections",
+        "login",
+        "signup",
+        "account",
+        "other",
+      ].includes(properties.page ?? "") && { page: properties.page }),
+      ...([
+        "web",
+        "android",
+        "ios",
+        "macos",
+        "windows",
+        "linux",
+        "api",
+        "mcp",
+        "typescript-sdk",
+        "cli",
+      ].includes(properties.platform ?? "") && {
+        platform: properties.platform,
+      }),
+      ...(["production", "preview"].includes(properties.channel ?? "") && {
+        channel: properties.channel,
+      }),
+      ...(Number.isFinite(properties.duration_ms) &&
+        properties.duration_ms! >= 0 &&
+        properties.duration_ms! <= Number.MAX_SAFE_INTEGER && {
+          duration_ms: Math.round(properties.duration_ms!),
+        }),
+      ...Object.fromEntries(
+        (["time_since_app_creation_ms", "run_number", "run_attempt"] as const)
+          .filter(
+            (key) =>
+              Number.isSafeInteger(properties[key]) && properties[key]! >= 0,
+          )
+          .map((key) => [key, properties[key]]),
+      ),
+    };
+    if (userId && anonymousId) {
+      const response = await fetch(`${host}/capture/`, {
+        method: "POST",
+        signal: AbortSignal.timeout(2000),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          api_key: token,
+          event: "$identify",
+          properties: {
+            distinct_id: identity,
+            $anon_distinct_id: await opaqueId(
+              `disposabl:${token}:anonymous:${anonymousId}`,
+            ),
+            $ip: "0.0.0.0",
+          },
+        }),
+      });
+      if (!response.ok) return;
+    }
     await fetch(`${host}/capture/`, {
       method: "POST",
       signal: AbortSignal.timeout(2000),
@@ -156,7 +180,9 @@ export async function captureTelemetry(
           distinct_id: identity,
           ...safe,
           environment: "production",
-          $process_person_profile: false,
+          ...(!userId || !anonymousId
+            ? { $process_person_profile: false }
+            : {}),
           $ip: "0.0.0.0",
         },
       }),
