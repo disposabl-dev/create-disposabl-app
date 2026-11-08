@@ -191,6 +191,32 @@ Backend URLs are available to mobile code through
 `process.env.EXPO_PUBLIC_CONVEX_SITE_URL`. The distribution workflow supplies
 them to the same native authentication flow used during development.
 
+## Local Google Play bundle
+
+The normal release workflow continues to produce installable APKs. For a Play
+upload, first verify the existing listing package ID, highest uploaded version
+code, and upload certificate SHA-256 in Play Console. For a new listing, use
+its confirmed package ID and `0` as the previous version. Do not use a debug
+key for a Play submission.
+
+Use a dedicated local checkout with a fresh Android prebuild generated for the
+production channel, package and version. Configure the intended production
+backend URLs explicitly and set these environment variables:
+
+- `PLAY_PACKAGE_ID`, `PLAY_PREVIOUS_VERSION_CODE`, `PLAY_UPLOAD_CERT_SHA256`
+- `DISPOSABL_ANDROID_VERSION_CODE` (greater than the previous version)
+- `EXPO_PUBLIC_CONVEX_URL`, `EXPO_PUBLIC_CONVEX_SITE_URL` (HTTPS)
+- `ANDROID_KEYSTORE_PATH`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`,
+  `ANDROID_KEY_PASSWORD`
+- `BUNDLETOOL_JAR`, the local path to the official standalone bundletool jar
+
+Run `node apps/mobile/scripts/play-aab.mjs` from the repository root. It checks
+the keystore certificate and Expo/native identity before building, uses the
+configured Android architectures, and verifies the resulting AAB's manifest,
+ABIs and upload signature. It prints the output path and SHA-256. It does not
+upload or submit the bundle. Keep signing values out of shell history and logs.
+A debug-signed or E2E bundle is not a Play release.
+
 ## iOS
 
 When iOS is enabled and affected, the Web runner checks the latest
