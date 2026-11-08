@@ -4,9 +4,10 @@ set -euo pipefail
 case "${1:?operation required}" in
   prepare)
     df -Pk .
+    available=$(df -Pk . | awk 'END {print $4}')
     # Only disposable GitHub-hosted Linux runners. Keep Android, Java, Node,
     # the checkout and dependency caches intact; these toolchains are unused.
-    if [[ "${GITHUB_ACTIONS:-}" == true && "${RUNNER_ENVIRONMENT:-}" == github-hosted && "${RUNNER_OS:-}" == Linux ]]; then
+    if [[ "${GITHUB_ACTIONS:-}" == true && "${RUNNER_ENVIRONMENT:-}" == github-hosted && "${RUNNER_OS:-}" == Linux && "$available" =~ ^[0-9]+$ ]] && (( available < 25 * 1024 * 1024 )); then
       unused=(/usr/share/dotnet /usr/local/.ghcup /opt/ghc /opt/hostedtoolcache/CodeQL
         /usr/share/swift /usr/share/miniconda /opt/microsoft/powershell /usr/local/share/powershell
         /usr/local/share/vcpkg /home/linuxbrew)
@@ -36,7 +37,17 @@ case "${1:?operation required}" in
     TIMEFORMAT='Gradle elapsed: %3R seconds; shell and child CPU: %3U user, %3S system'
     status=0
     time ./gradlew :app:assembleRelease --no-daemon --build-cache || status=$?
+    if [[ -n "${CCACHE_DIR:-}" ]]; then ccache --show-stats; fi
     exit "$status"
+    ;;
+  prime)
+    status=0
+    timeout --signal=INT --kill-after=15s 16m ./gradlew :app:externalNativeBuildRelease --no-daemon --build-cache || status=$?
+    ccache --show-stats
+    if [[ "$status" != 0 && "$status" != 124 ]]; then exit "$status"; fi
+    if [[ "$status" == 124 ]]; then echo 'Native warmup reached its time budget; saving completed compiler entries.'; fi
+    misses=$(ccache --print-stats | awk '$1 == "cache_miss" {print $2}')
+    [[ "$misses" =~ ^[0-9]+$ ]] && (( misses > 0 )) || { echo 'No compiler results were cached.' >&2; exit 1; }
     ;;
   *) echo "Unknown operation: $1" >&2; exit 1 ;;
 esac

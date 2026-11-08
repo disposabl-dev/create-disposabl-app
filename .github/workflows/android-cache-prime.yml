@@ -1,0 +1,62 @@
+name: Prime Android native cache
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  prime:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      DO_NOT_TRACK: "1"
+      E2E_TELEMETRY_DISABLED: "1"
+      EXPO_NO_TELEMETRY: "1"
+      EXPO_NO_DOTENV: "1"
+      DISPOSABL_MOBILE_CHANNEL: production
+      EXPO_PROJECT_ID: 00000000-0000-4000-8000-000000000001
+      CCACHE_DIR: ${{ runner.temp }}/ccache
+      CCACHE_COMPILERCHECK: content
+      CMAKE_C_COMPILER_LAUNCHER: ccache
+      CMAKE_CXX_COMPILER_LAUNCHER: ccache
+    steps:
+      - uses: actions/checkout@v6
+        with: { persist-credentials: false }
+      - uses: actions/setup-node@v6
+        with: { node-version: "24", package-manager-cache: false }
+      - uses: oven-sh/setup-bun@v2
+        with: { bun-version: "1.4.4" }
+      - run: bun install --frozen-lockfile --filter @disposabl/mobile
+      - uses: actions/setup-java@v5
+        with: { distribution: temurin, java-version: "17" }
+      - uses: android-actions/setup-android@v3
+        with: { packages: platform-tools }
+      - uses: gradle/actions/setup-gradle@v4
+        with: { cache-read-only: false }
+      - name: Install compiler cache
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ccache
+      - name: Restore compiler cache
+        id: cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}/ccache
+          key: android-ccache-v1-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+      - name: Prebuild Android
+        if: steps.cache.outputs.cache-hit != 'true'
+        working-directory: apps/mobile
+        run: bun x --no-install expo prebuild --platform android --no-install
+      - name: Compile native targets within budget
+        if: steps.cache.outputs.cache-hit != 'true'
+        working-directory: apps/mobile/android
+        run: bash ../../../.github/scripts/android-runner.sh prime
+      - name: Save compiler cache
+        if: steps.cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ runner.temp }}/ccache
+          key: android-ccache-v1-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}

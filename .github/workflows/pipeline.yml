@@ -215,6 +215,19 @@ jobs:
       - name: Gradle
         uses: gradle/actions/setup-gradle@v4
         with: { cache-read-only: false }
+      - name: Restore native compiler cache
+        if: github.event_name == 'push'
+        id: native-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}/ccache
+          key: android-ccache-v1-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+      - name: Install native compiler cache
+        if: github.event_name == 'push' && steps.native-cache.outputs.cache-hit == 'true'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ccache
+          printf 'CCACHE_DIR=%s\nCCACHE_COMPILERCHECK=content\nCMAKE_C_COMPILER_LAUNCHER=ccache\nCMAKE_CXX_COMPILER_LAUNCHER=ccache\n' "$RUNNER_TEMP/ccache" >> "$GITHUB_ENV"
       - name: Build
         working-directory: apps/mobile
         env:

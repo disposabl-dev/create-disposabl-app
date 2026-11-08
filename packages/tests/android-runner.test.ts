@@ -114,6 +114,8 @@ test("Android disk preparation only removes unused hosted-runner toolchains", ()
       assert.equal(readFileSync(calls, "utf8"), "");
     }
     assert.equal(run("prepare").status, 0);
+    assert.equal(readFileSync(calls, "utf8"), "");
+    assert.equal(run("prepare", { AVAILABLE: "1024" }).status, 0);
     assert.equal(
       readFileSync(calls, "utf8"),
       "rm -rf -- /usr/share/dotnet /usr/local/.ghcup /opt/ghc /opt/hostedtoolcache/CodeQL /usr/share/swift /usr/share/miniconda /opt/microsoft/powershell /usr/local/share/powershell /usr/local/share/vcpkg /home/linuxbrew\n",
@@ -127,8 +129,76 @@ test("Android disk preparation only removes unused hosted-runner toolchains", ()
     assert.equal(run("check", { AVAILABLE: "invalid" }).status, 1);
     assert.equal(run("unsupported").status, 1);
     writeFileSync(join(dir, "sudo"), "#!/bin/sh\nexit 42\n", { mode: 0o755 });
-    assert.equal(run("prepare").status, 42);
+    assert.equal(run("prepare", { AVAILABLE: "1024" }).status, 42);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test("native cache warmup saves completed work after its budget but rejects real failures", () => {
+  const dir = mkdtempSync(join(tmpdir(), "android-prime-"));
+  try {
+    writeFileSync(
+      join(dir, "timeout"),
+      '#!/bin/sh\nprintf "%s\\n" "$*"\nexit "$TIMEOUT_RESULT"\n',
+      { mode: 0o755 },
+    );
+    writeFileSync(
+      join(dir, "ccache"),
+      '#!/bin/sh\nif [ "$1" = "--print-stats" ]; then printf "cache_miss\\t%s\\n" "$CACHE_MISSES"; fi\n',
+      { mode: 0o755 },
+    );
+    const script = resolve(
+      import.meta.dirname,
+      "../../.github/scripts/android-runner.sh",
+    );
+    const run = (status: number, misses: number) =>
+      spawnSync("bash", [script, "prime"], {
+        cwd: dir,
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          PATH: `${dir}:${process.env.PATH}`,
+          TIMEOUT_RESULT: String(status),
+          CACHE_MISSES: String(misses),
+        },
+      });
+    for (const status of [0, 124]) {
+      const result = run(status, 10);
+      assert.equal(result.status, 0, result.stderr);
+      assert.match(
+        result.stdout,
+        /--signal=INT --kill-after=15s 16m .*:app:externalNativeBuildRelease/,
+      );
+    }
+    assert.equal(run(42, 10).status, 42);
+    assert.equal(run(0, 0).status, 1);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("native warmup and production use the same exact-commit cache", () => {
+  const root = resolve(import.meta.dirname, "../..");
+  const primeText = readFileSync(
+    join(root, ".github/workflows/android-cache-prime.yml"),
+    "utf8",
+  );
+  const pipelineText = readFileSync(
+    join(root, ".github/workflows/pipeline.yml"),
+    "utf8",
+  );
+  const prime = Bun.YAML.parse(primeText) as {
+    jobs: { prime: { if: string; "timeout-minutes": number } };
+  };
+  assert.equal(prime.jobs.prime.if, "github.ref == 'refs/heads/main'");
+  assert.equal(prime.jobs.prime["timeout-minutes"], 20);
+  assert.doesNotMatch(primeText, /secrets\.|id-token|publish|report/i);
+  const key =
+    "android-ccache-v1-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}";
+  assert.equal(primeText.split(key).length - 1, 2);
+  assert.equal(pipelineText.split(key).length - 1, 1);
+  assert.match(primeText, /actions\/cache\/save@v4/);
+  assert.match(pipelineText, /actions\/cache\/restore@v4/);
+  assert.doesNotMatch(primeText + pipelineText, /CCACHE_SLOPPINESS/);
 });
