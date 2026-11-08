@@ -271,6 +271,8 @@ const agentFixtureParagraph =
   /^The provider-inert agent fixture in `fixtures\/agent-inert-convex\/`[^\n]*\n\n/m;
 const passwordDiagnosticParagraph =
   /^For the product username flow only, `E2E_IOS_SAVE_PASSWORD_DIAGNOSTIC=1`[^\n]*\n\n/m;
+const receiptFixtureParagraph =
+  /^The opt-in `flows\/account-deletion-receipt.e2e.ts`[^\n]*\n\n/m;
 if (!agentFixtureParagraph.test(testsReadme))
   throw new Error(
     "Starter reset inputs changed: agent fixture guidance missing.",
@@ -281,7 +283,8 @@ await Bun.write(
   testsReadmePath,
   testsReadme
     .replace(agentFixtureParagraph, "")
-    .replace(passwordDiagnosticParagraph, ""),
+    .replace(passwordDiagnosticParagraph, "")
+    .replace(receiptFixtureParagraph, ""),
 );
 await Bun.write(
   join(root, "apps/web/site.json"),

@@ -71,9 +71,9 @@ test(
         { name },
         "query",
       );
-      expect(value?.value?.trim() ?? "").toBe(
-        name === "E2E_TELEMETRY_DISABLED" ? "1" : "",
-      );
+      const expected = name === "E2E_TELEMETRY_DISABLED" ? "1" : "";
+      if ((value?.value?.trim() ?? "") !== expected)
+        throw new Error(`Local receipt fixture isolation failed: ${name}`);
     }
     const username = `receipt${randomUUID().replaceAll("-", "")}`;
     const password = `Test-${randomUUID()}!`;

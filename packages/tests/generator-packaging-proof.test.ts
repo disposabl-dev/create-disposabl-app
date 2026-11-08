@@ -178,7 +178,7 @@ test("packaged starter and generated profiles exclude product proof fixtures", a
       );
       assert.doesNotMatch(
         testsReadme,
-        /agent-inert-convex|provider-inert agent fixture|E2E_IOS_SAVE_PASSWORD_DIAGNOSTIC/,
+        /agent-inert-convex|provider-inert agent fixture|E2E_IOS_SAVE_PASSWORD_DIAGNOSTIC|E2E_RECEIPT_CLEANUP/,
       );
       assert.equal(
         existsSync(join(root, "packages/tests/flows/agent.e2e.ts")),
