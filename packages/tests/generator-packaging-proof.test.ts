@@ -12,6 +12,8 @@ import {
 } from "../create-disposabl-app/options";
 
 const excluded = [
+  "packages/tests/ios-save-password.test.ts",
+  "packages/tests/helpers/ios-save-password.ts",
   "packages/backend/convex/users/receipts.ts",
   "packages/tests/legal-product-providers.test.ts",
   "packages/tests/fixtures/file-deletion-convex",
@@ -175,7 +177,7 @@ test("packaged starter and generated profiles exclude product proof fixtures", a
       );
       assert.doesNotMatch(
         testsReadme,
-        /agent-inert-convex|provider-inert agent fixture/,
+        /agent-inert-convex|provider-inert agent fixture|E2E_IOS_SAVE_PASSWORD_DIAGNOSTIC/,
       );
       assert.equal(
         existsSync(join(root, "packages/tests/flows/agent.e2e.ts")),

@@ -25,6 +25,8 @@ if (
 // Product-only proof harnesses must not enter generated apps. Keep the same
 // paths in the symlink validation and removal inventories.
 const productProofTests = [
+  "packages/tests/ios-save-password.test.ts",
+  "packages/tests/helpers/ios-save-password.ts",
   "packages/tests/legal-product-providers.test.ts",
   "packages/tests/fixtures/file-deletion-convex",
   "packages/tests/fixtures/auth-identity-erasure-convex",
@@ -266,6 +268,8 @@ const testsReadmePath = join(root, "packages/tests/README.md");
 const testsReadme = await readFile(testsReadmePath, "utf8");
 const agentFixtureParagraph =
   /^The provider-inert agent fixture in `fixtures\/agent-inert-convex\/`[^\n]*\n\n/m;
+const passwordDiagnosticParagraph =
+  /^For the product username flow only, `E2E_IOS_SAVE_PASSWORD_DIAGNOSTIC=1`[^\n]*\n\n/m;
 if (!agentFixtureParagraph.test(testsReadme))
   throw new Error(
     "Starter reset inputs changed: agent fixture guidance missing.",
@@ -274,7 +278,9 @@ if (!agentFixtureParagraph.test(testsReadme))
 // Generated apps start with their own origin and copy, never Disposabl's SEO.
 await Bun.write(
   testsReadmePath,
-  testsReadme.replace(agentFixtureParagraph, ""),
+  testsReadme
+    .replace(agentFixtureParagraph, "")
+    .replace(passwordDiagnosticParagraph, ""),
 );
 await Bun.write(
   join(root, "apps/web/site.json"),
