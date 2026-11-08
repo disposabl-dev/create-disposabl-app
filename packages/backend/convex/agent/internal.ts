@@ -143,7 +143,7 @@ export async function enqueueMessageHandler(
 }
 
 export const enqueueMessage = internalMutation({
-  args: { ...identityFields, ...sendArgs },
+  args: enqueueArgs.fields,
   returns: result,
   handler: (ctx, args) =>
     enqueueMessageHandler(ctx, args, () => Boolean(env.BOAT_API_KEY)),
