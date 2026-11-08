@@ -484,3 +484,75 @@ test("native top-up fails closed and checks identity at purchase", async () => {
   await run();
   assert.equal(purchases, 1);
 });
+
+test("web top-up preflight rechecks storefront, product, route and account independently of monthly plan", async () => {
+  const { preflightWebTopup } =
+    await import("../disposabl-kit/mobile/billing/policy");
+  const product = {
+    identifier: "coins",
+    productCategory: "NON_SUBSCRIPTION",
+    productType: "CONSUMABLE",
+    priceString: "$5",
+  };
+  const sdk = {
+    canMakePayments: async () => true,
+    getStorefront: async () => ({ countryCode: "USA" }),
+    getAppUserID: async () => "user",
+    getProducts: async () => [product],
+    PRODUCT_CATEGORY: { NON_SUBSCRIPTION: "NON_SUBSCRIPTION" },
+  };
+  const state = {
+    customerId: "user",
+    mobileWebCheckoutEnabled: true,
+    nativeTopupRoutes: [{ app: "apple", store: "APP_STORE", product: "coins" }],
+    hasMonthlyPlan: true,
+    monthlyCheckoutPending: true,
+  };
+  const run = (
+    changes = {},
+    snapshot = state,
+    platform = "ios",
+    current = () => true,
+  ) =>
+    preflightWebTopup(
+      { ...sdk, ...changes } as never,
+      platform,
+      "apple",
+      "coins",
+      "user",
+      async () => snapshot,
+      current,
+    );
+  await run();
+  for (const changes of [
+    { canMakePayments: async () => false },
+    { getStorefront: async () => null },
+    { getStorefront: async () => ({ countryCode: "CAN" }) },
+    {
+      getStorefront: async () => {
+        throw Error();
+      },
+    },
+    { getAppUserID: async () => "other" },
+    { getProducts: async () => [{ ...product, productType: "UNKNOWN" }] },
+  ])
+    await assert.rejects(run(changes));
+  await assert.rejects(run({}, { ...state, nativeTopupRoutes: [] }));
+  await assert.rejects(run({}, { ...state, customerId: "other" }));
+  await assert.rejects(run({}, { ...state, mobileWebCheckoutEnabled: false }));
+  await assert.rejects(run({}, state, "android"));
+  let current = true;
+  await assert.rejects(
+    run(
+      {
+        getProducts: async () => {
+          current = false;
+          return [product];
+        },
+      },
+      state,
+      "ios",
+      () => current,
+    ),
+  );
+});

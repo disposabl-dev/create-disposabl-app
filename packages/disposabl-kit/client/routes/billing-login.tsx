@@ -22,6 +22,8 @@ const redeem = makeFunctionReference<
     refreshToken: string;
     refreshTokenExpiresAt: number;
     userId: string;
+    purchase: "monthly" | "topup";
+    expiresAt: number;
   }
 >("billingHandoff:redeem");
 function BillingLogin() {
@@ -47,8 +49,12 @@ function BillingLogin() {
     if (!account?.name || pending) return;
     setPending(true);
     try {
-      await setSession(await exchange({ code }));
-      window.sessionStorage.setItem("billing-from-ios", "1");
+      const { purchase, expiresAt, ...tokens } = await exchange({ code });
+      await setSession(tokens);
+      window.sessionStorage.setItem(
+        "billing-from-ios",
+        JSON.stringify({ purchase, expiresAt, userId: tokens.userId }),
+      );
       window.location.replace("/pricing?source=ios");
     } catch {
       setError(

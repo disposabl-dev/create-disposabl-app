@@ -257,6 +257,13 @@ export function AccountBilling({ customerId }: { customerId: string }) {
           onPress={() => void topup.purchase()}
         />
       )}
+      {web.topupAvailable && (
+        <AuthButton
+          title="Buy top-up on website"
+          disabled={busy || web.busy || topup.busy}
+          onPress={() => void web.open("topup")}
+        />
+      )}
       {!!topup.message && (
         <Text accessibilityRole="alert" className={authClasses.body}>
           {topup.message}

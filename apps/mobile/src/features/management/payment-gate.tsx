@@ -33,22 +33,40 @@ export function PaymentGate({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   useEffect(() => {
+    awaitingReturn.current = false;
     const selected = billingSession.acquire(customerId);
     version.current = selected;
     return () => billingSession.release(customerId, selected);
   }, [customerId]);
   useEffect(() => {
+    let active = true;
+    let sequence = 0;
     const listener = AppState.addEventListener("change", (state) => {
-      if (state === "active")
-        void refresh().then((balance) => {
-          if (awaitingReturn.current && balance !== null && balance >= 10) {
-            awaitingReturn.current = false;
-            proceed();
-          }
-        });
+      if (state === "active") {
+        const currentSequence = ++sequence;
+        const generation = version.current;
+        void refresh()
+          .then((balance) => {
+            if (
+              active &&
+              currentSequence === sequence &&
+              billingSession.current(customerId, generation) &&
+              awaitingReturn.current &&
+              balance !== null &&
+              balance >= 10
+            ) {
+              awaitingReturn.current = false;
+              proceed();
+            }
+          })
+          .catch(() => undefined);
+      }
     });
-    return () => listener.remove();
-  }, [refresh, proceed]);
+    return () => {
+      active = false;
+      listener.remove();
+    };
+  }, [customerId, refresh, proceed]);
   const key =
     Platform.OS === "ios"
       ? process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY
@@ -72,29 +90,27 @@ export function PaymentGate({
     )
       return;
     if (!billingSession.beginTransaction()) return;
+    const generation = version.current;
+    const current = () => billingSession.current(customerId, generation);
     setBusy(true);
     setError("");
     try {
-      await billingSession.run(customerId, version.current, key, (sdk) =>
-        presentMonthlyPaywall(
-          sdk,
-          () => snapshot({}),
-          () => billingSession.current(customerId, version.current),
-          productId,
-        ),
+      await billingSession.run(customerId, generation, key, (sdk) =>
+        presentMonthlyPaywall(sdk, () => snapshot({}), current, productId),
       );
-      await refresh();
+      if (current()) await refresh();
     } catch (error) {
-      setError(
-        error instanceof Error &&
-          error.message ===
-            "Finish or cancel your website checkout before subscribing here."
-          ? error.message
-          : "Store purchase is unavailable. Please try again later.",
-      );
+      if (current())
+        setError(
+          error instanceof Error &&
+            error.message ===
+              "Finish or cancel your website checkout before subscribing here."
+            ? error.message
+            : "Store purchase is unavailable. Please try again later.",
+        );
     } finally {
       billingSession.endTransaction();
-      setBusy(false);
+      if (current()) setBusy(false);
     }
   }
   return (
@@ -146,6 +162,13 @@ export function PaymentGate({
           label={`Buy ${creditQuantity("topup")} credits · ${topup.product.priceString}`}
           onPress={() => void topup.purchase()}
           disabled={busy || web.busy || topup.busy}
+        />
+      )}
+      {web.topupAvailable && (
+        <Action
+          label="Buy top-up on website"
+          disabled={busy || web.busy || topup.busy}
+          onPress={() => void web.open("topup")}
         />
       )}
       {!!topup.message && (

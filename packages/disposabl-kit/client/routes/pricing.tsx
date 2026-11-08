@@ -13,6 +13,8 @@ import { sessionId } from "../../lib/auth-session";
 import { paymentsEnabled } from "../../features";
 import {
   requestCheckout,
+  handoffSelection,
+  handoffAllows,
   type CheckoutResult,
 } from "../../payments/checkout-attempt";
 import {
@@ -90,11 +92,16 @@ function SubscriptionHelp() {
   );
 }
 function PurchasePage({ session }: { session: string | null }) {
+  const [handoff] = useState(() =>
+    typeof window === "undefined"
+      ? null
+      : handoffSelection(window.sessionStorage.getItem("billing-from-ios")),
+  );
   const [fromIos] = useState(
     () =>
       typeof window !== "undefined" &&
       (new URLSearchParams(window.location.search).get("source") === "ios" ||
-        window.sessionStorage.getItem("billing-from-ios") === "1"),
+        !!handoff),
   );
   const { isLoading } = useConvexAuth();
   const getSnapshot = useAction(snapshot);
@@ -145,7 +152,13 @@ function PurchasePage({ session }: { session: string | null }) {
     if (session) void refresh();
   }, [session, refresh]);
   async function purchase(kind: "monthly" | "topup") {
-    if (!session || !customerId || busy) return;
+    if (
+      !session ||
+      !customerId ||
+      busy ||
+      !handoffAllows(fromIos, handoff, customerId, kind)
+    )
+      return;
     const version = generation.current;
     setBusy(true);
     setMessage("");
@@ -238,26 +251,32 @@ function PurchasePage({ session }: { session: string | null }) {
         </>
       )}
       <div className="grid gap-5 md:grid-cols-2">
-        <section className="rounded-lg border p-6">
-          <h2 className="text-xl font-semibold">{monthlyLabel()}</h2>
-          <p>{formatPrice(pricing.monthly.price)} / month</p>
-          <p>
-            {creditQuantity("monthly")} credits each month. Unused monthly
-            credits expire.
-          </p>
-          <button
-            className="mt-4 rounded bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50"
-            disabled={
-              !session || !customerId || busy || hasMonthlyPlan !== false
-            }
-            onClick={() => void purchase("monthly")}
-          >
-            {hasMonthlyPlan
-              ? "Monthly plan active or scheduled"
-              : "Choose monthly"}
-          </button>
-        </section>
-        {!fromIos && (
+        {(!fromIos || handoff?.purchase === "monthly") && (
+          <section className="rounded-lg border p-6">
+            <h2 className="text-xl font-semibold">{monthlyLabel()}</h2>
+            <p>{formatPrice(pricing.monthly.price)} / month</p>
+            <p>
+              {creditQuantity("monthly")} credits each month. Unused monthly
+              credits expire.
+            </p>
+            <button
+              className="mt-4 rounded bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50"
+              disabled={
+                !session ||
+                !customerId ||
+                busy ||
+                hasMonthlyPlan !== false ||
+                !handoffAllows(fromIos, handoff, customerId, "monthly")
+              }
+              onClick={() => void purchase("monthly")}
+            >
+              {hasMonthlyPlan
+                ? "Monthly plan active or scheduled"
+                : "Choose monthly"}
+            </button>
+          </section>
+        )}
+        {handoffAllows(fromIos, handoff, customerId, "topup") && (
           <section className="rounded-lg border p-6">
             <h2 className="text-xl font-semibold">Top-up</h2>
             <p>{formatPrice(pricing.topup.price)} once</p>

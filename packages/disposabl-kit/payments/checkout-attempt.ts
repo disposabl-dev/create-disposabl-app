@@ -18,3 +18,38 @@ export async function requestCheckout(
   if (result.url || result.retryAllowed === true) storage.removeItem(key);
   return result;
 }
+
+/** A query parameter marks the iOS context but cannot grant a purchase option. */
+export function handoffSelection(value: string | null) {
+  try {
+    const parsed: unknown = JSON.parse(value ?? "null");
+    if (!parsed || typeof parsed !== "object") return null;
+    const record = parsed as Record<string, unknown>;
+    return typeof record.userId === "string" &&
+      typeof record.expiresAt === "number" &&
+      record.expiresAt > Date.now() &&
+      (record.purchase === "monthly" || record.purchase === "topup")
+      ? {
+          userId: record.userId,
+          purchase: record.purchase,
+          expiresAt: record.expiresAt,
+        }
+      : null;
+  } catch {
+    return null;
+  }
+}
+export function handoffAllows(
+  fromIos: boolean,
+  selection: ReturnType<typeof handoffSelection>,
+  customerId: string | null,
+  purchase: "monthly" | "topup",
+) {
+  return (
+    !fromIos ||
+    (!!customerId &&
+      selection?.userId === customerId &&
+      selection.expiresAt > Date.now() &&
+      selection.purchase === purchase)
+  );
+}

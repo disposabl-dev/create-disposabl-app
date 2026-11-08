@@ -32,6 +32,7 @@ export default defineSchema({
     hash: v.string(),
     userId: v.string(),
     sessionId: v.string(),
+    purchase: v.optional(v.union(v.literal("monthly"), v.literal("topup"))),
     expiresAt: v.number(),
   }).index("by_hash", ["hash"]),
   billingAttempts: defineTable({

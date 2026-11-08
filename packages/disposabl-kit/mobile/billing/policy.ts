@@ -1,5 +1,6 @@
 import type Purchases from "react-native-purchases";
 import { validMonthlyOffering, type BillingSnapshot } from "./paywall";
+import { loadTopup, matchingTopupRoute, type TopupSnapshot } from "./topup";
 
 export function paymentOptions(input: {
   platform: string;
@@ -72,4 +73,53 @@ export async function preflightWebMonthly(
   check();
   if (customer.activeSubscriptions.length)
     throw new Error("existing_subscription");
+}
+
+/** The matching route and real consumable must still exist at the moment of handoff. */
+export async function preflightWebTopup(
+  sdk: Pick<
+    typeof Purchases,
+    | "canMakePayments"
+    | "getStorefront"
+    | "getAppUserID"
+    | "getProducts"
+    | "PRODUCT_CATEGORY"
+    | "purchaseStoreProduct"
+  >,
+  platform: string,
+  app: string | undefined,
+  productId: string | undefined,
+  customerId: string,
+  snapshot: () => Promise<
+    TopupSnapshot & { mobileWebCheckoutEnabled: boolean }
+  >,
+  current: () => boolean,
+) {
+  const check = () => {
+    if (!current()) throw new Error("Account changed.");
+  };
+  const latest = await snapshot();
+  check();
+  if (
+    latest.customerId !== customerId ||
+    !matchingTopupRoute(latest, platform, app, productId)
+  )
+    throw new Error("Top-up unavailable.");
+  const eligibility = await storeEligibility(sdk, platform);
+  check();
+  if ((await sdk.getAppUserID()) !== customerId)
+    throw new Error("Account changed.");
+  check();
+  const product = await loadTopup(sdk, platform, productId!);
+  check();
+  if (
+    !paymentOptions({
+      platform,
+      ...eligibility,
+      paymentsEnabled: true,
+      webCheckoutEnabled: latest.mobileWebCheckoutEnabled,
+      nativeReady: !!product,
+    }).web
+  )
+    throw new Error("Website checkout is unavailable.");
 }

@@ -6,19 +6,25 @@ import { billingSession } from "./session";
 import {
   paymentOptions,
   preflightWebMonthly,
+  preflightWebTopup,
   storeEligibility,
 } from "./policy";
 import { validMonthlyOffering, type BillingSnapshot } from "./paywall";
+import { loadTopup, matchingTopupRoute, type TopupSnapshot } from "./topup";
+
+const topupApp = process.env.EXPO_PUBLIC_REVENUECAT_IOS_APP_ID;
+const topupProduct = process.env.EXPO_PUBLIC_REVENUECAT_IOS_TOPUP_PRODUCT;
 
 const create = makeFunctionReference<
   "mutation",
-  Record<string, never>,
+  { purchase: "monthly" | "topup" },
   { url: string; userId: string }
 >("billingHandoff:create");
-type Snapshot = BillingSnapshot & {
-  mobileWebCheckoutEnabled: boolean;
-  customerId: string;
-};
+type Snapshot = BillingSnapshot &
+  TopupSnapshot & {
+    mobileWebCheckoutEnabled: boolean;
+    customerId: string;
+  };
 export function useWebCheckout(
   customerId: string,
   version: React.RefObject<number>,
@@ -28,6 +34,7 @@ export function useWebCheckout(
 ) {
   const handoff = useMutation(create);
   const [available, setAvailable] = useState(false);
+  const [topupAvailable, setTopupAvailable] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const lifecycle = useRef({ sequence: 0 });
@@ -35,7 +42,8 @@ export function useWebCheckout(
     async (generation: number) => {
       const seq = ++lifecycle.current.sequence;
       setAvailable(false);
-      if (Platform.OS !== "ios" || !key || !productId) return;
+      setTopupAvailable(false);
+      if (Platform.OS !== "ios" || !key) return;
       try {
         const latest = await snapshot();
         if (latest.customerId !== customerId) return;
@@ -45,24 +53,46 @@ export function useWebCheckout(
           key,
           async (sdk) => {
             const eligibility = await storeEligibility(sdk, Platform.OS);
-            const offering = (await sdk.getOfferings()).current;
-            return paymentOptions({
+            const offering = productId
+              ? (await sdk.getOfferings().catch(() => null))?.current
+              : null;
+            const common = {
               platform: Platform.OS,
               ...eligibility,
               paymentsEnabled: true,
               webCheckoutEnabled: latest.mobileWebCheckoutEnabled,
-              nativeReady:
-                latest.nativeSubscriptionsEnabled &&
-                !!offering &&
-                validMonthlyOffering(offering.availablePackages, productId),
-            }).web;
+            };
+            const topup =
+              matchingTopupRoute(latest, Platform.OS, topupApp, topupProduct) &&
+              (await sdk.getAppUserID()) === customerId &&
+              topupProduct
+                ? await loadTopup(sdk, Platform.OS, topupProduct).catch(
+                    () => null,
+                  )
+                : null;
+            return {
+              topup: paymentOptions({ ...common, nativeReady: !!topup }).web,
+              monthly: paymentOptions({
+                platform: Platform.OS,
+                ...eligibility,
+                paymentsEnabled: true,
+                webCheckoutEnabled: latest.mobileWebCheckoutEnabled,
+                nativeReady:
+                  latest.nativeSubscriptionsEnabled &&
+                  !!offering &&
+                  !!productId &&
+                  validMonthlyOffering(offering.availablePackages, productId),
+              }).web,
+            };
           },
         );
         if (
           seq === lifecycle.current.sequence &&
           billingSession.current(customerId, generation)
-        )
-          setAvailable(value && latest.hasMonthlyPlan === false);
+        ) {
+          setAvailable(value.monthly && latest.hasMonthlyPlan === false);
+          setTopupAvailable(value.topup);
+        }
       } catch {
         /* Fail closed until the next refresh. */
       }
@@ -81,8 +111,12 @@ export function useWebCheckout(
       listener.remove();
     };
   }, [refresh, version]);
-  async function open() {
-    if (!available || !key || !productId || !billingSession.beginTransaction())
+  async function open(purchase: "monthly" | "topup" = "monthly") {
+    if (
+      !(purchase === "monthly" ? available && productId : topupAvailable) ||
+      !key ||
+      !billingSession.beginTransaction()
+    )
       return false;
     const generation = version.current;
     const current = () => billingSession.current(customerId, generation);
@@ -94,15 +128,27 @@ export function useWebCheckout(
         generation,
         key,
         async (sdk) => {
-          await preflightWebMonthly(
-            sdk,
-            Platform.OS,
-            productId,
-            customerId,
-            snapshot,
-            current,
-          );
-          return handoff({});
+          if (purchase === "monthly")
+            await preflightWebMonthly(
+              sdk,
+              Platform.OS,
+              productId!,
+              customerId,
+              snapshot,
+              current,
+            );
+          else
+            await preflightWebTopup(
+              sdk,
+              Platform.OS,
+              topupApp,
+              topupProduct,
+              customerId,
+              snapshot,
+              current,
+            );
+          if (!current()) throw new Error("Account changed.");
+          return handoff({ purchase });
         },
       );
       const parsed = new URL(handoffResult.url);
@@ -124,6 +170,7 @@ export function useWebCheckout(
     } catch {
       if (current()) {
         setAvailable(false);
+        setTopupAvailable(false);
         setError("Website checkout is unavailable. Refresh and try again.");
       }
       return false;
@@ -134,6 +181,7 @@ export function useWebCheckout(
   }
   return {
     available,
+    topupAvailable,
     busy,
     error,
     open,

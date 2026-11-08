@@ -32,9 +32,9 @@ async function lookup(ctx: QueryCtx, code: string) {
   return row;
 }
 export const create = mutation({
-  args: {},
+  args: { purchase: v.union(v.literal("monthly"), v.literal("topup")) },
   returns: v.object({ url: v.string(), userId: v.string() }),
-  handler: async (ctx) => {
+  handler: async (ctx, { purchase }) => {
     const config = billingConfig(paymentsEnabled, process.env);
     if (!config || !mobileWebCheckoutConfigured(paymentsEnabled, process.env))
       throw new ConvexError("Website checkout is unavailable.");
@@ -52,6 +52,7 @@ export const create = mutation({
       hash,
       userId,
       sessionId: identity.subject,
+      purchase,
       expiresAt: Date.now() + ttl,
     });
     await ctx.scheduler.runAfter(ttl, cleanupRef, { hash });
@@ -96,12 +97,18 @@ export const redeem = mutation({
     refreshToken: v.string(),
     refreshTokenExpiresAt: v.number(),
     userId: v.string(),
+    purchase: v.union(v.literal("monthly"), v.literal("topup")),
+    expiresAt: v.number(),
   }),
   handler: async (ctx, { code }) => {
     const row = await lookup(ctx, code);
     const tokens = await exchangeBrowserSession(ctx, row.sessionId, row.userId);
     await ctx.db.delete("billingHandoffs", row._id);
-    return tokens;
+    return {
+      ...tokens,
+      purchase: row.purchase ?? "monthly",
+      expiresAt: row.expiresAt,
+    };
   },
 });
 export const cleanup = internalMutation({

@@ -7,6 +7,7 @@ test("billing handoff expires and a redeemed link cannot be replayed", async () 
     _id: "one",
     userId: "alice",
     sessionId: "session",
+    purchase: "topup",
     expiresAt: Date.now() + 120_000,
   };
   let exchanges = 0;
@@ -23,7 +24,12 @@ test("billing handoff expires and a redeemed link cannot be replayed", async () 
     },
   };
   const code = "Q".repeat(43);
-  assert.equal((await (redeem as any)._handler(ctx, { code })).userId, "alice");
+  const expiresAt = row.expiresAt;
+  assert.deepEqual(await (redeem as any)._handler(ctx, { code }), {
+    userId: "alice",
+    purchase: "topup",
+    expiresAt,
+  });
   await assert.rejects((redeem as any)._handler(ctx, { code }), /expired/);
   assert.equal(exchanges, 1);
   row = {
@@ -35,4 +41,38 @@ test("billing handoff expires and a redeemed link cannot be replayed", async () 
   await assert.rejects((redeem as any)._handler(ctx, { code }), /expired/);
   await (cleanup as any)._handler(ctx, { hash: "hash" });
   assert.equal(row, null);
+});
+
+test("pricing requires the redeemed selection and matching account for iOS", async () => {
+  const { handoffSelection, handoffAllows } =
+    await import("../disposabl-kit/payments/checkout-attempt");
+  assert.equal(
+    handoffAllows(true, handoffSelection(null), "alice", "topup"),
+    false,
+  );
+  assert.equal(
+    handoffAllows(true, handoffSelection("1"), "alice", "topup"),
+    false,
+  );
+  const selection = handoffSelection(
+    JSON.stringify({
+      userId: "alice",
+      purchase: "topup",
+      expiresAt: Date.now() + 120000,
+    }),
+  );
+  assert.equal(handoffAllows(true, selection, "alice", "topup"), true);
+  assert.equal(handoffAllows(true, selection, "bob", "topup"), false);
+  assert.equal(handoffAllows(true, selection, "alice", "monthly"), false);
+  assert.equal(handoffAllows(false, null, "alice", "topup"), true);
+  assert.equal(
+    handoffSelection(
+      JSON.stringify({
+        userId: "alice",
+        purchase: "topup",
+        expiresAt: Date.now() - 1,
+      }),
+    ),
+    null,
+  );
 });
