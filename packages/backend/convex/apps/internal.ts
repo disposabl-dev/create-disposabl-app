@@ -49,15 +49,16 @@ export const insert = internalMutation({
     if (!name || name.length > 214)
       throw new ConvexError("App name must contain 1–214 characters.");
     const platforms = [...new Set(args.platforms)];
+    validateAndroidArchitectures(
+      args.androidArchitectures ?? defaultAndroidArchitectures,
+    );
     const id = await ctx.db.insert("apps", {
       userId: args.userId,
       appId: args.appId,
       name,
       platforms,
       features: resolveFeatures(args.features ?? []),
-      androidArchitectures: validateAndroidArchitectures(
-        args.androidArchitectures ?? defaultAndroidArchitectures,
-      ),
+      androidArchitectures: [...defaultAndroidArchitectures],
       expoAccountId: null,
     });
     await scheduleTelemetry(
@@ -149,13 +150,9 @@ export const applyConfiguration = internalMutation({
     until: v.number(),
     platforms: v.array(platform),
     features: v.array(feature),
-    androidArchitectures: v.optional(v.array(androidArchitecture)),
   },
   returns: v.null(),
-  handler: async (
-    ctx,
-    { userId, appId, until, platforms, features, androidArchitectures },
-  ) => {
+  handler: async (ctx, { userId, appId, until, platforms, features }) => {
     const app = await ownedApp(ctx, userId, appId);
     if (
       app.operation?.kind !== "setup" ||
@@ -163,15 +160,7 @@ export const applyConfiguration = internalMutation({
       until <= Date.now()
     )
       throw new ConvexError("App setup lease expired. Retry setup.");
-    await ctx.db.patch("apps", app._id, {
-      platforms,
-      features,
-      androidArchitectures: validateAndroidArchitectures(
-        androidArchitectures ??
-          app.androidArchitectures ??
-          defaultAndroidArchitectures,
-      ),
-    });
+    await ctx.db.patch("apps", app._id, { platforms, features });
     return null;
   },
 });

@@ -12,6 +12,7 @@ const appOperations = new Set([
   "apps/internal:get",
   "apps/internal:repositoryToken",
   "previews/token/internal:create",
+  "previews/token/internal:complete",
   "previews/internal:get",
   "previews/internal:list",
   "releases/internal:get",

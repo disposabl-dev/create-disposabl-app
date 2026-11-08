@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { getFunctionName, httpRouter } from "convex/server";
 import { requestConfigurationChecked } from "../backend/convex/apps/index";
 import { create } from "../backend/convex/previews/token/actions/create";
+import { stage, complete } from "../backend/convex/previews/token/internal";
 import {
   applyConfiguration,
   get,
@@ -85,68 +86,76 @@ test("only the current unexpired setup lease can commit selections", async () =>
   assert.deepEqual(saved, {
     platforms: ["web", "ios"],
     features: [],
-    androidArchitectures: ["arm64-v8a"],
   });
 });
 
-test("applied architectures read back only after a valid owner lease", async () => {
+test("architecture completion is owner and lease fenced and consumes the staged selection", async () => {
   const until = Date.now() + 10000;
   let row: any = { ...app, operation: { kind: "setup", until } };
   const ctx = {
-    db: db(row, async (_table, _id, value) => {
-      row = { ...row, ...(value as object) };
-    }),
+    db: {
+      query: () => ({ withIndex: () => ({ unique: async () => row }) }),
+      patch: async (_table: unknown, _id: unknown, value: object) => {
+        row = { ...row, ...value };
+      },
+    },
   };
-  const args = {
-    userId: "owner",
-    appId,
-    until,
-    platforms: ["web", "android"],
-    features: [],
-    androidArchitectures: ["x86_64"],
-  };
+  const args = { userId: "owner", appId, until };
+  const selection = { ...args, androidArchitectures: ["x86_64"] };
   await assert.rejects(
-    (applyConfiguration as any)._handler(ctx, { ...args, userId: "other" }),
-    /App not found/,
+    (stage as any)._handler(ctx, { ...selection, androidArchitectures: [] }),
   );
   await assert.rejects(
-    (applyConfiguration as any)._handler(ctx, {
-      ...args,
-      androidArchitectures: [],
-    }),
-  );
-  await assert.rejects(
-    (applyConfiguration as any)._handler(ctx, {
-      ...args,
+    (stage as any)._handler(ctx, {
+      ...selection,
       androidArchitectures: ["bogus"],
     }),
   );
   await assert.rejects(
-    (applyConfiguration as any)._handler(ctx, {
-      ...args,
+    (stage as any)._handler(ctx, {
+      ...selection,
       androidArchitectures: ["x86_64", "x86_64"],
     }),
   );
-  assert.deepEqual(row.androidArchitectures, ["arm64-v8a"]);
-  await (applyConfiguration as any)._handler(ctx, args);
-  const readCtx = { db: db(row, () => {}) };
+  await (stage as any)._handler(ctx, selection);
+  // A failed local configure leaves the staged selection unapplied.
   assert.deepEqual(
-    (await (get as any)._handler(readCtx, { userId: "owner", appId }))
-      .androidArchitectures,
+    (await (get as any)._handler(ctx, args)).androidArchitectures,
+    ["arm64-v8a"],
+  );
+  await assert.rejects(
+    (complete as any)._handler(ctx, { ...args, userId: "other" }),
+    /App not found/,
+  );
+  await assert.rejects(
+    (complete as any)._handler(ctx, { ...args, until: until - 1 }),
+    /lease expired/,
+  );
+  row.operation.until = Date.now() - 1;
+  await assert.rejects(
+    (complete as any)._handler(ctx, { ...args, until: row.operation.until }),
+    /lease expired/,
+  );
+  row.operation = {
+    kind: "setup",
+    until: until + 1,
+    androidArchitectures: ["arm64-v8a"],
+  };
+  await assert.rejects((complete as any)._handler(ctx, args), /lease expired/);
+  row.operation = { kind: "setup", until, androidArchitectures: ["x86_64"] };
+  await (complete as any)._handler(ctx, args);
+  assert.deepEqual(
+    (await (get as any)._handler(ctx, args)).androidArchitectures,
     ["x86_64"],
   );
   await assert.rejects(
-    (get as any)._handler(readCtx, { userId: "other", appId }),
-    /App not found/,
+    (complete as any)._handler(ctx, args),
+    /already completed/,
   );
   const legacy = { ...row, androidArchitectures: undefined };
   assert.deepEqual(
-    (
-      await (get as any)._handler(
-        { db: db(legacy, () => {}) },
-        { userId: "owner", appId },
-      )
-    ).androidArchitectures,
+    (await (get as any)._handler({ db: db(legacy, () => {}) }, args))
+      .androidArchitectures,
     ["arm64-v8a", "x86_64"],
   );
 });

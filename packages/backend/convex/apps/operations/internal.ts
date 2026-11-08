@@ -60,7 +60,8 @@ export const begin = internalMutation({
     // Longer than Convex's maximum action runtime, including nested actions.
     const until = Date.now() + 15 * 60_000;
     await ctx.db.patch("apps", app._id, {
-      operation: { ...app.operation, kind, until },
+      operation:
+        kind === "setup" ? { kind, until } : { ...app.operation, kind, until },
     });
     return {
       until,

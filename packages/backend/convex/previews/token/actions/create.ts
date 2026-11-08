@@ -24,7 +24,12 @@ import { provisionPayments } from "../../../apps/actions/billing";
 import { analyticsConfig } from "../../../connections/validator";
 
 export const create = internalAction({
-  args: { ...identityFields, ...previewIdentity, ...requestedConfiguration },
+  args: {
+    ...identityFields,
+    ...previewIdentity,
+    ...requestedConfiguration,
+    configurationLease: v.optional(v.boolean()),
+  },
   returns: v.object({
     appId: v.string(),
     ...deployment.fields,
@@ -32,6 +37,7 @@ export const create = internalAction({
     productionConvexSiteUrl: v.optional(v.string()),
     repositoryUrl: v.optional(v.string()),
     analytics: v.optional(analyticsConfig),
+    configurationLeaseUntil: v.optional(v.number()),
   }),
   handler: async (
     ctx,
@@ -46,6 +52,7 @@ export const create = internalAction({
     productionConvexSiteUrl?: string;
     repositoryUrl?: string;
     analytics?: { projectId: number; projectToken: string; host: string };
+    configurationLeaseUntil?: number;
   }> => {
     validateReference(args.reference);
     const identity = { userId: args.userId, appId: args.appId };
@@ -56,6 +63,7 @@ export const create = internalAction({
         kind: "setup",
       },
     );
+    let retainLease = false;
     try {
       const current = await ctx.runQuery(internal.apps.internal.get, identity);
       const platforms = validatePlatforms(args.platforms ?? current.platforms);
@@ -102,11 +110,19 @@ export const create = internalAction({
         ...identity,
         platforms,
         features,
-        androidArchitectures,
         until,
       });
+      if (args.configurationLease) {
+        await ctx.runMutation(internal.previews.token.internal.stage, {
+          ...identity,
+          until,
+          androidArchitectures,
+        });
+        retainLease = true;
+      }
       return {
         appId: args.appId,
+        ...(retainLease ? { configurationLeaseUntil: until } : {}),
         ...deployment,
         deployKey,
         productionConvexSiteUrl: production.deploymentUrl.replace(
@@ -125,11 +141,12 @@ export const create = internalAction({
           : {}),
       };
     } finally {
-      await ctx.runMutation(internal.apps.operations.internal.finish, {
-        ...identity,
-        until,
-        retryDelete: false,
-      });
+      if (!retainLease)
+        await ctx.runMutation(internal.apps.operations.internal.finish, {
+          ...identity,
+          until,
+          retryDelete: false,
+        });
     }
   },
 });

@@ -137,6 +137,7 @@ export default defineSchema({
       v.object({
         kind: v.union(v.literal("setup"), v.literal("delete")),
         until: v.number(),
+        androidArchitectures: v.optional(v.array(androidArchitecture)),
         pending: v.optional(pendingDelete),
         expoManual: v.optional(v.boolean()),
       }),
