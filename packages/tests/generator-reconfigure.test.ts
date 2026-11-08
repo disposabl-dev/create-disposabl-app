@@ -176,6 +176,13 @@ test(
       );
       for (const features of ["payments", "authentication", "payments"]) {
         await reconfigureApp(template, app, version, { features });
+        assert.ok(
+          existsSync(join(app, "apps/mobile/src/app/+native-intent.ts")),
+        );
+        assert.match(
+          await read(app, "apps/mobile/app.config.js"),
+          /disposabl-billing-/,
+        );
         manifest = JSON.parse(await read(app, manifestPath));
         assert.equal(manifest.dependencies["custom-example"], "1.2.3");
         assert.equal(

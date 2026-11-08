@@ -16,6 +16,7 @@ module.exports = ({ config }) => {
     .update(project.name)
     .digest("hex")
     .slice(0, 12);
+  const billingScheme = `disposabl-billing-${suffix}-${channel}`;
   const basePackage = config.android?.package || `app.disposabl.a${suffix}`;
   const versionCode = Number(process.env.DISPOSABL_ANDROID_VERSION_CODE || 1);
   if (
@@ -49,8 +50,10 @@ module.exports = ({ config }) => {
             ...new Set([
               ...[config.scheme || []].flat(),
               `disposabl-${project.name.replace(/[^a-z0-9.-]/g, "-")}`,
+              billingScheme,
             ]),
           ],
+    extra: { ...config.extra, billingReturnChannel: channel },
     owner: process.env.EXPO_OWNER || config.owner,
     slug: process.env.EXPO_SLUG || config.slug,
     ios: {
@@ -96,7 +99,11 @@ module.exports = ({ config }) => {
     ...(projectId
       ? {
           runtimeVersion: { policy: "fingerprint" },
-          extra: { ...config.extra, eas: { ...config.extra?.eas, projectId } },
+          extra: {
+            ...config.extra,
+            billingReturnChannel: channel,
+            eas: { ...config.extra?.eas, projectId },
+          },
         }
       : {}),
     updates: {

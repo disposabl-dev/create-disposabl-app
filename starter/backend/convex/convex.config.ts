@@ -18,6 +18,7 @@ const app = defineApp({
     AUTUMN_SECRET_KEY: v.optional(v.string()),
     BILLING_RETURN_URL: v.optional(v.string()),
     MOBILE_WEB_CHECKOUT_ENABLED: v.optional(v.string()),
+    BILLING_IOS_RETURN_CHANNELS: v.optional(v.string()),
     REVENUECAT_CONSUMABLE_OWNER: v.optional(v.string()),
     REVENUECAT_CONSUMABLE_INTEGRATION_VERIFIED: v.optional(v.string()),
     REVENUECAT_WEBHOOK_AUTH: v.optional(v.string()),

@@ -83,11 +83,16 @@ test(
         "../../apps/mobile/app.config.js",
       );
       const config = configure({ config: { scheme: ["custom", "another"] } });
-      assert.deepEqual(config.scheme, [
+      assert.deepEqual(config.scheme.slice(0, 3), [
         "custom",
         "another",
         new URL(mobileAuthReturnUrl).protocol.slice(0, -1),
       ]);
+      assert.match(
+        config.scheme[3],
+        /^disposabl-billing-[a-f0-9]{12}-[a-z][a-z0-9-]{0,62}$/,
+      );
+      assert.equal(config.scheme.length, 4);
     } finally {
       keys.forEach((key, index) => {
         if (saved[index] === undefined) delete process.env[key];

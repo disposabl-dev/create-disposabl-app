@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { makeFunctionReference } from "convex/server";
-import { useAction, useConvexAuth } from "convex/react";
+import { useAction, useConvexAuth, useQuery } from "convex/react";
 import {
   useCallback,
   useEffect,
@@ -14,6 +14,8 @@ import { paymentsEnabled } from "../../features";
 import {
   requestCheckout,
   handoffContext,
+  handoffReturnClaim,
+  safeBillingReturnUrl,
   handoffAllows,
   type CheckoutResult,
 } from "../../payments/checkout-attempt";
@@ -46,6 +48,11 @@ const checkout = makeFunctionReference<
   { purchase: "monthly" | "topup"; requestId: string },
   CheckoutResult
 >("billing:checkout");
+const returnTarget = makeFunctionReference<
+  "query",
+  { code: string },
+  { url: string; expiresAt: number } | null
+>("billingHandoff:returnTarget");
 const portal = makeFunctionReference<
   "action",
   Record<string, never>,
@@ -100,6 +107,16 @@ function PurchasePage({ session }: { session: string | null }) {
           window.location.search,
         ),
   );
+  const [returnClaim] = useState(() =>
+    typeof window === "undefined"
+      ? null
+      : handoffReturnClaim(window.sessionStorage.getItem("billing-from-ios")),
+  );
+  const returnLink = useQuery(
+    returnTarget,
+    session && returnClaim ? { code: returnClaim } : "skip",
+  );
+  const openApp = safeBillingReturnUrl(returnLink?.url);
   const { isLoading } = useConvexAuth();
   const getSnapshot = useAction(snapshot);
   const start = useAction(checkout);
@@ -230,7 +247,21 @@ function PurchasePage({ session }: { session: string | null }) {
             the balance has not updated yet.
           </p>
           {fromIos && (
-            <p>After checkout, return to the app and refresh your credits.</p>
+            <p>
+              After checkout, return to the app and refresh your credits.{" "}
+              {openApp && (
+                <a
+                  className="underline"
+                  href={openApp}
+                  onClick={(event) => {
+                    if (!returnLink || Date.now() >= returnLink.expiresAt)
+                      event.preventDefault();
+                  }}
+                >
+                  Open app
+                </a>
+              )}
+            </p>
           )}
           {checkoutNeedsReview && (
             <p role="alert">

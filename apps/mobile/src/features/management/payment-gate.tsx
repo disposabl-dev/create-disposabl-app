@@ -29,44 +29,19 @@ export function PaymentGate({
 }) {
   const snapshot = useAction(api.billing.snapshot);
   const version = useRef(0);
-  const awaitingReturn = useRef(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   useEffect(() => {
-    awaitingReturn.current = false;
     const selected = billingSession.acquire(customerId);
     version.current = selected;
     return () => billingSession.release(customerId, selected);
   }, [customerId]);
   useEffect(() => {
-    let active = true;
-    let sequence = 0;
     const listener = AppState.addEventListener("change", (state) => {
-      if (state === "active") {
-        const currentSequence = ++sequence;
-        const generation = version.current;
-        void refresh()
-          .then((balance) => {
-            if (
-              active &&
-              currentSequence === sequence &&
-              billingSession.current(customerId, generation) &&
-              awaitingReturn.current &&
-              balance !== null &&
-              balance >= 10
-            ) {
-              awaitingReturn.current = false;
-              proceed();
-            }
-          })
-          .catch(() => undefined);
-      }
+      if (state === "active") void refresh().catch(() => undefined);
     });
-    return () => {
-      active = false;
-      listener.remove();
-    };
-  }, [customerId, refresh, proceed]);
+    return () => listener.remove();
+  }, [refresh]);
   const key =
     Platform.OS === "ios"
       ? process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY
@@ -148,12 +123,7 @@ export function PaymentGate({
       {web.available && (
         <Action
           label="Buy monthly on website"
-          onPress={() => {
-            awaitingReturn.current = true;
-            void web.open().then((opened) => {
-              if (!opened) awaitingReturn.current = false;
-            });
-          }}
+          onPress={() => void web.open()}
           disabled={busy || web.busy || topup.busy}
         />
       )}

@@ -62,3 +62,24 @@ export function handoffContext(stored: string | null, search: string) {
       stored !== null || new URLSearchParams(search).get("source") === "ios",
   };
 }
+
+/** A claim is checked against the redeemed browser session by the backend. */
+export function handoffReturnClaim(value: string | null) {
+  try {
+    const record = JSON.parse(value ?? "null");
+    return typeof record?.returnClaim === "string" &&
+      /^[A-Za-z0-9_-]{43}$/.test(record.returnClaim)
+      ? record.returnClaim
+      : null;
+  } catch {
+    return null;
+  }
+}
+export function safeBillingReturnUrl(value: string | undefined) {
+  return value &&
+    /^disposabl-billing-[a-f0-9]{12}-[a-z][a-z0-9-]{0,62}:\/\/billing-return$/.test(
+      value,
+    )
+    ? value
+    : null;
+}

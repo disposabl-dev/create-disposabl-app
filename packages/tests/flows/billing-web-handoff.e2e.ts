@@ -121,13 +121,19 @@ test(
       process.env.E2E_BILLING_WEB_FIXTURE !== "1",
       "Requires isolated billing browser fixture on ports 3450/3451",
     );
-    await reset("topup", { mode: "unknown" });
+    await reset("topup", {
+      mode: "unknown",
+      returnChannel: "preview",
+      returnExpiresAt: Date.now() + 300_000,
+    });
     await app.open(`/billing-login#${code}`);
     await screen.getByRole("button", "Continue as @alice").tap();
     await screen.getByRole("button", "Buy top-up").tap();
     await expect(screen.getByRole("status")).toContainText(
       "Checkout status could not be confirmed",
     );
+    await expect(screen.getByRole("link", "Open app")).toBeVisible();
+    await expect(screen.getByRole("alert")).toContainText("needs review");
     await screen.getByRole("button", "Buy top-up").tap();
     await expect(screen.getByRole("status")).toContainText(
       "Checkout status could not be confirmed",
@@ -191,7 +197,7 @@ test(
 );
 
 test(
-  "mocked native storefront retains store and US handoff resumes only at ten credits",
+  "mocked native storefront retains store and requires explicit continuation",
   { platforms: ["web"] },
   async ({ app, screen }) => {
     test.skip(
@@ -239,6 +245,9 @@ test(
     await expect(screen.getByText("Gate continued")).toHaveCount(0);
     await update({ balance: 10 });
     await screen.getByRole("button", "Simulate app foreground").tap();
+    await expect(screen.getByRole("button", "Continue")).toBeVisible();
+    await expect(screen.getByText("Gate continued")).toHaveCount(0);
+    await screen.getByRole("button", "Continue").tap();
     await expect(screen.getByText("Gate continued")).toBeVisible();
     await app.screenshot("native-gate-mock-ten-credits");
   },
@@ -268,6 +277,66 @@ test(
     await app.open("/pricing");
     await expect(screen.getByRole("button", "Buy top-up")).toBeVisible();
     await expect(screen.getByRole("button", "Choose monthly")).toBeVisible();
+    expect((await attempts()).length).toBe(0);
+  },
+);
+
+test(
+  "return link is session-bound, channel-specific and absent for old or forged handoffs",
+  { platforms: ["web"] },
+  async ({ app, screen, browser }) => {
+    test.skip(
+      process.env.E2E_BILLING_WEB_FIXTURE !== "1",
+      "Requires isolated billing browser fixture on ports 3450/3451",
+    );
+    for (const channel of ["production", "preview"]) {
+      await reset("topup", {
+        returnChannel: channel,
+        returnExpiresAt: Date.now() + 300_000,
+      });
+      await app.open(`/billing-login#${code}`);
+      await screen.getByRole("button", "Continue as @alice").tap();
+      await expect(screen.getByRole("link", "Open app")).toHaveAttribute(
+        "href",
+        `disposabl-billing-97f7be92f4c3-${channel}://billing-return`,
+      );
+      await expect(screen.getByRole("button", "Buy top-up")).toBeVisible();
+      expect((await attempts()).length).toBe(0);
+      await app.screenshot(`return-${channel}`);
+      await browser.evaluate(() => {
+        const stored = JSON.parse(sessionStorage.getItem("billing-from-ios")!);
+        stored.expiresAt = Date.now() - 1;
+        sessionStorage.setItem("billing-from-ios", JSON.stringify(stored));
+        return null;
+      });
+      await app.open("/pricing");
+      await expect(screen.getByRole("button", "Buy top-up")).toHaveCount(0);
+      await expect(screen.getByRole("link", "Open app")).toHaveAttribute(
+        "href",
+        `disposabl-billing-97f7be92f4c3-${channel}://billing-return`,
+      );
+    }
+    await reset("topup");
+    await app.open(`/billing-login#${code}`);
+    await screen.getByRole("button", "Continue as @alice").tap();
+    await expect(screen.getByRole("button", "Buy top-up")).toBeVisible();
+    await expect(screen.getByRole("link", "Open app")).toHaveCount(0);
+    await browser.evaluate((claim) => {
+      sessionStorage.setItem(
+        "billing-from-ios",
+        JSON.stringify({
+          userId: "alice",
+          purchase: "topup",
+          expiresAt: Date.now() + 120000,
+          returnClaim: claim,
+          returnUrl: "https://evil.example",
+        }),
+      );
+      sessionStorage.setItem("fixture-user", "bob");
+      return null;
+    }, code);
+    await app.open("/pricing?source=ios&returnUrl=https://evil.example");
+    await expect(screen.getByRole("link", "Open app")).toHaveCount(0);
     expect((await attempts()).length).toBe(0);
   },
 );

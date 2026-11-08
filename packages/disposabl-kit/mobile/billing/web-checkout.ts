@@ -1,3 +1,4 @@
+import Constants from "expo-constants";
 import { useMutation } from "convex/react";
 import { makeFunctionReference } from "convex/server";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -17,7 +18,7 @@ const topupProduct = process.env.EXPO_PUBLIC_REVENUECAT_IOS_TOPUP_PRODUCT;
 
 const create = makeFunctionReference<
   "mutation",
-  { purchase: "monthly" | "topup" },
+  { purchase: "monthly" | "topup"; returnChannel?: string },
   { url: string; userId: string }
 >("billingHandoff:create");
 type Snapshot = BillingSnapshot &
@@ -148,7 +149,12 @@ export function useWebCheckout(
               current,
             );
           if (!current()) throw new Error("Account changed.");
-          return handoff({ purchase });
+          const returnChannel =
+            Constants.expoConfig?.extra?.billingReturnChannel;
+          return handoff({
+            purchase,
+            ...(typeof returnChannel === "string" ? { returnChannel } : {}),
+          });
         },
       );
       const parsed = new URL(handoffResult.url);

@@ -5,6 +5,8 @@ type State = {
   purchase: "monthly" | "topup";
   expiresAt: number;
   used: boolean;
+  returnChannel?: string;
+  returnExpiresAt?: number;
   balance: number;
   monthly: boolean;
   mode: string;
@@ -59,7 +61,25 @@ Bun.serve({
           refreshTokenExpiresAt: state.expiresAt,
           purchase: state.purchase,
           expiresAt: state.expiresAt,
+          returnClaim: state.returnChannel ? args.code : null,
         },
+        { headers },
+      );
+    }
+    if (name === "billingHandoff:returnTarget") {
+      const valid =
+        state.used &&
+        args.code === state.code &&
+        user === state.user &&
+        ["production", "preview"].includes(state.returnChannel ?? "") &&
+        (state.returnExpiresAt ?? 0) > Date.now();
+      return Response.json(
+        valid
+          ? {
+              url: `disposabl-billing-97f7be92f4c3-${state.returnChannel}://billing-return`,
+              expiresAt: state.returnExpiresAt,
+            }
+          : null,
         { headers },
       );
     }
