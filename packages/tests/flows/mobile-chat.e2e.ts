@@ -310,7 +310,7 @@ test(
         await screen.scrollUntilVisible(
           platform === "ios"
             ? screen.getByRole("link", "View web build logs", { exact: true })
-            : screen.getByText("View build logs", { exact: true }),
+            : screen.getByRole("group", "View web build logs", { exact: true }),
         );
         await app.screenshot("chat-build-logs");
         const download = screen.getByRole("button", "Download Android", {
