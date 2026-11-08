@@ -391,7 +391,7 @@ test("native top-up fails closed and checks identity at purchase", async () => {
     REVENUECAT_CONSUMABLE_INTEGRATION_VERIFIED: "true",
     REVENUECAT_WEBHOOK_AUTH: "auth",
     REVENUECAT_PROJECT_ID: "project",
-    AUTUMN_SECRET_KEY: "key",
+    AUTUMN_SECRET_KEY: "am_sk_test_fixture",
     REVENUECAT_ENVIRONMENT: "SANDBOX",
     REVENUECAT_ROUTES: JSON.stringify([
       { app: "apple", store: "APP_STORE", product: "coins" },
@@ -403,6 +403,7 @@ test("native top-up fails closed and checks identity at purchase", async () => {
     { REVENUECAT_CONSUMABLE_INTEGRATION_VERIFIED: "false" },
     { REVENUECAT_ROUTES: "[]" },
     { REVENUECAT_WEBHOOK_AUTH: "" },
+    { AUTUMN_SECRET_KEY: "am_sk_live_fixture" },
   ])
     assert.deepEqual(nativeTopupRoutes(true, { ...env, ...change }), []);
   const snapshot = {

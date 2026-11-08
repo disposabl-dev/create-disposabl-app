@@ -93,7 +93,7 @@ export const route = query({
       REVENUECAT_PROJECT_ID: "project",
       REVENUECAT_ENVIRONMENT: "SANDBOX",
       REVENUECAT_ROUTES: a.routes,
-      AUTUMN_SECRET_KEY: "fixture",
+      AUTUMN_SECRET_KEY: "am_sk_test_fixture",
     });
     return configs
       ? {

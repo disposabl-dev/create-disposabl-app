@@ -127,7 +127,7 @@ describe("RevenueCat consumable inbox", () => {
       REVENUECAT_WEBHOOK_AUTH: "Bearer test",
       REVENUECAT_PROJECT_ID: "proj",
       REVENUECAT_ENVIRONMENT: "SANDBOX",
-      AUTUMN_SECRET_KEY: "key",
+      AUTUMN_SECRET_KEY: "am_sk_test_fixture",
       REVENUECAT_ROUTES: JSON.stringify([
         { app: "app", store: "APP_STORE", product: "topup" },
         { app: "android", store: "PLAY_STORE", product: "coins" },
@@ -191,6 +191,50 @@ describe("RevenueCat consumable inbox", () => {
         configs[0]!,
       ),
       null,
+    );
+  });
+  test("sandbox and production events require matching Autumn key environments", () => {
+    const env = {
+      REVENUECAT_CONSUMABLE_OWNER: "custom",
+      REVENUECAT_WEBHOOK_AUTH: "Bearer fixture",
+      REVENUECAT_PROJECT_ID: "project",
+      REVENUECAT_ROUTES: JSON.stringify([
+        { app: "ios", store: "APP_STORE", product: "topup" },
+      ]),
+      REVENUECAT_ENVIRONMENT: "SANDBOX",
+      AUTUMN_SECRET_KEY: "am_sk_test_fixture",
+    };
+    assert.equal(revenueCatConfigs(true, env)?.[0]?.environment, "SANDBOX");
+    assert.equal(
+      revenueCatConfigs(true, {
+        ...env,
+        AUTUMN_SECRET_KEY: "am_sk_live_fixture",
+      }),
+      null,
+    );
+    assert.equal(
+      revenueCatConfigs(true, { ...env, AUTUMN_SECRET_KEY: "unknown" }),
+      null,
+    );
+    assert.equal(
+      revenueCatConfigs(true, { ...env, AUTUMN_SECRET_KEY: "am_sk_test_" }),
+      null,
+    );
+    assert.equal(
+      revenueCatConfigs(true, {
+        ...env,
+        AUTUMN_SECRET_KEY: "am_sk_test_bad key",
+      }),
+      null,
+    );
+    const live = { ...env, REVENUECAT_ENVIRONMENT: "PRODUCTION" };
+    assert.equal(revenueCatConfigs(true, live), null);
+    assert.equal(
+      revenueCatConfigs(true, {
+        ...live,
+        AUTUMN_SECRET_KEY: "am_sk_live_fixture",
+      })?.[0]?.environment,
+      "PRODUCTION",
     );
   });
   test("transfer holds affect the other app in the same project and environment", async () => {

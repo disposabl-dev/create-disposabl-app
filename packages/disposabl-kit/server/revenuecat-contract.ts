@@ -78,7 +78,13 @@ export function revenueCatConfigs(
     !authorization ||
     !project ||
     !autumnKey ||
-    (environment !== "SANDBOX" && environment !== "PRODUCTION")
+    (environment !== "SANDBOX" && environment !== "PRODUCTION") ||
+    !autumnKey.startsWith(
+      environment === "SANDBOX" ? "am_sk_test_" : "am_sk_live_",
+    ) ||
+    autumnKey.length <= "am_sk_test_".length ||
+    autumnKey.length > 4096 ||
+    /\s/.test(autumnKey)
   )
     return null;
   let routes: unknown;
