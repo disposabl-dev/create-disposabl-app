@@ -6,7 +6,7 @@ import type { PurchasesPackage } from "react-native-purchases";
 import { AuthButton, authClasses } from "../components/auth-ui";
 import { billingSession } from "./session";
 import { presentMonthlyPaywall, validMonthlyOffering } from "./paywall";
-import { creditQuantity } from "../../payments/config";
+import { creditQuantity, monthlyLabel } from "../../payments/config";
 import { paymentOptions, storeEligibility } from "./policy";
 import { useWebCheckout } from "./web-checkout";
 
@@ -187,7 +187,8 @@ export function AccountBilling({ customerId }: { customerId: string }) {
         Available: {data?.balance ?? "unavailable"}
       </Text>
       <Text className={authClasses.body}>
-        {creditQuantity("monthly")} credits each monthly billing cycle.
+        {monthlyLabel()}: {creditQuantity("monthly")} credits each billing
+        cycle. Unused monthly credits expire.
       </Text>
       {data?.hasMonthlyPlan && (
         <Text className={authClasses.body}>

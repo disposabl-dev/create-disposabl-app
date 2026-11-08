@@ -14,6 +14,7 @@ import {
   pricing,
   creditQuantity,
   formatPrice,
+  monthlyLabel,
   type Pricing,
 } from "../disposabl-kit/payments/config";
 import { resolveFeatures } from "../disposabl-kit/feature-options";
@@ -59,12 +60,13 @@ describe("billing boundary", () => {
       currency: "USD",
       creditsPerDollar: 100,
       featureId: "credits",
-      monthly: { planId: "credits_monthly", price: 5 },
+      monthly: { planId: "credits_monthly", price: 5, creditMultiplier: 1.5 },
       topup: { planId: "credits_topup", price: 5 },
     };
     assert.equal(formatPrice(example.monthly.price, example), "$5");
-    assert.equal(creditQuantity("monthly", example), 500);
+    assert.equal(creditQuantity("monthly", example), 750);
     assert.equal(creditQuantity("topup", example), 500);
+    assert.equal(monthlyLabel(example), "Monthly · 50% more");
     assert.equal(
       creditQuantity("topup", {
         ...example,
@@ -76,7 +78,11 @@ describe("billing boundary", () => {
       ...example,
       featureId: "workspace_credits",
       creditsPerDollar: 80,
-      monthly: { planId: "workspace_monthly", price: 12 },
+      monthly: {
+        planId: "workspace_monthly",
+        price: 12,
+        creditMultiplier: 1.25,
+      },
       topup: { planId: "workspace_topup", price: 3 },
     };
     const request = purchaseRequest(
@@ -89,7 +95,8 @@ describe("billing boundary", () => {
     assert.deepEqual(request.feature_quantities, [
       { feature_id: "workspace_credits", quantity: 240, adjustable: false },
     ]);
-    assert.equal(creditQuantity("monthly", custom), 960);
+    assert.equal(creditQuantity("monthly", custom), 1200);
+    assert.equal(monthlyLabel(custom), "Monthly · 25% more");
     assert.equal(formatPrice(custom.monthly.price, custom), "$12");
     assert.equal(
       balanceFromCustomer(

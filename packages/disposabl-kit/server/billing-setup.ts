@@ -24,6 +24,8 @@ export async function setupBilling(
     !/^[A-Z]{3}$/i.test(config.currency) ||
     !Number.isFinite(config.creditsPerDollar) ||
     config.creditsPerDollar <= 0 ||
+    !Number.isFinite(config.monthly.creditMultiplier) ||
+    config.monthly.creditMultiplier <= 0 ||
     config.monthly.planId === config.topup.planId ||
     (["monthly", "topup"] as const).some(
       (kind) =>

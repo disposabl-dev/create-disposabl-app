@@ -71,6 +71,7 @@ test("enabled setup needs this deployment's key and valid pricing before request
   );
   for (const config of [
     { ...pricing, creditsPerDollar: 0 },
+    { ...pricing, monthly: { ...pricing.monthly, creditMultiplier: 0 } },
     { ...pricing, monthly: { ...pricing.monthly, price: NaN } },
     { ...pricing, topup: { ...pricing.topup, planId: pricing.monthly.planId } },
   ])
@@ -106,7 +107,7 @@ test("defaults create monthly included credits and nonexpiring prepaid top-ups o
         items: [
           {
             feature_id: "credits",
-            included: 500,
+            included: 750,
             reset: { interval: "month" },
           },
         ],
@@ -150,7 +151,7 @@ test("edited config drives new IDs, prices and quantities without assuming USD",
     currency: "EUR",
     featureId: "tokens",
     creditsPerDollar: 80,
-    monthly: { planId: "custom_monthly", price: 12 },
+    monthly: { planId: "custom_monthly", price: 12, creditMultiplier: 1.25 },
     topup: { planId: "custom_topup", price: 3 },
   };
   await setupBilling(true, env, config, p.fetcher);
@@ -159,7 +160,7 @@ test("edited config drives new IDs, prices and quantities without assuming USD",
     interval: "month",
   });
   assert.deepEqual(p.plans.get("custom_monthly")?.items, [
-    { feature_id: "tokens", included: 960, reset: { interval: "month" } },
+    { feature_id: "tokens", included: 1200, reset: { interval: "month" } },
   ]);
   assert.deepEqual(p.plans.get("custom_topup")?.items, [
     {

@@ -11,7 +11,12 @@ import {
 import { useAuthToken } from "@convex-dev/auth/react";
 import { sessionId } from "../../lib/auth-session";
 import { paymentsEnabled } from "../../features";
-import { pricing, creditQuantity, formatPrice } from "../../payments/config";
+import {
+  pricing,
+  creditQuantity,
+  formatPrice,
+  monthlyLabel,
+} from "../../payments/config";
 
 export const Route = createFileRoute("/_providers/pricing")({
   component: () => (
@@ -181,9 +186,6 @@ function PurchasePage({ session }: { session: string | null }) {
     <section className="mx-auto max-w-5xl space-y-8 p-8">
       <div>
         <h1 className="text-3xl font-semibold">Pricing</h1>
-        <p>
-          {pricing.creditsPerDollar} credits per {formatPrice(1)}.
-        </p>
       </div>
       {isLoading ? (
         <p>Checking your account...</p>
@@ -227,7 +229,7 @@ function PurchasePage({ session }: { session: string | null }) {
       )}
       <div className="grid gap-5 md:grid-cols-2">
         <section className="rounded-lg border p-6">
-          <h2 className="text-xl font-semibold">Monthly</h2>
+          <h2 className="text-xl font-semibold">{monthlyLabel()}</h2>
           <p>{formatPrice(pricing.monthly.price)} / month</p>
           <p>
             {creditQuantity("monthly")} credits each month. Unused monthly

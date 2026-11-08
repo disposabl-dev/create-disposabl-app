@@ -5,6 +5,7 @@ import { Pricing as Checkout } from "../../../../packages/disposabl-kit/client/r
 import {
   creditQuantity,
   formatPrice,
+  monthlyLabel,
   pricing,
 } from "../../../../packages/disposabl-kit/payments/config";
 import { MarketingShell, TextLink } from "../components/landing/shell";
@@ -29,7 +30,7 @@ function PricingPage() {
       ],
     },
     {
-      name: "Agent Mode monthly",
+      name: monthlyLabel(),
       price: `${formatPrice(pricing.monthly.price)} / month`,
       details: [
         `${creditQuantity("monthly")} credits each month`,

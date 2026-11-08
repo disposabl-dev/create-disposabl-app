@@ -164,7 +164,7 @@ test(
       .getByText("Is Disposabl really free?", { exact: true })
       .tap();
     await expect(browser.locator("#faq details[open] p")).toContainText(
-      "500 credits for $5 per month",
+      "750 credits for $5 per month",
     );
     await screen.getByRole("button", "Open menu").tap();
     await browser.locator('#marketing-links a[href="/build"]').tap();
@@ -464,7 +464,10 @@ test(
     await expect(screen.getByRole("heading", "Build your way.")).toBeVisible();
     await app.open("/pricing");
     await expect(browser.locator(".pricing-grid")).toContainText(
-      "500 credits each month",
+      "750 credits each month",
+    );
+    await expect(browser.locator(".pricing-grid")).toContainText(
+      "Monthly · 50% more",
     );
     await expect(browser.locator(".pricing-grid")).toContainText(
       "Monthly credits expire",
