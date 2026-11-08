@@ -86,7 +86,7 @@ export function MessageComposer({
       placeholderTextColor={c.mutedForeground}
       accessibilityLabel={label}
       testID={testID}
-      className={`w-full pt-[10px] pb-[6px] text-[17px] leading-[24px] text-foreground align-top ${inline ? "min-h-[44px] pl-[52px] pr-[96px]" : compact ? "min-h-[44px] px-[8px]" : "min-h-[100px] px-[8px]"} ${compact ? (compactViewport ? "max-h-[44px]" : "max-h-[120px]") : "max-h-[176px]"}`}
+      className={`w-full pt-[10px] pb-[6px] text-[17px] leading-[24px] text-foreground align-top px-[8px] ${compact ? "min-h-[44px]" : "min-h-[100px]"} ${compact ? (compactViewport ? "max-h-[44px]" : "max-h-[120px]") : "max-h-[176px]"}`}
     />
   );
   const plus = (
@@ -285,7 +285,7 @@ export function MessageComposer({
           </View>
         ) : (
           <>
-            {input}
+            <View className={inline ? "ml-[44px] mr-[88px]" : ""}>{input}</View>
             <View
               pointerEvents="box-none"
               className={`flex-row items-end ${inline ? "absolute inset-x-[6px] bottom-[6px]" : ""}`}
