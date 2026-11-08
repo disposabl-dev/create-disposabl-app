@@ -101,6 +101,7 @@ export async function createApp(
       for (const path of [
         "packages/disposabl-kit/client/routes/_auth-pages",
         "packages/disposabl-kit/client/routes/consent.tsx",
+        "packages/disposabl-kit/client/routes/billing-login.tsx",
         "packages/disposabl-kit/client/routes/_authenticated/change-password.tsx",
         "apps/web/src/router/_authenticated/dashboard.api-keys.tsx",
         "apps/mobile/src/app/(auth)",
