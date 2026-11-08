@@ -22,9 +22,25 @@ if (
     "Refusing to reset a working checkout or an invalid staging directory.",
   );
 
+// Product-only proof harnesses must not enter generated apps. Keep the same
+// paths in the symlink validation and removal inventories.
+const productProofTests = [
+  "packages/tests/compute-provider-http.test.ts",
+  "packages/tests/billing-web.config.ts",
+  "packages/tests/fixtures/billing-web",
+  "packages/tests/flows/billing-web-handoff.e2e.ts",
+  "packages/tests/autumn-checkout-integration.test.ts",
+  "packages/tests/fixtures/autumn-checkout",
+  "packages/tests/native-inbox-transactions.test.ts",
+  "packages/tests/fixtures/native-inbox-convex",
+  "packages/tests/low-credit-email-integration.test.ts",
+  "packages/tests/fixtures/low-credit-convex",
+];
+
 // Validate every required input before removing anything. Unrelated skill
 // symlinks may be packaged, but reset must never read or write through a link.
 const touched = [
+  ...productProofTests,
   "packages/backend/convex",
   "packages/backend/generated",
   "packages/backend/package.json",
@@ -222,6 +238,7 @@ for (const entry of await readdir(convex)) {
     await rm(join(convex, entry), { recursive: true, force: true });
 }
 for (const path of [
+  ...productProofTests,
   "packages/tests/generator-service-origin.test.ts",
   "packages/tests/mobile-attachment-lifecycle.test.ts",
   "packages/tests/components/mobile-attachment-lifecycle.test.mjs",
