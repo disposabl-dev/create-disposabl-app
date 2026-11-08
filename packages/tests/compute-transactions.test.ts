@@ -989,13 +989,11 @@ test(
       ).length,
       101,
     );
-    const conflicts = ids
-      .slice(0, 100)
-      .map((debitId) => ({
-        sessionId: original,
-        debitId,
-        evidence: "provider reference",
-      }));
+    const conflicts = ids.slice(0, 100).map((debitId) => ({
+      sessionId: original,
+      debitId,
+      evidence: "provider reference",
+    }));
     await assert.rejects(
       call("resolveConflictsHold", {
         currentSessionId,
