@@ -119,10 +119,12 @@ function fixture() {
       version) :;;
       pack)
         mkdir -p "$RUNNER_TEMP/pack-source/dist"
-        node -e 'const fs=require("node:fs"); const d=process.env; let m={name:d.PACKAGE_NAME || "@disposabl/cli",version:d.VERSION,repository:{type:"git",url:"https://github.com/example/app"}}; if(d.PACK_CASE==="userinfo") m.repository.url="https://user:synthetic-secret@example.test/repo"; if(d.PACK_CASE==="query") m.homepage="https://example.test/?token=synthetic-secret"; if(d.PACK_CASE==="invalid") m.bugs={url:"https://synthetic-secret@"}; fs.writeFileSync(d.RUNNER_TEMP+"/pack-source/package.json",JSON.stringify(m)); fs.writeFileSync(d.RUNNER_TEMP+"/pack-source/dist/index.js","// fixture");'
+        node -e 'const fs=require("node:fs"); const d=process.env; let m={name:d.PACKAGE_NAME || "@disposabl/cli",version:d.VERSION,repository:{type:"git",url:"https://github.com/example/app"}}; if(d.PACK_CASE==="userinfo") m.repository.url="https://user:synthetic-secret@example.test/repo"; if(d.PACK_CASE==="query") m.homepage="https://example.test/?token=synthetic-secret"; if(d.PACK_CASE==="invalid") m.bugs={url:"https://synthetic-secret@"}; if(d.PACK_CASE==="whitespace") m.homepage=" https://user:synthetic-secret@example.test/"; if(d.PACK_CASE==="key") m.repository={"synthetic-secret":"https://user:synthetic-secret@example.test/"}; fs.writeFileSync(d.RUNNER_TEMP+"/pack-source/package.json",JSON.stringify(m)); fs.writeFileSync(d.RUNNER_TEMP+"/pack-source/dist/index.js","// fixture");'
         "$REAL_NPM" pack "$RUNNER_TEMP/pack-source" --json --ignore-scripts --pack-destination "$PWD" > "$RUNNER_TEMP/real-pack.json" || exit 1
         node -e 'const p=require(process.argv[1]);p[0].integrity="sha512-test";process.stdout.write(JSON.stringify(p))' "$RUNNER_TEMP/real-pack.json";;
-      publish) echo publish >> "$RUNNER_TEMP/published";; *) exit 1;; esac`,
+      publish)
+        node -e 'const fs=require("node:fs"); const p=require(process.env.RUNNER_TEMP+"/real-pack.json")[0]; if(process.argv[1]!==p.filename || !fs.existsSync(process.argv[1])) process.exit(1)' "$2" || exit 1
+        echo publish >> "$RUNNER_TEMP/published";; *) exit 1;; esac`,
   );
   script(
     "curl",
@@ -217,7 +219,13 @@ test(
           ),
         ),
       ).toBe(false);
-      for (const packCase of ["userinfo", "query", "invalid"]) {
+      for (const packCase of [
+        "userinfo",
+        "query",
+        "invalid",
+        "whitespace",
+        "key",
+      ]) {
         const result = f.run(
           recovery,
           { PACKAGE_NAME: packageName, PACK_CASE: packCase },
@@ -439,6 +447,15 @@ test(
           },
         ],
         ["homepage", "https://example.test/?token=synthetic-secret"],
+        ["homepage", " https://user:synthetic-secret@example.test/ "],
+        ["homepage", "\u0000ht\ttps://user:synthetic-secret@example.test/"],
+        [
+          "repository",
+          {
+            "synthetic-secret":
+              " Git+https://user:synthetic-secret@example.test/",
+          },
+        ],
         ["bugs", { url: "https://example.test/#synthetic-secret" }],
         ["funding", { url: "https://user:synthetic-secret@example.test/" }],
       ]) {

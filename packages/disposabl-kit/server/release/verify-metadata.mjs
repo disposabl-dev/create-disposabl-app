@@ -6,7 +6,10 @@ import { pathToFileURL } from "node:url";
 export function verifyMetadata(manifest) {
   function inspect(value, field) {
     if (typeof value === "string") {
-      const candidate = value.replace(/^git\+/, "");
+      const candidate = value
+        .trim()
+        .replace(/[\u0000-\u0020]/g, "")
+        .replace(/^git\+/i, "");
       if (/^[a-z][a-z\d+.-]*:\/\//i.test(candidate)) {
         let url;
         try {
@@ -22,8 +25,7 @@ export function verifyMetadata(manifest) {
     } else if (Array.isArray(value)) {
       value.forEach((item) => inspect(item, field));
     } else if (value && typeof value === "object") {
-      for (const [key, item] of Object.entries(value))
-        inspect(item, `${field}.${key}`);
+      for (const item of Object.values(value)) inspect(item, field);
     }
   }
   for (const field of [
