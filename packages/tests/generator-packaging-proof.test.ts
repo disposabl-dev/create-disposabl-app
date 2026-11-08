@@ -12,6 +12,7 @@ import {
 } from "../create-disposabl-app/options";
 
 const excluded = [
+  "packages/tests/telemetry-deletion-guard.test.ts",
   "packages/tests/flows/billing-handoff-auth.e2e.ts",
   "packages/tests/fixtures/billing-handoff-browser",
   "packages/tests/billing-handoff-local.test.ts",
