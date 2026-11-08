@@ -138,6 +138,18 @@ test("packaged starter and both generated profiles exclude product proof fixture
       assert.doesNotMatch(publisher, /Yast AI|vivek@yast\.ai/);
       const fixtures = join(root, "packages/tests/fixtures");
       if (existsSync(fixtures)) assert.deepEqual(await readdir(fixtures), []);
+      const testsReadme = await readFile(
+        join(root, "packages/tests/README.md"),
+        "utf8",
+      );
+      assert.doesNotMatch(
+        testsReadme,
+        /agent-inert-convex|provider-inert agent fixture/,
+      );
+      assert.equal(
+        existsSync(join(root, "packages/tests/flows/agent.e2e.ts")),
+        false,
+      );
       for (const path of excluded)
         assert.equal(existsSync(join(root, path)), false, `${root}: ${path}`);
       for (const path of [

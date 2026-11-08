@@ -77,6 +77,7 @@ const touched = [
   "packages/backend/generated",
   "packages/backend/package.json",
   "packages/backend/README.md",
+  "packages/tests/README.md",
   "packages/sdk/src",
   "packages/cli",
   "packages/create-disposabl-app",
@@ -259,8 +260,20 @@ const starterCopies = [
   ["starter/mobile/mobile.e2e.ts", "packages/tests/flows/mobile.e2e.ts"],
 ] as const;
 for (const [source] of starterCopies) await readFile(join(root, source));
+const testsReadmePath = join(root, "packages/tests/README.md");
+const testsReadme = await readFile(testsReadmePath, "utf8");
+const agentFixtureParagraph =
+  /^The provider-inert agent fixture in `fixtures\/agent-inert-convex\/`[^\n]*\n\n/m;
+if (!agentFixtureParagraph.test(testsReadme))
+  throw new Error(
+    "Starter reset inputs changed: agent fixture guidance missing.",
+  );
 
 // Generated apps start with their own origin and copy, never Disposabl's SEO.
+await Bun.write(
+  testsReadmePath,
+  testsReadme.replace(agentFixtureParagraph, ""),
+);
 await Bun.write(
   join(root, "apps/web/site.json"),
   JSON.stringify(
