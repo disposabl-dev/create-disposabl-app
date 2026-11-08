@@ -3,6 +3,7 @@ export {
   claim,
   complete,
   dispatch,
+  routing,
   inspect,
   confirmFullRefund,
   confirmUnknown,

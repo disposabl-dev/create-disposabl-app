@@ -4,7 +4,10 @@ import {
   balanceId,
   balanceRequest,
   parseRevenueCatEvent,
-  revenueCatConfig,
+  revenueCatConfigs,
+  selectRevenueCatRoute,
+  resolveRevenueCatRoute,
+  parseTransfer,
   type PurchaseEvent,
 } from "../disposabl-kit/server/revenuecat-contract";
 import {
@@ -14,8 +17,12 @@ import {
   confirmFullRefund,
   receiveTransfer,
   webhookAuthorized,
+  webhook,
   dispatchBalance,
 } from "../disposabl-kit/server/revenuecat-functions";
+
+import { creditQuantity } from "../disposabl-kit/payments/config";
+import { paymentsEnabled } from "../disposabl-kit/features";
 
 const config = {
   authorization: "Bearer test",
@@ -114,6 +121,106 @@ const scopedClaim = (balanceId: string) => ({
 });
 
 describe("RevenueCat consumable inbox", () => {
+  test("validated routes select both stores and reject ambiguous or removed configuration", () => {
+    const env = {
+      REVENUECAT_CONSUMABLE_OWNER: "custom",
+      REVENUECAT_WEBHOOK_AUTH: "Bearer test",
+      REVENUECAT_PROJECT_ID: "proj",
+      REVENUECAT_ENVIRONMENT: "SANDBOX",
+      AUTUMN_SECRET_KEY: "key",
+      REVENUECAT_ROUTES: JSON.stringify([
+        { app: "app", store: "APP_STORE", product: "topup" },
+        { app: "android", store: "PLAY_STORE", product: "coins" },
+      ]),
+    };
+    const configs = revenueCatConfigs(true, env)!;
+    assert.equal(configs.length, 2);
+    const payload = (app: string, store: string, product: string) => ({
+      api_version: "1.0",
+      event: {
+        id: "id",
+        app_id: app,
+        store,
+        product_id: product,
+        environment: "SANDBOX",
+        app_user_id: "user-1",
+        transaction_id: "tx",
+        type: "NON_RENEWING_PURCHASE",
+      },
+    });
+    assert.equal(
+      selectRevenueCatRoute(payload("app", "APP_STORE", "topup"), configs)?.app,
+      "app",
+    );
+    assert.equal(
+      selectRevenueCatRoute(payload("android", "PLAY_STORE", "coins"), configs)
+        ?.app,
+      "android",
+    );
+    assert.equal(
+      selectRevenueCatRoute(payload("android", "APP_STORE", "coins"), configs),
+      null,
+    );
+    assert.equal(resolveRevenueCatRoute(event, configs.slice(1)), null);
+    assert.equal(
+      resolveRevenueCatRoute(event, [configs[0]!, configs[0]!]),
+      null,
+    );
+    assert.equal(
+      revenueCatConfigs(true, {
+        ...env,
+        REVENUECAT_ROUTES: JSON.stringify([
+          { app: "app", store: "APP_STORE", product: "topup" },
+          { app: "app", store: "PLAY_STORE", product: "coins" },
+        ]),
+      }),
+      null,
+    );
+    assert.equal(
+      parseTransfer(
+        {
+          api_version: "1.0",
+          event: {
+            id: "t",
+            type: "TRANSFER",
+            app_id: "app",
+            transferred_from: ["user-1"],
+            transferred_to: ["user-2"],
+          },
+        },
+        configs[0]!,
+      ),
+      null,
+    );
+  });
+  test("transfer holds affect the other app in the same project and environment", async () => {
+    const f = fixture();
+    const android = {
+      ...event,
+      app: "android",
+      store: "PLAY_STORE",
+      product: "coins",
+    };
+    const id = await balanceId(android);
+    await call(receive, f.ctx, { event: android, balanceId: id });
+    await call(receiveTransfer, f.ctx, {
+      project: "proj",
+      app: "app",
+      environment: "SANDBOX",
+      deliveryId: "transfer",
+      from: ["user-1"],
+      to: ["user-2"],
+    });
+    assert.equal(
+      await call(claim, f.ctx, {
+        ...scopedClaim(id),
+        app: "android",
+        store: "PLAY_STORE",
+        product: "coins",
+      }),
+      null,
+    );
+  });
   test("lost provider response and crash after success never dispatch again", async () => {
     for (const failure of ["lost response", "crash"]) {
       const f = fixture();
@@ -148,6 +255,24 @@ describe("RevenueCat consumable inbox", () => {
       assert.equal(f.tables.revenueCatPurchases![0].state, "grant_unknown");
     }
   });
+  test(
+    "payments-off starter rejects webhook before any mutation",
+    { skip: paymentsEnabled },
+    async () => {
+      const response = await call(
+        webhook,
+        {
+          runMutation: () => {
+            throw new Error("unexpected mutation");
+          },
+        },
+        new Request("https://example.test/revenuecat/webhook", {
+          method: "POST",
+        }),
+      );
+      assert.equal(response.status, 503);
+    },
+  );
   test("webhook authorization requires the exact configured header", async () => {
     assert.equal(
       await webhookAuthorized(
@@ -204,9 +329,9 @@ describe("RevenueCat consumable inbox", () => {
     );
   });
   test("disabled and incomplete configuration cannot read or dispatch payments", () => {
-    assert.equal(revenueCatConfig(false, {}), null);
+    assert.equal(revenueCatConfigs(false, {}), null);
     assert.equal(
-      revenueCatConfig(true, { REVENUECAT_CONSUMABLE_OWNER: "custom" }),
+      revenueCatConfigs(true, { REVENUECAT_CONSUMABLE_OWNER: "custom" }),
       null,
     );
   });
@@ -272,7 +397,7 @@ describe("RevenueCat consumable inbox", () => {
       customer_id: event.customer,
       feature_id: "credits",
       balance_id: id,
-      included_grant: 500,
+      included_grant: creditQuantity("topup"),
     });
     assert.notEqual(await balanceId(event), await balanceId(second));
   });
@@ -340,5 +465,12 @@ describe("RevenueCat consumable inbox", () => {
       remaining: 0,
     });
     assert.equal(await call(claim, g.ctx, scopedClaim(id)), null);
+    assert.equal(g.tables.revenueCatPurchases![0].state, "refund_unknown");
+    await call(receive, g.ctx, {
+      event: { ...event, deliveryId: "refund-replay", type: "cancel" },
+      balanceId: id,
+    });
+    assert.equal(await call(claim, g.ctx, scopedClaim(id)), null);
+    assert.equal(g.tables.revenueCatPurchases![0].state, "refund_unknown");
   });
 });

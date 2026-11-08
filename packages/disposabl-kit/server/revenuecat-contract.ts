@@ -1,4 +1,4 @@
-import { pricing } from "../payments/config";
+import { creditQuantity, pricing } from "../payments/config";
 
 export type RevenueCatConfig = {
   authorization: string;
@@ -44,7 +44,7 @@ export function parseTransfer(payload: unknown, config: RevenueCatConfig) {
   if (
     e.type !== "TRANSFER" ||
     e.app_id !== config.app ||
-    (e.environment !== undefined && e.environment !== config.environment) ||
+    e.environment !== config.environment ||
     (e.store !== undefined && e.store !== config.store) ||
     (e.project_id !== undefined && e.project_id !== config.project) ||
     typeof e.id !== "string" ||
@@ -64,38 +64,82 @@ export function parseTransfer(payload: unknown, config: RevenueCatConfig) {
   };
 }
 
-/** Explicit opt-in means a managed integration must not own this product. */
-export function revenueCatConfig(
+/** One authenticated project/environment may route only explicitly listed apps. */
+export function revenueCatConfigs(
   enabled: boolean,
   env: Record<string, string | undefined>,
-): RevenueCatConfig | null {
+): RevenueCatConfig[] | null {
   if (!enabled || env.REVENUECAT_CONSUMABLE_OWNER !== "custom") return null;
   const authorization = env.REVENUECAT_WEBHOOK_AUTH?.trim();
   const project = env.REVENUECAT_PROJECT_ID?.trim();
-  const app = env.REVENUECAT_APP_ID?.trim();
-  const product = env.REVENUECAT_TOPUP_PRODUCT_ID?.trim();
   const autumnKey = env.AUTUMN_SECRET_KEY?.trim();
   const environment = env.REVENUECAT_ENVIRONMENT;
-  const store = env.REVENUECAT_STORE;
   if (
     !authorization ||
     !project ||
-    !app ||
-    !product ||
     !autumnKey ||
-    (environment !== "SANDBOX" && environment !== "PRODUCTION") ||
-    (store !== "APP_STORE" && store !== "PLAY_STORE")
+    (environment !== "SANDBOX" && environment !== "PRODUCTION")
   )
     return null;
-  return {
-    authorization,
-    project,
-    app,
-    environment,
-    product,
-    store,
-    autumnKey,
-  };
+  let routes: unknown;
+  try {
+    routes = JSON.parse(env.REVENUECAT_ROUTES ?? "");
+  } catch {
+    return null;
+  }
+  if (!Array.isArray(routes) || routes.length === 0 || routes.length > 20)
+    return null;
+  const result: RevenueCatConfig[] = [];
+  for (const route of routes) {
+    if (
+      !route ||
+      typeof route !== "object" ||
+      Array.isArray(route) ||
+      Object.keys(route).sort().join(",") !== "app,product,store" ||
+      typeof route.app !== "string" ||
+      !route.app ||
+      route.app.trim() !== route.app ||
+      route.app.length > 256 ||
+      typeof route.product !== "string" ||
+      !route.product ||
+      route.product.trim() !== route.product ||
+      route.product.length > 256 ||
+      (route.store !== "APP_STORE" && route.store !== "PLAY_STORE") ||
+      result.some((item) => item.app === route.app)
+    )
+      return null;
+    result.push({ authorization, project, environment, autumnKey, ...route });
+  }
+  return result;
+}
+
+export function selectRevenueCatRoute(
+  payload: unknown,
+  configs: RevenueCatConfig[],
+) {
+  const matches = configs.filter(
+    (config) =>
+      parseTransfer(payload, config) || parseRevenueCatEvent(payload, config),
+  );
+  return matches.length === 1 ? matches[0]! : null;
+}
+
+export function resolveRevenueCatRoute(
+  identity: Pick<
+    PurchaseEvent,
+    "project" | "app" | "environment" | "store" | "product"
+  >,
+  configs: RevenueCatConfig[],
+) {
+  const matches = configs.filter(
+    (config) =>
+      config.project === identity.project &&
+      config.app === identity.app &&
+      config.environment === identity.environment &&
+      config.store === identity.store &&
+      config.product === identity.product,
+  );
+  return matches.length === 1 ? matches[0]! : null;
 }
 
 export function parseRevenueCatEvent(
@@ -182,6 +226,8 @@ export function balanceRequest(
     customer_id: customer,
     feature_id: pricing.featureId,
     balance_id: balance,
-    ...(kind === "grant" ? { included_grant: 500 } : { remaining: 0 }),
+    ...(kind === "grant"
+      ? { included_grant: creditQuantity("topup") }
+      : { remaining: 0 }),
   };
 }

@@ -12,7 +12,9 @@ import {
   balanceRequest,
   parseRevenueCatEvent,
   parseTransfer,
-  revenueCatConfig,
+  revenueCatConfigs,
+  selectRevenueCatRoute,
+  resolveRevenueCatRoute,
   type PurchaseEvent,
   type RevenueCatConfig,
 } from "./revenuecat-contract";
@@ -82,9 +84,9 @@ export async function webhookAuthorized(
 }
 
 export const webhook = httpActionGeneric(async (ctx, request) => {
-  const config = revenueCatConfig(paymentsEnabled, process.env);
-  if (!config) return new Response("Unavailable", { status: 503 });
-  if (!(await webhookAuthorized(request, config.authorization)))
+  const configs = revenueCatConfigs(paymentsEnabled, process.env);
+  if (!configs) return new Response("Unavailable", { status: 503 });
+  if (!(await webhookAuthorized(request, configs[0]!.authorization)))
     return new Response("Unauthorized", { status: 401 });
   let payload: unknown;
   try {
@@ -92,6 +94,8 @@ export const webhook = httpActionGeneric(async (ctx, request) => {
   } catch {
     return new Response("Invalid event", { status: 400 });
   }
+  const config = selectRevenueCatRoute(payload, configs);
+  if (!config) return new Response("Invalid event", { status: 400 });
   const transfer = parseTransfer(payload, config);
   if (transfer) {
     await ctx.runMutation(transferRef, transfer);
@@ -328,7 +332,6 @@ export const claim = internalMutation({
       .withIndex("by_customer_active", (q) =>
         q
           .eq("project", project)
-          .eq("app", app)
           .eq("environment", environment)
           .eq("customer", row.customer)
           .eq("active", true),
@@ -416,11 +419,52 @@ function scopedOperation({
   };
 }
 
+const routingRef = makeFunctionReference<
+  "query",
+  { balanceId: string },
+  Pick<
+    PurchaseEvent,
+    "project" | "app" | "environment" | "store" | "product"
+  > | null
+>("revenuecat:routing");
+
+export const routing = internalQuery({
+  args: { balanceId: v.string() },
+  returns: v.union(
+    v.null(),
+    v.object({
+      project: v.string(),
+      app: v.string(),
+      environment: v.string(),
+      store: v.string(),
+      product: v.string(),
+    }),
+  ),
+  handler: async (ctx, { balanceId }) => {
+    const row = await ctx.db
+      .query("revenueCatPurchases")
+      .withIndex("by_balanceId", (q) => q.eq("balanceId", balanceId))
+      .unique();
+    return row
+      ? {
+          project: row.project,
+          app: row.app,
+          environment: row.environment,
+          store: row.store,
+          product: row.product,
+        }
+      : null;
+  },
+});
+
 export const dispatch = internalAction({
   args: { balanceId: v.string() },
   returns: v.null(),
   handler: async (ctx, { balanceId }) => {
-    const config = revenueCatConfig(paymentsEnabled, process.env);
+    const configs = revenueCatConfigs(paymentsEnabled, process.env);
+    if (!configs) return null;
+    const identity = await ctx.runQuery(routingRef, { balanceId });
+    const config = identity && resolveRevenueCatRoute(identity, configs);
     if (!config) return null;
     await dispatchBalance(
       config,

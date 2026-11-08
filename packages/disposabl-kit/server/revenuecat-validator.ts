@@ -66,13 +66,7 @@ export const revenueCatTransferHolds = defineTable({
   deliveryId: v.string(),
   active: v.boolean(),
 })
-  .index("by_customer_active", [
-    "project",
-    "app",
-    "environment",
-    "customer",
-    "active",
-  ])
+  .index("by_customer_active", ["project", "environment", "customer", "active"])
   .index("by_delivery_customer", [
     "project",
     "app",
