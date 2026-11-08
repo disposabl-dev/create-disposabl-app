@@ -15,6 +15,7 @@ import {
   createOpenApi,
   createPlatforms,
   type ApiPolicy,
+  type AccountEligibility,
 } from "./lib/platform-spec";
 import { registerPageRoutes } from "./lib/static";
 import { resend } from "../../backend/convex/emails";
@@ -24,7 +25,7 @@ import { desktopAuthPath, desktopAuthRedirect } from "../lib/desktop-auth";
 
 export { tool } from "@convex-dev/mcp";
 export type { McpServerOptions, McpUser, ToolCtx } from "@convex-dev/mcp";
-export type { ApiPolicy } from "./lib/platform-spec";
+export type { ApiPolicy, AccountEligibility } from "./lib/platform-spec";
 
 const platforms = createPlatforms(modules);
 if (
@@ -37,33 +38,60 @@ if (
 export const platformSpec = platforms.spec;
 
 const enabled = validatePlatforms(config.platforms);
-const mcp: McpServer | undefined = enabled.some(
-  (platform) => platform === "mcp" || platform === "api",
-)
-  ? new McpServer(components.mcp, {
-      name: "disposabl",
-      title: "Disposabl",
-      version: "1.0.0",
-      siteUrl: env.CONVEX_SITE_URL,
-      consentUrl: `${env.CONVEX_SITE_URL}/consent`,
-      scopes: {},
-      clientMetadataDocumentHosts: ["claude.ai"],
-      tools: platforms.tools,
-    })
-  : undefined;
+function createMcp(eligibility?: AccountEligibility): McpServer | undefined {
+  return enabled.some((platform) => platform === "mcp" || platform === "api")
+    ? new McpServer(components.mcp, {
+        name: "disposabl",
+        title: "Disposabl",
+        version: "1.0.0",
+        siteUrl: env.CONVEX_SITE_URL,
+        consentUrl: `${env.CONVEX_SITE_URL}/consent`,
+        scopes: {},
+        clientMetadataDocumentHosts: ["claude.ai"],
+        tools: eligibility
+          ? createPlatforms(modules, eligibility).tools
+          : platforms.tools,
+      })
+    : undefined;
+}
 
-// Keep the enabled API types for consumers; disabled exports are absent at runtime.
+/** Protect issuance while retaining listing and revocation for existing grants. */
+export function createMcpApi(eligibility?: AccountEligibility) {
+  const mcp = createMcp(eligibility);
+  if (!mcp) return {} as ReturnType<McpServer["api"]>;
+  const standard = mcp.api({ getUserId: getSessionUserId });
+  if (!eligibility) return standard;
+  const guarded = mcp.api({
+    getUserId: async (ctx) => {
+      const id = await getSessionUserId(ctx);
+      return id &&
+        (await eligibility(ctx as Parameters<AccountEligibility>[0], id))
+        ? id
+        : null;
+    },
+  });
+  return {
+    ...standard,
+    authorize: guarded.authorize,
+    createApiKey: guarded.createApiKey,
+  };
+}
 export const {
   getAuthRequest,
   authorize,
   listConnections,
   revokeConnection,
   createApiKey,
-} =
-  mcp?.api({ getUserId: getSessionUserId }) ??
-  ({} as ReturnType<McpServer["api"]>);
+} = createMcpApi();
 
-export default function createHttpRouter(apiPolicy?: ApiPolicy) {
+export default function createHttpRouter(
+  apiPolicy?: ApiPolicy,
+  eligibility?: AccountEligibility,
+) {
+  const mcp = createMcp(eligibility);
+  const requestPlatforms = eligibility
+    ? createPlatforms(modules, eligibility)
+    : platforms;
   const http = httpRouter();
   if (authenticationEnabled) {
     if (
@@ -157,7 +185,7 @@ export default function createHttpRouter(apiPolicy?: ApiPolicy) {
           const response =
             method === "OPTIONS"
               ? new Response(null, { status: 204 })
-              : await platforms.handleApi(
+              : await requestPlatforms.handleApi(
                   ctx,
                   request,
                   mcp.authenticate.bind(mcp),

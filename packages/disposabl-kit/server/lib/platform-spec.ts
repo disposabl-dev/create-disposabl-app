@@ -47,9 +47,15 @@ export type ApiPolicy = {
   ) => boolean;
 };
 
+export type AccountEligibility = (
+  ctx: ToolCtx,
+  userId: string,
+) => Promise<boolean>;
+
 /** One opt-in produces the shared JSON contract and both transport adapters. */
 export function createPlatforms(
   modules: Record<string, Record<string, unknown>>,
+  eligibility?: AccountEligibility,
 ) {
   const spec: Operation[] = [];
   const tools: Record<string, ToolDefinition> = Object.create(null);
@@ -98,6 +104,8 @@ export function createPlatforms(
         args,
         returns: fn.returns,
         handler: async (ctx, input, user) => {
+          if (eligibility && !(await eligibility(ctx, user.userId)))
+            throw new ConvexError("Account is unavailable.");
           const startedAt = Date.now();
           try {
             const result = await runOperation(ctx, input, user);
@@ -185,6 +193,8 @@ export function createPlatforms(
             input.value as Record<string, unknown>,
           )
         )
+          return Response.json({ error: "forbidden" }, { status: 403 });
+        if (eligibility && !(await eligibility(ctx, user.userId)))
           return Response.json({ error: "forbidden" }, { status: 403 });
         const startedAt = Date.now();
         const header = request.headers.get("X-Disposabl-Source");

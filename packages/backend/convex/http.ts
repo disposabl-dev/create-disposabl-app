@@ -8,9 +8,9 @@ import { token, report } from "./github/actions/http";
 import createHttpRouter from "@disposabl/disposabl-kit/server/http";
 import { posthogMetadata } from "./connections/http";
 import { desktopUpdate } from "./desktopUpdates";
-import { agentApiPolicy } from "./agent/api_policy";
+import { agentApiPolicy, accountEligibility } from "./agent/api_policy";
 
-const http = createHttpRouter(agentApiPolicy);
+const http = createHttpRouter(agentApiPolicy, accountEligibility);
 http.route({
   path: "/revenuecat/webhook",
   method: "POST",

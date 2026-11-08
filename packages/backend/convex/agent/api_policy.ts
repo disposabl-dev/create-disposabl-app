@@ -1,5 +1,8 @@
 import type { McpUser } from "@convex-dev/mcp";
-import type { ApiPolicy } from "@disposabl/disposabl-kit/server/http";
+import type {
+  ApiPolicy,
+  AccountEligibility,
+} from "@disposabl/disposabl-kit/server/http";
 import { internal } from "../_generated/api";
 import { accessPrefix, digest } from "./access";
 
@@ -53,3 +56,7 @@ export const agentApiPolicy: ApiPolicy = {
     );
   },
 };
+
+/** Consulted for every tool call and new capability, independent of token age. */
+export const accountEligibility: AccountEligibility = async (ctx, userId) =>
+  !(await ctx.runQuery(internal.users.internal.deletionPending, { userId }));
