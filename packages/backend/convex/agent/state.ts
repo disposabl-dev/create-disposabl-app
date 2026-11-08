@@ -1,3 +1,4 @@
+import { deletionPending } from "../users/deletion";
 import { saveMessage } from "@convex-dev/agent";
 import { internalMutation } from "@disposabl/disposabl-kit/server/lib/functions";
 import { v, type Infer } from "convex/values";
@@ -23,7 +24,11 @@ export const claim = internalMutation({
   returns: v.union(thread, v.null()),
   handler: async (ctx, { id, token }): Promise<Infer<typeof thread> | null> => {
     const current = await getThread(ctx, id);
-    if (!current || (current.lease && current.lease.expiresAt > Date.now()))
+    if (
+      !current ||
+      (await deletionPending(ctx, current.userId)) ||
+      (current.lease && current.lease.expiresAt > Date.now())
+    )
       return null;
     if (
       !current.pending.length &&
@@ -64,6 +69,7 @@ export const next = internalMutation({
   ),
   handler: async (ctx, args) => {
     const current = await locked(ctx, args);
+    if (await deletionPending(ctx, current.userId)) return null;
     const messageId = current.pending[0];
     if (
       !(await sessionAllows(

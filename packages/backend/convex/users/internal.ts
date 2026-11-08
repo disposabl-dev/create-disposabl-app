@@ -1,3 +1,8 @@
+import { deletionPending as isDeletionPending } from "./deletion";
+import {
+  paginationOptsValidator,
+  paginationResultValidator,
+} from "convex/server";
 import {
   identityFields,
   internalQuery,
@@ -98,3 +103,44 @@ function displayProfile(profile: GoogleProfile) {
       : {}),
   };
 }
+
+/** Internal operator queue: requested means cleanup and remote stop remain unconfirmed. */
+export const deletionRequests = internalQuery({
+  args: { paginationOpts: paginationOptsValidator },
+  returns: paginationResultValidator(
+    v.object({
+      userId: v.id("users"),
+      requestedAt: v.number(),
+      status: v.literal("requested"),
+      blockers: v.array(v.string()),
+    }),
+  ),
+  handler: async (ctx, { paginationOpts }) => {
+    const result = await ctx.db
+      .query("users")
+      .withIndex("by_deletionRequestedAt", (q) =>
+        q.gt("deletionRequestedAt", 0),
+      )
+      .paginate(paginationOpts);
+    return {
+      ...result,
+      page: result.page.map((user) => ({
+        userId: user._id,
+        requestedAt: user.deletionRequestedAt!,
+        status: "requested" as const,
+        blockers: [
+          "remote_stop",
+          "data_cleanup",
+          "provider_cleanup",
+          "session_revocation",
+        ],
+      })),
+    };
+  },
+});
+
+export const deletionPending = internalQuery({
+  args: identityFields,
+  returns: v.boolean(),
+  handler: (ctx, { userId }) => isDeletionPending(ctx, userId),
+});

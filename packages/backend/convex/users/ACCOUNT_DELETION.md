@@ -1,0 +1,7 @@
+# Account deletion request boundary
+
+`users.index.requestDeletion` accepts the exact confirmation `DELETE` for the authenticated session; `deletionStatus` remains available to that owner. Both return `requested` only. The internal paginated `users.internal.deletionRequests` queue identifies outstanding requests and unverified work. Duplicate requests preserve their original time. No data or provider resource is deleted by requesting.
+
+Agent admission, worker claim and next-message selection, worker compute-access checks, and agent credential issuance/authentication check the request marker. This does not interrupt a remote operation already in flight, revoke other credentials or sessions, block every provider or API route, or prove the remote sandbox stopped. Do not represent it as completed deletion or as a complete account lockdown.
+
+Before completion can be implemented: fence and drain all user-initiated and already-running work, confirm remote sandbox and provider cleanup or document justified retention, handle production releases and manual Expo deletion, remove or retain user-owned app, preview, connection, file, agent, billing and telemetry records according to explicit policy, remove auth-provider identities and revoke all sessions using supported auth component APIs, then verify these outcomes and provide a durable completion receipt that does not rely on a revoked session. Keep failure and unknown outcomes resumable and operator-visible. Store submission remains blocked until that lifecycle and the public deletion path are delivered.

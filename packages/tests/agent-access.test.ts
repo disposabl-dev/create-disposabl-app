@@ -81,7 +81,11 @@ test("agent credential lookup rejects expired, stopped, failed, deleted and unco
   };
   let row: any = app;
   const ctx = {
-    db: { query: () => ({ withIndex: () => ({ unique: async () => row }) }) },
+    db: {
+      normalizeId: () => "user",
+      get: async () => ({}),
+      query: () => ({ withIndex: () => ({ unique: async () => row }) }),
+    },
   };
   const lookup = () => (authenticate as any)._handler(ctx, { hash: "fixture" });
   assert.deepEqual(await lookup(), binding);
@@ -112,6 +116,8 @@ test("only the current unexpired worker can issue access; sandboxes belong to us
   let patch: any;
   const ctx = {
     db: {
+      normalizeId: () => "user",
+      get: async () => ({}),
       query: () => ({ withIndex: () => ({ unique: async () => row }) }),
       patch: async (_table: string, _id: string, value: unknown) => {
         patch = value;
@@ -135,4 +141,41 @@ test("only the current unexpired worker can issue access; sandboxes belong to us
     );
   }
   assert.notDeepEqual(sandboxRef("owner"), sandboxRef("other-owner"));
+});
+
+test("pending deletion rejects active worker credential issue and lookup", async () => {
+  const row = {
+    ...binding,
+    agent: {
+      threadId: binding.threadId,
+      status: "processing",
+      pending: [],
+      lease: { token: "lease", expiresAt: Date.now() + 60000 },
+      access: { expiresAt: Date.now() + 60000 },
+    },
+  };
+  let writes = 0;
+  const ctx = {
+    db: {
+      normalizeId: () => "user",
+      get: async () => ({ deletionRequestedAt: 1 }),
+      query: () => ({ withIndex: () => ({ unique: async () => row }) }),
+      patch: async () => {
+        writes++;
+      },
+    },
+  };
+  assert.equal(
+    await (authenticate as any)._handler(ctx, { hash: "fixture" }),
+    null,
+  );
+  await assert.rejects(
+    (issue as any)._handler(ctx, {
+      id: binding.threadId,
+      token: "lease",
+      hash: "a".repeat(64),
+    }),
+    /active worker lease/,
+  );
+  assert.equal(writes, 0);
 });

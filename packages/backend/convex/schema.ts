@@ -104,6 +104,7 @@ export default defineSchema({
     lease: v.optional(v.string()),
   }).index("by_key", ["key"]),
   users: defineTable({
+    deletionRequestedAt: v.optional(v.number()),
     profile: v.optional(profile),
     connectionState: v.optional(connectionState),
     browserHandoff: v.optional(
@@ -113,7 +114,9 @@ export default defineSchema({
         expiresAt: v.number(),
       }),
     ),
-  }).index("by_browserHandoffHash", ["browserHandoff.hash"]),
+  })
+    .index("by_browserHandoffHash", ["browserHandoff.hash"])
+    .index("by_deletionRequestedAt", ["deletionRequestedAt"]),
   connections: defineTable({
     userId: v.string(),
     provider: tokenProvider,

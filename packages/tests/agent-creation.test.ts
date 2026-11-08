@@ -23,6 +23,8 @@ test("agent creation saves structured selections and resolves feature dependenci
             return connected;
           },
           db: {
+            normalizeId: () => "user",
+            get: async () => ({}),
             insert: async (_table: string, value: unknown) => {
               saved = value;
               throw new Error("fixture stops before scheduling");
@@ -60,6 +62,8 @@ test("mobile creation without Expo fails before inserting or scheduling work", a
         {
           runQuery: async () => ({ ...connected, expo: null }),
           db: {
+            normalizeId: () => "user",
+            get: async () => ({}),
             insert: async () => {
               inserted = true;
             },
@@ -74,4 +78,28 @@ test("mobile creation without Expo fails before inserting or scheduling work", a
     if (previous === undefined) delete process.env.BOAT_API_KEY;
     else process.env.BOAT_API_KEY = previous;
   }
+});
+
+test("deletion request blocks new agent admission before any side effect", async () => {
+  let touched = false;
+  const ctx = {
+    db: {
+      normalizeId: () => "user",
+      get: async () => ({ deletionRequestedAt: 1 }),
+      insert: async () => {
+        touched = true;
+      },
+    },
+    runQuery: async () => {
+      touched = true;
+    },
+  };
+  await assert.rejects(
+    (enqueueMessage as any)._handler(ctx, {
+      userId: "owner",
+      prompt: "Build a planner",
+    }),
+    /Account deletion has been requested/,
+  );
+  assert.equal(touched, false);
 });

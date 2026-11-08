@@ -1,3 +1,4 @@
+import { requireNotDeleting } from "../users/deletion";
 import { listMessages, saveMessage } from "@convex-dev/agent";
 import {
   identityFields,
@@ -28,6 +29,7 @@ export const enqueueMessage = internalMutation({
     ctx,
     { userId, appId, prompt, platforms, features, fileIds = [] },
   ): Promise<Infer<typeof result>> => {
+    await requireNotDeleting(ctx, userId);
     prompt = prompt.trim();
     if (!prompt || prompt.length > 32_000)
       throw new ConvexError("Prompt must contain 1–32,000 characters.");
@@ -271,6 +273,14 @@ export async function guardedEnqueue(
       userId: args.userId,
       appId: args.appId,
     });
+  if (
+    await ctx.runQuery(internal.users.internal.deletionPending, {
+      userId: args.userId,
+    })
+  )
+    throw new ConvexError(
+      "Account deletion has been requested. Contact support for assistance.",
+    );
   await check(args.userId);
   return ctx.runMutation(internal.agent.internal.enqueueMessage, args);
 }

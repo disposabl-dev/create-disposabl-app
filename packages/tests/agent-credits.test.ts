@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { getFunctionName } from "convex/server";
 import {
   requireCredits,
   requireCurrentClient,
@@ -118,7 +119,9 @@ test("credits gate checks the actual owner balance and fails closed", async () =
 test("ownership and credits precede enqueue, with no public unchecked endpoint", async () => {
   const calls: string[] = [];
   const ctx = {
-    runQuery: async (_ref: unknown, args: any) => {
+    runQuery: async (ref: any, args: any) => {
+      if (getFunctionName(ref) === "users/internal:deletionPending")
+        return false;
       calls.push(`owner:${args.userId}`);
     },
     runMutation: async (_ref: unknown, args: any) => {
@@ -226,4 +229,19 @@ test("debit response is preserved through the real HTTP parser without a second 
   );
   assert.deepEqual(result, { outcome: "confirmed", responseBalance: 7 });
   assert.equal(calls, 1);
+});
+
+test("pending deletion prevents balance lookup before admission", async () => {
+  let charged = false;
+  await assert.rejects(
+    guardedEnqueue(
+      { runQuery: async () => true } as any,
+      { userId: "owner", prompt: "work" },
+      async () => {
+        charged = true;
+      },
+    ),
+    /Account deletion has been requested/,
+  );
+  assert.equal(charged, false);
 });

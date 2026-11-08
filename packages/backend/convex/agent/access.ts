@@ -1,3 +1,4 @@
+import { deletionPending } from "../users/deletion";
 import { v } from "convex/values";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { getThread, patchThread } from "./threads";
@@ -23,6 +24,7 @@ export const issue = internalMutation({
     const current = await getThread(ctx, id);
     if (
       !current ||
+      (await deletionPending(ctx, current.userId)) ||
       !(await sessionAllows(
         ctx,
         current.computeSessionId,
@@ -55,6 +57,7 @@ export const authenticate = internalQuery({
       .unique();
     if (
       !app?.agent?.access ||
+      (await deletionPending(ctx, app.userId)) ||
       !(await sessionAllows(
         ctx,
         app.agent.computeSessionId,

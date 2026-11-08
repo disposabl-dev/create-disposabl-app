@@ -55,7 +55,13 @@ test("unavailable attachments finish an empty run but preserve active steering",
       const mutations: { name: string; args: any }[] = [];
       await (tick as any)._handler(
         {
-          runQuery: async () => {
+          runQuery: async (ref: any) => {
+            try {
+              if (getFunctionName(ref) === "users/internal:deletionPending")
+                return false;
+            } catch {
+              // Component references are not local function references.
+            }
             if (++query === 1)
               return { sandboxId: "sandbox", state: "running" };
             if (query === 2) return {};
