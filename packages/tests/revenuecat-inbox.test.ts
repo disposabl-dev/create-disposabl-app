@@ -19,6 +19,8 @@ import {
   webhookAuthorized,
   webhook,
   dispatchBalance,
+  dispatch,
+  routing,
 } from "../disposabl-kit/server/revenuecat-functions";
 
 import { creditQuantity } from "../disposabl-kit/payments/config";
@@ -237,6 +239,83 @@ describe("RevenueCat consumable inbox", () => {
       "PRODUCTION",
     );
   });
+  test(
+    "queued sandbox dispatch rechecks the current environment and key",
+    { skip: !paymentsEnabled },
+    async () => {
+      const f = fixture();
+      const id = await balanceId(event);
+      await call(receive, f.ctx, { event, balanceId: id });
+      assert.equal(f.tables.revenueCatPurchases![0].state, "queued");
+      const env = {
+        REVENUECAT_CONSUMABLE_OWNER: "custom",
+        REVENUECAT_WEBHOOK_AUTH: "Bearer fixture",
+        REVENUECAT_PROJECT_ID: "proj",
+        REVENUECAT_ENVIRONMENT: "SANDBOX",
+        REVENUECAT_ROUTES: JSON.stringify([
+          { app: "app", store: "APP_STORE", product: "topup" },
+        ]),
+        AUTUMN_SECRET_KEY: "am_sk_test_fixture",
+      };
+      const previous = Object.fromEntries(
+        Object.keys(env).map((key) => [key, process.env[key]]),
+      );
+      const originalFetch = globalThis.fetch;
+      let claims = 0;
+      let completions = 0;
+      let requests = 0;
+      const ctx = {
+        runQuery: async (ref: any, args: unknown) => {
+          assert.equal(ref[Symbol.for("functionName")], "revenuecat:routing");
+          return call(routing, f.ctx, args);
+        },
+        runMutation: async (ref: any, args: unknown) => {
+          const name = ref[Symbol.for("functionName")];
+          if (name === "revenuecat:claim") {
+            claims++;
+            return call(claim, f.ctx, args);
+          }
+          assert.equal(name, "revenuecat:complete");
+          completions++;
+          return call(complete, f.ctx, args);
+        },
+      };
+      try {
+        Object.assign(process.env, env);
+        globalThis.fetch = (async (url, init) => {
+          requests++;
+          assert.equal(url, "https://api.useautumn.com/v1/balances.create");
+          assert.equal(
+            new Headers(init?.headers).get("authorization"),
+            "Bearer am_sk_test_fixture",
+          );
+          assert.deepEqual(
+            JSON.parse(String(init?.body)),
+            balanceRequest(event.customer, id, "grant"),
+          );
+          return Response.json({ success: true });
+        }) as typeof fetch;
+        process.env.AUTUMN_SECRET_KEY = "am_sk_live_fixture";
+        await call(dispatch, ctx, { balanceId: id });
+        assert.deepEqual([claims, requests, completions], [0, 0, 0]);
+        assert.equal(f.tables.revenueCatPurchases![0].state, "queued");
+        process.env.REVENUECAT_ENVIRONMENT = "PRODUCTION";
+        await call(dispatch, ctx, { balanceId: id });
+        assert.deepEqual([claims, requests, completions], [0, 0, 0]);
+        assert.equal(f.tables.revenueCatPurchases![0].state, "queued");
+        Object.assign(process.env, env);
+        await call(dispatch, ctx, { balanceId: id });
+        assert.deepEqual([claims, requests, completions], [1, 1, 1]);
+        assert.equal(f.tables.revenueCatPurchases![0].state, "granted");
+      } finally {
+        globalThis.fetch = originalFetch;
+        for (const [key, value] of Object.entries(previous)) {
+          if (value === undefined) delete process.env[key];
+          else process.env[key] = value;
+        }
+      }
+    },
+  );
   test("transfer holds affect the other app in the same project and environment", async () => {
     const f = fixture();
     const android = {
