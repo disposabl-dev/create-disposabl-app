@@ -24,5 +24,13 @@ export const computeDebitFields = {
   ),
   paidUntil: v.number(),
   noticeComplete: v.optional(v.boolean()),
+  resolution: v.optional(
+    v.object({
+      outcome: v.union(v.literal("confirmed"), v.literal("denied")),
+      evidence: v.string(),
+      operator: v.string(),
+      resolvedAt: v.number(),
+    }),
+  ),
 };
 export const computeSessionArgs = { sessionId: v.id("computeSessions") };

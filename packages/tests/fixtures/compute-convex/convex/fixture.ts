@@ -3,6 +3,17 @@ import {
   queryGeneric as query,
 } from "convex/server";
 import { v } from "convex/values";
+import { resolve } from "../../../../backend/convex/agent/computeRecovery";
+export const resolveHold = mutation({
+  args: {
+    sessionId: v.id("computeSessions"),
+    debitId: v.id("computeDebits"),
+    outcome: v.union(v.literal("confirmed"), v.literal("denied")),
+    evidence: v.string(),
+    operator: v.string(),
+  },
+  handler: (ctx, args) => (resolve as any)._handler(ctx, args),
+});
 import {
   admitSession,
   claimWindow,

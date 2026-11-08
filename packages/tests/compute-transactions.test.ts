@@ -61,9 +61,18 @@ test(
     assert.equal(second.length, 1);
     assert.equal((await call("debits", { sessionId }, true)).length, 2);
     await call("crash", { debitId: second[0]._id });
+    const resolution = {
+      sessionId,
+      debitId: second[0]._id,
+      outcome: "confirmed",
+      evidence: "provider ledger immutable reference 123",
+      operator: "operator-1",
+    };
+    await assert.rejects(call("resolveHold", resolution), /Normal stop/);
     await call("settleDebit", { debitId: second[0]._id, outcome: "confirmed" });
     assert.equal((await call("get", { sessionId }, true)).state, "hold");
     await assert.rejects(call("admit", { userId }), /reconciliation/);
+
     assert.equal(
       await call("claim", { sessionId, expectedDebit: first[0]._id }),
       null,
@@ -91,6 +100,56 @@ test(
     assert.equal((await call("get", { sessionId }, true)).state, "hold");
     await assert.rejects(call("admit", { userId }), /reconciliation/);
 
+    await assert.rejects(
+      call("resolveHold", { ...resolution, debitId: first[0]._id }),
+      /match/,
+    );
+    await assert.rejects(
+      call("resolveHold", { ...resolution, evidence: " " }),
+      /evidence/,
+    );
+    await call("worker", {
+      appId,
+      token: "late",
+      expiresAt: Date.now() + 60000,
+    });
+    await assert.rejects(call("resolveHold", resolution), /Worker leases/);
+    await call("setStatus", { appId, status: "idle" });
+    const before = await call("get", { sessionId }, true);
+    const results = await Promise.allSettled([
+      ...Array.from({ length: 8 }, () => call("resolveHold", resolution)),
+      ...Array.from({ length: 8 }, () => call("admit", { userId })),
+    ]);
+    assert.equal(
+      results.slice(0, 8).filter((r) => r.status === "fulfilled").length,
+      1,
+    );
+    const next = await call("admit", { userId });
+    assert.notEqual(next, sessionId);
+    for (const result of results.slice(8)) {
+      if (result.status === "fulfilled") assert.equal(result.value, next);
+    }
+    await call("app", { userId, sessionId: next, threadId: randomUUID() });
+    const nextDebit = await call("claim", { sessionId: next });
+    assert.ok(nextDebit);
+    assert.notEqual(nextDebit._id, second[0]._id);
+    const after = await call("get", { sessionId }, true);
+    assert.equal(after.state, "stopped");
+    assert.equal(after.paidUntil, before.paidUntil);
+    const recorded = (await call("debits", { sessionId }, true)).find(
+      (d: any) => d._id === second[0]._id,
+    );
+    assert.equal(recorded.state, "unknown");
+    assert.equal(recorded.paidUntil, second[0].paidUntil);
+    assert.equal(recorded.resolution.outcome, "confirmed");
+    assert.equal(recorded.resolution.evidence, resolution.evidence);
+    await assert.rejects(call("resolveHold", resolution), /stale|resolved/);
+    await call("settleDebit", { debitId: second[0]._id, outcome: "denied" });
+    assert.equal(
+      (await call("get", { sessionId: next }, true)).state,
+      "starting",
+    );
+
     const other = randomUUID(),
       old = await call("admit", { userId: other });
     const otherApp = await call("app", {
@@ -112,6 +171,36 @@ test(
       "stopped",
     );
     assert.notEqual(await call("admit", { userId: other }), old);
+  },
+);
+
+test(
+  "a provider-denied debit is recorded without granting paid time",
+  { skip: !url },
+  async () => {
+    const userId = randomUUID();
+    const sessionId = await call("admit", { userId });
+    const appId = await call("app", {
+      userId,
+      sessionId,
+      threadId: randomUUID(),
+    });
+    const debit = await call("claim", { sessionId });
+    await call("crash", { debitId: debit._id });
+    await call("stop", { sessionId, token: "stop" });
+    await call("setStatus", { appId, status: "idle" });
+    await call("stoppedResult", { sessionId, token: "stop", archived: true });
+    await call("resolveHold", {
+      sessionId,
+      debitId: debit._id,
+      outcome: "denied",
+      evidence: "final provider denial 456",
+      operator: "operator-1",
+    });
+    const row = (await call("debits", { sessionId }, true))[0];
+    assert.equal(row.state, "unknown");
+    assert.equal(row.resolution.outcome, "denied");
+    assert.equal((await call("get", { sessionId }, true)).paidUntil, 0);
   },
 );
 
