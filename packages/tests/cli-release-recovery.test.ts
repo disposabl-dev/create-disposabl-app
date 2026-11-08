@@ -128,8 +128,32 @@ function fixture() {
   );
   script(
     "curl",
-    `[[ "\${CURL_FAIL:-}" != 1 ]] || exit 7; printf '{"name":"%s","version":"%s","dist":{"integrity":"%s"}}' "\${PACKAGE_NAME:-@disposabl/cli}" "\${REGISTRY_VERSION:-$VERSION}" "\${INTEGRITY:-sha512-test}" > "$3"; printf '%s' "\${STATUS:-404}"`,
+    `[[ "\${CURL_FAIL:-}" != 1 ]] || exit 7
+    if [[ -z "\${VERIFY_MODE:-}" ]]; then
+      printf '{"name":"%s","version":"%s","dist":{"integrity":"%s"}}' "\${PACKAGE_NAME:-@disposabl/cli}" "\${REGISTRY_VERSION:-$VERSION}" "\${INTEGRITY:-sha512-test}" > "$3"; printf '%s' "\${STATUS:-404}"; exit
+    fi
+    output=''; url=''; previous=''
+    for arg in "$@"; do
+      [[ "$previous" != -o ]] || output="$arg"
+      [[ "$arg" != https://* ]] || url="$arg"
+      previous="$arg"
+    done
+    if [[ "$url" == */latest ]]; then
+      attempt=$(cat "$RUNNER_TEMP/verify-attempt" 2>/dev/null || echo 0)
+      version=1.1.0
+      if [[ "$VERIFY_MODE" == persistent || ( "$VERIFY_MODE" == delayed && "$attempt" == 1 ) ]]; then version=1.0.0; fi
+      integrity=sha512-test; [[ "$VERIFY_MODE" != integrity ]] || integrity=sha512-wrong
+      printf '{"name":"@disposabl/cli","version":"%s","dist":{"integrity":"%s"}}' "$version" "$integrity" > "$output"; printf 200; exit
+    fi
+    attempt=$(cat "$RUNNER_TEMP/verify-attempt" 2>/dev/null || echo 0)
+    attempt=$((attempt + 1)); echo "$attempt" > "$RUNNER_TEMP/verify-attempt"
+    if [[ "$VERIFY_MODE" == auth ]]; then printf 401; exit; fi
+    if [[ "$VERIFY_MODE" == network && "$attempt" == 1 ]]; then exit 7; fi
+    if [[ "$VERIFY_MODE" == persistent || ( "$VERIFY_MODE" == delayed && "$attempt" == 1 ) ]]; then printf 404; exit; fi
+    name=@disposabl/cli; [[ "$VERIFY_MODE" != contradictory ]] || name=wrong-package
+    printf '{"name":"%s","version":"1.1.0","dist":{"integrity":"sha512-test"}}' "$name" > "$output"; printf 200`,
   );
+  script("sleep", 'echo sleep >> "$RUNNER_TEMP/verify-sleeps"');
   script("gh", "exit 0");
   script("bun", "exit 0");
   const run = (
@@ -162,6 +186,50 @@ test("missing newer tagged CLI blocks generator with exact recovery instruction"
   const r = f.run("Verify CLI release and tag");
   expect(r.status).not.toBe(0);
   expect(r.stdout).toContain("cli_recovery_version=1.1.0");
+});
+
+test("post-publish verification retries only propagation and transient network errors", () => {
+  for (const mode of ["delayed", "network"]) {
+    const f = fixture();
+    f.git("tag", "@disposabl/cli@1.1.0");
+    writeFileSync(join(f.dir, "published"), "publish\n");
+    const result = f.run("Verify published CLI release and tag", {
+      VERIFY_MODE: mode,
+    });
+    expect(result.status).toBe(0);
+    expect(readFileSync(join(f.dir, "verify-attempt"), "utf8").trim()).toBe(
+      "2",
+    );
+    expect(readFileSync(join(f.dir, "verify-sleeps"), "utf8")).toBe("sleep\n");
+    expect(readFileSync(join(f.dir, "published"), "utf8")).toBe("publish\n");
+  }
+});
+
+test("post-publish verification fails boundedly on 404 and immediately on contradictions or auth", () => {
+  for (const [mode, attempts, sleeps] of [
+    ["persistent", "10", 9],
+    ["contradictory", "1", 0],
+    ["integrity", "1", 0],
+    ["auth", "1", 0],
+  ] as const) {
+    const f = fixture();
+    f.git("tag", "@disposabl/cli@1.1.0");
+    writeFileSync(join(f.dir, "published"), "publish\n");
+    const result = f.run("Verify published CLI release and tag", {
+      VERIFY_MODE: mode,
+    });
+    expect(result.status).not.toBe(0);
+    expect(readFileSync(join(f.dir, "verify-attempt"), "utf8").trim()).toBe(
+      attempts,
+    );
+    const sleepFile = join(f.dir, "verify-sleeps");
+    expect(
+      existsSync(sleepFile)
+        ? readFileSync(sleepFile, "utf8").trim().split("\n").length
+        : 0,
+    ).toBe(sleeps);
+    expect(readFileSync(join(f.dir, "published"), "utf8")).toBe("publish\n");
+  }
 });
 
 test("recovery publishes only a 404 and safely replays a matching version", () => {
@@ -346,7 +414,13 @@ test("network, registry, and dist-tag failures do not publish", () => {
     steps.filter(
       (s: { name?: string }) => s.name === "Verify CLI release and tag",
     ),
-  ).toHaveLength(2);
+  ).toHaveLength(1);
+  expect(
+    steps.filter(
+      (s: { name?: string }) =>
+        s.name === "Verify published CLI release and tag",
+    ),
+  ).toHaveLength(1);
   expect(workflow.env.DISPOSABL_CLI_TELEMETRY_REQUIRED).toBe("1");
   expect(workflow.env.DISPOSABL_CLI_POSTHOG_PROJECT_TOKEN).toContain(
     "vars.DISPOSABL_CLI_POSTHOG_PROJECT_TOKEN",
