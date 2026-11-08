@@ -10,6 +10,7 @@ export const nativeBillingTest = join(
   "native-billing.test.ts",
 );
 export const purchasesPackage = "react-native-purchases";
+const purchasesPackages = [purchasesPackage, "react-native-purchases-ui"];
 const dependencyFields = [
   "dependencies",
   "peerDependencies",
@@ -28,25 +29,26 @@ export function mergePurchasesManifest(
   const withoutSdk = (value: typeof before) => {
     const copy = structuredClone(value);
     for (const field of dependencyFields)
-      delete copy[field]?.[purchasesPackage];
+      for (const name of purchasesPackages) delete copy[field]?.[name];
     return JSON.stringify(copy);
   };
   if (withoutSdk(before) !== withoutSdk(after)) return undefined;
-  for (const field of dependencyFields) {
-    const oldValue = before[field]?.[purchasesPackage];
-    const newValue = after[field]?.[purchasesPackage];
-    const currentValue = actual[field]?.[purchasesPackage];
-    if (JSON.stringify(oldValue) === JSON.stringify(newValue)) continue;
-    if (
-      JSON.stringify(currentValue) !== JSON.stringify(oldValue) &&
-      JSON.stringify(currentValue) !== JSON.stringify(newValue)
-    )
-      throw new Error(
-        `Cannot reconfigure: customized ${purchasesPackage} ${field}. No files were changed.`,
-      );
-    if (newValue === undefined) delete actual[field]?.[purchasesPackage];
-    else (actual[field] ??= {})[purchasesPackage] = newValue;
-  }
+  for (const field of dependencyFields)
+    for (const name of purchasesPackages) {
+      const oldValue = before[field]?.[name];
+      const newValue = after[field]?.[name];
+      const currentValue = actual[field]?.[name];
+      if (JSON.stringify(oldValue) === JSON.stringify(newValue)) continue;
+      if (
+        JSON.stringify(currentValue) !== JSON.stringify(oldValue) &&
+        JSON.stringify(currentValue) !== JSON.stringify(newValue)
+      )
+        throw new Error(
+          `Cannot reconfigure: customized ${name} ${field}. No files were changed.`,
+        );
+      if (newValue === undefined) delete actual[field]?.[name];
+      else (actual[field] ??= {})[name] = newValue;
+    }
   return Buffer.from(JSON.stringify(actual, null, 2) + "\n");
 }
 
@@ -57,7 +59,8 @@ export async function omitMobilePayments(root: string) {
     if (!existsSync(path)) continue;
     const manifest = JSON.parse(await readFile(path, "utf8"));
     for (const field of dependencyFields)
-      if (manifest[field]) delete manifest[field][purchasesPackage];
+      if (manifest[field])
+        for (const name of purchasesPackages) delete manifest[field][name];
     await writeFile(path, JSON.stringify(manifest, null, 2) + "\n");
   }
   const path = join(root, "packages/disposabl-kit/mobile/screens/account.tsx");

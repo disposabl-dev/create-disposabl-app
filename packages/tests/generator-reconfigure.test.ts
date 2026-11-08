@@ -106,6 +106,7 @@ test("native payments selection adds and removes the SDK without replacing custo
     });
     let manifest = JSON.parse(await read(app, manifestPath));
     assert.equal(manifest.dependencies["react-native-purchases"], undefined);
+    assert.equal(manifest.dependencies["react-native-purchases-ui"], undefined);
     assert.equal(existsSync(join(app, billingPath)), false);
     assert.doesNotMatch(
       await read(app, "packages/disposabl-kit/mobile/screens/account.tsx"),
@@ -122,6 +123,10 @@ test("native payments selection adds and removes the SDK without replacing custo
       assert.equal(manifest.dependencies["custom-example"], "1.2.3");
       assert.equal(
         !!manifest.dependencies["react-native-purchases"],
+        features === "payments",
+      );
+      assert.equal(
+        !!manifest.dependencies["react-native-purchases-ui"],
         features === "payments",
       );
       assert.equal(existsSync(join(app, billingPath)), features === "payments");

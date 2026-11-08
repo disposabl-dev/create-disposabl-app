@@ -58,6 +58,16 @@ test("reset welcome reflects selected platforms and hides disabled docs", async 
         false,
       );
       assert.equal(
+        existsSync(join(app, "packages/tests/agent-credits.test.ts")),
+        false,
+      );
+      assert.equal(
+        existsSync(
+          join(app, "packages/tests/mobile-submission-policy.test.ts"),
+        ),
+        false,
+      );
+      assert.equal(
         existsSync(join(app, "packages/tests/app-telemetry.test.ts")),
         false,
       );

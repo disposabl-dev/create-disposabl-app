@@ -39,6 +39,7 @@ export function ConnectionPanel({
   onProvider,
   onManage,
   busy = false,
+  expoRequired = false,
 }: {
   connections?: ConnectionSummary;
   onConnect: () => void;
@@ -46,11 +47,16 @@ export function ConnectionPanel({
   onProvider?: (provider: "github" | "convex" | "expo") => void;
   onManage?: () => void;
   busy?: boolean;
+  expoRequired?: boolean;
 }) {
   const c = useTheme();
   if (!connections)
     return <ActivityIndicator accessibilityLabel="Loading connections" />;
-  const completed = Number(!!connections.github) + Number(!!connections.convex);
+  const completed =
+    Number(!!connections.github) +
+    Number(!!connections.convex) +
+    Number(expoRequired && !!connections.expo);
+  const total = expoRequired ? 3 : 2;
   const rows = [
     {
       id: "github",
@@ -98,7 +104,7 @@ export function ConnectionPanel({
         <Label
           variant="caption"
           color={c.mutedForeground}
-        >{`${completed} of 2 essentials connected`}</Label>
+        >{`${completed} of ${total} essentials connected`}</Label>
       </View>
       <View className="bg-card rounded-[24px] px-[20px]">
         {rows.map((row, index) => (
@@ -115,7 +121,7 @@ export function ConnectionPanel({
               <Label variant="heading">{row.name}</Label>
               <Label variant="caption" color={c.mutedForeground}>
                 {row.account ??
-                  `${row.id === "expo" ? "Optional" : "Required"} · ${row.detail}`}
+                  `${row.id === "expo" && !expoRequired ? "Optional" : "Required"} · ${row.detail}`}
               </Label>
             </View>
             {row.account ? (

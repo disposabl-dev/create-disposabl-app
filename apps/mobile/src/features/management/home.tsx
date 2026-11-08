@@ -1,4 +1,4 @@
-import { useConvexAuth, useAction } from "convex/react";
+import { useConvexAuth, useAction, useMutation, useQuery } from "convex/react";
 import { ConvexError } from "convex/values";
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
@@ -9,9 +9,15 @@ import {
   resolvePlatforms,
   type Platform,
 } from "@disposabl/disposabl-kit/platforms";
-import { authenticationEnabled } from "@disposabl/disposabl-kit/features";
+import {
+  authenticationEnabled,
+  paymentsEnabled,
+} from "@disposabl/disposabl-kit/features";
 import { useTheme } from "../../../../../packages/disposabl-kit/mobile/design/use-theme";
-import { ConnectionGate } from "../studio/connections";
+import { ConnectionPanel } from "../studio/connection-panel";
+import { PaymentGate, type BillingSnapshot } from "./payment-gate";
+import { nextSubmissionStep } from "./submission-policy";
+import { openURL } from "expo-linking";
 import { examples } from "../studio/data";
 import { MessageComposer } from "../studio/message-composer";
 import { useAttachments } from "../studio/attachments";
@@ -58,11 +64,7 @@ function ComposeEntry() {
         />
       </View>
     );
-  return (
-    <ConnectionGate>
-      <Composer />
-    </ConnectionGate>
-  );
+  return <Composer />;
 }
 
 function Composer() {
@@ -86,14 +88,66 @@ function Composer() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const send = useAction(api.agent.index.sendMessageChecked);
+  const snapshot = useAction(api.billing.snapshot);
+  const user = useQuery(api.users.index.current, {});
+  const connections = useQuery(api.connections.index.status, {
+    features: ["authentication"],
+  });
+  const handoff = useMutation(api.browserHandoff.create);
+  const [phase, setPhase] = useState<"payment" | "connections" | null>(null);
+  const [billing, setBilling] = useState<BillingSnapshot | null>(null);
   const c = useTheme();
+  async function refreshBalance() {
+    try {
+      const data = await snapshot({});
+      if (isActive()) setBilling(data);
+    } catch {
+      if (isActive()) setBilling(null);
+    }
+  }
   async function submit(text: string) {
     const fileIds = attachmentIds(attachments);
     if (!text.trim() || busy || attachmentsBusy || !fileIds) return;
-    if (!beginSend(fileIds)) return;
     setBusy(true);
     setError("");
+    let started = false;
     try {
+      if (paymentsEnabled) {
+        let data: BillingSnapshot;
+        try {
+          data = await snapshot({});
+        } catch {
+          if (isActive()) {
+            setBilling(null);
+            setPhase("payment");
+          }
+          return;
+        }
+        if (!isActive()) return;
+        setBilling(data);
+        if (
+          nextSubmissionStep(true, data.balance, true, false, false) ===
+          "payment"
+        ) {
+          setPhase("payment");
+          return;
+        }
+      }
+      const mobile = selected.some((p) => p === "android" || p === "ios");
+      if (
+        nextSubmissionStep(
+          false,
+          null,
+          !!connections?.ready,
+          mobile,
+          !!connections?.expo,
+        ) === "connections"
+      ) {
+        setPhase("connections");
+        return;
+      }
+      if (!beginSend(fileIds)) return;
+      started = true;
       const result = await send({
         prompt: text.trim(),
         ...(fileIds.length ? { fileIds } : {}),
@@ -107,12 +161,68 @@ function Composer() {
         params: { appId: result.appId },
       });
     } catch (e) {
-      sendFailed(fileIds, e instanceof ConvexError);
-      if (isActive())
-        setError(e instanceof Error ? e.message : "Could not send your idea.");
+      if (started) sendFailed(fileIds, e instanceof ConvexError);
+      if (isActive()) {
+        const code =
+          e instanceof ConvexError && typeof e.data === "object" && e.data
+            ? e.data.code
+            : undefined;
+        if (code === "credits_required" || code === "credits_unavailable") {
+          await refreshBalance();
+          setPhase("payment");
+        } else if (code === "connections_required") setPhase("connections");
+        else
+          setError(
+            e instanceof Error ? e.message : "Could not send your idea.",
+          );
+      }
     } finally {
       if (isActive()) setBusy(false);
     }
+  }
+  if (phase === "payment")
+    return user ? (
+      <PaymentGate
+        customerId={user.id}
+        data={billing}
+        refresh={refreshBalance}
+        proceed={() => void submit(prompt)}
+        cancel={() => setPhase(null)}
+      />
+    ) : (
+      <ActivityIndicator accessibilityLabel="Loading account" />
+    );
+  if (phase === "connections") {
+    const ready =
+      !!connections?.ready &&
+      (!selected.some((p) => p === "android" || p === "ios") ||
+        !!connections.expo);
+    return (
+      <View className="gap-[20px]">
+        <ConnectionPanel
+          connections={connections ? { ...connections, ready } : undefined}
+          expoRequired={selected.some((p) => p === "android" || p === "ios")}
+          busy={busy}
+          onConnect={() =>
+            void handoff({})
+              .then(openURL)
+              .catch(() => setError("Could not open connections."))
+          }
+          onProvider={() =>
+            void handoff({})
+              .then(openURL)
+              .catch(() => setError("Could not open connections."))
+          }
+          onContinue={() => void submit(prompt)}
+        />
+        <Action label="Back to idea" onPress={() => setPhase(null)} />
+        {!!error && (
+          <Text accessibilityRole="alert" className="text-destructive">
+            {error}
+          </Text>
+        )}
+      </View>
+    );
   }
   return (
     <View className="gap-[28px]">

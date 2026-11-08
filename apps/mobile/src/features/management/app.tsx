@@ -2,6 +2,9 @@ import { VariableContextProvider } from "nativewind";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "expo-router/react-navigation";
 import { Details } from "./details";
+import { PaymentGate, type BillingSnapshot } from "./payment-gate";
+import { nextSubmissionStep } from "./submission-policy";
+import { paymentsEnabled } from "@disposabl/disposabl-kit/features";
 import { MessageBubble } from "../studio/message-bubble";
 import { MessageComposer } from "../studio/message-composer";
 import { useAttachments } from "../studio/attachments";
@@ -86,16 +89,51 @@ function Chat({ appId }: { appId: string }) {
   });
   const send = useAction(api.agent.index.sendMessageChecked);
   const abort = useMutation(api.agent.index.abortMessage);
+  const snapshot = useAction(api.billing.snapshot);
+  const user = useQuery(api.users.index.current, {});
+  const [payment, setPayment] = useState(false);
+  const [billing, setBilling] = useState<BillingSnapshot | null>(null);
+  async function refreshBalance() {
+    try {
+      const value = await snapshot({});
+      if (isActive()) setBilling(value);
+    } catch {
+      if (isActive()) setBilling(null);
+    }
+  }
   const [prompt, setPrompt] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   async function submit(text: string) {
     const fileIds = attachmentIds(attachments);
     if (!text.trim() || busy || attachmentsBusy || !fileIds) return;
-    if (!beginSend(fileIds)) return;
     setBusy(true);
     setError("");
+    let started = false;
     try {
+      if (paymentsEnabled) {
+        let data: BillingSnapshot;
+        try {
+          data = await snapshot({});
+        } catch {
+          if (isActive()) {
+            setBilling(null);
+            setPayment(true);
+          }
+          return;
+        }
+        if (!isActive()) return;
+        setBilling(data);
+        if (
+          nextSubmissionStep(true, data.balance, true, false, false) ===
+          "payment"
+        ) {
+          setPayment(true);
+          return;
+        }
+      }
+      if (!beginSend(fileIds)) return;
+      started = true;
       const submitted = text;
       const originalPrompt = prompt;
       followLatest.current = true;
@@ -106,14 +144,24 @@ function Chat({ appId }: { appId: string }) {
       });
       markSent(fileIds);
       if (!isActive()) return;
+      setPayment(false);
       setPrompt((current) =>
         current === submitted || current === originalPrompt ? "" : current,
       );
       setCursors([null]);
     } catch (e) {
-      sendFailed(fileIds, e instanceof ConvexError);
-      if (isActive())
-        setError(e instanceof Error ? e.message : "Could not send message.");
+      if (started) sendFailed(fileIds, e instanceof ConvexError);
+      if (isActive()) {
+        const code =
+          e instanceof ConvexError && typeof e.data === "object" && e.data
+            ? e.data.code
+            : undefined;
+        if (code === "credits_required" || code === "credits_unavailable") {
+          await refreshBalance();
+          setPayment(true);
+        } else
+          setError(e instanceof Error ? e.message : "Could not send message.");
+      }
     } finally {
       if (isActive()) setBusy(false);
     }
@@ -130,6 +178,20 @@ function Chat({ appId }: { appId: string }) {
       setBusy(false);
     }
   }
+  if (payment)
+    return user ? (
+      <View className="p-[24px]">
+        <PaymentGate
+          customerId={user.id}
+          data={billing}
+          refresh={refreshBalance}
+          proceed={() => void submit(prompt)}
+          cancel={() => setPayment(false)}
+        />
+      </View>
+    ) : (
+      <Loading />
+    );
   if (!history) return <Loading />;
   if (history.kind !== "messages")
     return (
