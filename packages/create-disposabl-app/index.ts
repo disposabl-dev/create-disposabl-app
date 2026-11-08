@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { Command, CommanderError } from "commander";
 import * as p from "@clack/prompts";
 import { version } from "./package.json";
-import { capture } from "../cli/telemetry";
+import { capture, telemetryStatePath } from "../cli/telemetry";
 import {
   features,
   featureDependencies,
@@ -333,10 +333,16 @@ async function main() {
   }
 }
 
-await capture(version, "generator", "create", "started");
+await capture(version, "generator", "create", "started", telemetryStatePath());
 try {
   await main();
-  await capture(version, "generator", "create", "success");
+  await capture(
+    version,
+    "generator",
+    "create",
+    "success",
+    telemetryStatePath(),
+  );
 } catch (error) {
   await capture(
     version,
@@ -347,6 +353,7 @@ try {
       : error instanceof Cancelled
         ? "cancelled"
         : "failure",
+    telemetryStatePath(),
   );
   if (error instanceof CommanderError && error.exitCode === 0) {
     process.exitCode = 0;

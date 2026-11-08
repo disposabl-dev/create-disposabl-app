@@ -1,9 +1,10 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { lock } from "proper-lockfile";
 
-type State = { anonymousId: string; userId?: string };
+type State = { anonymousId: string; userId?: string; loginAttempt?: string };
 type Product = "cli" | "generator";
 type Outcome = "started" | "success" | "failure" | "cancelled";
 
@@ -25,8 +26,8 @@ export function telemetryConfig(
   entry = process.argv[1] ?? "",
 ) {
   const env = process.env;
-  const host = env.DISPOSABL_CLI_POSTHOG_HOST;
-  const token = env.DISPOSABL_CLI_POSTHOG_PROJECT_TOKEN;
+  const host = process.env.DISPOSABL_CLI_POSTHOG_HOST;
+  const token = process.env.DISPOSABL_CLI_POSTHOG_PROJECT_TOKEN;
   if (
     !installedRelease(version, entry) ||
     env.NODE_ENV === "test" ||
@@ -49,8 +50,8 @@ export function telemetryConfig(
 }
 
 const directory = () => join(homedir(), ".config", "disposabl");
-const statePath = () => join(directory(), "telemetry.json");
-async function state(path = statePath()): Promise<State> {
+export const telemetryStatePath = () => join(directory(), "telemetry.json");
+async function state(path: string): Promise<State> {
   try {
     const value = JSON.parse(await readFile(path, "utf8")) as State;
     if (
@@ -74,6 +75,22 @@ async function state(path = statePath()): Promise<State> {
     )
       throw new Error("Invalid telemetry state");
     return value;
+  }
+}
+async function synchronized<T>(
+  path: string,
+  run: () => Promise<T>,
+): Promise<T> {
+  await mkdir(dirname(path), { recursive: true, mode: 0o700 });
+  const release = await lock(path, {
+    realpath: false,
+    stale: 5000,
+    retries: { retries: 20, minTimeout: 50, maxTimeout: 50 },
+  });
+  try {
+    return await run();
+  } finally {
+    await release();
   }
 }
 async function send(
@@ -102,13 +119,14 @@ export async function capture(
   product: Product,
   command: string,
   outcome: Outcome,
-  path = statePath(),
+  path: string,
 ) {
   const config = telemetryConfig(version);
   if (!config) return;
   try {
-    const current = await state(path);
+    const current = await synchronized(path, () => state(path));
     const allowed = [
+      "agent",
       "login",
       "logout",
       "apps",
@@ -141,47 +159,75 @@ export async function capture(
   }
 }
 
+// A new attempt invalidates any earlier in-flight login. A linked identity
+// gets a new anonymous ID before another account can use it.
+export async function prepareLogin(path: string): Promise<string | undefined> {
+  try {
+    return await synchronized(path, async () => {
+      const current = await state(path);
+      const loginAttempt = randomUUID();
+      const next = {
+        anonymousId: current.userId ? randomUUID() : current.anonymousId,
+        loginAttempt,
+      };
+      await writeFile(path, JSON.stringify(next), { mode: 0o600 });
+      return loginAttempt;
+    });
+  } catch {
+    return undefined;
+  }
+}
+
 export async function identify(
   version: string,
   userId: unknown,
-  path = statePath(),
+  path: string,
+  attempt: string | undefined,
 ) {
   const config = telemetryConfig(version);
   if (
     !config ||
+    !attempt ||
     typeof userId !== "string" ||
     !/^[a-zA-Z0-9_-]{1,128}$/.test(userId)
   )
     return;
   try {
-    const current = await state(path);
-    if (current.userId === userId) return;
-    if (current.userId) return; // Rotate before another login, never merge accounts.
-    if (
-      await send(config, "$identify", userId, {
-        $anon_distinct_id: current.anonymousId,
-      })
-    ) {
-      await writeFile(path, JSON.stringify({ ...current, userId }), {
-        mode: 0o600,
-      });
-    }
+    await synchronized(path, async () => {
+      // Do not recreate state after logout or a later login.
+      const current = JSON.parse(await readFile(path, "utf8")) as State;
+      if (
+        current.loginAttempt !== attempt ||
+        current.userId ||
+        !/^[0-9a-f-]{36}$/.test(current.anonymousId)
+      )
+        return;
+      const opaqueId = createHash("sha256")
+        .update(`disposabl:${config.token}:${userId}`)
+        .digest("hex");
+      if (
+        await send(config, "$identify", opaqueId, {
+          $anon_distinct_id: current.anonymousId,
+        })
+      ) {
+        await writeFile(
+          path,
+          JSON.stringify({
+            anonymousId: current.anonymousId,
+            userId: opaqueId,
+          }),
+          { mode: 0o600 },
+        );
+      }
+    });
   } catch {
     /* analytics must not affect login */
   }
 }
 
-// On logout and before switching accounts, forget the linked anonymous ID.
-export async function resetIdentity(
-  onlyIfIdentified = false,
-  path = statePath(),
-) {
+export async function resetIdentity(path: string) {
   try {
-    if (onlyIfIdentified) {
-      const current = JSON.parse(await readFile(path, "utf8")) as State;
-      if (!current.userId) return;
-    }
-    await rm(path, { force: true });
+    await synchronized(path, () => rm(path, { force: true }));
   } catch {
     /* analytics must not affect authentication */
   }

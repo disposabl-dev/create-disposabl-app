@@ -1,13 +1,16 @@
+import { createHash } from "node:crypto";
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { homedir, tmpdir } from "node:os";
+import { join, resolve, sep } from "node:path";
+import { telemetryBuildDefine } from "../cli/telemetry-build";
 import {
   capture,
   identify,
   resetIdentity,
+  prepareLogin,
   telemetryConfig,
-} from "../../cli/telemetry";
+} from "../cli/telemetry";
 
 const originalEnv = { ...process.env };
 const originalFetch = globalThis.fetch;
@@ -20,8 +23,13 @@ let requests: {
 }[];
 const path = () => join(home, ".config/disposabl/telemetry.json");
 beforeEach(async () => {
+  const tempRoot = resolve(tmpdir());
+  const realHome = resolve(homedir());
+  if (tempRoot === realHome || tempRoot.startsWith(realHome + sep))
+    throw new Error(
+      "Tests require a temporary directory outside the home directory.",
+    );
   home = await mkdtemp(join(tmpdir(), "disposabl-telemetry-test-"));
-  process.env.HOME = home;
   process.env.NODE_ENV = "production";
   delete process.env.BUN_ENV;
   delete process.env.CI;
@@ -80,18 +88,24 @@ test("anonymous events link on login and reset between users with only approved 
   await capture("1.2.3", "generator", "create", "started", path());
   expect(requests[0].properties.invocation).toBe("npx");
   const anonymous = requests[0].distinct_id;
-  await identify("1.2.3", "user_123", path());
+  const attempt = await prepareLogin(path());
+  await identify("1.2.3", "user_123", path(), attempt);
   await capture("1.2.3", "cli", "my-prompt-secret", "success", path());
   expect(requests[1]).toMatchObject({
     event: "$identify",
-    distinct_id: "user_123",
+    distinct_id: createHash("sha256")
+      .update("disposabl:phc_test:user_123")
+      .digest("hex"),
     properties: { $anon_distinct_id: anonymous },
   });
   expect(requests[2]).toMatchObject({
-    distinct_id: "user_123",
+    distinct_id: createHash("sha256")
+      .update("disposabl:phc_test:user_123")
+      .digest("hex"),
     properties: { command: "other", outcome: "success" },
   });
   expect(JSON.stringify(requests)).not.toContain("my-prompt-secret");
+  expect(JSON.stringify(requests)).not.toContain("user_123");
   expect(Object.keys(requests[2].properties).sort()).toEqual(
     [
       "$geoip_disable",
@@ -104,11 +118,12 @@ test("anonymous events link on login and reset between users with only approved 
       "version",
     ].sort(),
   );
-  await resetIdentity(true, path());
+  await resetIdentity(path());
   await capture("1.2.3", "cli", "login", "started", path());
   expect(requests[3].distinct_id).not.toBe(anonymous);
   expect(requests[3].distinct_id).not.toBe("user_123");
-  await identify("1.2.3", "user_456", path());
+  const nextAttempt = await prepareLogin(path());
+  await identify("1.2.3", "user_456", path(), nextAttempt);
   expect(requests[4].properties.$anon_distinct_id).toBe(
     requests[3].distinct_id,
   );
@@ -116,7 +131,9 @@ test("anonymous events link on login and reset between users with only approved 
     JSON.parse(
       await readFile(join(home, ".config/disposabl/telemetry.json"), "utf8"),
     ).userId,
-  ).toBe("user_456");
+  ).toBe(
+    createHash("sha256").update("disposabl:phc_test:user_456").digest("hex"),
+  );
 });
 
 test("transport failures do not escape", async () => {
@@ -127,4 +144,63 @@ test("transport failures do not escape", async () => {
     capture("1.2.3", "cli", "help", "success", path()),
   ).resolves.toBeUndefined();
   await expect(identify("1.2.3", "user_123", path())).resolves.toBeUndefined();
+});
+
+test("new login and logout invalidate concurrent identity attempts", async () => {
+  await Promise.all(
+    Array.from({ length: 4 }, () =>
+      capture("1.2.3", "cli", "agent", "started", path()),
+    ),
+  );
+  expect(new Set(requests.map((request) => request.distinct_id)).size).toBe(1);
+  expect(
+    requests.every((request) => request.properties.command === "agent"),
+  ).toBe(true);
+  const first = await prepareLogin(path());
+  const second = await prepareLogin(path());
+  await identify("1.2.3", "user_123", path(), first);
+  expect(requests).toHaveLength(4);
+  await identify("1.2.3", "user_456", path(), second);
+  expect(requests).toHaveLength(5);
+  const pending = await prepareLogin(path());
+  await resetIdentity(path());
+  await identify("1.2.3", "user_789", path(), pending);
+  expect(requests).toHaveLength(5);
+  await capture("1.2.3", "cli", "agent", "success", path());
+  expect(requests[5].distinct_id).not.toBe(requests[4].distinct_id);
+});
+
+test("release builds require public ingestion config and embed it in the bundle", async () => {
+  expect(() => telemetryBuildDefine("1.0.0", {})).toThrow("Release requires");
+  expect(() =>
+    telemetryBuildDefine("0.0.0-development", {
+      DISPOSABL_CLI_TELEMETRY_REQUIRED: "1",
+    }),
+  ).toThrow("Release requires");
+  expect(() =>
+    telemetryBuildDefine("1.0.0", {
+      DISPOSABL_CLI_POSTHOG_PROJECT_TOKEN: "phx_secret",
+      DISPOSABL_CLI_POSTHOG_HOST: "https://us.i.posthog.com",
+    }),
+  ).toThrow("Invalid");
+  const define = telemetryBuildDefine("1.0.0", {
+    DISPOSABL_CLI_POSTHOG_PROJECT_TOKEN: "phc_fixture",
+    DISPOSABL_CLI_POSTHOG_HOST: "https://eu.i.posthog.com",
+  });
+  const result = await Bun.build({
+    entrypoints: [join(import.meta.dir, "../cli/telemetry.ts")],
+    outdir: home,
+    target: "bun",
+    define,
+  });
+  expect(result.success).toBe(true);
+  const bundle = await import(join(home, "telemetry.js"));
+  process.env.DISPOSABL_CLI_POSTHOG_PROJECT_TOKEN = "phc_wrong";
+  process.env.DISPOSABL_CLI_POSTHOG_HOST = "https://us.i.posthog.com";
+  expect(bundle.telemetryConfig("1.0.0", process.argv[1])).toEqual({
+    token: "phc_fixture",
+    host: "https://eu.i.posthog.com",
+  });
+  process.env.DO_NOT_TRACK = "1";
+  expect(bundle.telemetryConfig("1.0.0", process.argv[1])).toBeNull();
 });

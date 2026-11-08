@@ -4,6 +4,8 @@ import manifest from "./package.json";
 import {
   identify,
   installedRelease,
+  prepareLogin,
+  telemetryStatePath,
   resetIdentity,
   telemetryConfig,
 } from "./telemetry";
@@ -47,12 +49,16 @@ export function createProgram(serviceOrigin: string, centralAnalytics = false) {
     .option("--no-browser", "Print the login URL without opening a browser")
     .action(async (options) => {
       const base = origin();
-      if (
+      const central =
         centralAnalytics &&
         base === "https://www.disposabl.dev" &&
-        installedRelease(manifest.version)
-      )
-        await resetIdentity(true);
+        installedRelease(manifest.version);
+      const enabled = central && telemetryConfig(manifest.version);
+      let attempt: string | undefined;
+      if (central) {
+        if (enabled) attempt = await prepareLogin(telemetryStatePath());
+        else await resetIdentity(telemetryStatePath());
+      }
       await login(base, options.browser);
       if (
         centralAnalytics &&
@@ -68,7 +74,12 @@ export function createProgram(serviceOrigin: string, centralAnalytics = false) {
             signal: AbortSignal.timeout(500),
           });
           if (response.ok)
-            await identify(manifest.version, (await response.json())?.id);
+            await identify(
+              manifest.version,
+              (await response.json())?.id,
+              telemetryStatePath(),
+              attempt,
+            );
         } catch {
           /* identity lookup is optional */
         }
@@ -118,7 +129,7 @@ export function createProgram(serviceOrigin: string, centralAnalytics = false) {
       origin() === "https://www.disposabl.dev" &&
       installedRelease(manifest.version)
     )
-      await resetIdentity();
+      await resetIdentity(telemetryStatePath());
     console.error("Signed out.");
   });
 

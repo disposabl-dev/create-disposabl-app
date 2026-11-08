@@ -3,15 +3,18 @@ import { lstatSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join, resolve, sep } from "node:path";
 import manifest from "./package.json";
+import { telemetryBuildDefine } from "../cli/telemetry-build";
 
 const dir = import.meta.dir;
 const root = join(dir, "../..");
 const outdir = join(dir, "dist");
+const define = telemetryBuildDefine(manifest.version);
 await rm(outdir, { recursive: true, force: true });
 const result = await Bun.build({
   entrypoints: [join(dir, "index.ts")],
   outdir,
   target: "node",
+  define,
   external: ["commander", "@clack/core", "@clack/prompts", "picocolors"],
 });
 if (!result.success) throw new AggregateError(result.logs, "CLI build failed");
@@ -20,6 +23,7 @@ const cli = await Bun.build({
   outdir,
   naming: "disposabl.js",
   target: "node",
+  define,
   external: ["commander", "proper-lockfile", "@modelcontextprotocol/sdk"],
   plugins: [
     {
@@ -55,6 +59,7 @@ try {
         path !== join(root, "packages/tests/starter-welcome.test.ts") &&
         path !== join(root, "packages/tests/starter-ci.ts") &&
         path !== join(root, "packages/tests/generator-cli.test.ts") &&
+        path !== join(root, "packages/tests/cli-telemetry.test.ts") &&
         path !== join(root, "apps/web/src/components/landing") &&
         ![
           ".git",
