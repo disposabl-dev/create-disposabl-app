@@ -1,5 +1,8 @@
 /** Public ingestion configuration only. Personal API keys must never be bundled. */
-export function telemetryBuildDefine(version: string, env = process.env) {
+export function telemetryBuildDefine(
+  version: string,
+  env: Record<string, string | undefined> = process.env,
+) {
   const token = env.DISPOSABL_CLI_POSTHOG_PROJECT_TOKEN ?? "";
   const host = env.DISPOSABL_CLI_POSTHOG_HOST ?? "";
   const valid =

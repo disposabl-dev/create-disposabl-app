@@ -52,7 +52,7 @@ export { apiUrl } from "./origin";
 const fetchFor = (origin: string): typeof fetch =>
   Object.assign(
     async (
-      input: Parameters<typeof fetch>[0],
+      input: string | URL | Request,
       init?: Parameters<typeof fetch>[1],
     ) => {
       const url = new URL(input instanceof Request ? input.url : input);
@@ -66,8 +66,10 @@ const fetchFor = (origin: string): typeof fetch =>
         signal: init?.signal ?? AbortSignal.timeout(30_000),
       });
     },
-    { preconnect: fetch.preconnect },
-  );
+    {
+      preconnect: (fetch as typeof fetch & { preconnect?: unknown }).preconnect,
+    },
+  ) as typeof fetch;
 async function load(url: string): Promise<Session> {
   try {
     return JSON.parse(await readFile(sessionPath(url), "utf8"));

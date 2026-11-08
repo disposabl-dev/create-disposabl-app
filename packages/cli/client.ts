@@ -34,7 +34,29 @@ export type Operation = {
   requestBody?: { content: { "application/json": { schema: Schema } } };
 };
 
-export function createProgram(serviceOrigin: string, centralAnalytics = false) {
+type ProgramDependencies = {
+  version?: string;
+  telemetryPath?: string;
+  login?: typeof login;
+  logout?: typeof logout;
+  hasCredentials?: typeof hasCredentials;
+  accessToken?: typeof accessToken;
+  loginAccessToken?: typeof loginAccessToken;
+};
+
+export function createProgram(
+  serviceOrigin: string,
+  centralAnalytics = false,
+  dependencies: ProgramDependencies = {},
+) {
+  const version = dependencies.version ?? manifest.version;
+  const path = () => dependencies.telemetryPath ?? telemetryStatePath();
+  const sessionLogin = dependencies.login ?? login;
+  const sessionLogout = dependencies.logout ?? logout;
+  const sessionHasCredentials = dependencies.hasCredentials ?? hasCredentials;
+  const sessionAccessToken = dependencies.accessToken ?? accessToken;
+  const sessionLoginAccessToken =
+    dependencies.loginAccessToken ?? loginAccessToken;
   const program = new Command()
     .name(Object.keys(manifest.bin)[0])
     .version(manifest.version);
@@ -52,21 +74,21 @@ export function createProgram(serviceOrigin: string, centralAnalytics = false) {
       const central =
         centralAnalytics &&
         base === "https://www.disposabl.dev" &&
-        installedRelease(manifest.version);
-      const enabled = central && telemetryConfig(manifest.version);
+        installedRelease(version);
+      const enabled = central && telemetryConfig(version);
       let attempt: string | undefined;
       if (central) {
-        if (enabled) attempt = await prepareLogin(telemetryStatePath());
-        else await resetIdentity(telemetryStatePath());
+        if (enabled) attempt = await prepareLogin(path());
+        else await resetIdentity(path());
       }
-      await login(base, options.browser);
+      await sessionLogin(base, options.browser);
       if (
         centralAnalytics &&
         base === "https://www.disposabl.dev" &&
-        telemetryConfig(manifest.version)
+        telemetryConfig(version)
       ) {
         try {
-          const token = await loginAccessToken(base);
+          const token = await sessionLoginAccessToken(base);
           if (!token) throw new Error("No login token.");
           const response = await fetch(`${base}/api/users/current`, {
             headers: { Authorization: `Bearer ${token}` },
@@ -75,9 +97,9 @@ export function createProgram(serviceOrigin: string, centralAnalytics = false) {
           });
           if (response.ok)
             await identify(
-              manifest.version,
+              version,
               (await response.json())?.id,
-              telemetryStatePath(),
+              path(),
               attempt,
             );
         } catch {
@@ -91,14 +113,20 @@ export function createProgram(serviceOrigin: string, centralAnalytics = false) {
     .description("Return the server-verified current user")
     .action(async () => {
       const base = origin();
-      if (!(await hasCredentials(base))) {
+      const enabled =
+        centralAnalytics &&
+        base === "https://www.disposabl.dev" &&
+        telemetryConfig(version);
+      if (!(await sessionHasCredentials(base))) {
+        if (enabled) await resetIdentity(path());
         console.log(JSON.stringify({ currentUser: null }));
         return;
       }
+      const attempt = enabled ? await prepareLogin(path()) : undefined;
       const send = async (refresh = false) =>
         fetch(`${base}/api/users/current`, {
           headers: {
-            Authorization: `Bearer ${await accessToken(base, refresh)}`,
+            Authorization: `Bearer ${await sessionAccessToken(base, refresh)}`,
             "X-Disposabl-Source": "cli",
           },
           redirect: "error",
@@ -111,25 +139,29 @@ export function createProgram(serviceOrigin: string, centralAnalytics = false) {
           response = await send(true);
       } catch (error) {
         if (!(error instanceof NotAuthenticated)) throw error;
+        if (enabled) await resetIdentity(path());
         console.log(JSON.stringify({ currentUser: null }));
         return;
       }
       if (response.status === 401) {
+        if (enabled) await resetIdentity(path());
         console.log(JSON.stringify({ currentUser: null }));
         return;
       }
       if (!response.ok)
         throw new Error(`Login status failed (${response.status}).`);
-      console.log(JSON.stringify({ currentUser: await response.json() }));
+      const currentUser = await response.json();
+      if (enabled) await identify(version, currentUser?.id, path(), attempt);
+      console.log(JSON.stringify({ currentUser }));
     });
   program.command("logout").action(async () => {
-    await logout(origin());
+    await sessionLogout(origin());
     if (
       centralAnalytics &&
       origin() === "https://www.disposabl.dev" &&
-      installedRelease(manifest.version)
+      installedRelease(version)
     )
-      await resetIdentity(telemetryStatePath());
+      await resetIdentity(path());
     console.error("Signed out.");
   });
 

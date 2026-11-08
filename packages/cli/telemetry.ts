@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
+import { realpathSync } from "node:fs";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
@@ -14,6 +15,11 @@ export function installedRelease(
   version: string,
   entry = process.argv[1] ?? "",
 ) {
+  try {
+    entry = realpathSync(entry);
+  } catch {
+    // The production binary can be replaced while it is running.
+  }
   return (
     /(?:^|[\\/])node_modules[\\/]/.test(entry) &&
     /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version) &&
@@ -167,7 +173,10 @@ export async function prepareLogin(path: string): Promise<string | undefined> {
       const current = await state(path);
       const loginAttempt = randomUUID();
       const next = {
-        anonymousId: current.userId ? randomUUID() : current.anonymousId,
+        anonymousId:
+          current.userId || current.loginAttempt
+            ? randomUUID()
+            : current.anonymousId,
         loginAttempt,
       };
       await writeFile(path, JSON.stringify(next), { mode: 0o600 });
