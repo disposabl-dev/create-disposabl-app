@@ -51,6 +51,8 @@ const productProofTests = [
   "packages/tests/cli-oauth-build.test.ts",
   "packages/tests/flows/desktop-real.e2e.ts",
   "packages/tests/components/desktop-real.cjs",
+  "packages/tests/billing-deletion.test.ts",
+  "packages/tests/components/billing-deletion.test.mjs",
   "packages/tests/billing-handoff-transactions.test.ts",
   "packages/tests/fixtures/billing-handoff-convex",
   "packages/tests/architecture-transactions.test.ts",
