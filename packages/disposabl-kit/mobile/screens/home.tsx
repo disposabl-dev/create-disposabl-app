@@ -31,11 +31,20 @@ export function HomeScreen() {
         options={{
           title: "Your app",
           headerRight: () => (
-            <GlassIconButton
-              label="Settings"
-              icon={{ ios: "slider.horizontal.3", android: "tune" }}
-              onPress={() => router.push("/settings")}
-            />
+            <View style={{ flexDirection: "row", gap: 8 }}>
+              {docs && (
+                <GlassIconButton
+                  label="Docs"
+                  icon={{ ios: "book", android: "menu_book" }}
+                  onPress={() => void openGuide("getting-started")}
+                />
+              )}
+              <GlassIconButton
+                label="Settings"
+                icon={{ ios: "slider.horizontal.3", android: "tune" }}
+                onPress={() => router.push("/settings")}
+              />
+            </View>
           ),
         }}
       />
