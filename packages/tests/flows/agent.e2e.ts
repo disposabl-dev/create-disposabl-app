@@ -72,6 +72,14 @@ test(
         );
       return result.value;
     }
+    test.skip(
+      process.env.E2E_AGENT_INERT_FIXTURE !== "1",
+      "Requires the disposable provider-inert agent fixture",
+    );
+    if (url.origin !== "http://127.0.0.1:3550")
+      throw new Error(
+        "Agent inert fixture requires the isolated port 3550 backend.",
+      );
     const boatResponse = await fetch(`${url.origin}/api/query`, {
       method: "POST",
       headers: {
@@ -88,10 +96,8 @@ test(
     const boat = await boatResponse.json();
     if (boat.status !== "success")
       throw new Error("Unable to verify the isolated agent configuration.");
-    test.skip(
-      !boat.value?.value?.trim(),
-      "Remote agent configuration is absent",
-    );
+    if (boat.value?.value?.trim())
+      throw new Error("Agent fixture requires an empty Boat key.");
     async function user() {
       const signup = await value(
         "auth:signUpWithUsernamePassword",
@@ -229,18 +235,12 @@ test(
     }
     let claimed = false;
     try {
-      const claim = await value(
-        "agent/state:claim",
-        { id, token },
+      await value(
+        "agentFixture:seedLease",
+        { appId, userId: owner.id, token },
         { admin: true },
       );
       claimed = true;
-      expect(claim).toMatchObject({
-        appId,
-        threadId: id,
-        status: "processing",
-        lease: { token },
-      });
       const grant = () =>
         value(
           "agent/access:issue",
@@ -338,13 +338,6 @@ test(
       expect(cliStatus(previousBearer)).toBeNull();
       expect((await rest("apps/get", { appId })).status).toBe(200);
       expect(
-        await value(
-          "agent/state:claim",
-          { id, token: randomUUID() },
-          { admin: true },
-        ),
-      ).toBeNull();
-      expect(
         (
           await call(
             "agent/state:append",
@@ -427,81 +420,14 @@ test(
         cursor: "cursor-1",
         lease: { token },
       });
-      // The held lease keeps the scheduled worker from contacting Boat.
-      const attachmentId = await value(
-        "files/index:upload",
-        {
-          filename: "reference.txt",
-          mediaType: "text/plain",
-          bytes: {
-            $bytes: Buffer.from("Project reference fixture").toString("base64"),
-          },
-        },
-        { token: owner.token, action: true },
-      );
-      expect(
-        (
-          await call(
-            "agent/attachments:get",
-            { userId: other.id, ids: [attachmentId] },
-            { admin: true },
-          )
-        ).status,
-      ).toBe("error");
-      const sent = await value(
-        "agent/index:sendMessageChecked",
-        { appId, prompt: "Queued fixture prompt", fileIds: [attachmentId] },
-        { token: owner.token, action: true },
-      );
-      expect(sent).toMatchObject({ appId, threadId: id, status: "processing" });
-      expect(
-        (
-          await call(
-            "agent/index:sendMessageChecked",
-            { appId, prompt: "Forbidden" },
-            { token: other.token, action: true },
-          )
-        ).status,
-      ).toBe("error");
-      const stopping = await value(
-        "agent/index:abortMessage",
-        { appId },
-        { token: owner.token, mutation: true },
-      );
-      expect(stopping.status).toBe("stopping");
-      expect((await rest("apps/get", { appId })).status).toBe(401);
-      const messages = await value(
-        "agent/index:getMessages",
-        { appId },
-        { token: owner.token },
-      );
-      expect(
-        messages.page.find(
-          (m: { content: string }) => m.content === "Queued fixture prompt",
-        ).attachments,
-      ).toEqual([
-        {
-          id: attachmentId,
-          filename: "reference.txt",
-          mediaType: "text/plain",
-        },
-      ]);
-      expect(
-        messages.page.find(
-          (m: { content: string }) => m.content === "Queued fixture prompt",
-        ).status,
-      ).toBe("failed");
       await value(
         "agent/state:finish",
         { id, token, stopped: true },
         { admin: true },
       );
       claimed = false;
-      await value(
-        "files/index:remove",
-        { id: attachmentId },
-        { token: owner.token, action: true },
-      );
+      expect((await rest("apps/get", { appId })).status).toBe(401);
+      expect(cliStatus(agentBearer)).toBeNull();
       const aborted = await value(
         "agent/index:abortMessage",
         { appId },

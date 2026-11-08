@@ -11,6 +11,7 @@ import {
 } from "../create-disposabl-app/options";
 
 const excluded = [
+  "packages/tests/fixtures/agent-inert-convex",
   "packages/tests/fixtures/auth-erasure-convex",
   "packages/backend/convex/users/authDeletion.ts",
   "packages/tests/mcp-deletion-product.test.ts",

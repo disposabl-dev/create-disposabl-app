@@ -23,7 +23,7 @@ For an isolated preview or CI deployment, set `E2E_CONVEX_URL` and `E2E_CONVEX_S
 
 The initial flows check the public web page, the dashboard's authentication boundary, an anonymous backend auth query, the API contract when enabled, and the mobile home screen. They do not create users or modify data. Add product-specific flows here as behavior changes, including login and saved-state checks using dedicated test users. Keep required flows deterministic; an agent can write and debug tests without adding model calls to their execution.
 
-The repository's agent fixture flow (`flows/agent.e2e.ts`) creates test users, an app, and component history to verify ownership, pagination, and worker state without calling Boat. It requires `E2E_CONVEX_ADMIN_KEY` and explicitly skips when the key is absent; admin fixture calls are restricted to a loopback backend. Use only a disposable local deployment and keep the key out of source control and logs. Run through the `bun run e2e` or `bun run test` wrappers so E2E telemetry stays disabled.
+The provider-inert agent fixture in `fixtures/agent-inert-convex/` exercises ownership, history, access-token rotation, and CLI status using real product handlers without Boat credentials. It requires an explicitly enabled disposable backend and local admin key; see its README. It does not test remote admission or queued workers.
 
 The storage fallback flow (`flows/files.e2e.ts`) uses the same loopback/admin restriction to confirm R2 is not configured before uploading. It checks downloaded bytes, anonymous and cross-user rejection, and owner deletion, removing only its own new file. It makes no R2 requests and skips when R2 is fully configured.
 
