@@ -9,6 +9,10 @@ on:
         description: Existing release version to recover (for example 0.12.0)
         required: false
         type: string
+      cli_recovery_version:
+        description: Existing CLI tag version to recover (for example 1.0.1)
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -38,6 +42,21 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      - name: Verify CLI recovery tag
+        if: inputs.cli_recovery_version != ''
+        env:
+          VERSION: ${{ inputs.cli_recovery_version }}
+          GENERATOR_RECOVERY: ${{ inputs.recovery_version }}
+        run: |
+          set -euo pipefail
+          [[ -z "$GENERATOR_RECOVERY" ]] || { echo 'Select only one recovery.'; exit 1; }
+          [[ "$VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || { echo 'Invalid CLI recovery version'; exit 1; }
+          tag="@disposabl/cli@${VERSION}"
+          git rev-parse --verify "refs/tags/${tag}^{commit}" >/dev/null
+          git merge-base --is-ancestor "refs/tags/${tag}^{commit}" HEAD
+          highest=$(git tag --merged HEAD --list '@disposabl/cli@*' --sort=-version:refname | grep -E '^@disposabl/cli@(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$' | head -1)
+          [[ "$tag" == "$highest" ]] || { echo 'Recovery must use the highest reachable CLI release tag.'; exit 1; }
+          git checkout --detach "refs/tags/${tag}^{commit}"
       - uses: actions/setup-node@v6
         with:
           node-version: "24"
@@ -47,22 +66,65 @@ jobs:
           bun-version: "1.4.4"
       - run: bun install --frozen-lockfile
         working-directory: .
-      - name: Verify bootstrap release and tag
+      - &verify-cli-release
+        name: Verify CLI release and tag
+        if: inputs.cli_recovery_version == ''
         run: |
           set -euo pipefail
           version=$(npm view @disposabl/cli version --prefer-online)
+          [[ "$version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || { echo 'Invalid npm latest CLI version'; exit 1; }
           git rev-parse --verify "refs/tags/@disposabl/cli@${version}^{commit}" >/dev/null
           git merge-base --is-ancestor "refs/tags/@disposabl/cli@${version}^{commit}" HEAD
+          highest=$(git tag --merged HEAD --list '@disposabl/cli@*' --sort=-version:refname | grep -E '^@disposabl/cli@(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$' | head -1)
+          if [[ "$highest" != "@disposabl/cli@${version}" ]]; then
+            missing=${highest#@disposabl/cli@}
+            status=$(curl -sS -o "$RUNNER_TEMP/cli-version.json" -w '%{http_code}' "https://registry.npmjs.org/@disposabl%2fcli/${missing}")
+            if [[ "$status" == 404 ]]; then
+              echo "CLI ${missing} is missing from npm. Run publish.yml on main with cli_recovery_version=${missing}; do not move or delete the tag."
+            elif [[ "$status" == 200 ]]; then
+              node -e 'const p=require(process.argv[1]); if(p.name!=="@disposabl/cli" || p.version!==process.argv[2]) process.exit(1)' "$RUNNER_TEMP/cli-version.json" "$missing"
+              echo "CLI ${missing} exists but npm latest is ${version}; investigate the dist-tag before publishing the generator."
+            else
+              echo "CLI registry lookup failed with HTTP ${status}."
+            fi
+            exit 1
+          fi
       - run: bun run typecheck && bun run build
+        if: inputs.cli_recovery_version == ''
       - name: Publish CLI before generator
+        if: inputs.cli_recovery_version == ''
         run: bun run release
         env:
           GITHUB_TOKEN: ${{ github.token }}
           npm_config_workspaces_update: "false"
+      - *verify-cli-release
+      - name: Recover tagged CLI release
+        if: inputs.cli_recovery_version != ''
+        env:
+          VERSION: ${{ inputs.cli_recovery_version }}
+          npm_config_workspaces_update: "false"
+        run: |
+          set -euo pipefail
+          latest=$(npm view @disposabl/cli version --prefer-online)
+          [[ "$latest" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || { echo 'Invalid npm latest CLI version'; exit 1; }
+          node -e 'const [a,b]=process.argv.slice(1).map(v=>v.split(".").map(BigInt)); if(a.length!==3 || b.length!==3 || a.some((n,i)=>n>b[i] && a.slice(0,i).every((x,j)=>x===b[j]))) process.exit(1)' "$latest" "$VERSION"
+          status=$(curl -sS -o "$RUNNER_TEMP/cli-version.json" -w '%{http_code}' "https://registry.npmjs.org/@disposabl%2fcli/${VERSION}")
+          [[ "$status" == 404 || "$status" == 200 ]] || { echo "CLI registry lookup failed with HTTP ${status}."; exit 1; }
+          npm version "$VERSION" --no-git-tag-version --workspaces=false
+          bun run build
+          npm pack --json > "$RUNNER_TEMP/cli-pack.json"
+          node -e 'const p=require(process.argv[1])[0]; if(p.name!=="@disposabl/cli" || p.version!==process.argv[2] || !p.files.some(f=>f.path==="dist/index.js")) process.exit(1)' "$RUNNER_TEMP/cli-pack.json" "$VERSION"
+          if [[ "$status" == 200 ]]; then
+            node -e 'const p=require(process.argv[1]), t=require(process.argv[2])[0]; if(p.name!=="@disposabl/cli" || p.version!==process.argv[3] || p.dist?.integrity!==t.integrity) process.exit(1)' "$RUNNER_TEMP/cli-version.json" "$RUNNER_TEMP/cli-pack.json" "$VERSION"
+            echo 'Matching CLI version already exists; leaving it untouched.'
+          else
+            tarball=$(node -p 'require(process.argv[1])[0].filename' "$RUNNER_TEMP/cli-pack.json")
+            npm publish "$tarball" --provenance --access public --tag latest
+          fi
 
   publish:
     needs: cli
-    if: always() && !cancelled() && github.repository == 'disposabl-dev/create-disposabl-app' && github.ref == 'refs/heads/main' && (inputs.recovery_version != '' || needs.cli.result == 'success')
+    if: always() && !cancelled() && github.repository == 'disposabl-dev/create-disposabl-app' && github.ref == 'refs/heads/main' && inputs.cli_recovery_version == '' && (inputs.recovery_version != '' || needs.cli.result == 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     defaults:
