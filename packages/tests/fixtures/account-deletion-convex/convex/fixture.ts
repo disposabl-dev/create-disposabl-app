@@ -1,3 +1,14 @@
+import { register as registerFileHandler } from "../../../../backend/convex/files/internal";
+import {
+  save as saveConnectionHandler,
+  begin as beginConnectionHandler,
+  consume as consumeConnectionHandler,
+} from "../../../../backend/convex/connections/internal";
+import {
+  refresh,
+  select,
+} from "../../../../backend/convex/connections/posthog";
+import { connect as githubConnect } from "../../../../backend/convex/github/internal";
 import { get as nativeAppGet } from "../../../../backend/convex/apps/index";
 import {
   mutationGeneric as mutation,
@@ -121,4 +132,85 @@ export const nativeApp = query({
       { appId: "fixture" },
     );
   },
+});
+
+export const saveConnection = mutation({
+  args: { userId: v.id("users"), token: v.string() },
+  handler: (ctx, a) =>
+    (saveConnectionHandler as any)._handler(ctx, {
+      userId: a.userId,
+      provider: "posthog",
+      accountId: "a",
+      name: "fixture",
+      token: a.token,
+    }),
+});
+export const refreshConnection = mutation({
+  args: { userId: v.id("users"), previous: v.string(), next: v.string() },
+  handler: (ctx, a) => (refresh as any)._handler(ctx, a),
+});
+export const selectConnection = mutation({
+  args: { userId: v.id("users"), token: v.string() },
+  handler: (ctx, a) =>
+    (select as any)._handler(ctx, { ...a, accountId: "new", name: "new" }),
+});
+export const githubConnection = mutation({
+  args: { userId: v.id("users") },
+  handler: (ctx, a) =>
+    (githubConnect as any)._handler(ctx, {
+      ...a,
+      owner: "fixture",
+      installationId: "123",
+    }),
+});
+export const beginConnection = mutation({
+  args: { userId: v.id("users") },
+  handler: (ctx, a) =>
+    (beginConnectionHandler as any)._handler(ctx, {
+      ...a,
+      provider: "convex",
+      hash: "fixture",
+      verifier: "fixture",
+    }),
+});
+export const consumeConnection = mutation({
+  args: { userId: v.id("users") },
+  handler: (ctx, a) =>
+    (consumeConnectionHandler as any)._handler(ctx, {
+      ...a,
+      provider: "convex",
+      hash: "fixture",
+    }),
+});
+export const registerFile = mutation({
+  args: { userId: v.id("users") },
+  handler: (ctx, a) =>
+    (registerFileHandler as any)._handler(identity(ctx, a.userId), {
+      filename: "test.txt",
+      mediaType: "text/plain",
+      size: 1,
+      location: {
+        provider: "r2",
+        key: "fixture",
+        account: "fixture",
+        bucket: "fixture",
+      },
+    }),
+});
+export const owned = query({
+  args: { userId: v.id("users") },
+  handler: async (ctx, a) => ({
+    files: await ctx.db
+      .query("files")
+      .withIndex("by_owner", (q) => q.eq("owner", a.userId))
+      .take(100),
+    connections: await ctx.db
+      .query("connections")
+      .withIndex("by_userId_provider", (q) => q.eq("userId", a.userId))
+      .take(100),
+    github: await ctx.db
+      .query("githubConnections")
+      .withIndex("by_userId_owner", (q) => q.eq("userId", a.userId))
+      .take(100),
+  }),
 });

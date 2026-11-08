@@ -1,3 +1,6 @@
+import { upload } from "../backend/convex/files/index";
+import { requireFileWrite } from "../backend/convex/files/guard";
+import { save } from "../backend/convex/connections/internal";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { getFunctionName } from "convex/server";
@@ -134,4 +137,95 @@ test("REST authentication rejects a pending owner while allowing another", async
     ),
     user,
   );
+});
+
+test("upload compensates when deletion wins before registration", async () => {
+  let deleted = 0,
+    inserted = 0;
+  const ctx = {
+    auth: { getUserIdentity: async () => ({ subject: "session" }) },
+    runQuery: async (_ref: unknown, args: any) =>
+      "sessionId" in args ? { userId: "owner" } : false,
+    storage: {
+      store: async () => "fixture-object",
+      delete: async () => {
+        deleted++;
+      },
+    },
+    runMutation: async () => {
+      inserted++;
+      throw new Error("Account deletion has been requested");
+    },
+  };
+  await assert.rejects(
+    (upload as any)._handler(ctx, {
+      filename: "a.txt",
+      mediaType: "text/plain",
+      bytes: new TextEncoder().encode("a").buffer,
+    }),
+    /Account deletion/,
+  );
+  assert.equal(inserted, 1);
+  assert.equal(deleted, 1);
+});
+
+test("missing owner is fenced before connection or file writes", async () => {
+  let writes = 0;
+  const ctx = {
+    db: {
+      normalizeId: () => null,
+      get: async () => null,
+      query: () => {
+        writes++;
+        throw new Error("unexpected query");
+      },
+    },
+  };
+  await assert.rejects(
+    requireFileWrite(ctx as any, "invalid"),
+    /account no longer exists/,
+  );
+  await assert.rejects(
+    (save as any)._handler(ctx, {
+      userId: "invalid",
+      provider: "convex",
+      token: "fixture",
+      name: "fixture",
+      accountId: "fixture",
+    }),
+    /account no longer exists/,
+  );
+  assert.equal(writes, 0);
+});
+
+test("late OAuth callback stops before provider exchange when state consumption is fenced", async () => {
+  const { complete } =
+    await import("../backend/convex/connections/actions/oauth");
+  let calls = 0;
+  const original = globalThis.fetch;
+  globalThis.fetch = async () => {
+    calls++;
+    throw new Error("unexpected provider request");
+  };
+  try {
+    await assert.rejects(
+      (complete as any)._handler(
+        {
+          runMutation: async () => {
+            throw new Error("Account deletion has been requested");
+          },
+        },
+        {
+          userId: "owner",
+          provider: "convex",
+          code: "fixture",
+          state: "fixture",
+        },
+      ),
+      /Account deletion/,
+    );
+    assert.equal(calls, 0);
+  } finally {
+    globalThis.fetch = original;
+  }
 });

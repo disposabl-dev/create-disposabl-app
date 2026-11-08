@@ -136,3 +136,55 @@ test(
     assert.equal((await call("status", { userId }, true)).status, "requested");
   },
 );
+
+test(
+  "late provider callbacks and file registration cannot commit after a deletion request",
+  { skip: !url },
+  async () => {
+    const userId = await call("create", { label: randomUUID() });
+    const other = await call("create", { label: randomUUID() });
+    await call("saveConnection", { userId, token: "old" });
+    await call("beginConnection", { userId });
+    await call("request", { userId, confirmation: "DELETE" });
+    for (const [name, args] of [
+      ["saveConnection", { userId, token: "late" }],
+      ["refreshConnection", { userId, previous: "old", next: "new" }],
+      ["selectConnection", { userId, token: "old" }],
+      ["githubConnection", { userId }],
+      ["beginConnection", { userId }],
+      ["consumeConnection", { userId }],
+      ["registerFile", { userId }],
+    ] as const)
+      await assert.rejects(call(name, args), /Account deletion/);
+    assert.equal(
+      await call("refreshConnection", { userId, previous: "old", next: "old" }),
+      false,
+    );
+    const rows = await call("owned", { userId }, true);
+    assert.equal(rows.connections.length, 1);
+    assert.equal(rows.connections[0].token, "old");
+    assert.equal(rows.github.length, 0);
+    assert.equal(rows.files.length, 0);
+    await call("saveConnection", { userId: other, token: "ok" });
+    await call("registerFile", { userId: other });
+    const unaffected = await call("owned", { userId: other }, true);
+    assert.equal(unaffected.connections.length, 1);
+    assert.equal(unaffected.files.length, 1);
+  },
+);
+
+test(
+  "registration racing a request serializes and no later registration succeeds",
+  { skip: !url },
+  async () => {
+    const userId = await call("create", { label: randomUUID() });
+    const results = await Promise.allSettled([
+      call("request", { userId, confirmation: "DELETE" }),
+      call("registerFile", { userId }),
+    ]);
+    assert.equal(results[0].status, "fulfilled");
+    await assert.rejects(call("registerFile", { userId }), /Account deletion/);
+    const rows = await call("owned", { userId }, true);
+    assert.equal(rows.files.length, results[1].status === "fulfilled" ? 1 : 0);
+  },
+);

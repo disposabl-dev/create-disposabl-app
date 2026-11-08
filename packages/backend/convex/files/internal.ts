@@ -1,5 +1,7 @@
+import { createRegister } from "@disposabl/disposabl-kit/server/files-functions";
+import { requireFileWrite } from "./guard";
+export const register = createRegister(requireFileWrite);
 export {
-  register,
   getOwned,
   forget,
 } from "@disposabl/disposabl-kit/server/files-functions";

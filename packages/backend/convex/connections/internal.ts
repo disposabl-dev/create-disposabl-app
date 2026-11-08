@@ -1,3 +1,4 @@
+import { requireNotDeleting } from "../users/deletion";
 import {
   identityFields,
   internalMutation,
@@ -102,6 +103,7 @@ export const save = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    await requireNotDeleting(ctx, args.userId);
     const row = await connection(ctx, args.userId, args.provider);
     if (row) await ctx.db.replace("connections", row._id, args);
     else await ctx.db.insert("connections", args);
@@ -139,6 +141,7 @@ export const begin = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, { userId, ...state }) => {
+    await requireNotDeleting(ctx, userId);
     const id = ctx.db.normalizeId("users", userId);
     if (!id) throw new ConvexError("Invalid userId.");
     await ctx.db.patch("users", id, {
@@ -154,6 +157,7 @@ export const consume = internalMutation({
     region: v.optional(posthogRegion),
   }),
   handler: async (ctx, { userId, provider, hash }) => {
+    await requireNotDeleting(ctx, userId);
     const id = ctx.db.normalizeId("users", userId);
     const state = id
       ? (await ctx.db.get("users", id))?.connectionState
