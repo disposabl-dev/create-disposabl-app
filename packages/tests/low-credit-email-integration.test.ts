@@ -85,7 +85,11 @@ test(
     const sent = await emails();
     assert.equal(sent.length, before + 1);
     assert.equal(sent[before].to, "verified@example.invalid");
-    assert.match(sent[before].text, /files will be saved/i);
+    assert.match(sent[before].text, /add credits and send a new message/i);
+    assert.doesNotMatch(
+      sent[before].text,
+      /unless you add credits|files will be saved/i,
+    );
     const direct = {
       userId: paid.userId,
       windowId: paid.debitId,
@@ -255,5 +259,86 @@ test(
       "queued",
     );
     assert.equal((await emails()).length, before + 1);
+  },
+);
+
+test(
+  "deletion eligibility fences settled notices and inert enqueue transactionally",
+  { skip: !url || process.env.LOW_CREDIT_BACKEND_E2E !== "1" },
+  async () => {
+    await config();
+    const pending = await seed();
+    const missing = await seed();
+    const active = await seed();
+    for (const record of [pending, missing, active])
+      await call("settleDebit", {
+        debitId: record.debitId,
+        outcome: "confirmed",
+        responseBalance: 9,
+      });
+    await call("requestDeletion", { userId: pending.userId });
+    await call("removeSyntheticUser", { userId: missing.userId });
+    const args = (record: any) => ({
+      userId: record.userId,
+      windowId: record.debitId,
+      paidUntil: Date.now() + 300000,
+      balance: 9,
+    });
+    assert.equal(
+      await call("actualProductQueue", args(pending)),
+      "account_ineligible",
+    );
+    assert.equal(
+      await call("actualProductQueue", args(missing)),
+      "account_ineligible",
+    );
+    assert.equal(await call("actualProductQueue", args(active)), "disabled");
+    for (const record of [pending, missing, active])
+      await call("notify", { debitId: record.debitId });
+    assert.equal(
+      (await call("debit", { debitId: pending.debitId }, true)).noticeOutcome,
+      "account_ineligible",
+    );
+    assert.equal(
+      (await call("debit", { debitId: missing.debitId }, true)).noticeOutcome,
+      "account_ineligible",
+    );
+    assert.equal(
+      (await call("debit", { debitId: active.debitId }, true)).noticeOutcome,
+      "disabled",
+    );
+    for (const record of [pending, missing, active]) {
+      const debit = await call("debit", { debitId: record.debitId }, true);
+      assert.equal(debit.state, "confirmed");
+      assert.equal(debit.responseBalance, 9);
+      await call("notify", { debitId: record.debitId });
+    }
+    const before = (await emails()).length;
+    assert.equal(
+      await call("enqueueInert", { userId: pending.userId, key: "pending" }),
+      "account_ineligible",
+    );
+    assert.equal(
+      await call("enqueueInert", { userId: missing.userId, key: "missing" }),
+      "account_ineligible",
+    );
+    assert.equal(
+      await call("enqueueInert", { userId: active.userId, key: "active" }),
+      "queued",
+    );
+    const racing = await seed();
+    const [race] = await Promise.all([
+      call("enqueueInert", { userId: racing.userId, key: "racing" }),
+      call("requestDeletion", { userId: racing.userId }),
+    ]);
+    assert.ok(["queued", "account_ineligible"].includes(race));
+    assert.equal(
+      await call("enqueueInert", { userId: racing.userId, key: "late" }),
+      "account_ineligible",
+    );
+    assert.equal(
+      (await emails()).length,
+      before + 1 + (race === "queued" ? 1 : 0),
+    );
   },
 );

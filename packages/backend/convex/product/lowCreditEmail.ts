@@ -1,7 +1,8 @@
 import { paymentsEnabled } from "@disposabl/disposabl-kit/features";
 import { v } from "convex/values";
 import { components } from "../_generated/api";
-import { env } from "../_generated/server";
+import { env, type MutationCtx } from "../_generated/server";
+import type { Doc, Id } from "../_generated/dataModel";
 import { internalMutation } from "@disposabl/disposabl-kit/server/lib/functions";
 import { resend } from "../emails";
 
@@ -73,10 +74,22 @@ export async function queueLowCreditNotice(
     from: options.sender.trim(),
     to: email,
     subject: "Your Disposabl credits are running low",
-    text: `Your balance is below 10 credits. Your current access ends at ${new Date(notice.paidUntil).toISOString()} unless you add credits before then.\n\nYour files will be saved. If access expires, send a new message to resume after adding credits.\n\nAdd credits: ${paymentUrl}`,
+    text: `Your balance is below 10 credits. Your current access window ends at ${new Date(notice.paidUntil).toISOString()}. To resume after it ends, add credits and send a new message.\n\nAdd credits: ${paymentUrl}`,
     idempotencyKey: `low-credit:${key}`,
   });
   return "queued" as const;
+}
+
+/** Check in the enqueue transaction so a deletion request serializes with it. */
+export async function queueForEligibleOwner<T>(
+  ctx: Pick<MutationCtx, "db">,
+  userId: Id<"users">,
+  queue: (user: Doc<"users">) => Promise<T>,
+): Promise<T | "account_ineligible"> {
+  const user = await ctx.db.get("users", userId);
+  if (!user || user.deletionRequestedAt !== undefined)
+    return "account_ineligible";
+  return queue(user);
 }
 
 /**
@@ -97,33 +110,34 @@ export const queue = internalMutation({
   },
   returns: v.union(
     v.literal("disabled"),
+    v.literal("account_ineligible"),
     v.literal("not_low"),
     v.literal("no_verified_email"),
     v.literal("queued"),
   ),
   handler: async (ctx, notice) =>
-    queueLowCreditNotice(notice, {
-      enabled: paymentsEnabled,
-      environment: env.DISPOSABL_ENVIRONMENT,
-      // The test wrapper sets this process flag; no provider call is allowed in E2E.
-      // eslint-disable-next-line @convex-dev/no-process-env
-      e2e: process.env.E2E_TELEMETRY_DISABLED,
-      sender: env.RESEND_FROM_EMAIL,
-      apiKey: env.RESEND_API_KEY,
-      // Checkout's return destination may be a completion page, not a place to buy.
-      paymentUrl: "https://www.disposabl.dev/pricing",
-      getVerifiedEmail: async () => {
-        const user = await ctx.db.get("users", notice.userId);
-        if (!user) return null;
-        return (
-          (await ctx.runQuery(
-            components.authEmail.verifiedEmails.getPrimaryEmail,
-            { userId: notice.userId },
-          )) ??
-          user.profile?.email ??
-          null
-        );
-      },
-      enqueue: (message) => resend.sendEmail(ctx, message),
-    }),
+    queueForEligibleOwner(ctx, notice.userId, (user) =>
+      queueLowCreditNotice(notice, {
+        enabled: paymentsEnabled,
+        environment: env.DISPOSABL_ENVIRONMENT,
+        // The test wrapper sets this process flag; no provider call is allowed in E2E.
+        // eslint-disable-next-line @convex-dev/no-process-env
+        e2e: process.env.E2E_TELEMETRY_DISABLED,
+        sender: env.RESEND_FROM_EMAIL,
+        apiKey: env.RESEND_API_KEY,
+        // Checkout's return destination may be a completion page, not a place to buy.
+        paymentUrl: "https://www.disposabl.dev/pricing",
+        getVerifiedEmail: async () => {
+          return (
+            (await ctx.runQuery(
+              components.authEmail.verifiedEmails.getPrimaryEmail,
+              { userId: notice.userId },
+            )) ??
+            user.profile?.email ??
+            null
+          );
+        },
+        enqueue: (message) => resend.sendEmail(ctx, message),
+      }),
+    ),
 });

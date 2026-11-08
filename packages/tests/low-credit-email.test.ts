@@ -35,8 +35,11 @@ test("queues the paid-window warning with a stable per-user window key", async (
   assert.equal(await queueLowCreditNotice(notice, f.options), "queued");
   assert.equal(f.messages[0].idempotencyKey, f.messages[1].idempotencyKey);
   assert.match(f.messages[0].text, /2027-01-01T00:00:00.000Z/);
-  assert.match(f.messages[0].text, /files will be saved/i);
-  assert.match(f.messages[0].text, /send a new message to resume/i);
+  assert.match(f.messages[0].text, /add credits and send a new message/i);
+  assert.doesNotMatch(
+    f.messages[0].text,
+    /unless you add credits|files will be saved/i,
+  );
   assert.match(f.messages[0].text, /https:\/\/example.com\/pricing/);
   assert.equal(f.messages[0].to, "verified@example.com");
   await queueLowCreditNotice({ ...notice, windowId: "window-2" }, f.options);

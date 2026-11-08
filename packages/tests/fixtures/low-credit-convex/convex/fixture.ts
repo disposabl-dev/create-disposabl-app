@@ -12,7 +12,10 @@ import {
 import { settle, notice } from "../../../../backend/convex/agent/compute";
 import { debitCompute } from "../../../../backend/convex/agent/computeDebit";
 import { billingRequest } from "../../../../disposabl-kit/server/billing";
-import { queue as actualQueue } from "../../../../backend/convex/product/lowCreditEmail";
+import {
+  queue as actualQueue,
+  queueForEligibleOwner,
+} from "../../../../backend/convex/product/lowCreditEmail";
 
 export const config = mutation({
   args: {
@@ -172,4 +175,27 @@ export const fundFixture = action({
         ),
       ),
     ),
+});
+
+// Synthetic marker only: the real email gate remains enabled in the deployment.
+export const enqueueInert = mutation({
+  args: { userId: v.id("users"), key: v.string() },
+  handler: (ctx, { userId, key }) =>
+    queueForEligibleOwner(ctx as any, userId, async () => {
+      await ctx.db.insert("fixtureEmails", {
+        key,
+        to: "inert",
+        text: "no email",
+      });
+      return "queued" as const;
+    }),
+});
+export const requestDeletion = mutation({
+  args: { userId: v.id("users") },
+  handler: (ctx, { userId }) =>
+    ctx.db.patch(userId, { deletionRequestedAt: Date.now() }),
+});
+export const removeSyntheticUser = mutation({
+  args: { userId: v.id("users") },
+  handler: (ctx, { userId }) => ctx.db.delete(userId),
 });

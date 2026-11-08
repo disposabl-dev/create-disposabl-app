@@ -46,6 +46,7 @@ export const computeDebitFields = {
     v.union(
       v.literal("queued"),
       v.literal("disabled"),
+      v.literal("account_ineligible"),
       v.literal("no_verified_email"),
       v.literal("not_low"),
       v.literal("expired"),
