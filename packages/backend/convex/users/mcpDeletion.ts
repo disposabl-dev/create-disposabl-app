@@ -1,6 +1,6 @@
 import { ConvexError, v } from "convex/values";
 import { components } from "../_generated/api";
-import { internalMutation } from "../_generated/server";
+import { internalMutation } from "@disposabl/disposabl-kit/server/lib/functions";
 import { mcpDeletionProgress } from "./validator";
 
 /** One explicit operator call advances one component batch. */
