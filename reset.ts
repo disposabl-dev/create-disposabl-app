@@ -27,6 +27,7 @@ if (
 const productProofTests = [
   "packages/tests/ios-save-password.test.ts",
   "packages/tests/helpers/ios-save-password.ts",
+  "packages/tests/flows/account-deletion-receipt.e2e.ts",
   "packages/tests/legal-product-providers.test.ts",
   "packages/tests/fixtures/file-deletion-convex",
   "packages/tests/fixtures/auth-identity-erasure-convex",

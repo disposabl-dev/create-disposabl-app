@@ -14,6 +14,7 @@ import {
 const excluded = [
   "packages/tests/ios-save-password.test.ts",
   "packages/tests/helpers/ios-save-password.ts",
+  "packages/tests/flows/account-deletion-receipt.e2e.ts",
   "packages/backend/convex/users/receipts.ts",
   "packages/tests/legal-product-providers.test.ts",
   "packages/tests/fixtures/file-deletion-convex",

@@ -25,6 +25,8 @@ The initial flows check the public web page, the dashboard's authentication boun
 
 The provider-inert agent fixture in `fixtures/agent-inert-convex/` exercises queued messages, ownership, history, access-token rotation, and CLI status using real product handlers without Boat credentials. Its isolated adapter substitutes the scheduled worker with a no-op; see its README. It does not test real provider dispatch or remote stop.
 
+The opt-in `flows/account-deletion-receipt.e2e.ts` downloads a request receipt and then erases authentication for its newly created synthetic account. Run it only against a fresh disposable product backend on 3540/3541 with backend telemetry disabled, no provider credentials, a local admin key, `E2E_RECEIPT_CLEANUP=1`, and an artifact directory under `/tmp/disposabl-receipt-e2e-`. It does not prove whole-account deletion.
+
 The storage fallback flow (`flows/files.e2e.ts`) uses the same loopback/admin restriction to confirm R2 is not configured before uploading. It checks downloaded bytes, anonymous and cross-user rejection, and owner deletion, removing only its own new file. It makes no R2 requests and skips when R2 is fully configured.
 
 The connections browser flow additionally exercises invalid Autumn key submission when `E2E_CONNECTIONS_ENABLED=1`. Set a temporary `CONNECTIONS_ENCRYPTION_KEY` on the isolated backend for that run; the invalid input is rejected before any Autumn request. Restore the backend setting afterward.
