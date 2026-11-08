@@ -128,19 +128,24 @@ test(
     await rm(`${path()}.lock`, { recursive: true });
     const afterLogin = requests.length;
     await capture("1.2.3", "cli", "agent", "success", path());
-    expect(requests).toHaveLength(afterLogin);
+    expect(requests).toHaveLength(afterLogin + 1);
+    expect(requests.at(-1)!.distinct_id).not.toBe(oldIdentity);
+    expect(requests.at(-1)!.properties.$process_person_profile).toBe(false);
     expect(
       JSON.parse(await readFile(credentials, "utf8")).tokens.access_token,
     ).toBe("account-b-token");
     await program().parseAsync(["node", "cli", "login", "status"]);
     await capture("1.2.3", "cli", "agent", "success", path());
     expect(requests.at(-1)!.distinct_id).not.toBe(oldIdentity);
+    const secondIdentity = requests.at(-1)!.distinct_id;
     const afterRecovery = requests.length;
     await mkdir(`${path()}.lock`);
     await program().parseAsync(["node", "cli", "logout"]);
     await rm(`${path()}.lock`, { recursive: true });
     await capture("1.2.3", "cli", "agent", "success", path());
-    expect(requests).toHaveLength(afterRecovery);
+    expect(requests).toHaveLength(afterRecovery + 1);
+    expect(requests.at(-1)!.distinct_id).not.toBe(secondIdentity);
+    expect(requests.at(-1)!.properties.$process_person_profile).toBe(false);
     await expect(readFile(credentials)).rejects.toMatchObject({
       code: "ENOENT",
     });
@@ -148,6 +153,43 @@ test(
     expect(JSON.stringify(requests)).not.toContain("account-b-token");
   },
 );
+
+test("legacy state and changed access tokens rotate to anonymous without retaining an account", async () => {
+  await mkdir(join(path(), ".."), { recursive: true });
+  const legacyId = "11111111-1111-4111-8111-111111111111";
+  for (const legacy of [
+    { anonymousId: legacyId },
+    { anonymousId: legacyId, userId: "legacy_account" },
+  ]) {
+    await writeFile(path(), JSON.stringify(legacy));
+    await capture("1.2.3", "generator", "create", "started", path());
+    expect(requests.at(-1)!.distinct_id).not.toBe(legacyId);
+    expect(requests.at(-1)!.distinct_id).not.toBe("legacy_account");
+    expect(requests.at(-1)!.properties.$process_person_profile).toBe(false);
+  }
+  const attempt = await prepareLogin(path());
+  await identify("1.2.3", "account_a", path(), attempt);
+  const identified = requests.at(-1)!.distinct_id;
+  const credentials = join(
+    process.env.DISPOSABL_CONFIG_DIR!,
+    `${createHash("sha256").update("https://www.disposabl.dev").digest("hex")}.json`,
+  );
+  await mkdir(process.env.DISPOSABL_CONFIG_DIR!, { recursive: true });
+  await writeFile(
+    credentials,
+    JSON.stringify({ tokens: { access_token: "refreshed-token" } }),
+  );
+  await capture("1.2.3", "cli", "apps", "success", path());
+  const anonymous = requests.at(-1)!.distinct_id;
+  expect(anonymous).not.toBe(identified);
+  expect(requests.at(-1)!.properties.$process_person_profile).toBe(false);
+  await capture("1.2.3", "cli", "apps", "success", path());
+  expect(requests.at(-1)!.distinct_id).toBe(anonymous);
+  const count = requests.length;
+  await writeFile(credentials, "broken credential file");
+  await capture("1.2.3", "cli", "apps", "failure", path());
+  expect(requests).toHaveLength(count);
+});
 
 test("an old verified snapshot cannot bind after credentials change without rotation", async () => {
   const oldRevision = await credentialRevision();

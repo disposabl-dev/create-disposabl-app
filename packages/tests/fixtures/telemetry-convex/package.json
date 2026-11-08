@@ -1,5 +1,7 @@
 {
   "name": "telemetry-transaction-fixture",
   "private": true,
-  "dependencies": { "convex": "^1.49.0" }
+  "dependencies": {
+    "convex": "^1.49.0"
+  }
 }

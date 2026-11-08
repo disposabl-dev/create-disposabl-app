@@ -64,33 +64,30 @@ export function telemetryConfig(
 const directory = () => join(homedir(), ".config", "disposabl");
 export const telemetryStatePath = () => join(directory(), "telemetry.json");
 async function state(path: string): Promise<State> {
+  const revision = await credentialRevision();
   try {
     const value = JSON.parse(await readFile(path, "utf8")) as State;
     if (
       /^[0-9a-f-]{36}$/.test(value.anonymousId) &&
-      (!value.userId || /^[a-zA-Z0-9_-]{1,128}$/.test(value.userId))
+      (!value.userId || /^[a-zA-Z0-9_-]{1,128}$/.test(value.userId)) &&
+      value.credentialRevision === revision
     )
       return value;
-  } catch {
-    /* create a fresh anonymous ID */
+  } catch (error) {
+    if (
+      !(error instanceof SyntaxError) &&
+      (error as NodeJS.ErrnoException).code !== "ENOENT"
+    )
+      throw error;
   }
   await mkdir(join(path, ".."), { recursive: true, mode: 0o700 });
   const fresh = {
     anonymousId: randomUUID(),
-    credentialRevision: await credentialRevision(),
+    credentialRevision: revision,
   };
-  try {
-    await writeFile(path, JSON.stringify(fresh), { mode: 0o600, flag: "wx" });
-    return fresh;
-  } catch {
-    const value = JSON.parse(await readFile(path, "utf8")) as State;
-    if (
-      !/^[0-9a-f-]{36}$/.test(value.anonymousId) ||
-      (value.userId && !/^[a-zA-Z0-9_-]{1,128}$/.test(value.userId))
-    )
-      throw new Error("Invalid telemetry state");
-    return value;
-  }
+  // Every caller holds the telemetry lock. Never migrate an old account binding.
+  await writeFile(path, JSON.stringify(fresh), { mode: 0o600 });
+  return fresh;
 }
 async function synchronized<T>(
   path: string,
@@ -185,7 +182,10 @@ export async function prepareLogin(path: string): Promise<string | undefined> {
       const loginAttempt = randomUUID();
       const next = {
         anonymousId:
-          current.userId || current.loginAttempt
+          current.userId ||
+          current.loginAttempt ||
+          current.credentialRevision !==
+            createHash("sha256").update("anonymous").digest("hex")
             ? randomUUID()
             : current.anonymousId,
         loginAttempt,
