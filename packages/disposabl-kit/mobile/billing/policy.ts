@@ -54,11 +54,16 @@ export async function preflightWebMonthly(
   const latest = await snapshot();
   check();
   if (latest.customerId !== customerId) throw new Error("Account changed.");
-  const eligibility = await storeEligibility(sdk, platform);
-  check();
   const offerings = await sdk.getOfferings();
   check();
   const offering = selectMonthlyOffering(offerings, productId, offeringId);
+  if (latest.hasMonthlyPlan !== false) throw new Error("existing_subscription");
+  const customer = await sdk.getCustomerInfo();
+  check();
+  if (customer.activeSubscriptions.length)
+    throw new Error("existing_subscription");
+  const eligibility = await storeEligibility(sdk, platform);
+  check();
   const options = paymentOptions({
     platform,
     ...eligibility,
@@ -67,11 +72,6 @@ export async function preflightWebMonthly(
     nativeReady: latest.nativeSubscriptionsEnabled && !!offering,
   });
   if (!options.web) throw new Error("Website checkout is unavailable.");
-  if (latest.hasMonthlyPlan !== false) throw new Error("existing_subscription");
-  const customer = await sdk.getCustomerInfo();
-  check();
-  if (customer.activeSubscriptions.length)
-    throw new Error("existing_subscription");
 }
 
 /** The matching route and real consumable must still exist at the moment of handoff. */
@@ -104,12 +104,12 @@ export async function preflightWebTopup(
     !matchingTopupRoute(latest, platform, app, productId)
   )
     throw new Error("Top-up unavailable.");
-  const eligibility = await storeEligibility(sdk, platform);
-  check();
   if ((await sdk.getAppUserID()) !== customerId)
     throw new Error("Account changed.");
   check();
   const product = await loadTopup(sdk, platform, productId!);
+  check();
+  const eligibility = await storeEligibility(sdk, platform);
   check();
   if (
     !paymentOptions({

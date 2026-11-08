@@ -711,6 +711,7 @@ test("web handoff rechecks the storefront and account after link creation", asyn
   let storefrontError = false;
   let restricted = false;
   let current = true;
+  let changeRegionDuringLookup = false;
   const monthly = {
     product: { identifier: "monthly", subscriptionPeriod: "P1M" },
   };
@@ -728,9 +729,15 @@ test("web handoff rechecks the storefront and account after link creation", asyn
       return country === null ? null : { countryCode: country };
     },
     getCustomerInfo: async () => ({ activeSubscriptions: [] }),
-    getOfferings: async () => ({ current: null, all: { dedicated: offering } }),
+    getOfferings: async () => {
+      if (changeRegionDuringLookup) country = "CAN";
+      return { current: null, all: { dedicated: offering } };
+    },
     getAppUserID: async () => "alice",
-    getProducts: async () => [product],
+    getProducts: async () => {
+      if (changeRegionDuringLookup) country = "CAN";
+      return [product];
+    },
     PRODUCT_CATEGORY: { NON_SUBSCRIPTION: "NON_SUBSCRIPTION" },
   };
   const snapshot = async () => ({
@@ -812,6 +819,19 @@ test("web handoff rechecks the storefront and account after link creation", asyn
     country = "USA";
     storefrontError = false;
     restricted = false;
+    await assert.rejects(
+      guardedWebHandoff(
+        preflight,
+        async () => {
+          changeRegionDuringLookup = true;
+          return "link";
+        },
+        () => current,
+      ),
+      /unavailable/,
+    );
+    changeRegionDuringLookup = false;
+    country = "USA";
     await assert.rejects(
       guardedWebHandoff(
         preflight,
