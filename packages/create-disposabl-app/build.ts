@@ -60,6 +60,9 @@ try {
         path !== join(root, "packages/tests/starter-ci.ts") &&
         path !== join(root, "packages/tests/generator-cli.test.ts") &&
         path !== join(root, "packages/tests/cli-telemetry.test.ts") &&
+        path !== join(root, "packages/tests/cli-oauth-build.test.ts") &&
+        path !== join(root, "packages/tests/helpers/cli-oauth-fixture.ts") &&
+        path !== join(root, "packages/tests/flows/cli-oauth.e2e.ts") &&
         path !== join(root, "apps/web/src/components/landing") &&
         ![
           ".git",
