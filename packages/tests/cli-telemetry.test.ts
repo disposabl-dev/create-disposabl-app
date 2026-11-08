@@ -15,7 +15,7 @@ import { homedir, tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import { telemetryBuildDefine } from "../cli/telemetry-build";
 import { createProgram } from "../cli/client";
-import { login as oauthLogin } from "../cli/auth";
+import { login as oauthLogin, withCredentialSession } from "../cli/auth";
 import {
   capture,
   identify,
@@ -52,6 +52,7 @@ beforeEach(async () => {
       "Tests require a temporary directory outside the home directory.",
     );
   home = await mkdtemp(join(tmpdir(), "disposabl-telemetry-test-"));
+  process.env.DISPOSABL_CONFIG_DIR = join(home, "credentials");
   process.env.NODE_ENV = "production";
   delete process.env.BUN_ENV;
   delete process.env.CI;
@@ -503,6 +504,7 @@ test("rejected status never identifies an existing session", async () => {
     telemetryPath: path(),
     hasCredentials: async () => true,
     accessToken: async () => "fixture-token",
+    loginAccessToken: async () => "fixture-token",
   };
   globalThis.fetch = (async (url) => {
     expect(String(url)).toEndWith("/api/users/current");
@@ -528,6 +530,306 @@ test("rejected status never identifies an existing session", async () => {
     console.log = previousLog;
   }
 });
+
+test(
+  "status that wins the credential lock cannot leave the old identity after login",
+  { timeout: 10_000 },
+  async () => {
+    const origin = "https://www.disposabl.dev";
+    const credentialDir = process.env.DISPOSABL_CONFIG_DIR!;
+    await mkdir(credentialDir, { recursive: true });
+    await writeFile(
+      join(
+        credentialDir,
+        `${createHash("sha256").update(origin).digest("hex")}.json`,
+      ),
+      JSON.stringify({
+        client: { client_id: "old-client" },
+        tokens: { access_token: "fixture-old", token_type: "Bearer" },
+        expiresAt: Date.now() + 3600_000,
+      }),
+    );
+    let gateEntered!: () => void;
+    let releaseGate!: () => void;
+    let authorizationReady!: (url: string) => void;
+    const entered = new Promise<void>((resolve) => {
+      gateEntered = resolve;
+    });
+    const gate = new Promise<void>((resolve) => {
+      releaseGate = resolve;
+    });
+    const authorization = new Promise<string>((resolve) => {
+      authorizationReady = resolve;
+    });
+    let operations = 0;
+    const credentialSession: typeof withCredentialSession = async (
+      url,
+      operation,
+    ) => {
+      operations++;
+      if (operations === 1) {
+        gateEntered();
+        await gate;
+      }
+      return withCredentialSession(url, operation);
+    };
+    globalThis.fetch = (async (input, init) => {
+      const url = new URL(input instanceof Request ? input.url : String(input));
+      if (url.origin === "https://us.i.posthog.com") {
+        requests.push(JSON.parse(String(init?.body)));
+        return new Response("1");
+      }
+      if (url.origin !== origin) throw new Error("Unexpected fixture request");
+      if (url.pathname.startsWith("/.well-known/oauth-protected-resource"))
+        return Response.json({
+          resource: `${origin}/mcp`,
+          authorization_servers: [origin],
+        });
+      if (url.pathname.startsWith("/.well-known/oauth-authorization-server"))
+        return Response.json({
+          issuer: origin,
+          authorization_endpoint: `${origin}/authorize`,
+          token_endpoint: `${origin}/token`,
+          registration_endpoint: `${origin}/register`,
+          response_types_supported: ["code"],
+          code_challenge_methods_supported: ["S256"],
+          token_endpoint_auth_methods_supported: ["none"],
+        });
+      if (url.pathname === "/register")
+        return Response.json({
+          client_id: "fixture-client",
+          token_endpoint_auth_method: "none",
+          redirect_uris: JSON.parse(String(init?.body)).redirect_uris,
+        });
+      if (url.pathname === "/token")
+        return Response.json({
+          access_token: "fixture-new",
+          token_type: "Bearer",
+          expires_in: 3600,
+        });
+      if (url.pathname === "/api/users/current")
+        return Response.json({
+          id:
+            new Headers(init?.headers).get("Authorization") ===
+            "Bearer fixture-old"
+              ? "old_user"
+              : "new_user",
+        });
+      throw new Error(`Unexpected fixture path: ${url.pathname}`);
+    }) as typeof fetch;
+    const previousLog = console.log;
+    const previousError = console.error;
+    console.log = () => {};
+    console.error = (message?: unknown) => {
+      const match = String(message).match(
+        /https:\/\/www\.disposabl\.dev\/authorize\?[^\s]+/,
+      );
+      if (match) authorizationReady(match[0]);
+    };
+    const program = () =>
+      createProgram(origin, true, {
+        version: "1.2.3",
+        telemetryPath: path(),
+        credentialSession,
+      });
+    try {
+      await capture("1.2.3", "cli", "agent", "started", path());
+      const login = program().parseAsync([
+        "node",
+        "cli",
+        "login",
+        "--no-browser",
+      ]);
+      await entered;
+      await program().parseAsync(["node", "cli", "login", "status"]);
+      expect(requests.at(-1)!.distinct_id).toBe(
+        createHash("sha256")
+          .update("disposabl:phc_test:old_user")
+          .digest("hex"),
+      );
+      releaseGate();
+      const authorize = new URL(await authorization);
+      const callback = new URL(authorize.searchParams.get("redirect_uri")!);
+      expect(callback.hostname).toBe("127.0.0.1");
+      callback.searchParams.set("code", "fixture-code");
+      callback.searchParams.set("state", authorize.searchParams.get("state")!);
+      callback.searchParams.set("iss", origin);
+      expect((await originalFetch(callback)).status).toBe(200);
+      await login;
+      await capture("1.2.3", "cli", "agent", "success", path());
+      expect(requests.at(-1)!.distinct_id).toBe(
+        createHash("sha256")
+          .update("disposabl:phc_test:new_user")
+          .digest("hex"),
+      );
+    } finally {
+      releaseGate();
+      console.log = previousLog;
+      console.error = previousError;
+    }
+  },
+);
+
+test(
+  "real credential lock orders old status and logout against a new login",
+  { timeout: 15_000 },
+  async () => {
+    const origin = "https://www.disposabl.dev";
+    const credentialDir = process.env.DISPOSABL_CONFIG_DIR!;
+    await mkdir(credentialDir, { recursive: true });
+    await writeFile(
+      join(
+        credentialDir,
+        `${createHash("sha256").update(origin).digest("hex")}.json`,
+      ),
+      JSON.stringify({
+        client: { client_id: "old-client" },
+        tokens: { access_token: "fixture-old", token_type: "Bearer" },
+        expiresAt: Date.now() + 3600_000,
+      }),
+    );
+    let statusStarted!: () => void;
+    let finishOldStatus!: (response: Response) => void;
+    let revokeStarted!: () => void;
+    let finishRevoke!: (response: Response) => void;
+    const oldStatusStarted = new Promise<void>((resolve) => {
+      statusStarted = resolve;
+    });
+    const oldRevokeStarted = new Promise<void>((resolve) => {
+      revokeStarted = resolve;
+    });
+    const authorizations: ((url: string) => void)[] = [];
+    const nextAuthorization = () =>
+      new Promise<string>((resolve) => {
+        authorizations.push(resolve);
+      });
+    let tokenNumber = 0;
+    globalThis.fetch = (async (input, init) => {
+      const url = new URL(input instanceof Request ? input.url : String(input));
+      if (url.origin === "https://us.i.posthog.com") {
+        requests.push(JSON.parse(String(init?.body)));
+        return new Response("1");
+      }
+      if (url.origin !== origin) throw new Error("Unexpected fixture request");
+      if (url.pathname.startsWith("/.well-known/oauth-protected-resource"))
+        return Response.json({
+          resource: `${origin}/mcp`,
+          authorization_servers: [origin],
+        });
+      if (url.pathname.startsWith("/.well-known/oauth-authorization-server"))
+        return Response.json({
+          issuer: origin,
+          authorization_endpoint: `${origin}/authorize`,
+          token_endpoint: `${origin}/token`,
+          registration_endpoint: `${origin}/register`,
+          response_types_supported: ["code"],
+          code_challenge_methods_supported: ["S256"],
+          token_endpoint_auth_methods_supported: ["none"],
+        });
+      if (url.pathname === "/register")
+        return Response.json({
+          client_id: "fixture-client",
+          token_endpoint_auth_method: "none",
+          redirect_uris: JSON.parse(String(init?.body)).redirect_uris,
+        });
+      if (url.pathname === "/token") {
+        tokenNumber++;
+        return Response.json({
+          access_token: `fixture-new-${tokenNumber}`,
+          token_type: "Bearer",
+          expires_in: 3600,
+        });
+      }
+      if (url.pathname === "/mcp/oauth/revoke")
+        return new Promise<Response>((resolve) => {
+          finishRevoke = resolve;
+          revokeStarted();
+        });
+      if (url.pathname === "/api/users/current") {
+        const token = new Headers(init?.headers).get("Authorization");
+        if (token === "Bearer fixture-old")
+          return new Promise<Response>((resolve) => {
+            finishOldStatus = resolve;
+            statusStarted();
+          });
+        return Response.json({
+          id: token === "Bearer fixture-new-1" ? "new_user_1" : "new_user_2",
+        });
+      }
+      throw new Error(`Unexpected fixture path: ${url.pathname}`);
+    }) as typeof fetch;
+    const previousLog = console.log;
+    const previousError = console.error;
+    console.log = () => {};
+    console.error = (message?: unknown) => {
+      const match = String(message).match(
+        /https:\/\/www\.disposabl\.dev\/authorize\?[^\s]+/,
+      );
+      if (match) authorizations.shift()?.(match[0]);
+    };
+    const completeLogin = async (url: string) => {
+      const authorize = new URL(url);
+      const callback = new URL(authorize.searchParams.get("redirect_uri")!);
+      expect(callback.hostname).toBe("127.0.0.1");
+      callback.searchParams.set("code", "fixture-code");
+      callback.searchParams.set("state", authorize.searchParams.get("state")!);
+      callback.searchParams.set("iss", origin);
+      expect((await originalFetch(callback)).status).toBe(200);
+    };
+    const program = () =>
+      createProgram(origin, true, { version: "1.2.3", telemetryPath: path() });
+    try {
+      await capture("1.2.3", "cli", "agent", "started", path());
+      const oldStatus = program().parseAsync([
+        "node",
+        "cli",
+        "login",
+        "status",
+      ]);
+      await oldStatusStarted;
+      const firstAuthorization = nextAuthorization();
+      const firstLogin = program().parseAsync([
+        "node",
+        "cli",
+        "login",
+        "--no-browser",
+      ]);
+      await completeLogin(await firstAuthorization);
+      await firstLogin;
+      finishOldStatus(new Response("unauthorized", { status: 401 }));
+      await oldStatus;
+      await capture("1.2.3", "cli", "agent", "success", path());
+      expect(requests.at(-1)!.distinct_id).toBe(
+        createHash("sha256")
+          .update("disposabl:phc_test:new_user_1")
+          .digest("hex"),
+      );
+
+      const oldLogout = program().parseAsync(["node", "cli", "logout"]);
+      await oldRevokeStarted;
+      const secondAuthorization = nextAuthorization();
+      const secondLogin = program().parseAsync([
+        "node",
+        "cli",
+        "login",
+        "--no-browser",
+      ]);
+      finishRevoke(new Response("ok"));
+      await oldLogout;
+      await completeLogin(await secondAuthorization);
+      await secondLogin;
+      await capture("1.2.3", "cli", "agent", "success", path());
+      expect(requests.at(-1)!.distinct_id).toBe(
+        createHash("sha256")
+          .update("disposabl:phc_test:new_user_2")
+          .digest("hex"),
+      );
+    } finally {
+      console.log = previousLog;
+      console.error = previousError;
+    }
+  },
+);
 
 test("release builds require public ingestion config and embed it in the bundle", async () => {
   expect(() => telemetryBuildDefine("1.0.0", {})).toThrow("Release requires");

@@ -17,6 +17,7 @@ import {
   login,
   loginAccessToken,
   logout,
+  withCredentialSession,
 } from "./auth";
 
 export type Schema = {
@@ -42,6 +43,7 @@ type ProgramDependencies = {
   hasCredentials?: typeof hasCredentials;
   accessToken?: typeof accessToken;
   loginAccessToken?: typeof loginAccessToken;
+  credentialSession?: typeof withCredentialSession;
 };
 
 export function createProgram(
@@ -57,6 +59,25 @@ export function createProgram(
   const sessionAccessToken = dependencies.accessToken ?? accessToken;
   const sessionLoginAccessToken =
     dependencies.loginAccessToken ?? loginAccessToken;
+  const credentialSession: typeof withCredentialSession = (url, operation) => {
+    if (dependencies.credentialSession)
+      return dependencies.credentialSession(url, operation);
+    if (!(
+      dependencies.login ||
+      dependencies.logout ||
+      dependencies.hasCredentials ||
+      dependencies.accessToken ||
+      dependencies.loginAccessToken
+    ))
+      return withCredentialSession(url, operation);
+    return operation({
+      login: (browser) => sessionLogin(url, browser),
+      logout: () => sessionLogout(url),
+      hasCredentials: () => sessionHasCredentials(url),
+      accessToken: (refresh) => sessionAccessToken(url, refresh),
+      loginAccessToken: () => sessionLoginAccessToken(url),
+    });
+  };
   const program = new Command()
     .name(Object.keys(manifest.bin)[0])
     .version(manifest.version);
@@ -76,20 +97,25 @@ export function createProgram(
         base === "https://www.disposabl.dev" &&
         installedRelease(version);
       const enabled = central && telemetryConfig(version);
-      let attempt: string | undefined;
-      if (central) {
-        if (enabled) attempt = await prepareLogin(path());
-        else await resetIdentity(path());
-      }
-      await sessionLogin(base, options.browser);
-      if (
-        centralAnalytics &&
-        base === "https://www.disposabl.dev" &&
-        telemetryConfig(version)
-      ) {
+      const { attempt, token } = await credentialSession(
+        base,
+        async (session) => {
+          let attempt: string | undefined;
+          if (central) {
+            if (enabled) attempt = await prepareLogin(path());
+            else await resetIdentity(path());
+          }
+          await session.login(options.browser);
+          return {
+            attempt,
+            token: enabled
+              ? await session.loginAccessToken().catch(() => undefined)
+              : undefined,
+          };
+        },
+      );
+      if (enabled && token) {
         try {
-          const token = await sessionLoginAccessToken(base);
-          if (!token) throw new Error("No login token.");
           const response = await fetch(`${base}/api/users/current`, {
             headers: { Authorization: `Bearer ${token}` },
             redirect: "error",
@@ -117,51 +143,76 @@ export function createProgram(
         centralAnalytics &&
         base === "https://www.disposabl.dev" &&
         telemetryConfig(version);
-      if (!(await sessionHasCredentials(base))) {
-        if (enabled) await resetIdentity(path());
+      let snapshot: { token: string; attempt: string | undefined } | undefined;
+      try {
+        snapshot = await credentialSession(base, async (session) => {
+          if (!(await session.hasCredentials())) {
+            if (enabled) await resetIdentity(path());
+            return undefined;
+          }
+          const attempt = enabled ? await prepareLogin(path()) : undefined;
+          try {
+            return { token: await session.accessToken(), attempt };
+          } catch (error) {
+            if (enabled && attempt) await resetIdentity(path(), attempt);
+            throw error;
+          }
+        });
+      } catch (error) {
+        if (!(error instanceof NotAuthenticated)) throw error;
         console.log(JSON.stringify({ currentUser: null }));
         return;
       }
-      const attempt = enabled ? await prepareLogin(path()) : undefined;
-      const send = async (refresh = false) =>
+      if (!snapshot) {
+        console.log(JSON.stringify({ currentUser: null }));
+        return;
+      }
+      const send = (token: string) =>
         fetch(`${base}/api/users/current`, {
           headers: {
-            Authorization: `Bearer ${await sessionAccessToken(base, refresh)}`,
+            Authorization: `Bearer ${token}`,
             "X-Disposabl-Source": "cli",
           },
           redirect: "error",
           signal: AbortSignal.timeout(30_000),
         });
-      let response: Response;
-      try {
-        response = await send();
-        if (response.status === 401 && !process.env.DISPOSABL_API_KEY)
-          response = await send(true);
-      } catch (error) {
-        if (!(error instanceof NotAuthenticated)) throw error;
-        if (enabled) await resetIdentity(path());
-        console.log(JSON.stringify({ currentUser: null }));
-        return;
+      let response = await send(snapshot.token);
+      if (response.status === 401 && !process.env.DISPOSABL_API_KEY) {
+        try {
+          const refreshed = await credentialSession(base, async (session) => {
+            if ((await session.loginAccessToken()) !== snapshot!.token)
+              return undefined;
+            return session.accessToken(true);
+          });
+          if (refreshed) response = await send(refreshed);
+        } catch (error) {
+          if (!(error instanceof NotAuthenticated)) throw error;
+        }
       }
       if (response.status === 401) {
-        if (enabled) await resetIdentity(path());
+        if (enabled && snapshot.attempt)
+          await resetIdentity(path(), snapshot.attempt);
         console.log(JSON.stringify({ currentUser: null }));
         return;
       }
       if (!response.ok)
         throw new Error(`Login status failed (${response.status}).`);
       const currentUser = await response.json();
-      if (enabled) await identify(version, currentUser?.id, path(), attempt);
+      if (enabled)
+        await identify(version, currentUser?.id, path(), snapshot.attempt);
       console.log(JSON.stringify({ currentUser }));
     });
   program.command("logout").action(async () => {
-    await sessionLogout(origin());
-    if (
-      centralAnalytics &&
-      origin() === "https://www.disposabl.dev" &&
-      installedRelease(version)
-    )
-      await resetIdentity(path());
+    const base = origin();
+    await credentialSession(base, async (session) => {
+      await session.logout();
+      if (
+        centralAnalytics &&
+        base === "https://www.disposabl.dev" &&
+        installedRelease(version)
+      )
+        await resetIdentity(path());
+    });
     console.error("Signed out.");
   });
 

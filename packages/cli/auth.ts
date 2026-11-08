@@ -282,6 +282,26 @@ async function withCredentials<T>(
     await release();
   }
 }
+export function withCredentialSession<T>(
+  url: string,
+  operation: (session: {
+    login: (browser?: boolean) => Promise<void>;
+    logout: () => Promise<void>;
+    hasCredentials: () => Promise<boolean>;
+    accessToken: (refresh?: boolean) => Promise<string>;
+    loginAccessToken: () => Promise<string | undefined>;
+  }) => Promise<T>,
+): Promise<T> {
+  return withCredentials(url, () =>
+    operation({
+      login: (browser) => unlockedLogin(url, browser),
+      logout: () => unlockedLogout(url),
+      hasCredentials: () => hasCredentials(url),
+      accessToken: (refresh) => unlockedAccessToken(url, refresh),
+      loginAccessToken: () => loginAccessToken(url),
+    }),
+  );
+}
 export const login = (url: string, browser = true) =>
   withCredentials(url, () => unlockedLogin(url, browser));
 export const accessToken = (url: string, refresh = false) =>

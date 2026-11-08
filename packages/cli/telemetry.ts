@@ -234,9 +234,15 @@ export async function identify(
   }
 }
 
-export async function resetIdentity(path: string) {
+export async function resetIdentity(path: string, attempt?: string) {
   try {
-    await synchronized(path, () => rm(path, { force: true }));
+    await synchronized(path, async () => {
+      if (attempt) {
+        const current = JSON.parse(await readFile(path, "utf8")) as State;
+        if (current.loginAttempt !== attempt) return;
+      }
+      await rm(path, { force: true });
+    });
   } catch {
     /* analytics must not affect authentication */
   }
