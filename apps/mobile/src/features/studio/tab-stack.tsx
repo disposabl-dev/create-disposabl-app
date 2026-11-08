@@ -2,7 +2,7 @@ import { Stack, useSegments } from "expo-router";
 import { Platform, Text } from "react-native";
 import { useTheme } from "../../../../../packages/disposabl-kit/mobile/design/use-theme";
 import { HeaderActions } from "./ui";
-import { useResolvedColorScheme } from "../../../../../packages/disposabl-kit/mobile/design/theme-provider";
+import { useResolvedColorScheme } from "@disposabl/disposabl-kit/mobile";
 
 const titles: Record<string, string> = {
   index: "Discover",
