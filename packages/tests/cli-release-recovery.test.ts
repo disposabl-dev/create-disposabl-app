@@ -25,6 +25,38 @@ const steps = workflow.jobs.cli.steps;
 const step = (name: string) =>
   steps.find((s: { name?: string }) => s.name === name).run as string;
 
+test("conflicting recovery inputs run validation and fail visibly", () => {
+  const shouldRun = new Function(
+    "github",
+    "inputs",
+    `return ${workflow.jobs.cli.if}`,
+  );
+  const github = {
+    repository: "disposabl-dev/create-disposabl-app",
+    ref: "refs/heads/main",
+  };
+  expect(
+    shouldRun(github, { recovery_version: "", cli_recovery_version: "" }),
+  ).toBe(true);
+  expect(
+    shouldRun(github, { recovery_version: "0.15.0", cli_recovery_version: "" }),
+  ).toBe(false);
+  expect(
+    shouldRun(github, { recovery_version: "", cli_recovery_version: "1.1.0" }),
+  ).toBe(true);
+  expect(
+    shouldRun(github, {
+      recovery_version: "0.15.0",
+      cli_recovery_version: "1.1.0",
+    }),
+  ).toBe(true);
+  const result = fixture().run("Verify CLI recovery tag", {
+    GENERATOR_RECOVERY: "0.15.0",
+  });
+  expect(result.status).not.toBe(0);
+  expect(result.stdout).toContain("Select only one recovery.");
+});
+
 function fixture() {
   const dir = mkdtempSync(join(tmpdir(), "cli-release-test-"));
   const bin = join(dir, "bin");

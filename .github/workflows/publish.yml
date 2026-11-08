@@ -25,7 +25,7 @@ env:
 
 jobs:
   cli:
-    if: github.repository == 'disposabl-dev/create-disposabl-app' && github.ref == 'refs/heads/main' && inputs.recovery_version == ''
+    if: github.repository == 'disposabl-dev/create-disposabl-app' && github.ref == 'refs/heads/main' && (inputs.recovery_version == '' || inputs.cli_recovery_version != '')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
