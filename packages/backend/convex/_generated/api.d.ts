@@ -76,6 +76,7 @@ import type * as previews_internal from "../previews/internal.js";
 import type * as previews_token_actions_create from "../previews/token/actions/create.js";
 import type * as previews_token_actions_management from "../previews/token/actions/management.js";
 import type * as previews_token_internal from "../previews/token/internal.js";
+import type * as product_lowCreditEmail from "../product/lowCreditEmail.js";
 import type * as releases_index from "../releases/index.js";
 import type * as releases_internal from "../releases/internal.js";
 import type * as telemetry from "../telemetry.js";
@@ -159,6 +160,7 @@ declare const fullApi: ApiFromModules<{
   "previews/token/actions/create": typeof previews_token_actions_create;
   "previews/token/actions/management": typeof previews_token_actions_management;
   "previews/token/internal": typeof previews_token_internal;
+  "product/lowCreditEmail": typeof product_lowCreditEmail;
   "releases/index": typeof releases_index;
   "releases/internal": typeof releases_internal;
   telemetry: typeof telemetry;

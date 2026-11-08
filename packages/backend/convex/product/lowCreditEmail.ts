@@ -1,5 +1,4 @@
 import { paymentsEnabled } from "@disposabl/disposabl-kit/features";
-import { billingConfig } from "@disposabl/disposabl-kit/server/billing";
 import { v } from "convex/values";
 import { components } from "../_generated/api";
 import { env } from "../_generated/server";
@@ -30,7 +29,6 @@ export async function queueLowCreditNotice(
     sender?: string;
     apiKey?: string;
     paymentUrl?: string;
-    billingKey?: string;
     getVerifiedEmail: () => Promise<string | null>;
     enqueue: (message: Message) => Promise<unknown>;
   },
@@ -53,11 +51,14 @@ export async function queueLowCreditNotice(
   if (notice.balance >= 10) return "not_low" as const;
   if (!options.sender?.trim() || !options.apiKey?.trim())
     throw new Error("Email delivery is not configured.");
-  const paymentUrl = billingConfig(true, {
-    AUTUMN_SECRET_KEY: options.billingKey,
-    BILLING_RETURN_URL: options.paymentUrl,
-  })!.returnUrl;
-  if (!paymentUrl.startsWith("https://"))
+  const paymentUrl = new URL(options.paymentUrl ?? "");
+  if (
+    paymentUrl.protocol !== "https:" ||
+    paymentUrl.username ||
+    paymentUrl.password ||
+    paymentUrl.search ||
+    paymentUrl.hash
+  )
     throw new Error("Payments are not configured.");
   const email = await options.getVerifiedEmail();
   if (!email) return "no_verified_email" as const;
@@ -108,8 +109,8 @@ export const queue = internalMutation({
       e2e: process.env.E2E_TELEMETRY_DISABLED,
       sender: env.RESEND_FROM_EMAIL,
       apiKey: env.RESEND_API_KEY,
-      paymentUrl: env.BILLING_RETURN_URL,
-      billingKey: env.AUTUMN_SECRET_KEY,
+      // Checkout's return destination may be a completion page, not a place to buy.
+      paymentUrl: "https://www.disposabl.dev/pricing",
       getVerifiedEmail: async () => {
         const user = await ctx.db.get("users", notice.userId);
         if (!user) return null;

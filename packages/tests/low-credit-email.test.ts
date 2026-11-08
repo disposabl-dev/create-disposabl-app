@@ -17,7 +17,6 @@ function fixture() {
     e2e: "0",
     sender: "Product <mail@example.com>",
     apiKey: "resend-key",
-    billingKey: "billing-key",
     paymentUrl: "https://example.com/pricing",
     getVerifiedEmail: async () => {
       lookups++;
@@ -87,7 +86,7 @@ test("reports missing verified email and rejects invalid data or configuration",
   for (const overrides of [
     { sender: "" },
     { apiKey: "" },
-    { billingKey: "" },
+    { paymentUrl: "" },
     { paymentUrl: "http://localhost/pricing" },
     { paymentUrl: "https://example.com/pricing?token=secret" },
   ])
