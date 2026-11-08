@@ -1,4 +1,5 @@
 import { Command } from "commander";
+import { apiError } from "./errors";
 import manifest from "./package.json";
 import {
   NotAuthenticated,
@@ -184,9 +185,7 @@ export async function runApiCli(argv: string[], serviceOrigin: string) {
           );
           const response = await requestOperation(base, path, method, input)();
           if (!response.ok)
-            throw new Error(
-              `API request failed (${response.status}): ${await response.text()}`,
-            );
+            throw new Error(apiError(response.status, await response.text()));
           console.log(JSON.stringify(await response.json(), null, 2));
         });
       }

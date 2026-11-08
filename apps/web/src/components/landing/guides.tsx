@@ -209,9 +209,10 @@ function BuildPage() {
             <p>
               Local mode uses your computer and coding agent. Agent Mode runs
               work in a remote sandbox. See <a href="/pricing">pricing</a> for
-              monthly and one-time credit options. Credit use varies by task.
-              Project context is sent outside your computer; review the agent’s
-              changes and test results.
+              monthly and one-time credit options. Compute costs 10 credits per
+              10-minute window; AI is currently included. Project context is
+              sent outside your computer; review the agent’s changes and test
+              results.
             </p>
           </details>
         </div>

@@ -55,6 +55,10 @@ function PricingPage() {
             <div className="pricing-intro">
               <h1>Build your way.</h1>
               <p>Start free on your computer, or use credits for Agent Mode.</p>
+              <p>
+                Agent compute costs 10 credits per 10-minute window. AI is
+                currently included.
+              </p>
             </div>
             <div className="pricing-grid">
               {plans.map((plan) => (

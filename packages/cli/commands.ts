@@ -1,4 +1,5 @@
 import { openExpoDeletion } from "./delete";
+import { apiError } from "./errors";
 import { openUrl } from "./auth";
 import { apiUrl, SERVICE_ORIGIN } from "./origin";
 import {
@@ -143,9 +144,7 @@ export async function runCli(
                 options.browser !== false,
               );
             if (!result.ok)
-              throw new Error(
-                `API request failed (${result.status}): ${await result.text()}`,
-              );
+              throw new Error(apiError(result.status, await result.text()));
             let value = await result.json();
             const ready = () =>
               value.ready && (!options.mobile || Boolean(value.expo));

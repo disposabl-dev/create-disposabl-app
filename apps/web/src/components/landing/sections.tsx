@@ -54,6 +54,8 @@ export function Pricing({
             <ul>
               {[
                 `${creditQuantity("topup")} credits`,
+                "10 credits per 10-minute compute window",
+                "AI currently included",
                 "Work on a remote computer",
                 "Longer tasks and refinements",
                 "Compare versions side by side",
@@ -104,7 +106,7 @@ export const faqs = [
   ],
   [
     "What does Agent Mode do, and how do credits work?",
-    `Agent Mode runs tasks on a separate remote computer. It suits longer tasks and repeated improvement: build an approach, test it, compare alternatives, and refine. Agents can use parallel previews to compare results; this is not a guarantee of automatic quality ranking. Agent Mode offers ${creditQuantity("monthly")} credits for ${formatPrice(pricing.monthly.price)} per month, or a ${formatPrice(pricing.topup.price)} one-time purchase of ${creditQuantity("topup")} credits. Monthly credits expire; one-time credits do not. Consumption will vary by task rather than a fixed price per app.`,
+    `Agent Mode runs tasks in one remote sandbox shared across your apps. Compute costs 10 credits per 10-minute window while the agent is active. AI is currently included. Agent Mode offers ${creditQuantity("monthly")} credits for ${formatPrice(pricing.monthly.price)} per month, or ${creditQuantity("topup")} credits for ${formatPrice(pricing.topup.price)} once. Monthly credits expire; one-time credits do not.`,
   ],
   [
     "Can I build an app for my business?",
