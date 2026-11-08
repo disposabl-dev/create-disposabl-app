@@ -1,3 +1,4 @@
+import { VariableContextProvider } from "nativewind";
 import { ConnectionNotice } from "./connections";
 import { FlatList, View, useWindowDimensions } from "react-native";
 import { useRouter } from "expo-router";
@@ -39,34 +40,29 @@ export default function HomeScreen() {
         showsHorizontalScrollIndicator={false}
         data={features}
         keyExtractor={(i) => i.title}
-        contentContainerStyle={{ gap: 12 }}
+        contentContainerClassName="gap-[12px]"
         renderItem={({ item }) => (
-          <Touch
-            label={item.action}
-            onPress={() => router.push(item.route)}
-            style={{
-              width: featureWidth,
-              padding: 28,
-              borderRadius: 28,
-              gap: 20,
-              backgroundColor: item.color,
+          <VariableContextProvider
+            value={{
+              "--layout-width": featureWidth ?? "auto",
+              "--layout-background-color": item.color,
             }}
           >
-            <Label variant="title">{item.title}</Label>
-            <Label color={c.mutedForeground}>{item.line}</Label>
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 12,
-              }}
+            <Touch
+              label={item.action}
+              onPress={() => router.push(item.route)}
+              className="w-[var(--layout-width)] p-[28px] rounded-[28px] gap-[20px] bg-[var(--layout-background-color)]"
             >
-              <View style={{ flex: 1 }}>
-                <Label variant="label">{item.action}</Label>
+              <Label variant="title">{item.title}</Label>
+              <Label color={c.mutedForeground}>{item.line}</Label>
+              <View className="flex-row items-center gap-[12px]">
+                <View className="flex-1">
+                  <Label variant="label">{item.action}</Label>
+                </View>
+                <Icon name="arrow" size={18} />
               </View>
-              <Icon name="arrow" size={18} />
-            </View>
-          </Touch>
+            </Touch>
+          </VariableContextProvider>
         )}
       />
       <AppCollection

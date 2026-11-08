@@ -15,6 +15,7 @@ import { requireConnections } from "../connections/config";
 import { readThread, patchThread } from "./threads";
 import { resolvePlatforms } from "@disposabl/disposabl-kit/platforms";
 import { resolveFeatures } from "@disposabl/disposabl-kit/feature-options";
+import { ownedAttachments, attachmentReferences } from "./attachments";
 
 export const sendMessage = internalMutation({
   platforms: true,
@@ -22,13 +23,14 @@ export const sendMessage = internalMutation({
   returns: result,
   handler: async (
     ctx,
-    { userId, appId, prompt, platforms, features },
+    { userId, appId, prompt, platforms, features, fileIds = [] },
   ): Promise<Infer<typeof result>> => {
     prompt = prompt.trim();
     if (!prompt || prompt.length > 32_000)
       throw new ConvexError("Prompt must contain 1–32,000 characters.");
     if (!env.BOAT_API_KEY)
       throw new ConvexError("Remote agents are not configured.");
+    const attachments = await ownedAttachments(ctx, userId, fileIds);
     let app: Doc<"apps">;
     if (appId) {
       if (platforms !== undefined || features !== undefined)
@@ -91,12 +93,28 @@ export const sendMessage = internalMutation({
     const { messageId } = await saveMessage(ctx, components.agent, {
       threadId: current.threadId,
       userId,
-      prompt,
+      message: {
+        role: "user",
+        content: [
+          { type: "text", text: prompt },
+          ...attachments.map((file) => ({
+            type: "file" as const,
+            data: {
+              type: "reference" as const,
+              reference: { disposablFile: file._id },
+            },
+            filename: file.filename,
+            mediaType: file.mediaType,
+          })),
+        ],
+      },
     });
     await patchThread(ctx, current, {
       pending: [...current.pending, messageId],
       status: "processing",
-      ...(current.status !== "processing" ? { access: undefined } : {}),
+      ...(current.status !== "processing"
+        ? { access: undefined, startedAt: Date.now(), finishedAt: undefined }
+        : {}),
       error: undefined,
       updatedAt: Date.now(),
     });
@@ -197,6 +215,8 @@ export const getMessages = internalQuery({
       kind: "messages",
       appId,
       threadId: current.threadId,
+      startedAt: current.startedAt,
+      finishedAt: current.finishedAt,
       status: current.status,
       error: current.error,
       stopUnconfirmed: current.stopUnconfirmed,
@@ -206,6 +226,7 @@ export const getMessages = internalQuery({
           id: m._id,
           role: m.message?.role ?? "assistant",
           content: m.text ?? "",
+          attachments: attachmentReferences(m.message?.content),
           status: m.status,
           createdAt: m._creationTime,
           tools: (

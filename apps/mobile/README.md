@@ -66,10 +66,11 @@ compatible changes.
 Select `android` in the root `disposabl.json`. When mobile or shared dependencies
 change, CI computes the Expo fingerprint in the Web job after web/backend
 deployment, reusing its runner and dependency install. The first run builds an
-installable APK in a separate 4-vCPU Android job. Later runs with the same fingerprint
-publish EAS Update from Web. Native jobs install only the mobile workspace using
-the shared dependency cache. Android and iOS native builds run in parallel.
-Linux and Windows start alongside Web.
+installable APK in a separate Android job on the selected Linux runner. Later
+runs with the same fingerprint publish EAS Update from Web. Native jobs install
+the workspace dependencies using the shared Bun cache; Android also restores
+Gradle caches. Native jobs start after Web. Desktop builds run only on main.
+Platform jobs have a 20-minute timeout; this is a limit, not a build-time guarantee.
 Production iOS checks the latest finished EAS store build for the same app and
 channel. If its fingerprint matches, CI publishes an iOS OTA update and skips
 the native build. A missing or incompatible binary requires a new EAS build.
@@ -138,8 +139,9 @@ The backend deployment supplies the same URLs to web and mobile:
 `CONVEX_URL` is the client API origin and `CONVEX_SITE_URL` is the HTTP/auth origin.
 CI exports this pair once, generating the `VITE_` and `EXPO_PUBLIC_` aliases
 for web builds, mobile fingerprinting, APK builds and EAS Update exports.
-Turbo includes the web aliases in build cache keys. Saved EAS aliases are ignored;
-conflicting canonical URLs fail the build. Each PR uses its own deployed backend.
+Turbo includes the web aliases in build cache keys. Every saved EAS backend URL,
+including its VITE_ and EXPO_PUBLIC_ aliases, must match the deployed URLs;
+conflicting values fail the build. Each PR uses its own deployed backend.
 EAS variables with secret visibility are not available to this local build or
 update flow; native secrets must be supplied through GitHub Actions.
 
@@ -153,8 +155,10 @@ DISPOSABL_MOBILE_CHANNEL=development bunx expo run:android --variant release
 
 This is a release-mode build with its JavaScript bundled, so it runs without
 Metro. Preview APKs use Expo's public debug signing key and a separate application
-ID. CI's prebuild, Gradle build, caching and embedded fingerprint checks live
-directly in `.github/workflows/pipeline.yml`; there is no Android build helper.
+ID. The workflow configures dependency caches and invokes
+[mobile.sh](../../.github/scripts/mobile.sh) for prebuild, Gradle compilation and
+embedded fingerprint checks. [android-runner.sh](../../.github/scripts/android-runner.sh)
+prepares disposable hosted-runner disk space and checks capacity before prebuild.
 
 ## Production
 
@@ -170,14 +174,17 @@ removes it after building. The version code comes from the workflow run number;
 preserve increasing numbers if moving this workflow to another repository.
 An OTA update does not require the signing key because it does not build an APK.
 
-Native builds publish GitHub prereleases for previews and releases for
-production. Web publishes Android after an update; the Android job publishes after a native build,
-without waiting for desktop. Each PR reuses its Android release, normally
-`app-pr-N-android`, replacing the APK/metadata and moving the tag to the tested
-commit. Only a published APK with matching metadata and digest is reusable.
-The job has `contents: write`; fork PRs never deploy or publish. There is no
-intermediate Actions artifact. This workflow does not submit to Google Play or
-the App Store.
+Web stages the Android APK after an OTA update; the Android job stages it after
+a native build. Both upload intermediate `release-android` Actions artifacts.
+The separate publisher waits for the selected build jobs, downloads verified
+artifacts and publishes GitHub prereleases for previews or releases for production.
+An exhausted Actions artifact quota can therefore block delivery after compilation.
+Each PR reuses its Android release, normally `app-pr-N-android`, replacing the
+APK/metadata and moving the tag to the tested commit. Only a published APK with
+matching metadata and digest is reusable. The publisher executes scripts from
+main with `contents: write`; fork PRs never deploy or publish. Android submission
+to Google Play is not implemented. iOS production uses the separate EAS Build
+and TestFlight flow described above; App Store release remains separate.
 
 Backend URLs are available to mobile code through
 `process.env.EXPO_PUBLIC_CONVEX_URL` and

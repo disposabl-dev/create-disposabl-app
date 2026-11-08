@@ -34,10 +34,13 @@ export const abortMessage = mutation({
 });
 export const getMessages = query({
   args: historyArgs,
-  returns: history,
-  handler: async (ctx, args): Promise<Infer<typeof history>> =>
-    ctx.runQuery(internal.agent.internal.getMessages, {
+  returns: v.union(history, v.null()),
+  handler: async (ctx, args): Promise<Infer<typeof history> | null> => {
+    const userId = await getSessionUserId(ctx);
+    if (!userId) return null;
+    return ctx.runQuery(internal.agent.internal.getMessages, {
       ...args,
-      userId: await requireUser(ctx),
-    }),
+      userId,
+    });
+  },
 });

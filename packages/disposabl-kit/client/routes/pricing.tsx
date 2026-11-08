@@ -11,6 +11,7 @@ import {
 import { useAuthToken } from "@convex-dev/auth/react";
 import { sessionId } from "../../lib/auth-session";
 import { paymentsEnabled } from "../../features";
+import { pricing, creditQuantity, formatPrice } from "../../payments/config";
 
 export const Route = createFileRoute("/_providers/pricing")({
   component: Pricing,
@@ -154,7 +155,9 @@ function PurchasePage({ session }: { session: string | null }) {
     <main className="mx-auto max-w-5xl space-y-8 p-8">
       <div>
         <h1 className="text-3xl font-semibold">Pricing</h1>
-        <p>100 credits per $1.</p>
+        <p>
+          {pricing.creditsPerDollar} credits per {formatPrice(1)}.
+        </p>
       </div>
       {isLoading ? (
         <p>Checking your account...</p>
@@ -190,8 +193,8 @@ function PurchasePage({ session }: { session: string | null }) {
       <div className="grid gap-5 md:grid-cols-2">
         <section className="rounded-lg border p-6">
           <h2 className="text-xl font-semibold">Monthly</h2>
-          <p>$5 / month</p>
-          <p>500 credits each billing cycle.</p>
+          <p>{formatPrice(pricing.monthly.price)} / month</p>
+          <p>{creditQuantity("monthly")} credits each billing cycle.</p>
           <button
             className="mt-4 rounded bg-black px-4 py-2 text-white disabled:opacity-50"
             disabled={!session || busy || hasMonthlyPlan !== false}
@@ -204,8 +207,8 @@ function PurchasePage({ session }: { session: string | null }) {
         </section>
         <section className="rounded-lg border p-6">
           <h2 className="text-xl font-semibold">Top-up</h2>
-          <p>$5 once</p>
-          <p>500 credits that do not expire.</p>
+          <p>{formatPrice(pricing.topup.price)} once</p>
+          <p>{creditQuantity("topup")} credits that do not expire.</p>
           <button
             className="mt-4 rounded bg-black px-4 py-2 text-white disabled:opacity-50"
             disabled={!session || busy}

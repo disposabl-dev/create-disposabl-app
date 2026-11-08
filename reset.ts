@@ -36,6 +36,23 @@ const touched = [
   ".github/workflows",
   "apps/web/src/router",
   "apps/mobile/src/app/index.tsx",
+  "apps/mobile/package.json",
+  "apps/mobile/app.json",
+  "packages/disposabl-kit/package.json",
+  "packages/disposabl-kit/mobile/components/use-dictation.ts",
+  "packages/tests/mobile-dictation.test.ts",
+  "packages/tests/components/mobile-dictation.test.mjs",
+  "packages/tests/mobile-attachments.test.ts",
+  "packages/tests/mobile-attachment-lifecycle.test.ts",
+  "packages/tests/components/mobile-attachment-lifecycle.test.mjs",
+  "packages/tests/mobile-conversation-scroll.test.ts",
+  "packages/tests/agent-attachments.test.ts",
+  "packages/tests/agent-events.test.ts",
+  "packages/tests/app-telemetry.test.ts",
+  "packages/tests/installer-download.test.ts",
+  "packages/tests/components/installer-download.test.mjs",
+  "packages/tests/flows/installer-download.e2e.ts",
+  "packages/tests/generator-service-origin.test.ts",
   "apps/mobile/src/app/_layout.tsx",
   "apps/mobile/src/app/settings.tsx",
   "apps/mobile/src/app/(authenticated)/apps",
@@ -48,6 +65,7 @@ const touched = [
   "apps/mobile/src/app/guide-detail.tsx",
   "packages/tests/flows/mobile.e2e.ts",
   "packages/tests/flows/mobile-management.e2e.ts",
+  "packages/tests/flows/mobile-chat.e2e.ts",
   "packages/tests/flows/connections-onboarding.e2e.ts",
   "packages/tests/connections-flow.test.ts",
   "packages/tests/configuration.test.ts",
@@ -133,6 +151,8 @@ const keep = new Set([
   "tsconfig.json",
   "users",
   "files",
+  "desktopUpdates",
+  "desktopUpdates.ts",
 ]);
 for (const entry of keep) await lstat(join(convex, entry));
 for (const path of [
@@ -188,11 +208,26 @@ for (const entry of await readdir(convex)) {
     await rm(join(convex, entry), { recursive: true, force: true });
 }
 for (const path of [
+  "packages/tests/generator-service-origin.test.ts",
+  "packages/tests/mobile-attachment-lifecycle.test.ts",
+  "packages/tests/components/mobile-attachment-lifecycle.test.mjs",
+  "packages/disposabl-kit/mobile/components/use-dictation.ts",
+  "packages/tests/mobile-dictation.test.ts",
+  "packages/tests/components/mobile-dictation.test.mjs",
+  "packages/tests/mobile-attachments.test.ts",
+  "packages/tests/mobile-conversation-scroll.test.ts",
+  "packages/tests/agent-attachments.test.ts",
+  "packages/tests/agent-events.test.ts",
+  "packages/tests/app-telemetry.test.ts",
+  "packages/tests/installer-download.test.ts",
+  "packages/tests/components/installer-download.test.mjs",
+  "packages/tests/flows/installer-download.e2e.ts",
   "packages/backend/generated",
   "packages/sdk/src/generated",
   "packages/create-disposabl-app",
   ".github/workflows/publish.yml",
   "apps/web/src/router/_authenticated/dashboard.connections.tsx",
+  "apps/web/src/router/mobile-login.tsx",
   "apps/mobile/src/app/(authenticated)/apps",
   "apps/mobile/src/features/management",
   "apps/mobile/src/features/studio",
@@ -202,6 +237,7 @@ for (const path of [
   "apps/mobile/src/app/example.tsx",
   "apps/mobile/src/app/guide-detail.tsx",
   "packages/tests/flows/mobile-management.e2e.ts",
+  "packages/tests/flows/mobile-chat.e2e.ts",
   "packages/tests/flows/connections-onboarding.e2e.ts",
   "packages/tests/connections-flow.test.ts",
   "packages/tests/configuration.test.ts",
@@ -253,7 +289,28 @@ lock.workspaces["packages/backend"] = {
   devDependencies: backend.devDependencies,
 };
 delete turbo.tasks["create-disposabl-app#build"];
+// Chat capture and rendering belong to the Disposabl product.
+const mobile = await json("apps/mobile/package.json");
+const mobileConfig = await json("apps/mobile/app.json");
+const kit = await json("packages/disposabl-kit/package.json");
+const chatPackages = [
+  "expo-image-picker",
+  "expo-document-picker",
+  "expo-file-system",
+  "expo-speech-recognition",
+  "react-native-enriched-markdown",
+];
+for (const name of chatPackages) delete mobile.dependencies[name];
+delete kit.peerDependencies["expo-speech-recognition"];
+delete kit.peerDependenciesMeta["expo-speech-recognition"];
+mobileConfig.expo.plugins = mobileConfig.expo.plugins.filter(
+  (plugin: string | [string, unknown]) =>
+    !chatPackages.includes(typeof plugin === "string" ? plugin : plugin[0]),
+);
 for (const [path, value] of [
+  ["apps/mobile/package.json", mobile],
+  ["apps/mobile/app.json", mobileConfig],
+  ["packages/disposabl-kit/package.json", kit],
   [backendPath, backend],
   ["bun.lock", lock],
   ["turbo.json", turbo],

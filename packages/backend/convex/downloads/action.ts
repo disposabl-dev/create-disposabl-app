@@ -20,6 +20,9 @@ type Candidate = {
   artifactUrl: string;
   runId: number;
   attempt: number;
+  commitSha: string;
+  preview: boolean;
+  artifactId?: number;
 };
 type Release = {
   html_url: string;
@@ -35,7 +38,12 @@ type Release = {
 };
 
 export const resolve = internalAction({
-  args: { appId: v.string(), platform: v.string() },
+  args: {
+    appId: v.string(),
+    platform: v.string(),
+    userId: v.optional(v.string()),
+    reference: v.optional(v.string()),
+  },
   returns: v.union(v.string(), v.null()),
   handler: async (ctx, args): Promise<string | null> => {
     if (
@@ -67,8 +75,10 @@ export const resolve = internalAction({
       return null;
     }
     if (
-      tag !==
-      `app-production-${args.platform}-${candidate.runId}-${candidate.attempt}`
+      candidate.preview
+        ? !new RegExp(`^app-pr-[1-9][0-9]*-${args.platform}$`).test(tag)
+        : tag !==
+          `app-production-${args.platform}-${candidate.runId}-${candidate.attempt}`
     )
       return null;
     const token = await githubToken(
@@ -84,7 +94,7 @@ export const resolve = internalAction({
     if (
       release.html_url !== candidate.releaseUrl ||
       release.draft !== false ||
-      release.prerelease !== false ||
+      release.prerelease !== candidate.preview ||
       !release.published_at ||
       !Array.isArray(release.assets)
     )
@@ -92,12 +102,25 @@ export const resolve = internalAction({
     const asset = release.assets.find(
       (a) =>
         a.browser_download_url === candidate.artifactUrl &&
+        (!candidate.preview || a.id === candidate.artifactId) &&
         a.state === "uploaded" &&
         suffixes[args.platform]?.some((s) => a.name.endsWith(s)) &&
         Number.isSafeInteger(a.id) &&
         a.id > 0,
     );
     if (!asset) return null;
+    // PR tags are reused. Reject an asset from a newer publication until its
+    // matching workflow result has reached the selected preview record.
+    if (candidate.preview) {
+      const ref = await githubRequest<{
+        object: { type: string; sha: string };
+      }>(token, `/repos/${repository}/git/ref/tags/${encodeURIComponent(tag)}`);
+      if (
+        ref.object.type !== "commit" ||
+        ref.object.sha !== candidate.commitSha
+      )
+        return null;
+    }
     const response = await fetch(
       `https://api.github.com/repos/${repository}/releases/assets/${asset.id}`,
       {
@@ -110,7 +133,10 @@ export const resolve = internalAction({
         signal: AbortSignal.timeout(30_000),
       },
     );
-    if (response.status !== 302) return null;
+    if (response.status !== 302) {
+      await response.body?.cancel();
+      return null;
+    }
     const location = response.headers.get("location");
     if (!location) return null;
     const url = new URL(location);

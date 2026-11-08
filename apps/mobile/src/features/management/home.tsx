@@ -1,4 +1,5 @@
 import { useConvexAuth, useMutation } from "convex/react";
+import { ConvexError } from "convex/values";
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { ActivityIndicator, Text, View } from "react-native";
@@ -13,6 +14,8 @@ import { useTheme } from "../../../../../packages/disposabl-kit/mobile/design/us
 import { ConnectionGate } from "../studio/connections";
 import { examples } from "../studio/data";
 import { MessageComposer } from "../studio/message-composer";
+import { useAttachments } from "../studio/attachments";
+import { attachmentIds } from "../studio/attachment-policy";
 import { Action, Screen, Label, Touch } from "../studio/ui";
 import { ErrorBoundary } from "./ui";
 
@@ -37,7 +40,7 @@ function ComposeEntry() {
     return <ActivityIndicator accessibilityLabel="Loading session" />;
   if (!isAuthenticated)
     return (
-      <View style={{ gap: 24 }}>
+      <View className="gap-[24px]">
         <Label variant="title">Let’s make your idea real.</Label>
         <Label>Sign in to create an app in your own accounts.</Label>
         <Action
@@ -63,6 +66,17 @@ function ComposeEntry() {
 }
 
 function Composer() {
+  const {
+    attachments,
+    beginSend,
+    markSent,
+    sendFailed,
+    isActive,
+    pick,
+    retry,
+    remove,
+    busy: attachmentsBusy,
+  } = useAttachments();
   const { exampleSlug } = useLocalSearchParams<{ exampleSlug?: string }>();
   const example = examples.find((app) => app.slug === exampleSlug);
   const [prompt, setPrompt] = useState(example?.prompt ?? "");
@@ -73,41 +87,53 @@ function Composer() {
   const [error, setError] = useState("");
   const send = useMutation(api.agent.index.sendMessage);
   const c = useTheme();
-  async function submit() {
-    if (!prompt.trim() || busy) return;
+  async function submit(text: string) {
+    const fileIds = attachmentIds(attachments);
+    if (!text.trim() || busy || attachmentsBusy || !fileIds) return;
+    if (!beginSend(fileIds)) return;
     setBusy(true);
     setError("");
     try {
       const result = await send({
-        prompt: prompt.trim(),
+        prompt: text.trim(),
+        ...(fileIds.length ? { fileIds } : {}),
         platforms: resolvePlatforms(selected),
         features: ["authentication"],
       });
+      markSent(fileIds);
+      if (!isActive()) return;
       router.replace({
         pathname: "/(authenticated)/apps/[appId]",
         params: { appId: result.appId },
       });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not send your idea.");
+      sendFailed(fileIds, e instanceof ConvexError);
+      if (isActive())
+        setError(e instanceof Error ? e.message : "Could not send your idea.");
     } finally {
-      setBusy(false);
+      if (isActive()) setBusy(false);
     }
   }
   return (
-    <View style={{ gap: 28 }}>
+    <View className="gap-[28px]">
       <Label variant="display">What will you build?</Label>
       <Label color={c.mutedForeground}>
         A thought, a tool, a little corner of the internet.
       </Label>
       <MessageComposer
+        attachments={attachments}
+        onPickAttachment={(source) => void pick(source)}
+        onRemoveAttachment={(index) => void remove(attachments[index])}
+        onRetryAttachment={(index) => void retry(attachments[index])}
+        attachmentsBusy={attachmentsBusy}
         value={prompt}
         onChange={setPrompt}
-        onSend={() => void submit()}
+        onSend={(text) => void submit(text)}
         disabled={busy}
         sending={busy}
       />
       <Label variant="heading">Make it available on</Label>
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
+      <View className="flex-row flex-wrap gap-[10px]">
         {platforms.map((platform) => (
           <Touch
             key={platform.id}
@@ -121,22 +147,10 @@ function Composer() {
                   : [...current, platform.id],
               );
             }}
-            style={{
-              borderRadius: 24,
-              paddingHorizontal: 18,
-              paddingVertical: 14,
-              backgroundColor: selected.includes(platform.id)
-                ? c.foreground
-                : c.card,
-            }}
+            className={`rounded-[24px] px-[18px] py-[14px] ${selected.includes(platform.id) ? "bg-foreground" : "bg-card"}`}
           >
             <Text
-              style={{
-                fontSize: 15,
-                color: selected.includes(platform.id)
-                  ? c.background
-                  : c.foreground,
-              }}
+              className={`text-[15px] ${selected.includes(platform.id) ? "text-background" : "text-foreground"}`}
             >
               {platform.label}
             </Text>
@@ -147,7 +161,7 @@ function Composer() {
         Every app includes a website for essentials and access.
       </Label>
       {!!error && (
-        <Text accessibilityRole="alert" style={{ color: c.destructive }}>
+        <Text accessibilityRole="alert" className="text-destructive">
           {error}
         </Text>
       )}

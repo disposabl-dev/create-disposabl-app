@@ -13,13 +13,14 @@ import {
   PreferenceCard,
   PreferenceRow,
   PreferenceSection,
-  usePreferenceColors,
 } from "../design/preferences";
 import { ThemedText } from "../design/themed-text";
 import { api } from "../lib/convex";
-import { authenticationEnabled, paymentsEnabled } from "../../features";
+import * as features from "../../features";
+// payments:start
 import { AccountBilling } from "../billing/account-billing";
 import { billingSession } from "../billing/session";
+// payments:end
 
 type AccountScreenProps = {
   accountRows?: ReactNode;
@@ -37,7 +38,7 @@ async function copyEmail(email: string) {
 
 /** Preferences are public. Only account content requires an authenticated provider. */
 export function AccountScreen(props: AccountScreenProps) {
-  return authenticationEnabled ? (
+  return features.authenticationEnabled ? (
     <SessionSettings {...props} />
   ) : (
     <GuestSettings {...props} />
@@ -60,7 +61,7 @@ function GuestSettings({
 }: AccountScreenProps & { loading?: boolean }) {
   return (
     <SettingsPage>
-      {authenticationEnabled && (
+      {features.authenticationEnabled && (
         <PreferenceSection title="Account">
           <PreferenceRow
             icon={{ ios: "person.crop.circle", android: "account_circle" }}
@@ -90,25 +91,30 @@ function SignedInSettings({
   footer,
   onCopyEmail = copyEmail,
 }: AccountScreenProps) {
-  const colors = usePreferenceColors();
   const { isAuthenticated } = useConvexAuth();
   const user = useQuery(api.users.index.current, isAuthenticated ? {} : "skip");
   const account = useQuery(api.auth.account, isAuthenticated ? {} : "skip");
   const { signOut } = useAuthActions();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // payments:start
   const [billingEpoch, setBillingEpoch] = useState(0);
+  // payments:end
 
   async function logOut() {
     if (pending) return;
+    // payments:start
     billingSession.select(null);
+    // payments:end
     setPending(true);
     setError(null);
     try {
       await signOut();
       router.dismissTo("/");
     } catch {
+      // payments:start
       setBillingEpoch((value) => value + 1);
+      // payments:end
       setError("Couldn't clear your session. Please try logging out again.");
     } finally {
       setPending(false);
@@ -146,9 +152,10 @@ function SignedInSettings({
           />
         </PreferenceSection>
       )}
-      {isAuthenticated && user && paymentsEnabled && !pending && (
+      {/* payments:start */}
+      {isAuthenticated && user && features.paymentsEnabled && !pending && (
         <PreferenceSection title="Billing">
-          <View style={{ padding: 20 }}>
+          <View className="p-[20px]">
             <AccountBilling
               key={`${user.id}:${billingEpoch}`}
               customerId={user.id}
@@ -156,6 +163,7 @@ function SignedInSettings({
           </View>
         </PreferenceSection>
       )}
+      {/* payments:end */}
       <View className="mt-7">
         <PreferenceCard>
           <PreferenceRow
@@ -173,8 +181,7 @@ function SignedInSettings({
       {error && (
         <ThemedText
           accessibilityRole="alert"
-          className="mt-3"
-          style={{ color: colors.destructive }}
+          className="mt-3 text-[#dc2626] dark:text-[#f87171]"
         >
           {error}
         </ThemedText>
@@ -187,12 +194,8 @@ function SignedInSettings({
 }
 
 function Version() {
-  const colors = usePreferenceColors();
   return Constants.expoConfig?.version ? (
-    <ThemedText
-      className="mt-7 text-center"
-      style={{ color: colors.secondary, fontSize: 13 }}
-    >
+    <ThemedText className="mt-7 text-center text-[#71717a] dark:text-[#a1a1aa] text-[13px]">
       Version {Constants.expoConfig.version}
     </ThemedText>
   ) : null;

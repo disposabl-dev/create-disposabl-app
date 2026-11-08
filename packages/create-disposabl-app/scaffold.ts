@@ -9,6 +9,8 @@ import {
 } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { basename, join } from "node:path";
+import { randomUUID } from "node:crypto";
+import { omitMobilePayments } from "./mobile-payments";
 import {
   selectedFolders,
   selectFeatures,
@@ -25,6 +27,7 @@ export async function createApp(
 ) {
   config = {
     ...config,
+    desktopId: config.desktopId ?? randomUUID().replaceAll("-", ""),
     platforms: selectPlatforms(config.platforms.join(",")),
     features: selectFeatures(config.features.join(",") || "none"),
   };
@@ -75,11 +78,22 @@ export async function createApp(
           force: true,
         });
     }
+    const tests = join(destination, "packages/tests");
+    for (const entry of await readdir(tests)) {
+      if (
+        (!folders.includes("apps/desktop") &&
+          /^desktop-.*\.test\.ts$/.test(entry)) ||
+        (!folders.includes("apps/mobile") &&
+          /^(mobile-.*|native-billing|ios-ota)\.test\.ts$/.test(entry))
+      )
+        await rm(join(tests, entry));
+    }
     if (!config.features.includes("authentication")) {
       // These are auth screens and starter examples, not backend capabilities.
       for (const path of [
         "packages/disposabl-kit/client/routes/_auth-pages",
         "packages/disposabl-kit/client/routes/consent.tsx",
+        "packages/disposabl-kit/client/routes/_authenticated/change-password.tsx",
         "apps/web/src/router/_authenticated/dashboard.api-keys.tsx",
         "apps/mobile/src/app/(auth)",
       ]) {
@@ -101,6 +115,8 @@ export const Route = createFileRoute("/_providers/_authenticated/dashboard")({
         );
       }
     }
+    if (!config.features.includes("payments"))
+      await omitMobilePayments(destination);
     if (!config.features.includes("docs")) {
       const webPackage = join(destination, "apps/web/package.json");
       const web = JSON.parse(await readFile(webPackage, "utf8"));
@@ -212,9 +228,25 @@ main().catch((error) => {
     if (folders.includes("apps/desktop")) {
       const desktopPath = join(destination, "apps/desktop/package.json");
       const desktop = JSON.parse(await readFile(desktopPath, "utf8"));
+      if (!/^[a-f0-9]{32}$/.test(config.desktopId!))
+        throw new Error("Invalid desktop identity.");
+      desktop.name = `disposabl-desktop-${config.desktopId}`;
+      desktop.disposablDesktopId = config.desktopId;
       desktop.productName = name;
       desktop.description = `${name} desktop app`;
       await writeFile(desktopPath, JSON.stringify(desktop, null, 2) + "\n");
+      const lockPath = join(destination, "bun.lock");
+      let lock = await readFile(lockPath, "utf8");
+      lock = lock
+        .replace(
+          '"apps/desktop": {\n      "name": "desktop"',
+          `"apps/desktop": {\n      "name": "${desktop.name}"`,
+        )
+        .replace(
+          '"desktop": ["desktop@workspace:apps/desktop"]',
+          `"${desktop.name}": ["${desktop.name}@workspace:apps/desktop"]`,
+        );
+      await writeFile(lockPath, lock);
     }
     if (folders.includes("apps/mobile")) {
       const appConfigPath = join(destination, "apps/mobile/app.json");

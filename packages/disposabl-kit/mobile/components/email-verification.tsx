@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { Text, TextInput } from "react-native";
 import { api } from "../lib/convex";
 import { authErrorMessage } from "../../lib/auth-errors";
-import { AuthButton, useAuthStyles } from "./auth-ui";
+import { AuthButton, authClasses } from "./auth-ui";
 
 export function emailLinkCode(link: string): string {
   try {
@@ -20,18 +20,17 @@ export function EmailLinkInput({
 }: {
   onContinue: (code: string) => void;
 }) {
-  const styles = useAuthStyles();
   const [link, setLink] = useState("");
   return (
     <>
-      <Text style={styles.body}>
+      <Text className={authClasses.body}>
         Copy the link from your email and paste it here. Finish in this app on
         the same device.
       </Text>
       <TextInput
         accessibilityLabel="Email verification link"
         placeholder="Paste email link"
-        style={styles.input}
+        className={authClasses.input}
         value={link}
         onChangeText={setLink}
         autoCapitalize="none"
@@ -56,7 +55,6 @@ export function EmailVerification() {
 }
 
 function CompleteVerification({ code }: { code: string }) {
-  const styles = useAuthStyles();
   const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
   const state = useCompleteSignUp(api.authEmail, { emailCode: code });
   useEffect(() => {
@@ -65,7 +63,9 @@ function CompleteVerification({ code }: { code: string }) {
   return (
     <Text
       accessibilityRole={state.status === "error" ? "alert" : undefined}
-      style={state.status === "error" ? styles.error : styles.body}
+      className={
+        state.status === "error" ? authClasses.error : authClasses.body
+      }
     >
       {state.status === "error"
         ? authErrorMessage(state.userError)

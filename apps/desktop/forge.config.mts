@@ -2,22 +2,27 @@ import { resolve } from 'node:path';
 import manifest from './package.json' with { type: 'json' };
 import type { ForgeConfig } from '@electron-forge/shared-types';
 import { MakerSquirrel } from '@electron-forge/maker-squirrel';
+import { MakerZIP } from '@electron-forge/maker-zip';
 import { MakerDMG } from '@electron-forge/maker-dmg';
 import { MakerDeb } from '@electron-forge/maker-deb';
 import { MakerRpm } from '@electron-forge/maker-rpm';
 import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
+import { desktopAuthScheme } from '../../packages/disposabl-kit/lib/desktop-auth';
 
-const executableName = manifest.productName
-  .toLowerCase()
-  .replace(/[^a-z0-9-]/g, '-');
+const executableName = manifest.name.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+const authScheme = desktopAuthScheme(
+  'disposablDesktopId' in manifest ? manifest.disposablDesktopId : null,
+);
+const mimeType = authScheme ? [`x-scheme-handler/${authScheme}`] : [];
 
 // specTemplate is supported by electron-installer-redhat but absent from Forge's types.
 const rpmOptions = {
   name: executableName,
   bin: executableName,
   specTemplate: resolve('rpm.spec.ejs'),
+  mimeType,
 };
 
 const signedRelease =
@@ -26,7 +31,9 @@ if (
   signedRelease &&
   (!process.env.APPLE_API_KEY ||
     !process.env.APPLE_API_KEY_ID ||
-    !process.env.APPLE_API_ISSUER)
+    !process.env.APPLE_API_ISSUER ||
+    !process.env.MACOS_SIGNING_IDENTITY ||
+    !process.env.MACOS_KEYCHAIN)
 )
   throw new Error('macOS releases require Apple notarization credentials');
 
@@ -34,12 +41,22 @@ const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
     executableName,
+    ...(authScheme
+      ? { protocols: [{ name: manifest.productName, schemes: [authScheme] }] }
+      : {}),
     icon: 'src/assets/icon',
-    appBundleId: process.env.MACOS_BUNDLE_ID || 'dev.disposabl.starter.desktop',
+    appBundleId:
+      process.env.MACOS_BUNDLE_ID ||
+      ('disposablDesktopId' in manifest
+        ? `dev.disposabl.app.d${manifest.disposablDesktopId}`
+        : 'dev.disposabl.starter.desktop'),
     ...(process.platform === 'darwin'
       ? {
           osxSign: signedRelease
-            ? {}
+            ? {
+                identity: process.env.MACOS_SIGNING_IDENTITY!,
+                keychain: process.env.MACOS_KEYCHAIN!,
+              }
             : {
                 identity: '-',
                 identityValidation: false,
@@ -79,9 +96,12 @@ const config: ForgeConfig = {
   },
   makers: [
     new MakerSquirrel({ setupIcon: 'src/assets/icon.ico' }),
+    new MakerZIP({}, ['darwin']),
     new MakerDMG({ format: 'ULFO' }),
     new MakerRpm({ options: rpmOptions }),
-    new MakerDeb({ options: { name: executableName, bin: executableName } }),
+    new MakerDeb({
+      options: { name: executableName, bin: executableName, mimeType },
+    }),
   ],
   plugins: [
     new VitePlugin({

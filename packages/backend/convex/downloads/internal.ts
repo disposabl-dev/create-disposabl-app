@@ -2,7 +2,12 @@ import { v } from "convex/values";
 import { internalQuery } from "@disposabl/disposabl-kit/server/lib/functions";
 
 export const candidate = internalQuery({
-  args: { appId: v.string(), platform: v.string() },
+  args: {
+    appId: v.string(),
+    platform: v.string(),
+    userId: v.optional(v.string()),
+    reference: v.optional(v.string()),
+  },
   returns: v.union(
     v.null(),
     v.object({
@@ -13,29 +18,47 @@ export const candidate = internalQuery({
       artifactUrl: v.string(),
       runId: v.number(),
       attempt: v.number(),
+      commitSha: v.string(),
+      preview: v.boolean(),
+      artifactId: v.optional(v.number()),
     }),
   ),
-  handler: async (ctx, { appId, platform }) => {
+  handler: async (ctx, { appId, platform, userId, reference }) => {
+    // Only the authenticated action supplies userId. Public HTTP downloads
+    // always omit both fields and remain restricted to production releases.
+    if (reference !== undefined && (!userId || !reference.trim())) return null;
     const app = await ctx.db
       .query("apps")
       .withIndex("by_appId", (q) => q.eq("appId", appId))
       .unique();
     if (
       !app?.githubOwner ||
+      (userId !== undefined && app.userId !== userId) ||
       !app.githubRepo ||
       app.operation?.kind === "delete" ||
       !app.platforms.some((p) => p === platform)
     )
       return null;
-    const release = await ctx.db
-      .query("appReleases")
-      .withIndex("by_appId", (q) => q.eq("appId", appId))
-      .unique();
+    const release =
+      reference !== undefined
+        ? await ctx.db
+            .query("previews")
+            .withIndex("by_appId_reference", (q) =>
+              q.eq("appId", appId).eq("reference", reference),
+            )
+            .unique()
+        : await ctx.db
+            .query("appReleases")
+            .withIndex("by_appId", (q) => q.eq("appId", appId))
+            .unique();
     const latest = release?.releases[platform];
     if (
       latest?.status !== "ready" ||
       !latest.githubReleaseUrl ||
-      !latest.artifactUrl
+      !latest.artifactUrl ||
+      (reference !== undefined &&
+        (!Number.isSafeInteger(latest.artifactId) ||
+          (latest.artifactId ?? 0) <= 0))
     )
       return null;
     const connection = await ctx.db
@@ -53,6 +76,11 @@ export const candidate = internalQuery({
       artifactUrl: latest.artifactUrl,
       runId: latest.run.id,
       attempt: latest.run.attempt,
+      commitSha: latest.run.commitSha,
+      preview: reference !== undefined,
+      ...(latest.artifactId !== undefined
+        ? { artifactId: latest.artifactId }
+        : {}),
     };
   },
 });

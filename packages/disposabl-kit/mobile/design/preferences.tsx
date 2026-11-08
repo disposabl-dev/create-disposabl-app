@@ -1,9 +1,10 @@
+import { VariableContextProvider } from "nativewind";
 import {
-  GlassView,
   isGlassEffectAPIAvailable,
   isLiquidGlassAvailable,
 } from "expo-glass-effect";
-import { SymbolView, type SymbolViewProps } from "expo-symbols";
+import type { SymbolViewProps } from "expo-symbols";
+import { GlassView, SymbolView } from "./nativewind";
 import type { ReactNode } from "react";
 import { Platform, Pressable, View } from "react-native";
 import { useResolvedColorScheme } from "./theme-provider";
@@ -29,13 +30,9 @@ export function PreferenceSection({
   title: string;
   children: ReactNode;
 }) {
-  const colors = usePreferenceColors();
   return (
     <View className="mt-7">
-      <ThemedText
-        className="mb-3 ml-4"
-        style={{ color: colors.secondary, fontSize: 19, fontWeight: "600" }}
-      >
+      <ThemedText className="mb-3 ml-4 text-[#71717a] dark:text-[#a1a1aa] text-[19px] font-semibold">
         {title}
       </ThemedText>
       <PreferenceCard>{children}</PreferenceCard>
@@ -44,25 +41,15 @@ export function PreferenceSection({
 }
 
 export function PreferenceCard({ children }: { children: ReactNode }) {
-  const colors = usePreferenceColors();
   return (
-    <View
-      className="overflow-hidden rounded-[24px]"
-      style={{ backgroundColor: colors.card }}
-    >
+    <View className="overflow-hidden rounded-[24px] bg-[#ffffff] dark:bg-[#18181b]">
       {children}
     </View>
   );
 }
 
 export function PreferenceSeparator() {
-  const colors = usePreferenceColors();
-  return (
-    <View
-      className="ml-[58px] h-px"
-      style={{ backgroundColor: colors.separator }}
-    />
-  );
+  return <View className="ml-[58px] h-px bg-[#e4e4e7] dark:bg-[#27272a]" />;
 }
 
 export function PreferenceIcon({
@@ -124,14 +111,15 @@ export function PreferenceRow({
   const content = (
     <>
       <SymbolView name={icon} size={23} tintColor={color} />
-      <ThemedText className="ml-4 flex-1" style={{ fontSize: 17, color }}>
+      <ThemedText
+        className={`ml-4 flex-1 text-[17px] ${destructive ? "text-[#dc2626] dark:text-[#f87171]" : "text-[#18181b] dark:text-[#fafafa]"}`}
+      >
         {label}
       </ThemedText>
       {value ? (
         <ThemedText
-          className="ml-3 max-w-[48%] text-right"
+          className="ml-3 max-w-[48%] text-right text-[16px] text-[#71717a] dark:text-[#a1a1aa]"
           numberOfLines={1}
-          style={{ fontSize: 16, color: colors.secondary }}
         >
           {value}
         </ThemedText>
@@ -142,29 +130,30 @@ export function PreferenceRow({
             name={{ ios: "chevron.right", android: "chevron_right" }}
             size={13}
             tintColor={colors.secondary}
-            style={{ marginLeft: 8 }}
+            className="ml-[8px]"
           />
         ) : null)}
     </>
   );
   return onPress ? (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      disabled={disabled}
-      onPress={onPress}
-      style={{ width }}
-      className="min-h-[60px] flex-row items-center px-5 py-3 active:opacity-60 disabled:opacity-50"
-    >
-      {content}
-    </Pressable>
+    <VariableContextProvider value={{ "--layout-width": width ?? "auto" }}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        disabled={disabled}
+        onPress={onPress}
+
+        className="min-h-[60px] flex-row items-center px-5 py-3 active:opacity-60 disabled:opacity-50 w-[var(--layout-width)]"
+      >
+        {content}
+      </Pressable>
+    </VariableContextProvider>
   ) : (
-    <View
-      style={{ width }}
-      className="min-h-[60px] flex-row items-center px-5 py-3"
-    >
-      {content}
-    </View>
+    <VariableContextProvider value={{ "--layout-width": width ?? "auto" }}>
+      <View className="min-h-[60px] flex-row items-center px-5 py-3 w-[var(--layout-width)]">
+        {content}
+      </View>
+    </VariableContextProvider>
   );
 }
 
@@ -207,25 +196,12 @@ export function GlassIconButton({
           isInteractive
           colorScheme={colors.dark ? "dark" : "light"}
           glassEffectStyle="regular"
-          style={{
-            width: 48,
-            height: 48,
-            borderRadius: 24,
-            alignItems: "center",
-            justifyContent: "center",
-          }}
+          className="size-[48px] items-center justify-center rounded-[24px]"
         >
           {symbol}
         </GlassView>
       ) : (
-        <View
-          className="h-12 w-12 items-center justify-center rounded-full"
-          style={{
-            backgroundColor: colors.card,
-            borderWidth: 1,
-            borderColor: colors.separator,
-          }}
-        >
+        <View className="h-12 w-12 items-center justify-center rounded-full bg-[#ffffff] dark:bg-[#18181b] border-[1px] border-[#e4e4e7] dark:border-[#27272a]">
           {symbol}
         </View>
       )}

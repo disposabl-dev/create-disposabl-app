@@ -25,7 +25,8 @@
     "build": "bun build.ts",
     "typecheck": "bun check",
     "lint": "cd ../.. && eslint --config packages/create-disposabl-app/eslint.config.ts packages/create-disposabl-app reset.ts",
-    "format": "bun fmt"
+    "format": "bun fmt",
+    "verify:starter": "bun ../tests/starter-ci.ts"
   },
   "publishConfig": {
     "access": "public"

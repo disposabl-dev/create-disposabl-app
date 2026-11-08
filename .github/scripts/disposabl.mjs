@@ -1,11 +1,25 @@
 import { appendFile, readFile } from "node:fs/promises";
 
-const origin = "https://www.disposabl.dev";
 const config = JSON.parse(
   await readFile(new URL("../../disposabl.json", import.meta.url), "utf8"),
 );
 const [command, platform, status, detail] = process.argv.slice(2);
 if (config.appId) {
+  if (!config.serviceOrigin)
+    throw new Error("Run Disposabl setup to save this app's service origin.");
+  const service = new URL(config.serviceOrigin);
+  if (
+    service.protocol !== "https:" ||
+    service.username ||
+    service.password ||
+    service.pathname !== "/" ||
+    service.search ||
+    service.hash
+  )
+    throw new Error(
+      "Workflow reporting requires an HTTPS Disposabl service origin.",
+    );
+  const origin = service.origin;
   const audience = new URL(process.env.ACTIONS_ID_TOKEN_REQUEST_URL);
   // The audience is an identity identifier, independent of the HTTP hostname.
   audience.searchParams.set("audience", "https://disposabl.dev");
@@ -87,11 +101,6 @@ if (config.appId) {
     if (!response.ok)
       throw new Error(`Cannot inspect release (${response.status}).`);
     const release = await response.json();
-    const updateOnly = /"action"\s*:\s*"update"/.test(release.body ?? "");
-    if (updateOnly) {
-      await call("/github/report", { platform, status: "ready" });
-      process.exit(0);
-    }
     const suffix = {
       android: ".apk",
       ios: ".ipa",

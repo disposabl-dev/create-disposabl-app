@@ -1,5 +1,6 @@
 import { openExpoDeletion } from "./delete";
-import { apiUrl, openUrl } from "./auth";
+import { openUrl } from "./auth";
+import { apiUrl, SERVICE_ORIGIN } from "./origin";
 import {
   createProgram,
   loadContract,
@@ -17,7 +18,7 @@ import {
   formatPreview,
 } from "./preview";
 
-export const SERVICE_ORIGIN = "https://www.disposabl.dev";
+export { SERVICE_ORIGIN } from "./origin";
 export async function runCli(
   argv = process.argv,
   serviceOrigin = process.env.DISPOSABL_API_ORIGIN || SERVICE_ORIGIN,

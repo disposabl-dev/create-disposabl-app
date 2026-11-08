@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Application API",
-    "version": "10.1.0"
+    "version": "12.0.0"
   },
   "security": [
     {
@@ -164,6 +164,12 @@
                         "kind": {
                           "const": "messages"
                         },
+                        "startedAt": {
+                          "type": "number"
+                        },
+                        "finishedAt": {
+                          "type": "number"
+                        },
                         "stopUnconfirmed": {
                           "type": "boolean"
                         },
@@ -201,6 +207,25 @@
                               },
                               "tools": {
                                 "type": "string"
+                              },
+                              "attachments": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "string"
+                                    },
+                                    "filename": {
+                                      "type": "string"
+                                    },
+                                    "mediaType": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": ["id", "filename", "mediaType"],
+                                  "additionalProperties": false
+                                }
                               }
                             },
                             "required": [
@@ -368,6 +393,13 @@
                   },
                   "appId": {
                     "type": "string"
+                  },
+                  "fileIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "description": "ID of a document in \"files\""
+                    }
                   },
                   "platforms": {
                     "type": "array",

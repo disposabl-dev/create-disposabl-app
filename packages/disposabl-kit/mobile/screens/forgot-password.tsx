@@ -8,11 +8,10 @@ import { useState } from "react";
 import { Text, TextInput } from "react-native";
 import { api } from "../lib/convex";
 import { authErrorMessage } from "../../lib/auth-errors";
-import { AuthButton, AuthScreen, useAuthStyles } from "../components/auth-ui";
+import { AuthButton, AuthScreen, authClasses } from "../components/auth-ui";
 import { EmailLinkInput } from "../components/email-verification";
 
 export function ForgotPasswordScreen() {
-  const styles = useAuthStyles();
   const providers = useQuery(api.auth.providers);
   const { startPasswordRecovery, pending } = useStartPasswordRecovery(
     api.authEmail,
@@ -23,11 +22,11 @@ export function ForgotPasswordScreen() {
   const [error, setError] = useState<string | null>(null);
   return (
     <AuthScreen>
-      <Text style={styles.title}>Reset password</Text>
+      <Text className={authClasses.title}>Reset password</Text>
       {!providers ? (
-        <Text style={styles.body}>Loading…</Text>
+        <Text className={authClasses.body}>Loading…</Text>
       ) : !providers.emailDelivery ? (
-        <Text style={styles.body}>
+        <Text className={authClasses.body}>
           Email recovery is not available. Username-only accounts need help from
           the app owner.
         </Text>
@@ -35,7 +34,7 @@ export function ForgotPasswordScreen() {
         <ResetPassword code={code} />
       ) : sent ? (
         <>
-          <Text style={styles.body}>
+          <Text className={authClasses.body}>
             If this email belongs to an account, a reset link will arrive
             shortly. It expires in 10 minutes.
           </Text>
@@ -43,12 +42,12 @@ export function ForgotPasswordScreen() {
         </>
       ) : (
         <>
-          <Text style={styles.body}>
+          <Text className={authClasses.body}>
             Enter the verified email for your account.
           </Text>
           <TextInput
             accessibilityLabel="Email"
-            style={styles.input}
+            className={authClasses.input}
             value={email}
             onChangeText={setEmail}
             autoCapitalize="none"
@@ -58,7 +57,7 @@ export function ForgotPasswordScreen() {
             editable={!pending}
           />
           {error && (
-            <Text accessibilityRole="alert" style={styles.error}>
+            <Text accessibilityRole="alert" className={authClasses.error}>
               {error}
             </Text>
           )}
@@ -79,7 +78,7 @@ export function ForgotPasswordScreen() {
           />
         </>
       )}
-      <Link href="/(auth)/login" style={styles.link}>
+      <Link href="/(auth)/login" className={authClasses.link}>
         Back to login
       </Link>
     </AuthScreen>
@@ -87,14 +86,17 @@ export function ForgotPasswordScreen() {
 }
 
 function ResetPassword({ code }: { code: string }) {
-  const styles = useAuthStyles();
   const state = useCompletePasswordRecovery(api.authEmail, { emailCode: code });
   const [password, setPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
   const [error, setError] = useState<string | null>(null);
   if (state.status !== "ready")
     return (
-      <Text style={state.status === "error" ? styles.error : styles.body}>
+      <Text
+        className={
+          state.status === "error" ? authClasses.error : authClasses.body
+        }
+      >
         {state.status === "error"
           ? authErrorMessage(state.userError)
           : state.status === "complete"
@@ -107,7 +109,7 @@ function ResetPassword({ code }: { code: string }) {
       <TextInput
         accessibilityLabel="New password"
         placeholder="New password"
-        style={styles.input}
+        className={authClasses.input}
         value={password}
         onChangeText={setPassword}
         secureTextEntry
@@ -119,7 +121,7 @@ function ResetPassword({ code }: { code: string }) {
       <TextInput
         accessibilityLabel="Confirm new password"
         placeholder="Confirm new password"
-        style={styles.input}
+        className={authClasses.input}
         value={confirmation}
         onChangeText={setConfirmation}
         secureTextEntry
@@ -129,7 +131,7 @@ function ResetPassword({ code }: { code: string }) {
         editable={!state.pending}
       />
       {error && (
-        <Text accessibilityRole="alert" style={styles.error}>
+        <Text accessibilityRole="alert" className={authClasses.error}>
           {error}
         </Text>
       )}

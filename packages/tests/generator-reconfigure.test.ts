@@ -21,6 +21,61 @@ if (!existsSync(template)) {
 const version = "test-version";
 const read = (dir: string, path: string) => readFile(join(dir, path), "utf8");
 
+test("native payments selection adds and removes the SDK without replacing custom dependencies", async () => {
+  const temp = await mkdtemp(join(tmpdir(), "payments-selection-"));
+  const app = join(temp, "app");
+  const manifestPath = "apps/mobile/package.json";
+  const billingPath =
+    "packages/disposabl-kit/mobile/billing/account-billing.tsx";
+  try {
+    await createApp(template, app, "billing-example", {
+      version,
+      platforms: ["web", "android"],
+      features: ["authentication"],
+    });
+    let manifest = JSON.parse(await read(app, manifestPath));
+    assert.equal(manifest.dependencies["react-native-purchases"], undefined);
+    assert.equal(existsSync(join(app, billingPath)), false);
+    assert.doesNotMatch(
+      await read(app, "packages/disposabl-kit/mobile/screens/account.tsx"),
+      /billingSession|AccountBilling/,
+    );
+    manifest.dependencies["custom-example"] = "1.2.3";
+    await writeFile(
+      join(app, manifestPath),
+      JSON.stringify(manifest, null, 2) + "\n",
+    );
+    for (const features of ["payments", "authentication", "payments"]) {
+      await reconfigureApp(template, app, version, { features });
+      manifest = JSON.parse(await read(app, manifestPath));
+      assert.equal(manifest.dependencies["custom-example"], "1.2.3");
+      assert.equal(
+        !!manifest.dependencies["react-native-purchases"],
+        features === "payments",
+      );
+      assert.equal(existsSync(join(app, billingPath)), features === "payments");
+    }
+    const config = await read(app, "disposabl.json");
+    const manifestBefore = await read(app, manifestPath);
+    await writeFile(
+      join(app, billingPath),
+      "// Custom billing implementation\n",
+    );
+    await assert.rejects(
+      reconfigureApp(template, app, version, { features: "authentication" }),
+      /customized/,
+    );
+    assert.equal(await read(app, "disposabl.json"), config);
+    assert.equal(await read(app, manifestPath), manifestBefore);
+    assert.equal(
+      await read(app, billingPath),
+      "// Custom billing implementation\n",
+    );
+  } finally {
+    await rm(temp, { recursive: true, force: true });
+  }
+});
+
 test(
   "reconfigures a generated app without losing user files",
   { timeout: 30000 },
@@ -181,6 +236,116 @@ test(
         /symlink/,
       );
       assert.equal(await read(app, "disposabl.json"), config);
+    } finally {
+      await rm(temp, { recursive: true, force: true });
+    }
+  },
+);
+
+test(
+  "desktop identities are unique and survive reconfiguration",
+  { timeout: 30000 },
+  async () => {
+    const temp = await mkdtemp(join(tmpdir(), "desktop-identity-"));
+    try {
+      const a = join(temp, "a"),
+        b = join(temp, "b");
+      const config = {
+        version,
+        platforms: ["web", "windows", "macos"] as const,
+        features: [],
+      };
+      await createApp(template, a, "same-name", {
+        ...config,
+        platforms: [...config.platforms],
+      });
+      await createApp(template, b, "same-name", {
+        ...config,
+        platforms: [...config.platforms],
+      });
+      const first = JSON.parse(await read(a, "disposabl.json"));
+      const second = JSON.parse(await read(b, "disposabl.json"));
+      const desktop = JSON.parse(await read(a, "apps/desktop/package.json"));
+      assert.match(first.desktopId, /^[a-f0-9]{32}$/);
+      assert.notEqual(first.desktopId, second.desktopId);
+      assert.equal(desktop.disposablDesktopId, first.desktopId);
+      assert.ok(
+        existsSync(join(a, "packages/backend/convex/desktopUpdates.ts")),
+      );
+      assert.match(
+        await read(a, "packages/backend/convex/schema.ts"),
+        /desktopUpdates: desktopUpdateTable/,
+      );
+      assert.match(
+        await read(a, "packages/backend/convex/http.ts"),
+        /desktopUpdate/,
+      );
+      const before = await read(b, "apps/desktop/package.json");
+      delete second.desktopId;
+      await writeFile(join(b, "disposabl.json"), JSON.stringify(second));
+      await assert.rejects(
+        reconfigureApp(template, b, version, { features: "authentication" }),
+        /no native identity/,
+      );
+      assert.equal(await read(b, "apps/desktop/package.json"), before);
+
+      assert.notEqual(
+        desktop.name,
+        JSON.parse(await read(b, "apps/desktop/package.json")).name,
+      );
+      assert.match(
+        await read(a, "bun.lock"),
+        new RegExp(`${desktop.name}@workspace:apps/desktop`),
+      );
+      await reconfigureApp(template, a, version, {
+        features: "authentication",
+      });
+      assert.equal(
+        JSON.parse(await read(a, "disposabl.json")).desktopId,
+        first.desktopId,
+      );
+      assert.equal(
+        JSON.parse(await read(a, "apps/desktop/package.json")).name,
+        desktop.name,
+      );
+      execFileSync(
+        "bun",
+        ["install", "--frozen-lockfile", "--filter", desktop.name],
+        { cwd: a, stdio: "pipe", timeout: 30000 },
+      );
+    } finally {
+      await rm(temp, { recursive: true, force: true });
+    }
+  },
+);
+
+test(
+  "enabling desktop later uses the original app identity",
+  { timeout: 30000 },
+  async () => {
+    const temp = await mkdtemp(join(tmpdir(), "desktop-later-"));
+    const app = join(temp, "app");
+    try {
+      await createApp(template, app, "later", {
+        version,
+        platforms: ["web"],
+        features: [],
+      });
+      const id = JSON.parse(await read(app, "disposabl.json")).desktopId;
+      await reconfigureApp(template, app, version, {
+        platforms: "web,windows",
+      });
+      const desktop = JSON.parse(await read(app, "apps/desktop/package.json"));
+      assert.equal(desktop.disposablDesktopId, id);
+      assert.match(
+        await read(app, "bun.lock"),
+        new RegExp(`${desktop.name}@workspace:apps/desktop`),
+      );
+      execFileSync(
+        "bun",
+        ["install", "--frozen-lockfile", "--filter", desktop.name],
+        { cwd: app, stdio: "pipe", timeout: 30000 },
+      );
     } finally {
       await rm(temp, { recursive: true, force: true });
     }

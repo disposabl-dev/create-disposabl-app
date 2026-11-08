@@ -33,7 +33,7 @@
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/packages/backend/convex/**"]
     },
     "@disposabl/disposabl-kit#typecheck": {
-      "dependsOn": ["^typecheck"],
+      "dependsOn": ["^typecheck", "@disposabl/web#generate:routes"],
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/packages/backend/convex/**"]
     },
     "create-disposabl-app#build": {
@@ -59,6 +59,14 @@
     "@disposabl/web#build": {
       "dependsOn": ["^build"],
       "cache": false
+    },
+    "@disposabl/web#generate:routes": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "!src/routeTree.gen.ts",
+        "$TURBO_ROOT$/packages/disposabl-kit/client/vite.config.ts"
+      ],
+      "outputs": ["src/routeTree.gen.ts"]
     }
   },
   "globalDependencies": ["disposabl.json"]

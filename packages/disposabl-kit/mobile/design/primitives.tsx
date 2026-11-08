@@ -1,4 +1,5 @@
-import { Host, Text as NativeText } from "@expo/ui";
+import { Host, GlassView } from "./nativewind";
+import { Text as NativeText } from "@expo/ui";
 import { fillMaxWidth } from "@expo/ui/jetpack-compose/modifiers";
 import {
   frame,
@@ -7,26 +8,18 @@ import {
 } from "@expo/ui/swift-ui/modifiers";
 import { NativeButton } from "./native-button";
 import { useTheme } from "./use-theme";
-import { useColorScheme } from "react-native";
 import {
-  GlassView,
-  isLiquidGlassAvailable,
-  isGlassEffectAPIAvailable,
-} from "expo-glass-effect";
-import {
+  useColorScheme,
   AccessibilityInfo,
   useWindowDimensions,
-  type StyleProp,
-  type ViewStyle,
   Pressable,
   View,
 } from "react-native";
 import {
-  useEffect,
-  useState,
-  type ComponentProps,
-  type ReactNode,
-} from "react";
+  isLiquidGlassAvailable,
+  isGlassEffectAPIAvailable,
+} from "expo-glass-effect";
+import { useEffect, useState, type ReactNode } from "react";
 
 export const space = {
   tiny: 4,
@@ -69,7 +62,7 @@ export function NativeLabel({
       pointerEvents="none"
       matchContents={inline ? true : { vertical: true }}
       colorScheme={scheme ?? "dark"}
-      style={inline ? undefined : { width: "100%" }}
+      className={inline ? undefined : "w-full"}
     >
       <NativeText
         modifiers={
@@ -114,20 +107,14 @@ export function NativeAction({
   const colors = useTheme();
   const scheme = useColorScheme();
   return (
-    <View
-      style={
-        compact
-          ? { alignSelf: "flex-start", maxWidth: "100%" }
-          : { width: "100%" }
-      }
-    >
+    <View className={compact ? "self-start max-w-[100%]" : "w-[100%]"}>
       <Host
         matchContents={compact ? true : { vertical: true }}
         colorScheme={scheme ?? "dark"}
         seedColor={
           process.env.EXPO_OS === "android" ? colors.primary : colors.foreground
         }
-        style={compact ? { minHeight: 48 } : { width: "100%", minHeight: 48 }}
+        className={compact ? "min-h-[48px]" : "min-h-[48px] w-full"}
       >
         <NativeButton
           label={label}
@@ -155,14 +142,13 @@ export function NativeAction({
 }
 export function GlassSurface({
   children,
-  style,
+  className,
   interactive = false,
 }: {
   children: ReactNode;
-  style?: ComponentProps<typeof View>["style"];
+  className?: string;
   interactive?: boolean;
 }) {
-  const colors = useTheme();
   const [solid, setSolid] = useState(true);
   useEffect(() => {
     let mounted = true;
@@ -184,17 +170,12 @@ export function GlassSurface({
     <GlassView
       glassEffectStyle="regular"
       isInteractive={interactive}
-      style={[{ borderRadius: shape.card }, style]}
+      className={className ?? "rounded-[28px]"}
     >
       {children}
     </GlassView>
   ) : (
-    <View
-      style={[
-        { backgroundColor: colors.card, borderRadius: shape.card },
-        style,
-      ]}
-    >
+    <View className={`bg-card ${className ?? "rounded-[28px]"}`}>
       {children}
     </View>
   );
@@ -204,13 +185,13 @@ export function Touch({
   onPress,
   label,
   selected,
-  style,
+  className,
 }: {
   children: ReactNode;
   onPress: () => void;
   label: string;
   selected?: boolean;
-  style?: StyleProp<ViewStyle>;
+  className?: string;
 }) {
   return (
     <Pressable
@@ -218,10 +199,7 @@ export function Touch({
       accessibilityLabel={label}
       accessibilityState={{ selected }}
       onPress={onPress}
-      style={({ pressed }) => [
-        { minHeight: 48, opacity: pressed ? 0.65 : 1 },
-        style,
-      ]}
+      className={`min-h-[48px] active:opacity-[0.65] ${className ?? ""}`}
     >
       {children}
     </Pressable>

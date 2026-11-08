@@ -46,9 +46,17 @@ Debug builds need Metro running with the current source. A release build embeds 
 
 The config evaluates `apps/mobile/app.config.js` to use the same bundle IDs and channel as the build. Match `DISPOSABL_MOBILE_CHANNEL` to the installed app. Override with `E2E_IOS_APP_ID` or `E2E_ANDROID_APP_ID` when testing a different artifact. Set `E2E_IOS_DEVICE` to a simulator name/UDID or `E2E_ANDROID_DEVICE` to an emulator serial to reserve a specific device. Keep each device under one owner's control.
 
+TesterArmy claims the device for its own session. Run automated flows before opening a Device panel or manual agent-device session, or release only your own manual session first. A manual session can block the test runner even when the same agent owns both. After the runner releases its claim, open the device for visual inspection. Never close another owner's session or take over an occupied device to make a test proceed.
+
 For a development client with several Metro servers running, set `E2E_MOBILE_DEV_URL` to this app's Metro URL and `E2E_MOBILE_DEV_SCHEME` to its unique installed URL scheme. The mobile flows explicitly connect after launch and restart. This prevents accidentally testing another server or backend. Release builds omit both variables.
 
+Verify that only the intended installed app registers that scheme. A scheme matching the bundle ID can still collide when another test build copied it. On iOS, inspect `CFBundleURLTypes` in the installed apps' `Info.plist` files. If the driver reports that the target is not running while Metro serves a bundle or shows a missing-native-module error, identify the receiving app before changing dependencies. Select a scheme registered only to the intended client, or rebuild it with a unique scheme; preserve other apps and their data.
+
+When supplying an isolated backend through Metro's shell environment, also set `EXPO_NO_DOTENV=1` and `EXPO_PUBLIC_E2E=true`. The Metro configuration excludes dotenv files in this mode: SDK 58's development environment module otherwise reloads `.env.local` after shell values. Set both `EXPO_PUBLIC_CONVEX_URL` and `EXPO_PUBLIC_CONVEX_SITE_URL` to the test backend, using the emulator's reachable host address. The test runner's `E2E_CONVEX_URL` and `E2E_CONVEX_SITE_URL` must address that same deployment from the host.
+
 ## CI
+
+Desktop navigation can be checked locally with `E2E_DESKTOP_NAVIGATION=1 bun run e2e run desktop-navigation.e2e.ts --target backend --retries 0`. This opt-in flow requires the desktop workspace, installed Electron binary, and a graphical session. It launches an isolated Electron instance against local fixture pages, intercepts browser launches, and checks the application's navigation and OAuth callback handling. No backend or provider calls are made. This is separate from real Google sign-in, installed protocol registration, and two-version native update verification.
 
 The same commands work in CI without model credentials. On Linux, install Chromium's system dependencies with `bun run --cwd packages/tests setup:browser`. Provision an isolated backend and deploy the current functions before testing. Set its URLs, then run `bun run test --target web,backend` and include `,api` when `disposabl.json` enables it.
 

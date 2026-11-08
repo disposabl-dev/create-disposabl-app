@@ -41,11 +41,13 @@ mock.module("expo-updates", () => ({
   fetchUpdateAsync: fetchUpdate,
   reloadAsync: reload,
 }));
+mock.module("nativewind", () => ({
+  VariableContextProvider: ({ children }) => children,
+}));
 mock.module("react-native", () => ({
   Alert: { alert: () => {} },
   AppState: app,
   Pressable: "Pressable",
-  StyleSheet: { create: (value) => value },
   Text: "Text",
   View: "View",
 }));

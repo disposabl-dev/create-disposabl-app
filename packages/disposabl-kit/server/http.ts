@@ -6,6 +6,7 @@ import { env } from "../../backend/convex/_generated/server";
 import modules from "../../backend/generated/platforms";
 import openapi from "../../backend/generated/openapi.json";
 import config from "../../../disposabl.json";
+import { authenticationEnabled } from "../features";
 import { validatePlatforms } from "../platforms";
 // docs:start
 import { registerDocsRoutes } from "./lib/docs";
@@ -19,6 +20,7 @@ import { registerPageRoutes } from "./lib/static";
 import { resend } from "../../backend/convex/emails";
 import { googleRelay } from "./google";
 import { mobileAuthPath, mobileAuthRedirect } from "../lib/mobile-auth";
+import { desktopAuthPath, desktopAuthRedirect } from "../lib/desktop-auth";
 
 export { tool } from "@convex-dev/mcp";
 export type { McpServerOptions, McpUser, ToolCtx } from "@convex-dev/mcp";
@@ -63,7 +65,22 @@ export const {
 
 export default function createHttpRouter(apiPolicy?: ApiPolicy) {
   const http = httpRouter();
-  if (config.features.includes("authentication")) {
+  if (authenticationEnabled) {
+    if (
+      enabled.some((platform) =>
+        ["macos", "windows", "linux"].includes(platform),
+      )
+    )
+      http.route({
+        path: desktopAuthPath,
+        method: "GET",
+        handler: httpActionGeneric(async (_ctx, request) =>
+          desktopAuthRedirect(
+            request,
+            "desktopId" in config ? config.desktopId : null,
+          ),
+        ),
+      });
     if (
       enabled.some((platform) => platform === "ios" || platform === "android")
     )

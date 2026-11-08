@@ -67,7 +67,7 @@ artifact=android.apk
 export artifact
 for ((page=1; ; page++)); do
   gh api "repos/$GH_REPO/releases?per_page=100&page=$page" > "$RUNNER_TEMP/releases.json"
-  jq --arg artifact "$artifact" --arg tag "$RELEASE_PREFIX-$CHANNEL-android" --arg legacy "$RELEASE_PREFIX-$CHANNEL" '[.[] | select(.draft | not) | select(.tag_name == $tag or .tag_name == $legacy or (.tag_name | startswith($legacy + "-"))) | select(any(.assets[]; .name == $artifact))] | sort_by(.tag_name != $tag, .tag_name != $legacy) | .[0] // {}' "$RUNNER_TEMP/releases.json" > "$RUNNER_TEMP/release.json"
+  jq --arg artifact "$artifact" --arg tag "$RELEASE_PREFIX-$CHANNEL-android" --arg channel "$CHANNEL" '[.[] | select(.draft | not) | select(.tag_name == $tag or ($channel == "production" and (.tag_name | startswith($tag + "-")) and (.tag_name | ltrimstr($tag + "-") | test("^[0-9]+-[0-9]+$")))) | select(any(.assets[]; .name == $artifact))] | sort_by(.tag_name != $tag) | .[0] // {}' "$RUNNER_TEMP/releases.json" > "$RUNNER_TEMP/release.json"
   if jq -e '.id' "$RUNNER_TEMP/release.json" > /dev/null || [[ $(jq length "$RUNNER_TEMP/releases.json") -lt 100 ]]; then break; fi
 done
 RUNTIME=$(bun x --no-install expo-updates runtimeversion:resolve --platform android --workflow managed | jq -er 'select(.fingerprintSources != null) | .runtimeVersion | select(test("^[a-f0-9]{40,64}$"))')
@@ -95,16 +95,20 @@ bun -e '
 artifact=android.apk
 mkdir -p dist/release
 gh release download "$TAG" --pattern "$artifact" --dir dist/release
-echo "$SHA  dist/release/$artifact" | sha256sum --check
+echo "$SHA  dist/release/$artifact" | sha256sum -c -
 cd apps/mobile
 MANIFEST=$(manifest)
 bun x --no-install expo export --platform android --output-dir dist/update
 test "$(bun x --no-install expo-updates runtimeversion:resolve --platform android --workflow managed | jq -er .runtimeVersion)" = "$RUNTIME"
 test "$(gh api "repos/$GH_REPO/$SOURCE_PATH" --jq 'if has("head") then (if .state == "open" then .head.sha else "closed" end) else .object.sha end')" = "$SOURCE"
 bun x "$EAS_CLI" update --platform android --channel "$CHANNEL" --environment "$EAS_ENVIRONMENT" --skip-bundler --input-dir dist/update --message "$SOURCE" --non-interactive
-jq --arg sha "$SHA" '. + {sha256: $sha, action: "update"}' <<< "$MANIFEST" > ../../dist/release/android.json
+jq --arg sha "$SHA" --arg tag "$TAG" '. + {sha256: $sha, action: "update", sourceTag: $tag}' <<< "$MANIFEST" > ../../dist/release/android.json
+# The trusted publisher retrieves this verified binary from its existing release.
+# Actions only needs the new OTA metadata, not another copy of the same APK.
+rm "../../dist/release/$artifact"
     ;;
   android-build)
+bash ../../.github/scripts/android-runner.sh check
 MANIFEST=$(manifest)
 test "$(gh api "repos/$GH_REPO/$SOURCE_PATH" --jq 'if has("head") then (if .state == "open" then .head.sha else "closed" end) else .object.sha end')" = "$SOURCE"
 if [[ "$CHANNEL" == production ]]; then
@@ -122,12 +126,11 @@ if [[ "$CHANNEL" == production ]]; then
 fi
 bun x --no-install expo prebuild --platform android --no-install
 test "$(bun x --no-install expo-updates runtimeversion:resolve --platform android --workflow managed | jq -er .runtimeVersion)" = "$RUNTIME"
-task=assembleRelease
 artifact=android.apk
 binary=android/app/build/outputs/apk/release/app-release.apk
 fingerprint=assets/fingerprint
 
-(cd android && ./gradlew ":app:$task" --no-daemon --build-cache)
+(cd android && bash ../../../.github/scripts/android-runner.sh build)
 test "$(unzip -p "$binary" "$fingerprint")" = "$RUNTIME"
 test "$(bun x --no-install expo-updates runtimeversion:resolve --platform android --workflow managed | jq -er .runtimeVersion)" = "$RUNTIME"
 mkdir -p ../../dist/release

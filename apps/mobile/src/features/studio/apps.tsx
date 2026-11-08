@@ -48,8 +48,8 @@ function OwnedApps() {
         data={results}
         keyExtractor={(app) => app.appId}
         contentInsetAdjustmentBehavior="automatic"
-        style={{ flex: 1, backgroundColor: c.background }}
-        contentContainerStyle={{ padding: 24, gap: 12, paddingBottom: 48 }}
+        className="flex-1 bg-background"
+        contentContainerClassName="p-[24px] gap-[12px] pb-[48px]"
         ListHeaderComponent={<Label variant="heading">Your apps</Label>}
         ListEmptyComponent={
           status === "LoadingFirstPage" ? (
@@ -76,17 +76,12 @@ function OwnedApps() {
                 params: { appId: item.appId },
               })
             }
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 16,
-              paddingVertical: 20,
-            }}
+            className="flex-row items-center gap-[16px] py-[20px]"
           >
             <View className="h-14 w-14 items-center justify-center rounded-2xl bg-muted">
               <Icon name="grid" />
             </View>
-            <View style={{ flex: 1, gap: 6 }}>
+            <View className="flex-1 gap-[6px]">
               <Label variant="heading">{item.name}</Label>
               <Label variant="caption" color={c.mutedForeground}>
                 {item.platforms.join(" · ")}

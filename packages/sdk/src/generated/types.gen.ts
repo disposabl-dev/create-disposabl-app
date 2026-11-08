@@ -89,6 +89,8 @@ export type AgentGetMessagesResponses = {
   200:
     | {
         kind: "messages";
+        startedAt?: number;
+        finishedAt?: number;
         stopUnconfirmed?: boolean;
         appId: string;
         threadId: string;
@@ -101,6 +103,11 @@ export type AgentGetMessagesResponses = {
           status: string;
           createdAt: number;
           tools?: string;
+          attachments?: Array<{
+            id: string;
+            filename: string;
+            mediaType: string;
+          }>;
         }>;
         continueCursor: string;
         isDone: boolean;
@@ -131,6 +138,7 @@ export type AgentSendMessageData = {
   body: {
     prompt: string;
     appId?: string;
+    fileIds?: Array<string>;
     platforms?: Array<
       | "web"
       | "android"

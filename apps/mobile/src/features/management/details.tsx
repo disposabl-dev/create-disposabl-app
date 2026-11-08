@@ -13,33 +13,39 @@ import { useState } from "react";
 import { Linking, Pressable, Text, View } from "react-native";
 import { api } from "../../../../../packages/backend/convex/_generated/api";
 import type { releasesResult } from "../../../../../packages/backend/convex/validator";
-import { Button, Loading, useStyles } from "./ui";
+import { Button, Loading } from "./ui";
+import { InstallerButton } from "./installer-button";
 export function Details({ appId }: { appId: string }) {
-  const styles = useStyles();
   const app = useQuery(api.apps.index.get, { appId });
   const release = useQuery(api.releases.index.get, { appId });
   if (!app || release === undefined) return <Loading />;
   return (
     <>
-      <Text style={styles.heading}>Platforms and features</Text>
+      <Text className="text-[21px] font-bold text-foreground">
+        Platforms and features
+      </Text>
       <Selection
         key={JSON.stringify([app.platforms, app.features])}
         appId={appId}
         initialPlatforms={app.platforms}
         initialFeatures={app.features ?? []}
       />
-      <Text style={styles.heading}>Production releases</Text>
+      <Text className="text-[21px] font-bold text-foreground">
+        Production releases
+      </Text>
       {release ? (
-        <View style={styles.card}>
-          <Text style={styles.muted}>
+        <View className="gap-[12px] rounded-[24px] border border-border bg-card p-[20px]">
+          <Text className="text-[14px] leading-[21px] text-muted-foreground">
             Updated {new Date(release.updatedAt).toLocaleString()}
           </Text>
-          <PlatformStates states={release.platforms} />
+          <PlatformStates appId={appId} states={release.platforms} />
         </View>
       ) : (
-        <Text style={styles.muted}>No production release records yet.</Text>
+        <Text className="text-[14px] leading-[21px] text-muted-foreground">
+          No production release records yet.
+        </Text>
       )}
-      <Text style={styles.heading}>Deployments</Text>
+      <Text className="text-[21px] font-bold text-foreground">Deployments</Text>
       <Previews appId={appId} />
     </>
   );
@@ -53,7 +59,6 @@ function Selection({
   initialPlatforms: Platform[];
   initialFeatures: Feature[];
 }) {
-  const styles = useStyles();
   const [selected, setSelected] = useState(initialPlatforms);
   const [chosen, setChosen] = useState(initialFeatures);
   const [busy, setBusy] = useState(false);
@@ -80,9 +85,11 @@ function Selection({
     }
   }
   return (
-    <View style={styles.card}>
-      <Text style={styles.text}>Platforms</Text>
-      <View style={styles.wrap}>
+    <View className="gap-[12px] rounded-[24px] border border-border bg-card p-[20px]">
+      <Text className="text-[16px] leading-[23px] text-foreground">
+        Platforms
+      </Text>
+      <View className="flex-row flex-wrap gap-[8px]">
         {platforms.map((p) => (
           <Pressable
             key={p.id}
@@ -100,14 +107,18 @@ function Selection({
                   : [...selected, p.id],
               )
             }
-            style={[styles.chip, selected.includes(p.id) && styles.selected]}
+            className={`rounded-[24px] border px-[14px] py-[10px] ${selected.includes(p.id) ? "border-foreground bg-muted" : "border-border"}`}
           >
-            <Text style={styles.text}>{p.label}</Text>
+            <Text className="text-[16px] leading-[23px] text-foreground">
+              {p.label}
+            </Text>
           </Pressable>
         ))}
       </View>
-      <Text style={styles.text}>Features</Text>
-      <View style={styles.wrap}>
+      <Text className="text-[16px] leading-[23px] text-foreground">
+        Features
+      </Text>
+      <View className="flex-row flex-wrap gap-[8px]">
         {features.map((f) => (
           <Pressable
             key={f.id}
@@ -121,13 +132,15 @@ function Selection({
                   : [...chosen, f.id],
               )
             }
-            style={[styles.chip, chosen.includes(f.id) && styles.selected]}
+            className={`rounded-[24px] border px-[14px] py-[10px] ${chosen.includes(f.id) ? "border-foreground bg-muted" : "border-border"}`}
           >
-            <Text style={styles.text}>{f.label}</Text>
+            <Text className="text-[16px] leading-[23px] text-foreground">
+              {f.label}
+            </Text>
           </Pressable>
         ))}
       </View>
-      <Text style={styles.muted}>
+      <Text className="text-[14px] leading-[21px] text-muted-foreground">
         Web is required. CLI and TypeScript SDK require API; Analytics requires
         Authentication and a PostHog connection.
       </Text>
@@ -136,30 +149,43 @@ function Selection({
         disabled={busy}
         onPress={() => void save()}
       />
-      {!!message && <Text style={styles.text}>{message}</Text>}
+      {!!message && (
+        <Text className="text-[16px] leading-[23px] text-foreground">
+          {message}
+        </Text>
+      )}
     </View>
   );
 }
 type States = (typeof releasesResult)["type"]["platforms"];
-function PlatformStates({ states }: { states: States }) {
+function PlatformStates({
+  states,
+  appId,
+  reference,
+}: {
+  states: States;
+  appId: string;
+  reference?: string;
+}) {
   const [error, setError] = useState("");
   async function open(url: string) {
     setError("");
     try {
       await Linking.openURL(url);
     } catch {
-      setError("Could not open this release. Please try again.");
+      setError("Could not open this link. Please try again.");
     }
   }
-  const styles = useStyles();
   return (
     <>
       {Object.entries(states)
         .filter(([, state]) => state.enabled)
         .map(([name, state]) => (
-          <View key={name} style={{ gap: 10 }}>
-            <Text style={styles.text}>{name}</Text>
-            <Text style={styles.muted}>
+          <View key={name} className="gap-[10px]">
+            <Text className="text-[16px] leading-[23px] text-foreground">
+              {name}
+            </Text>
+            <Text className="text-[14px] leading-[21px] text-muted-foreground">
               {state.latest
                 ? `${state.latest.status}${state.latest.version ? ` · ${state.latest.version}` : ""}${state.latest.reason ? ` · ${state.latest.reason}` : ""}`
                 : "No build reported"}
@@ -172,10 +198,41 @@ function PlatformStates({ states }: { states: States }) {
                   onPress={() => void open(state.url!)}
                 />
               )}
+            {state.latest?.status === "ready" &&
+              state.latest.artifactUrl &&
+              state.latest.githubReleaseUrl &&
+              ["android", "ios", "macos", "windows", "linux"].includes(
+                name,
+              ) && (
+                <InstallerButton
+                  appId={appId}
+                  platform={name as Platform}
+                  reference={reference}
+                  releaseKey={JSON.stringify(state.latest)}
+                />
+              )}
+            {state.latest &&
+              /^https:\/\/github\.com\/[^/]+\/[^/]+\/actions\/runs\/\d+(?:\/attempts\/\d+)?$/.test(
+                state.latest.run.url,
+              ) && (
+                <Pressable
+                  accessibilityRole="link"
+                  accessibilityLabel={`View ${name} build logs`}
+                  onPress={() => void open(state.latest!.run.url)}
+                  className="min-h-[44px] justify-center"
+                >
+                  <Text className="text-[16px] leading-[23px] text-foreground underline">
+                    View build logs
+                  </Text>
+                </Pressable>
+              )}
           </View>
         ))}
       {!!error && (
-        <Text accessibilityRole="alert" style={styles.text}>
+        <Text
+          accessibilityRole="alert"
+          className="text-[16px] leading-[23px] text-foreground"
+        >
           {error}
         </Text>
       )}
@@ -183,7 +240,6 @@ function PlatformStates({ states }: { states: States }) {
   );
 }
 function Previews({ appId }: { appId: string }) {
-  const styles = useStyles();
   const [cursors, setCursors] = useState<(string | null)[]>([null]);
   const previews = useQuery(api.previews.index.list, {
     appId,
@@ -191,26 +247,37 @@ function Previews({ appId }: { appId: string }) {
   });
   if (!previews) return <Loading />;
   return (
-    <View style={{ gap: 12 }}>
+    <View className="gap-[12px]">
       {previews.page.length === 0 && (
-        <Text style={styles.muted}>No deployment records yet.</Text>
+        <Text className="text-[14px] leading-[21px] text-muted-foreground">
+          No deployment records yet.
+        </Text>
       )}
       {previews.page.map((preview) => (
-        <View key={preview.reference} style={styles.card}>
-          <Text style={styles.text}>{preview.reference}</Text>
-          <Text style={styles.muted}>
+        <View
+          key={preview.reference}
+          className="gap-[12px] rounded-[24px] border border-border bg-card p-[20px]"
+        >
+          <Text className="text-[16px] leading-[23px] text-foreground">
+            {preview.reference}
+          </Text>
+          <Text className="text-[14px] leading-[21px] text-muted-foreground">
             {preview.stage} · Updated{" "}
             {new Date(preview.updatedAt).toLocaleString()}
           </Text>
           {preview.deployment && (
-            <Text style={styles.muted}>
+            <Text className="text-[14px] leading-[21px] text-muted-foreground">
               Deployment: {preview.deployment.name}
             </Text>
           )}
-          <PlatformStates states={preview.platforms} />
+          <PlatformStates
+            appId={appId}
+            reference={preview.reference}
+            states={preview.platforms}
+          />
         </View>
       ))}
-      <View style={styles.row}>
+      <View className="flex-row items-center gap-[12px]">
         {cursors.length > 1 && (
           <Button
             title="Previous deployments"

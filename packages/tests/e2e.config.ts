@@ -70,6 +70,8 @@ if (native.length) {
       name: platform,
       engine: mobile({
         platform,
+        // UIKit exposes final AX frames before native transitions accept input.
+        transition: platform === "ios" ? 2000 : undefined,
         device: process.env[`E2E_${platform.toUpperCase()}_DEVICE`],
       }),
       app: {

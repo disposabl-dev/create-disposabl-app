@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { BillingSession } from "../disposabl-kit/mobile/billing/session";
+import { pricing } from "../disposabl-kit/payments/config";
 import { monthlyPlanFromCustomer } from "../disposabl-kit/server/billing";
 
 function deferred() {
@@ -18,18 +19,20 @@ test("monthly state includes scheduled plans and fails closed for unknown respon
   for (const status of ["active", "scheduled"])
     assert.equal(
       monthlyPlanFromCustomer({
-        subscriptions: [{ plan_id: "credits_monthly", status }],
+        subscriptions: [{ plan_id: pricing.monthly.planId, status }],
       }),
       true,
     );
   assert.equal(monthlyPlanFromCustomer({}), null);
   assert.equal(
-    monthlyPlanFromCustomer({ subscriptions: [{ planId: "credits_monthly" }] }),
+    monthlyPlanFromCustomer({
+      subscriptions: [{ planId: pricing.monthly.planId }],
+    }),
     null,
   );
   assert.equal(
     monthlyPlanFromCustomer({
-      subscriptions: [{ plan_id: "credits_monthly", status: "unknown" }],
+      subscriptions: [{ plan_id: pricing.monthly.planId, status: "unknown" }],
     }),
     null,
   );

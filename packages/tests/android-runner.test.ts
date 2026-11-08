@@ -1,0 +1,134 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { mkdtempSync, writeFileSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { spawnSync } from "node:child_process";
+
+test("Android build diagnostics preserve Gradle arguments and failure status", () => {
+  const dir = mkdtempSync(join(tmpdir(), "android-build-"));
+  try {
+    writeFileSync(
+      join(dir, "gradlew"),
+      '#!/bin/sh\nwhile [ ! -f "$SAMPLER_PID" ]; do sleep 0.01; done\nprintf "%s\\n" "$*"\nexit "$GRADLE_RESULT"\n',
+      { mode: 0o755 },
+    );
+    writeFileSync(
+      join(dir, "vmstat"),
+      '#!/bin/sh\necho $$ > "$SAMPLER_PID"\nexec sleep 30\n',
+      {
+        mode: 0o755,
+      },
+    );
+    for (const status of [0, 42]) {
+      const samplerPid = join(dir, `sampler-${status}`);
+      const result = spawnSync(
+        "bash",
+        [
+          resolve(
+            import.meta.dirname,
+            "../../.github/scripts/android-runner.sh",
+          ),
+          "build",
+        ],
+        {
+          cwd: dir,
+          encoding: "utf8",
+          timeout: 5000,
+          env: {
+            ...process.env,
+            PATH: `${dir}:${process.env.PATH}`,
+            RUNNER_OS: "Linux",
+            GRADLE_RESULT: String(status),
+            SAMPLER_PID: samplerPid,
+          },
+        },
+      );
+      assert.equal(result.status, status, result.stderr);
+      assert.match(
+        result.stdout,
+        /:app:assembleRelease --no-daemon --build-cache/,
+      );
+      assert.match(result.stdout, /Android runner processors: \d+/);
+      assert.match(result.stderr, /Gradle elapsed:/);
+      assert.throws(
+        () => process.kill(Number(readFileSync(samplerPid, "utf8")), 0),
+        { code: "ESRCH" },
+      );
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("Android disk preparation only removes unused hosted-runner toolchains", () => {
+  const dir = mkdtempSync(join(tmpdir(), "android-runner-"));
+  try {
+    writeFileSync(
+      join(dir, "sudo"),
+      '#!/bin/sh\nprintf "%s\\n" "$*" >> "$CALLS"\n',
+      { mode: 0o755 },
+    );
+    writeFileSync(join(dir, "du"), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+    writeFileSync(
+      join(dir, "df"),
+      '#!/bin/sh\nprintf "Filesystem 1024-blocks Used Available Capacity Mounted\\n/dev/test 99999999 1 %s 1%% /\\n" "$AVAILABLE"\n',
+      { mode: 0o755 },
+    );
+    const calls = join(dir, "calls");
+    writeFileSync(calls, "");
+    const run = (operation: string, overrides: Record<string, string> = {}) =>
+      spawnSync(
+        "bash",
+        [
+          resolve(
+            import.meta.dirname,
+            "../../.github/scripts/android-runner.sh",
+          ),
+          operation,
+        ],
+        {
+          encoding: "utf8",
+          env: {
+            ...process.env,
+            PATH: `${dir}:${process.env.PATH}`,
+            CALLS: calls,
+            AVAILABLE: "31457280",
+            GITHUB_ACTIONS: "true",
+            RUNNER_ENVIRONMENT: "github-hosted",
+            RUNNER_OS: "Linux",
+            ...overrides,
+          },
+        },
+      );
+    const otherRunners: Record<string, string>[] = [
+      { RUNNER_ENVIRONMENT: "self-hosted" },
+      { GITHUB_ACTIONS: "false" },
+      { RUNNER_OS: "macOS" },
+      { RUNNER_ENVIRONMENT: "" },
+      { GITHUB_ACTIONS: "" },
+      { RUNNER_OS: "" },
+    ];
+    for (const overrides of otherRunners) {
+      assert.equal(run("prepare", overrides).status, 0);
+      assert.equal(readFileSync(calls, "utf8"), "");
+    }
+    assert.equal(run("prepare").status, 0);
+    assert.equal(
+      readFileSync(calls, "utf8"),
+      "rm -rf -- /usr/share/dotnet /usr/local/.ghcup /opt/ghc /opt/hostedtoolcache/CodeQL /usr/share/swift /usr/share/miniconda /opt/microsoft/powershell /usr/local/share/powershell /usr/local/share/vcpkg /home/linuxbrew\n",
+    );
+    assert.equal(run("check").status, 0);
+    assert.equal(run("check", { AVAILABLE: "26214400" }).status, 0);
+    assert.equal(run("check", { AVAILABLE: "26214399" }).status, 1);
+    const low = run("check", { AVAILABLE: "1024" });
+    assert.equal(low.status, 1);
+    assert.match(low.stderr, /25 GiB free/);
+    assert.equal(run("check", { AVAILABLE: "invalid" }).status, 1);
+    assert.equal(run("unsupported").status, 1);
+    writeFileSync(join(dir, "sudo"), "#!/bin/sh\nexit 42\n", { mode: 0o755 });
+    assert.equal(run("prepare").status, 42);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

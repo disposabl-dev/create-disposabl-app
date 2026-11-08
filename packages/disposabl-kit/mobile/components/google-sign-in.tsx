@@ -10,11 +10,10 @@ import {
   mobileAuthReturnUrl,
 } from "../../lib/mobile-auth";
 import { api } from "../lib/convex";
-import { useAuthStyles } from "./auth-ui";
+import { authClasses } from "./auth-ui";
 import { GoogleButton } from "./google-button";
 
 export function GoogleSignIn({ disabled = false }: { disabled?: boolean }) {
-  const styles = useAuthStyles();
   const { signIn } = useSignInWithGoogle(api.auth);
   const params = useLocalSearchParams<{
     returnTo?: string;
@@ -105,14 +104,14 @@ export function GoogleSignIn({ disabled = false }: { disabled?: boolean }) {
   }
 
   return (
-    <View style={{ gap: 12 }}>
+    <View className="gap-[12px]">
       <GoogleButton
         pending={pending}
         disabled={disabled}
         onPress={() => void start()}
       />
       {error && (
-        <Text accessibilityRole="alert" style={styles.error}>
+        <Text accessibilityRole="alert" className={authClasses.error}>
           {error}
         </Text>
       )}

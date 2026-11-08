@@ -12,4 +12,10 @@ Make the design distinctive through choices that suit the product, rather than a
 
 Use concise copy and real visuals suited to the product. Prioritize useful task UI over decorative filler; do not impose a fixed palette.
 
+For native screens, use NativeWind `className` utilities and the shared theme tokens, such as `bg-background`, `text-foreground`, and `border-border`. Do not introduce StyleSheet definitions or inline layout styles. Pass measured values through NativeWind CSS variables. Keep product-specific light/dark colors in the existing theme system and preserve its appearance preference.
+
+Use `useTheme` from `packages/disposabl-kit/mobile/design/use-theme.ts` only where native APIs need resolved colors, such as navigation headers, symbols, and status bars. Reuse the existing provider; fixed light surfaces can become unreadable when Settings switches the system chrome to Dark.
+
+When the app exposes Light, Dark, and System settings, verify the rendered guest and signed-in screens in those modes, including after restart and an OS appearance change in System mode. A changed selector label does not prove the screen changed. Add behavior coverage for the visible colors and preference persistence in `packages/tests`.
+
 Use the app's real tasks and representative content to evaluate the design. Check the landing page and signed-in experience at desktop and mobile widths in the browser, and inspect native layouts on the requested target device. Verify typography, contrast, hierarchy, focus states, wrapping, empty/error/loading states, and consistency with the chosen brand. Fix visible issues before calling the design complete.

@@ -43,6 +43,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       linux_runner: ${{ steps.platforms.outputs.linux_runner }}
+      android_runner: ${{ steps.platforms.outputs.android_runner }}
       macos_runner: ${{ steps.platforms.outputs.macos_runner }}
       changed: ${{ steps.platforms.outputs.changed }}
       android: ${{ steps.platforms.outputs.android }}
@@ -59,6 +60,7 @@ jobs:
         env:
           PR: ${{ github.event.number }}
           EXPO_CONNECTED: ${{ secrets.EXPO_TOKEN != '' }}
+          IOS_BUILDS_ENABLED: ${{ vars.IOS_BUILDS_ENABLED != 'false' }}
         run: bash "$GITHUB_WORKSPACE/.github/scripts/platforms.sh"
   web:
     name: Web
@@ -69,7 +71,7 @@ jobs:
       contents: read
       pull-requests: read
       id-token: write
-    timeout-minutes: 45
+    timeout-minutes: 20
     runs-on: ${{ needs.changes.outputs.linux_runner }}
     outputs:
       desktop: ${{ needs.changes.outputs.desktop }}
@@ -103,7 +105,7 @@ jobs:
           key: bun-${{ github.job == 'desktop' && 'desktop-' || '' }}${{ runner.os }}-${{ runner.arch }}-${{ env.BUN_VERSION }}-${{ hashFiles('bun.lock') }}
           restore-keys: bun-${{ github.job == 'desktop' && 'desktop-' || '' }}${{ runner.os }}-${{ runner.arch }}-${{ env.BUN_VERSION }}-
       - &install
-        run: bun install --frozen-lockfile ${{ github.job == 'desktop' && '--filter desktop' || (github.job == 'android' || startsWith(github.job, 'ios-')) && '--filter @disposabl/mobile' || '' }}
+        run: bun install --frozen-lockfile ${{ github.job == 'desktop' && '--filter "*desktop*" --filter @disposabl/backend' || (github.job == 'android' || startsWith(github.job, 'ios-')) && '--filter @disposabl/mobile' || '' }}
       - name: Report build start
         run: |
           node .github/scripts/disposabl.mjs report web,api,mcp building
@@ -130,6 +132,9 @@ jobs:
           target=()
           if [[ "$CHANNEL" != production ]]; then export AUTH_TARGET="--preview-name $CHANNEL"; target=(--preview-name "$CHANNEL"); fi
           bun x --no-install convex deploy --yes "${target[@]}" --cmd-url-env-var-name CONVEX_URL --cmd 'for name in CONVEX_URL CONVEX_SITE_URL; do value=$(printenv "$name"); test -n "$value" || exit 1; for prefix in "" VITE_ EXPO_PUBLIC_; do export "$prefix$name=$value"; printf "%s=%s\n" "$prefix$name" "$value" | tee -a "$GITHUB_ENV" >> "$GITHUB_OUTPUT"; done; done; bun run --cwd ../.. build --filter=@disposabl/web'
+          setup_target=(--prod)
+          if [[ "$CHANNEL" != production ]]; then setup_target=("${target[@]}"); fi
+          bun x --no-install convex run "${setup_target[@]}" billing:setup '{}'
           bun x --no-install static-hosting upload $AUTH_TARGET --no-spa --dist ../../apps/web/dist/client
       - name: Report web result
         if: always()
@@ -175,8 +180,8 @@ jobs:
     needs: [changes, web]
     if: needs.web.outputs.android_build == 'true'
     permissions: *release-permissions
-    runs-on: ${{ needs.changes.outputs.linux_runner }}
-    timeout-minutes: 60
+    runs-on: ${{ needs.changes.outputs.android_runner }}
+    timeout-minutes: 20
     env:
       PLATFORM: android
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
@@ -190,6 +195,8 @@ jobs:
       EXPO_PUBLIC_CONVEX_SITE_URL: ${{ needs.web.outputs.convex_site_url }}
     steps:
       - *checkout
+      - name: Prepare Android disk space
+        run: bash .github/scripts/android-runner.sh prepare
       - *node
       - *bun
       - *cache
@@ -221,16 +228,26 @@ jobs:
         run: bash "$GITHUB_WORKSPACE/.github/scripts/mobile.sh" android-build
       - *publish
       - *artifacts
-      - name: Report Android failure
-        if: failure() || cancelled()
-        run: node .github/scripts/disposabl.mjs report android failed
+  android-failure:
+    name: Report Android failure
+    needs: android
+    if: always() && (needs.android.result == 'failure' || needs.android.result == 'cancelled')
+    permissions:
+      contents: read
+      id-token: write
+    runs-on: *linux-runner
+    timeout-minutes: 5
+    steps:
+      - *checkout
+      - *node
+      - run: node .github/scripts/disposabl.mjs report android failed "Android build failed or was cancelled; check the workflow log."
   ios-preview:
     name: iOS simulator preview
     needs: [changes, web]
     if: github.event_name == 'pull_request' && needs.web.outputs.ios == 'true'
     permissions: *release-permissions
     runs-on: ${{ needs.changes.outputs.macos_runner }}
-    timeout-minutes: 90
+    timeout-minutes: 20
     env:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
       CONVEX_URL: ${{ needs.web.outputs.convex_url }}
@@ -288,7 +305,7 @@ jobs:
     if: github.event_name == 'push' && needs.web.outputs.ios == 'true'
     permissions: *release-permissions
     runs-on: ${{ needs.changes.outputs.linux_runner }}
-    timeout-minutes: 120
+    timeout-minutes: 20
     env:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
       EXPO_PROJECT_ID: ${{ secrets.EXPO_PROJECT_ID || vars.EXPO_PROJECT_ID }}
@@ -354,10 +371,12 @@ jobs:
       matrix:
         include: ${{ fromJSON(needs.web.outputs.desktop) }}
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 30
+    timeout-minutes: 20
     env:
       PLATFORM: ${{ matrix.platform }}
+      DISPOSABL_RELEASE_VERSION: 1.${{ github.run_number }}.${{ github.run_attempt }}
       DISPOSABL_DESKTOP_PLATFORM: ${{ matrix.platform }}
+      DISPOSABL_DESKTOP_UPDATE_CHANNEL: production
       CONVEX_SITE_URL: ${{ needs.web.outputs.convex_site_url }}
       electron_config_cache: ${{ github.workspace }}/.cache/electron
     steps:
@@ -376,11 +395,33 @@ jobs:
       - name: Packages
         if: matrix.platform == 'linux'
         run: command -v fakeroot && command -v rpmbuild && command -v dpkg-deb || { sudo apt-get update && sudo apt-get install -y fakeroot dpkg rpm; }
+      - name: Configure desktop update identity
+        shell: bash
+        run: |
+          id=$(node -p "require('./disposabl.json').desktopId || ''")
+          if [[ ! "$id" =~ ^[a-f0-9]{32}$ ]]; then echo 'Desktop identity missing; regenerate this app before its first installation.' >&2; exit 1; fi
+          echo "DISPOSABL_DESKTOP_ID=$id" >> "$GITHUB_ENV"
+          echo "DISPOSABL_DESKTOP_UPDATE_URL=${CONVEX_SITE_URL}/desktop/updates/$id" >> "$GITHUB_ENV"
       - name: Build
-        run: bun run --cwd apps/desktop preview
-      - *publish
-      - name: Upload desktop release artifacts
         if: matrix.platform != 'macos'
+        run: bun run --cwd apps/desktop preview
+      - name: Build macOS
+        if: matrix.platform == 'macos'
+        shell: bash
+        env:
+          MACOS_SIGNING_CONFIG: ${{ secrets.MACOS_SIGNING_CONFIG }}
+        run: bash .github/scripts/macos-release.sh
+      - *publish
+      - name: Publish desktop update feed
+        if: matrix.platform == 'windows' || (matrix.platform == 'macos' && env.MACOS_NOTARIZE == 'true')
+        shell: bash
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
+        run: |
+          test "$(gh api "repos/$GH_REPO/git/ref/heads/main" --jq .object.sha)" = "$SOURCE"
+          node apps/desktop/publish-update.mjs
+      - name: Upload desktop release artifacts
+        if: matrix.platform != 'macos' || env.MACOS_NOTARIZE == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: release-${{ env.PLATFORM }}
@@ -388,23 +429,37 @@ jobs:
           retention-days: 3
           compression-level: 0
           if-no-files-found: error
+      - name: Upload staged update feed
+        if: matrix.platform != 'linux' && env.DISPOSABL_DESKTOP_UPDATE_URL != '' && (matrix.platform != 'macos' || env.MACOS_NOTARIZE == 'true')
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-update-${{ env.PLATFORM }}
+          path: dist/update/
+          retention-days: 3
+          if-no-files-found: error
       - name: Upload unsigned macOS artifact
-        if: matrix.platform == 'macos'
+        if: matrix.platform == 'macos' && env.MACOS_NOTARIZE != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: macos-unsigned
-          path: dist/release/*.dmg
+          path: |
+            dist/release/*.dmg
+            dist/release/*.zip
           retention-days: 3
           compression-level: 0
           if-no-files-found: error
       - name: Report macOS artifact
-        if: matrix.platform == 'macos'
+        if: matrix.platform == 'macos' && env.MACOS_NOTARIZE != 'true'
         run: |
           echo 'macOS DMG is ad-hoc signed, not Developer ID signed or notarized. Download it from this workflow run’s artifacts.' >> "$GITHUB_STEP_SUMMARY"
           node .github/scripts/disposabl.mjs report macos blocked 'Ad-hoc signed DMG available in workflow artifacts; Developer ID signing and notarization are not configured.'
       - name: Report desktop failure
         if: failure() || cancelled()
         run: node .github/scripts/disposabl.mjs report "$PLATFORM" failed
+      - name: Clean up macOS signing
+        if: always() && matrix.platform == 'macos'
+        shell: bash
+        run: bash .github/scripts/macos-release.sh cleanup
   packages:
     name: Package / ${{ matrix.package }}
     needs: [changes, web]

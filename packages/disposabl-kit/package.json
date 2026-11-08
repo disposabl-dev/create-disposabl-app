@@ -73,7 +73,8 @@
     "react-native-purchases": "10.16.0",
     "react-native-css": "3.1.0-rc.1",
     "@expo/ui": "~58.0.27",
-    "expo-glass-effect": "~58.0.5"
+    "expo-glass-effect": "~58.0.5",
+    "expo-speech-recognition": "58.0.1"
   },
   "peerDependenciesMeta": {
     "expo-clipboard": {
@@ -110,6 +111,9 @@
       "optional": true
     },
     "expo-glass-effect": {
+      "optional": true
+    },
+    "expo-speech-recognition": {
       "optional": true
     }
   }

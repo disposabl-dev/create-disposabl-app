@@ -10,12 +10,7 @@ export function AccountButton() {
       accessibilityRole="button"
       accessibilityLabel="Settings"
       testID="settings-button"
-      style={{
-        minWidth: 44,
-        minHeight: 44,
-        alignItems: "center",
-        justifyContent: "center",
-      }}
+      className="min-w-[44px] min-h-[44px] items-center justify-center"
       onPress={() => router.push("/settings")}
     >
       <SymbolView

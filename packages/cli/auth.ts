@@ -48,26 +48,7 @@ const directory = () =>
   process.env.DISPOSABL_CONFIG_DIR || join(homedir(), ".config", "disposabl");
 const sessionPath = (url: string) =>
   join(directory(), `${createHash("sha256").update(url).digest("hex")}.json`);
-export function apiUrl(value: string) {
-  const url = new URL(value);
-  if (
-    url.protocol !== "https:" &&
-    !(
-      url.protocol === "http:" &&
-      ["127.0.0.1", "localhost", "[::1]"].includes(url.hostname)
-    )
-  )
-    throw new Error("Use HTTPS, or HTTP on loopback for local development.");
-  if (
-    url.username ||
-    url.password ||
-    url.search ||
-    url.hash ||
-    url.pathname !== "/"
-  )
-    throw new Error("Use the API origin without a path or credentials.");
-  return url.origin;
-}
+export { apiUrl } from "./origin";
 const fetchFor = (origin: string): typeof fetch =>
   Object.assign(
     async (

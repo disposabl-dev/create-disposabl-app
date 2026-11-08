@@ -13,6 +13,7 @@ import { api } from "../../../backend/convex/_generated/api";
 import { authErrorMessage } from "../../lib/auth-errors";
 import { GoogleSignIn } from "./google-sign-in";
 import { PasswordPage } from "./password-page";
+import { appName } from "../../lib/app-name";
 import { Button } from "./ui/button";
 import { Field, FieldGroup, FieldLabel } from "./ui/field";
 import { Input } from "./ui/input";
@@ -58,7 +59,7 @@ export function PasswordAuthForm({
   if (providers.googleOnly)
     return (
       <PasswordPage
-        title="Welcome to Disposabl"
+        title={appName ? `Welcome to ${appName}` : "Welcome"}
         description="Sign in or create an account with Google."
       >
         <GoogleSignIn />

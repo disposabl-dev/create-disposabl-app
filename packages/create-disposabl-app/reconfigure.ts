@@ -8,13 +8,20 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve, sep } from "node:path";
+import { randomUUID } from "node:crypto";
+import { basename, dirname, join, resolve, sep } from "node:path";
 import {
   selectFeatures,
   selectPlatforms,
   type DisposablConfig,
 } from "./options";
 import { createApp } from "./scaffold";
+import {
+  mergePurchasesManifest,
+  nativeBillingPath,
+  nativeBillingTest,
+  omitMobilePayments,
+} from "./mobile-payments";
 
 async function files(root: string, path = ""): Promise<string[]> {
   const result: string[] = [];
@@ -71,9 +78,17 @@ export async function reconfigureApp(
   if (!Array.isArray(existing.platforms) || !Array.isArray(existing.features))
     throw new Error("Invalid selections in disposabl.json.");
   const oldPlatforms = selectPlatforms(existing.platforms.join(","));
+  if (
+    !existing.desktopId &&
+    oldPlatforms.some((p) => ["macos", "windows", "linux"].includes(p))
+  )
+    throw new Error(
+      "This desktop project has no native identity. Create a fresh starter before its first installation.",
+    );
   const oldFeatures = selectFeatures(existing.features.join(",") || "none");
   const config = {
     ...existing,
+    desktopId: existing.desktopId ?? randomUUID().replaceAll("-", ""),
     platforms:
       options.platforms === undefined
         ? oldPlatforms
@@ -105,13 +120,41 @@ export async function reconfigureApp(
     const after = join(temp, "after");
     await createApp(template, before, name, {
       ...existing,
+      desktopId: config.desktopId,
       platforms: oldPlatforms,
       features: oldFeatures,
     });
     await createApp(template, after, name, combined);
+    if (
+      oldFeatures.includes("payments") &&
+      !config.features.includes("payments")
+    )
+      await omitMobilePayments(after);
     const oldFiles = new Set(await files(before));
-    const changes: { path: string; content: Buffer }[] = [];
-    for (const path of await files(after)) {
+    const nextFiles = new Set(await files(after));
+    const changes: { path: string; content?: Buffer }[] = [];
+    if (
+      oldFeatures.includes("payments") &&
+      !config.features.includes("payments")
+    ) {
+      const billing = join(directory, nativeBillingPath);
+      const stat = await lstat(billing).catch(
+        (error: NodeJS.ErrnoException) => {
+          if (error.code === "ENOENT") return undefined;
+          throw error;
+        },
+      );
+      if (stat?.isSymbolicLink())
+        throw new Error(`Refusing symlink: ${billing}`);
+      if (stat)
+        for (const path of await files(billing)) {
+          if (!oldFiles.has(nativeBillingPath + path))
+            throw new Error(
+              `Cannot disable payments: ${nativeBillingPath + path} is a custom billing file. No files were changed.`,
+            );
+        }
+    }
+    for (const path of nextFiles) {
       if (path === configPath) continue;
       const next = await readFile(join(after, path));
       const prior = oldFiles.has(path)
@@ -129,16 +172,39 @@ export async function reconfigureApp(
       else if (!prior)
         continue; // Existing user files always win over restored files.
       else if (current.equals(prior)) changes.push({ path, content: next });
-      else
+      else {
+        const merged =
+          basename(path) === "package.json"
+            ? mergePurchasesManifest(prior, next, current)
+            : undefined;
+        if (merged) changes.push({ path, content: merged });
+        else
+          throw new Error(
+            `Cannot reconfigure: ${path} conflicts with the starter changes. Reconcile this file and retry; no files were changed.`,
+          );
+      }
+    }
+    for (const path of oldFiles) {
+      if (
+        nextFiles.has(path) ||
+        !(path.startsWith(nativeBillingPath) || path === nativeBillingTest)
+      )
+        continue;
+      const current = await safeRead(directory, path);
+      if (!current) continue;
+      if (!current.equals(await readFile(join(before, path))))
         throw new Error(
-          `Cannot reconfigure: ${path} conflicts with the starter changes. Reconcile this file and retry; no files were changed.`,
+          `Cannot disable payments: ${path} was customized. No files were changed.`,
         );
+      changes.push({ path });
     }
     // Validate all paths before the first write, including config and parent directories.
     for (const { path } of changes) await safeRead(directory, path);
     for (const { path, content } of changes) {
-      await mkdir(dirname(join(directory, path)), { recursive: true });
-      await writeFile(join(directory, path), content);
+      if (content) {
+        await mkdir(dirname(join(directory, path)), { recursive: true });
+        await writeFile(join(directory, path), content);
+      } else await rm(join(directory, path));
     }
     await writeFile(
       join(directory, configPath),

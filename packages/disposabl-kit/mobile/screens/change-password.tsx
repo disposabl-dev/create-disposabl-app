@@ -2,11 +2,10 @@ import { authErrorMessage } from "../../lib/auth-errors";
 import { useMutation, useQuery } from "convex/react";
 import { useRef, useState } from "react";
 import { Keyboard, Switch, Text, TextInput, View } from "react-native";
-import { AuthButton, AuthScreen, useAuthStyles } from "../components/auth-ui";
+import { AuthButton, AuthScreen, authClasses } from "../components/auth-ui";
 import { api } from "../lib/convex";
 
 export function ChangePasswordScreen() {
-  const styles = useAuthStyles();
   const user = useQuery(api.auth.account);
   const usernameChange = useMutation(api.auth.changePassword);
   const emailChange = useMutation(api.authEmail.changePassword);
@@ -64,13 +63,15 @@ export function ChangePasswordScreen() {
 
   return (
     <AuthScreen>
-      <Text style={styles.title}>Change password</Text>
+      <Text className={authClasses.title}>Change password</Text>
       {user === undefined ? (
-        <Text style={styles.body}>Loading your account...</Text>
+        <Text className={authClasses.body}>Loading your account...</Text>
       ) : user === null ? (
-        <Text style={styles.error}>Your account could not be found.</Text>
+        <Text className={authClasses.error}>
+          Your account could not be found.
+        </Text>
       ) : !user.passwordMethod ? (
-        <Text style={styles.body}>
+        <Text className={authClasses.body}>
           This account uses an external sign-in provider. Continue using your
           sign-in provider.
         </Text>
@@ -93,11 +94,11 @@ export function ChangePasswordScreen() {
               ],
             ] as const
           ).map(([label, value, onChangeText, autoComplete]) => (
-            <View key={label} style={styles.field}>
-              <Text style={styles.label}>{label}</Text>
+            <View key={label} className={authClasses.field}>
+              <Text className={authClasses.label}>{label}</Text>
               <TextInput
                 accessibilityLabel={label}
-                style={styles.input}
+                className={authClasses.input}
                 value={value}
                 onChangeText={onChangeText}
                 secureTextEntry
@@ -108,15 +109,8 @@ export function ChangePasswordScreen() {
               />
             </View>
           ))}
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 12,
-            }}
-          >
-            <Text style={[styles.label, { flex: 1 }]}>
+          <View className="flex-row items-center justify-between gap-[12px]">
+            <Text className={`${authClasses.label} flex-1`}>
               Log out other devices
             </Text>
             <Switch
@@ -129,7 +123,7 @@ export function ChangePasswordScreen() {
           {message && (
             <Text
               accessibilityRole="alert"
-              style={message.success ? styles.body : styles.error}
+              className={message.success ? authClasses.body : authClasses.error}
             >
               {message.text}
             </Text>

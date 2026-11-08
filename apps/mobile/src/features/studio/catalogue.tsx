@@ -1,3 +1,4 @@
+import { VariableContextProvider } from "nativewind";
 import { FlatList, View, useWindowDimensions } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { AppArtwork } from "./art";
@@ -14,26 +15,33 @@ export function AppCollection({
 }) {
   const { width } = useWindowDimensions();
   return (
-    <View style={{ gap: 16 }}>
+    <View className="gap-[16px]">
       <Label variant="heading">{title}</Label>
       <FlatList
         horizontal
         data={apps}
         keyExtractor={(app) => app.slug}
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: 16 }}
+        contentContainerClassName="gap-[16px]"
         renderItem={({ item }) => (
-          <Touch
-            label={`Explore ${item.name}`}
-            onPress={() =>
-              router.push({ pathname: "/example", params: { slug: item.slug } })
-            }
-            style={{ width: Math.min(width * 0.72, 300), gap: 10 }}
+          <VariableContextProvider
+            value={{ "--layout-width": Math.min(width * 0.72, 300) ?? "auto" }}
           >
-            <AppArtwork app={item} compact />
-            <Label variant="label">{item.name}</Label>
-            <TargetBadges targets={item.targets} />
-          </Touch>
+            <Touch
+              label={`Explore ${item.name}`}
+              onPress={() =>
+                router.push({
+                  pathname: "/example",
+                  params: { slug: item.slug },
+                })
+              }
+              className="w-[var(--layout-width)] gap-[10px]"
+            >
+              <AppArtwork app={item} compact />
+              <Label variant="label">{item.name}</Label>
+              <TargetBadges targets={item.targets} />
+            </Touch>
+          </VariableContextProvider>
         )}
       />
     </View>
@@ -53,7 +61,7 @@ export function ExampleScreen() {
   return (
     <Screen title={app.name}>
       <AppArtwork app={app} />
-      <View style={{ gap: 12 }}>
+      <View className="gap-[12px]">
         <Label variant="title">{app.name}</Label>
         <Label>{app.about ?? app.line}</Label>
         <TargetBadges targets={app.targets} />

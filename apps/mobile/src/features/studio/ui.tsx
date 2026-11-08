@@ -1,3 +1,4 @@
+import { VariableContextProvider } from "nativewind";
 import { ScrollView, View, Text } from "react-native";
 import { SymbolView } from "expo-symbols";
 import * as Haptics from "expo-haptics";
@@ -33,6 +34,7 @@ const symbols = {
   file: ["paperclip", "attach-file"],
   send: ["arrow.up", "arrow-upward"],
   more: ["ellipsis", "more-horiz"],
+  compose: ["square.and.pencil", "edit-square"],
   grid: ["square.grid.2x2", "apps"],
   plus: ["plus", "add"],
   close: ["xmark", "close"],
@@ -86,69 +88,58 @@ export function Icon({
 export function Screen({
   children,
   title,
-  style,
+  contentClassName = "gap-[32px]",
   notice,
 }: {
   children: ReactNode;
   title: string;
   notice?: string;
-  style?: ComponentProps<typeof ScrollView>["contentContainerStyle"];
+  contentClassName?: string;
 }) {
   const c = useTheme();
   const insets = useSafeAreaInsets();
   return (
-    <>
+    <VariableContextProvider
+      value={{
+        "--screen-left": Math.max(insets.left, space.gutter),
+        "--screen-right": Math.max(insets.right, space.gutter),
+      }}
+    >
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
         automaticallyAdjustKeyboardInsets
         keyboardDismissMode="on-drag"
         keyboardShouldPersistTaps="handled"
-        style={{ flex: 1, backgroundColor: c.background }}
-        contentContainerStyle={[
-          {
-            paddingLeft: Math.max(insets.left, space.gutter),
-            paddingRight: Math.max(insets.right, space.gutter),
-            paddingTop: space.body,
-            paddingBottom: space.wide,
-            gap: space.section,
-            width: "100%",
-            maxWidth: 760,
-            alignSelf: "center",
-          },
-          style,
-        ]}
+        className="flex-1 bg-background"
+        contentContainerClassName={`w-full max-w-[760px] self-center pt-[16px] pb-[48px] pl-[var(--screen-left)] pr-[var(--screen-right)] ${contentClassName}`}
       >
         {children}
       </ScrollView>
       <Stack.Screen options={{ title }} />
       {notice ? (
-        <View
-          accessibilityRole="alert"
-          pointerEvents="none"
-          style={{
-            position: "absolute",
-            bottom: Math.max(insets.bottom, 24),
-            left: 24,
-            right: 24,
-            padding: 18,
-            borderRadius: 18,
-            backgroundColor: c.foreground,
-          }}
+        <VariableContextProvider
+          value={{ "--layout-bottom": Math.max(insets.bottom, 24) }}
         >
-          <NativeLabel color={c.background}>{notice}</NativeLabel>
-        </View>
+          <View
+            accessibilityRole="alert"
+            pointerEvents="none"
+            className="absolute bottom-[var(--layout-bottom)] left-[24px] right-[24px] p-[18px] rounded-[18px] bg-foreground"
+          >
+            <NativeLabel color={c.background}>{notice}</NativeLabel>
+          </View>
+        </VariableContextProvider>
       ) : null}
-    </>
+    </VariableContextProvider>
   );
 }
 export function HeaderActions() {
   const router = useRouter();
   return (
-    <View style={{ flexDirection: "row", gap: 4 }}>
+    <View className="flex-row gap-[4px]">
       <Touch
         label="Create a new app"
         onPress={() => router.push("/compose")}
-        style={{ width: 44, alignItems: "center", justifyContent: "center" }}
+        className="w-[44px] items-center justify-center"
       >
         <Icon name="plus" />
       </Touch>
@@ -162,15 +153,12 @@ export function TargetBadges({ targets }: { targets: Target[] }) {
     <View
       accessible
       accessibilityLabel={`Available for ${targets.map((t) => targetNames[t]).join(", ")}`}
-      style={{ flexDirection: "row", gap: space.compact, flexWrap: "wrap" }}
+      className="flex-row gap-[12px] flex-wrap"
     >
       {targets.map((t) => (
-        <View
-          key={t}
-          style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
-        >
+        <View key={t} className="flex-row items-center gap-[4px]">
           <Icon name={t} size={15} color={c.mutedForeground} />
-          <Text style={{ fontSize: 12, color: c.mutedForeground }}>
+          <Text className="text-[12px] text-muted-foreground">
             {targetNames[t]}
           </Text>
         </View>

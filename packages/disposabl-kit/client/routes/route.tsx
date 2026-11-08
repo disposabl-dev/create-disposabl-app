@@ -1,4 +1,5 @@
 import { Logo } from "../components/logo";
+import { appName } from "../../lib/app-name";
 import { LegalFooter } from "../components/legal-page";
 import { LogOut } from "../components/ui/log-out";
 import { useState } from "react";
@@ -84,7 +85,7 @@ function SiteHeader() {
         className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4"
         aria-label="Main navigation"
       >
-        <a href="/" aria-label="Disposabl home">
+        <a href="/" aria-label={appName ? `${appName} home` : "Home"}>
           <Logo />
         </a>
         <div className="flex items-center gap-5">

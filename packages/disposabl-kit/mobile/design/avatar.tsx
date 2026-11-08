@@ -20,7 +20,7 @@ export function Avatar({
   return source && failedSource !== source ? (
     <Image
       source={{ uri: source }}
-      style={{ width: 92, height: 92, borderRadius: 46 }}
+      className="w-[92px] h-[92px] rounded-[46px]"
       accessibilityLabel={`${name}'s profile picture`}
       onError={() => setFailedSource(source)}
     />

@@ -14,6 +14,7 @@ export const status = v.union(
 export const sendArgs = {
   prompt: v.string(),
   appId: v.optional(v.string()),
+  fileIds: v.optional(v.array(v.id("files"))),
   ...requestedConfiguration,
 };
 export const historyArgs = {
@@ -30,6 +31,8 @@ export const execution = v.object({
   status,
   pending: v.array(v.string()),
   updatedAt: v.number(),
+  startedAt: v.optional(v.number()),
+  finishedAt: v.optional(v.number()),
   conversationId: v.optional(v.string()),
   promptId: v.optional(v.string()),
   cursor: v.optional(v.string()),
@@ -58,10 +61,17 @@ export const message = v.object({
   status: v.string(),
   createdAt: v.number(),
   tools: v.optional(v.string()),
+  attachments: v.optional(
+    v.array(
+      v.object({ id: v.string(), filename: v.string(), mediaType: v.string() }),
+    ),
+  ),
 });
 export const history = v.union(
   v.object({
     kind: v.literal("messages"),
+    startedAt: v.optional(v.number()),
+    finishedAt: v.optional(v.number()),
     stopUnconfirmed: v.optional(v.boolean()),
     ...result.fields,
     error: v.optional(v.string()),

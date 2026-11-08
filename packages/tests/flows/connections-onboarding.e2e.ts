@@ -1,7 +1,41 @@
 import { test } from "@e2e-dev/web";
-import { expect } from "e2e";
+import { expect, test as backendTest } from "e2e";
 import { randomUUID } from "node:crypto";
 import { backendUrl, project } from "../project.ts";
+
+backendTest(
+  "management subscriptions clear when the session is absent",
+  { platforms: ["backend"] },
+  async () => {
+    const paginationOpts = { numItems: 10, cursor: null };
+    const emptyPage = { page: [], isDone: true, continueCursor: "" };
+    for (const [path, args, value] of [
+      ["connections/index:status", {}, null],
+      ["apps/index:list", { paginationOpts }, emptyPage],
+      ["apps/index:get", { appId: "signed-out" }, null],
+      [
+        "previews/index:list",
+        { appId: "signed-out", paginationOpts },
+        emptyPage,
+      ],
+      ["releases/index:get", { appId: "signed-out" }, null],
+      [
+        "agent/index:getMessages",
+        { appId: "signed-out", paginationOpts },
+        null,
+      ],
+    ]) {
+      const response = await fetch(`${backendUrl()}/api/query`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path, args }),
+        signal: AbortSignal.timeout(15_000),
+      });
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({ status: "success", value });
+    }
+  },
+);
 
 test(
   "login returns to connections and preserves the terminal setup URL",
@@ -90,5 +124,81 @@ test(
       await screen.getByRole("button", "Cancel", { exact: true }).tap();
     }
     await screen.getByRole("button", "Logout", { exact: true }).tap();
+  },
+);
+
+test(
+  "connected accounts continue to the composer and CLI setup stays on its completion page",
+  { platforms: ["web"], tags: ["connections"] },
+  async ({ app, screen, browser }) => {
+    const origin = new URL(backendUrl());
+    test.skip(
+      !["localhost", "127.0.0.1", "[::1]"].includes(origin.hostname) ||
+        !process.env.E2E_CONVEX_URL,
+      "Provider fixtures require the isolated loopback backend",
+    );
+    const key = process.env.E2E_CONVEX_ADMIN_KEY;
+    test.skip(!key, "E2E_CONVEX_ADMIN_KEY is required for isolated fixtures");
+    const { handoffFixture } = await import("../helpers/browser-handoff.ts");
+    const fixture = await handoffFixture();
+    async function seed(path: string, args: object) {
+      const result = await fetch(`${origin.origin}/api/mutation`, {
+        method: "POST",
+        signal: AbortSignal.timeout(15_000),
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Convex ${key}`,
+        },
+        body: JSON.stringify({ path, args, format: "json" }),
+      }).then((response) => response.json());
+      if (result.status !== "success")
+        throw new Error(`Local fixture failed: ${path}`);
+    }
+    await app.open(fixture.path);
+    await screen
+      .getByRole("button", `Continue as @${fixture.username}`, { exact: true })
+      .tap();
+    await expect(
+      screen.getByRole("heading", "Connect your accounts."),
+    ).toBeVisible();
+    await app.open("/dashboard?origin=web");
+    await expect(
+      screen.getByRole("heading", "Connect your accounts."),
+    ).toBeVisible();
+    await expect(
+      screen.getByRole("button", "Continue", { exact: true }),
+    ).toBeDisabled();
+    await seed("github/internal:connect", {
+      userId: fixture.userId,
+      owner: "fixture",
+      installationId: "12345",
+    });
+    await seed("connections/internal:save", {
+      userId: fixture.userId,
+      provider: "convex",
+      accountId: "fixture",
+      name: "Fixture",
+      token: "fixture",
+    });
+    await expect(
+      screen.getByRole("button", "Continue", { exact: true }),
+    ).toBeVisible();
+    await screen.getByRole("button", "Continue", { exact: true }).tap();
+    await expect(screen.getByTestId("agent-onboarding")).toBeVisible();
+
+    await app.open("/dashboard/connections?origin=cli");
+    await expect(
+      screen.getByRole("link", "Go to dashboard", { exact: true }),
+    ).toBeVisible();
+    await app.open(
+      "/dashboard/connections?error=access_denied&code=discard&state=discard",
+    );
+    await expect(screen.getByRole("alert")).toContainText("cancelled");
+    await expect(browser).toHaveURL("/dashboard/connections");
+    await browser.reload();
+    await expect(
+      screen.getByRole("link", "Go to dashboard", { exact: true }),
+    ).toBeVisible();
+    await expect(screen.getByTestId("agent-onboarding")).not.toBeVisible();
   },
 );

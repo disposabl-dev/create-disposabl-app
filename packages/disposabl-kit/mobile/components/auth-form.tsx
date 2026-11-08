@@ -20,12 +20,11 @@ import {
 } from "react-native";
 import { api } from "../lib/convex";
 import { authErrorMessage } from "../../lib/auth-errors";
-import { AuthButton, AuthScreen, useAuthStyles } from "./auth-ui";
+import { AuthButton, AuthScreen, authClasses } from "./auth-ui";
 import { GoogleSignIn } from "./google-sign-in";
 import { BrandMark } from "../design/brand-mark";
 
 export function AuthForm({ mode }: { mode: "login" | "signup" }) {
-  const styles = useAuthStyles();
   const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
   const { signIn, pending: signingIn } = useSignInWithUsernamePassword(
     api.auth,
@@ -86,7 +85,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   if (sent)
     return (
       <AuthScreen>
-        <Text style={styles.title}>Check your email</Text>
+        <Text className={authClasses.title}>Check your email</Text>
         <EmailVerification />
       </AuthScreen>
     );
@@ -94,10 +93,10 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   return (
     <AuthScreen>
       <BrandMark />
-      <Text style={styles.title}>
+      <Text className={authClasses.title}>
         {isSignup ? "Create your account" : "Welcome back"}
       </Text>
-      <Text style={styles.body}>
+      <Text className={authClasses.body}>
         {providers?.googleOnly
           ? "Continue with your Google account."
           : isSignup
@@ -108,18 +107,20 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
       </Text>
       {providers?.google && <GoogleSignIn disabled={pending} />}
       {providers?.googleOnly && !providers.google && (
-        <Text style={styles.error}>
+        <Text className={authClasses.error}>
           Sign-in is temporarily unavailable. Please try again later.
         </Text>
       )}
       {!providers?.googleOnly && (
         <>
-          <View style={styles.field}>
-            <Text style={styles.label}>{email ? "Email" : "Username"}</Text>
+          <View className={authClasses.field}>
+            <Text className={authClasses.label}>
+              {email ? "Email" : "Username"}
+            </Text>
             <TextInput
               accessibilityLabel={email ? "Email" : "Username"}
               keyboardType={email ? "email-address" : "default"}
-              style={styles.input}
+              className={authClasses.input}
               value={username}
               onChangeText={setUsername}
               autoCapitalize="none"
@@ -132,12 +133,12 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
               onSubmitEditing={() => passwordInput.current?.focus()}
             />
           </View>
-          <View style={styles.field}>
-            <Text style={styles.label}>Password</Text>
+          <View className={authClasses.field}>
+            <Text className={authClasses.label}>Password</Text>
             <TextInput
               ref={passwordInput}
               accessibilityLabel="Password"
-              style={styles.input}
+              className={authClasses.input}
               value={password}
               onChangeText={setPassword}
               secureTextEntry
@@ -154,12 +155,12 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
             />
           </View>
           {isSignup && (
-            <View style={styles.field}>
-              <Text style={styles.label}>Confirm password</Text>
+            <View className={authClasses.field}>
+              <Text className={authClasses.label}>Confirm password</Text>
               <TextInput
                 ref={confirmationInput}
                 accessibilityLabel="Confirm password"
-                style={styles.input}
+                className={authClasses.input}
                 value={confirmation}
                 onChangeText={setConfirmation}
                 secureTextEntry
@@ -173,12 +174,12 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
             </View>
           )}
           {email && isSignup && providers && !providers.emailDelivery && (
-            <Text style={styles.error}>
+            <Text className={authClasses.error}>
               Email signup is temporarily unavailable.
             </Text>
           )}
           {error && (
-            <Text accessibilityRole="alert" style={styles.error}>
+            <Text accessibilityRole="alert" className={authClasses.error}>
               {error}
             </Text>
           )}
@@ -200,7 +201,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
             onPress={() => void submit()}
           />
           {providers?.emailDelivery && (
-            <Link href="/(auth)/forgot-password" style={styles.link}>
+            <Link href="/(auth)/forgot-password" className={authClasses.link}>
               Forgot password?
             </Link>
           )}
@@ -211,7 +212,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
                 pathname: isSignup ? "/(auth)/login" : "/(auth)/signup",
                 params: { returnTo },
               }}
-              style={styles.link}
+              className={authClasses.link}
             >
               {isSignup
                 ? "Already have an account? Log in"

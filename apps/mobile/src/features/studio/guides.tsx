@@ -1,3 +1,4 @@
+import { VariableContextProvider } from "nativewind";
 import { FlatList, ScrollView, View, useWindowDimensions } from "react-native";
 import { useRef, useState } from "react";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
@@ -34,9 +35,9 @@ function Shelf({
   const { width } = useWindowDimensions();
   const cardWidth = Math.min(wide ? 258 : 184, width * (wide ? 0.68 : 0.46));
   return (
-    <View style={{ gap: 18 }}>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-        <View style={{ flex: 1 }}>
+    <View className="gap-[18px]">
+      <View className="flex-row items-center gap-[12px]">
+        <View className="flex-1">
           <Label variant="title">{title}</Label>
         </View>
         <Label
@@ -48,38 +49,37 @@ function Shelf({
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: 18, paddingBottom: 4 }}
+        contentContainerClassName="gap-[18px] pb-[4px]"
       >
         {lessons.map((guide) => (
-          <Touch
+          <VariableContextProvider
             key={guide.id}
-            label={`Read ${guide.title}`}
-            onPress={() =>
-              router.push({
-                pathname: "/guide-detail",
-                params: { id: guide.id },
-              })
-            }
-            style={{ width: cardWidth, gap: 12 }}
+            value={{ "--layout-width": cardWidth ?? "auto" }}
           >
-            <GuideCover
-              title={coverTitles[guide.id] ?? guide.title}
-              index={guides.indexOf(guide)}
-              height={wide ? 182 : cardWidth * 1.16}
-            />
-            <View
-              style={{
-                flexDirection: "row",
-                gap: 10,
-                alignItems: "flex-start",
-              }}
+            <Touch
+              key={guide.id}
+              label={`Read ${guide.title}`}
+              onPress={() =>
+                router.push({
+                  pathname: "/guide-detail",
+                  params: { id: guide.id },
+                })
+              }
+              className="w-[var(--layout-width)] gap-[12px]"
             >
-              <View style={{ flex: 1 }}>
-                <Label variant="label">{guide.title}</Label>
+              <GuideCover
+                title={coverTitles[guide.id] ?? guide.title}
+                index={guides.indexOf(guide)}
+                height={wide ? 182 : cardWidth * 1.16}
+              />
+              <View className="flex-row gap-[10px] items-start">
+                <View className="flex-1">
+                  <Label variant="label">{guide.title}</Label>
+                </View>
+                <Icon name="book" size={14} color={c.mutedForeground} />
               </View>
-              <Icon name="book" size={14} color={c.mutedForeground} />
-            </View>
-          </Touch>
+            </Touch>
+          </VariableContextProvider>
         ))}
       </ScrollView>
     </View>
@@ -89,13 +89,13 @@ export default function GuidesScreen() {
   const c = useTheme();
   const router = useRouter();
   return (
-    <Screen title="Guides" style={{ gap: 34 }}>
+    <Screen title="Guides" contentClassName="gap-[34px]">
       <Touch
         label="Read Meet Disposabl"
         onPress={() =>
           router.push({ pathname: "/guide-detail", params: { id: "welcome" } })
         }
-        style={{ gap: 16 }}
+        className="gap-[16px]"
       >
         <View>
           <GuideCover
@@ -104,21 +104,13 @@ export default function GuidesScreen() {
             height={300}
             featured
           />
-          <View style={{ position: "absolute", left: 24, bottom: 24 }}>
-            <GlassSurface
-              style={{
-                width: 54,
-                height: 54,
-                borderRadius: 27,
-                justifyContent: "center",
-                alignItems: "center",
-              }}
-            >
+          <View className="absolute left-[24px] bottom-[24px]">
+            <GlassSurface className="w-[54px] h-[54px] rounded-[27px] justify-center items-center">
               <Icon name="book" size={22} color={c.foreground} />
             </GlassSurface>
           </View>
         </View>
-        <View style={{ gap: 6 }}>
+        <View className="gap-[6px]">
           <Label variant="heading">Meet Disposabl</Label>
           <Label color={c.mutedForeground}>
             A place to begin. An idea to make your own.
@@ -134,7 +126,7 @@ export default function GuidesScreen() {
         lessons={guides.filter((g) => g.section === "Introduction")}
         wide
       />
-      <View style={{ gap: 20 }}>
+      <View className="gap-[20px]">
         <Label variant="title">Mastery</Label>
         <Label color={c.mutedForeground}>Take your next idea further.</Label>
         {guideSections
@@ -151,21 +143,16 @@ export default function GuidesScreen() {
                     params: { id: lessons[0]!.id },
                   })
                 }
-                style={{
-                  flexDirection: "row",
-                  gap: 18,
-                  alignItems: "center",
-                  paddingVertical: 8,
-                }}
+                className="flex-row gap-[18px] items-center py-[8px]"
               >
-                <View style={{ width: 100 }}>
+                <View className="w-[100px]">
                   <GuideCover
                     title={String(i + 1).padStart(2, "0")}
                     index={i + 1}
                     height={116}
                   />
                 </View>
-                <View style={{ flex: 1, gap: 8 }}>
+                <View className="flex-1 gap-[8px]">
                   <Label variant="heading">
                     {section.replace("Mastery · ", "")}
                   </Label>
@@ -199,7 +186,7 @@ export function GuideDetailScreen() {
   }
   return (
     <View
-      style={{ flex: 1, backgroundColor: c.background }}
+      className="flex-1 bg-background"
       onLayout={(e) => setHeight(e.nativeEvent.layout.height)}
     >
       <Stack.Screen options={{ title: guides[index]!.section }} />
@@ -228,65 +215,49 @@ export function GuideDetailScreen() {
           }
           showsVerticalScrollIndicator={false}
           renderItem={({ item, index: i }) => (
-            <ScrollView
-              style={{ height }}
-              contentContainerStyle={{
-                padding: 24,
-                gap: 24,
-                paddingBottom: 36,
-              }}
-            >
-              <Label variant="title">{item.title}</Label>
-              <View style={{ borderRadius: 24, overflow: "hidden" }}>
-                <GuideCover
-                  title={coverTitles[item.id] ?? item.title}
-                  index={i}
-                  height={280}
-                  featured
-                />
-                <View
-                  style={{
-                    padding: 20,
-                    backgroundColor: c.card,
-                    flexDirection: "row",
-                    gap: 12,
-                    alignItems: "center",
-                  }}
-                >
-                  <Icon name="book" />
-                  <View style={{ flex: 1 }}>
-                    <Label variant="label">Guide</Label>
+            <VariableContextProvider value={{ "--layout-height": height }}>
+              <ScrollView
+                className="h-[var(--layout-height)]"
+                contentContainerClassName="p-[24px] gap-[24px] pb-[36px]"
+              >
+                <Label variant="title">{item.title}</Label>
+                <View className="rounded-[24px] overflow-hidden">
+                  <GuideCover
+                    title={coverTitles[item.id] ?? item.title}
+                    index={i}
+                    height={280}
+                    featured
+                  />
+                  <View className="p-[20px] bg-card flex-row gap-[12px] items-center">
+                    <Icon name="book" />
+                    <View className="flex-1">
+                      <Label variant="label">Guide</Label>
+                    </View>
                   </View>
                 </View>
-              </View>
-              <Label>{item.body}</Label>
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  gap: 12,
-                }}
-              >
-                <Action
-                  compact
-                  label="Previous"
-                  secondary
-                  disabled={i === 0}
-                  onPress={() => move(i - 1)}
-                />
-                <Action
-                  compact
-                  label="Next"
-                  secondary
-                  disabled={i === guides.length - 1}
-                  onPress={() => move(i + 1)}
-                />
-              </View>
-              <Label variant="caption" color={c.mutedForeground}>
-                Swipe up for the next lesson. Lessons continue through each
-                section in order.
-              </Label>
-            </ScrollView>
+                <Label>{item.body}</Label>
+                <View className="flex-row justify-between gap-[12px]">
+                  <Action
+                    compact
+                    label="Previous"
+                    secondary
+                    disabled={i === 0}
+                    onPress={() => move(i - 1)}
+                  />
+                  <Action
+                    compact
+                    label="Next"
+                    secondary
+                    disabled={i === guides.length - 1}
+                    onPress={() => move(i + 1)}
+                  />
+                </View>
+                <Label variant="caption" color={c.mutedForeground}>
+                  Swipe up for the next lesson. Lessons continue through each
+                  section in order.
+                </Label>
+              </ScrollView>
+            </VariableContextProvider>
           )}
         />
       )}

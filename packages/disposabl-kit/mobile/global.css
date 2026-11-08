@@ -1,5 +1,6 @@
 @import "tailwindcss/theme.css" layer(theme);
 @import "tailwindcss/preflight.css" layer(base);
+@import "./typography.css" layer(components);
 @import "tailwindcss/utilities.css";
 
 @import "nativewind/theme";
@@ -57,6 +58,13 @@
   --destructive-foreground: #ffffff;
 }
 
+/* NativeWind's Android default currently maps font-serif to sans-serif. */
+@media android {
+  :root {
+    --font-serif: serif;
+  }
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #101a32;
@@ -105,61 +113,5 @@
 @media (prefers-color-scheme: dark) {
   .accent-black {
     --accent: #ffffff;
-  }
-}
-
-.type-default,
-.type-title,
-.type-subtitle,
-.type-small,
-.type-small-bold,
-.type-link {
-  font-family: "Spline Sans";
-}
-
-.type-default {
-  font-size: 16px;
-  font-weight: 500;
-  line-height: 24px;
-}
-
-.type-title {
-  font-size: 48px;
-  font-weight: 600;
-  line-height: 52px;
-}
-
-.type-subtitle {
-  font-size: 32px;
-  font-weight: 600;
-  line-height: 44px;
-}
-
-.type-small {
-  font-size: 14px;
-  font-weight: 500;
-  line-height: 20px;
-}
-
-.type-small-bold {
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 20px;
-}
-
-.type-link {
-  font-size: 14px;
-  line-height: 30px;
-}
-
-.type-code {
-  font-family: ui-monospace;
-  font-size: 12px;
-  font-weight: 500;
-}
-
-@media android {
-  .type-code {
-    font-weight: 700;
   }
 }

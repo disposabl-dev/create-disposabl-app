@@ -50,7 +50,9 @@ function Navigation({
           name="compose"
           options={{
             title: "Create app",
-            presentation: "formSheet",
+            presentation:
+              process.env.EXPO_OS === "ios" ? "formSheet" : "fullScreenModal",
+            headerShown: true,
             sheetAllowedDetents: [1],
             sheetGrabberVisible: true,
           }}

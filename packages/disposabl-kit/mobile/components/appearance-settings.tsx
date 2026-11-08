@@ -1,4 +1,6 @@
-import { MenuView, type MenuAction } from "@expo/ui/community/menu";
+import { VariableContextProvider } from "nativewind";
+import type { MenuAction } from "@expo/ui/community/menu";
+import { MenuView } from "../design/nativewind";
 import { SymbolView, type SymbolViewProps } from "expo-symbols";
 import { Platform, View } from "react-native";
 import {
@@ -78,51 +80,44 @@ function PreferenceMenu({
 }) {
   const colors = usePreferenceColors();
   return (
-    <PreferenceRow
-      icon={icon}
-      label={label}
-      trailing={
-        <MenuView
-          testID={`${label}-menu`}
-          style={{ flexShrink: 1, maxWidth: "55%" }}
-          actions={actions}
-          onPressAction={({ nativeEvent }) => onSelect(nativeEvent.event)}
-        >
-          <View
-            collapsable={false}
-            pointerEvents={Platform.OS === "ios" ? "none" : "auto"}
-            accessibilityRole="button"
-            accessibilityLabel={`${label}: ${value}`}
-            style={{
-              minHeight: 44,
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 8,
-            }}
+    <VariableContextProvider
+      value={{ "--swatch": valueColor ?? "transparent" }}
+    >
+      <PreferenceRow
+        icon={icon}
+        label={label}
+        trailing={
+          <MenuView
+            testID={`${label}-menu`}
+            className="max-w-[55%] shrink"
+            actions={actions}
+            onPressAction={({ nativeEvent }) => onSelect(nativeEvent.event)}
           >
-            {valueColor && (
-              <View
-                style={{
-                  width: 14,
-                  height: 14,
-                  borderRadius: 7,
-                  backgroundColor: valueColor,
-                }}
-              />
-            )}
-            <ThemedText
-              style={{ color: colors.secondary, fontSize: 16, flexShrink: 1 }}
+            <View
+              collapsable={false}
+              pointerEvents={Platform.OS === "ios" ? "none" : "auto"}
+              accessibilityRole="button"
+              accessibilityLabel={`${label}: ${value}`}
+              className="min-h-[44px] flex-row items-center gap-[8px]"
             >
-              {value}
-            </ThemedText>
-            <SymbolView
-              name={{ ios: "chevron.up.chevron.down", android: "unfold_more" }}
-              size={13}
-              tintColor={colors.secondary}
-            />
-          </View>
-        </MenuView>
-      }
-    />
+              {valueColor && (
+                <View className="size-[14px] rounded-full bg-[var(--swatch)]" />
+              )}
+              <ThemedText className="text-[#71717a] dark:text-[#a1a1aa] text-[16px] shrink">
+                {value}
+              </ThemedText>
+              <SymbolView
+                name={{
+                  ios: "chevron.up.chevron.down",
+                  android: "unfold_more",
+                }}
+                size={13}
+                tintColor={colors.secondary}
+              />
+            </View>
+          </MenuView>
+        }
+      />
+    </VariableContextProvider>
   );
 }

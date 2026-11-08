@@ -1,5 +1,5 @@
 import { getSessionUserId } from "@disposabl/disposabl-kit/server/lib/functions";
-import { ConvexError, v, type Infer } from "convex/values";
+import { v, type Infer } from "convex/values";
 import { internal } from "../_generated/api";
 import { query } from "../_generated/server";
 import { releasesResult } from "../validator";
@@ -9,7 +9,7 @@ export const get = query({
   returns: v.union(releasesResult, v.null()),
   handler: async (ctx, args): Promise<Infer<typeof releasesResult> | null> => {
     const userId = await getSessionUserId(ctx);
-    if (!userId) throw new ConvexError("Sign in to view releases.");
+    if (!userId) return null;
     return ctx.runQuery(internal.releases.internal.get, { ...args, userId });
   },
 });

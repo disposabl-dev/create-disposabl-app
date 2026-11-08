@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { MenuView } from "@expo/ui/community/menu";
+import { MenuView } from "../design/nativewind";
 import { Alert, Platform, View } from "react-native";
 import { Avatar } from "../design/avatar";
 import { ThemedText } from "../design/themed-text";
@@ -8,7 +8,6 @@ import {
   PreferenceIconButton,
   PreferenceSection,
   PreferenceSeparator,
-  usePreferenceColors,
 } from "../design/preferences";
 
 export function AccountProfile({
@@ -28,7 +27,6 @@ export function AccountProfile({
   title?: string;
   onCopyEmail?: (email: string) => Promise<void>;
 }) {
-  const colors = usePreferenceColors();
   const [emailVisible, setEmailVisible] = useState(false);
   const [local, domain] = email?.split("@") ?? [];
   const masked = local && domain ? `${local[0]}••••@${domain}` : "••••••";
@@ -36,10 +34,7 @@ export function AccountProfile({
     <>
       <View className="items-center pb-1 pt-2">
         <Avatar name={name} source={picture} />
-        <ThemedText
-          className="mt-4 text-center"
-          style={{ color: colors.text, fontSize: 22, fontWeight: "600" }}
-        >
+        <ThemedText className="mt-4 text-center text-[#18181b] dark:text-[#fafafa] text-[22px] font-semibold">
           {name}
         </ThemedText>
       </View>
@@ -54,19 +49,13 @@ export function AccountProfile({
                     : { ios: "person", android: "person" }
                 }
               />
-              <ThemedText
-                className="ml-4"
-                style={{ color: colors.text, fontSize: 17 }}
-              >
+              <ThemedText className="ml-4 text-[#18181b] dark:text-[#fafafa] text-[17px]">
                 {email ? "Email" : "Username"}
               </ThemedText>
-              <View
-                className="ml-auto flex-row items-center gap-1"
-                style={{ flexShrink: 1, minWidth: 0 }}
-              >
+              <View className="ml-auto flex-row items-center gap-1 shrink min-w-[0px]">
                 {email && onCopyEmail ? (
                   <MenuView
-                    style={{ flexShrink: 1 }}
+                    className="shrink"
                     actions={[{ id: "copy", title: "Copy email" }]}
                     onPressAction={() =>
                       void onCopyEmail(email).catch(() =>
@@ -82,11 +71,11 @@ export function AccountProfile({
                       pointerEvents={Platform.OS === "ios" ? "none" : "auto"}
                       accessibilityRole="button"
                       accessibilityLabel="Email options"
-                      style={{ minHeight: 44, justifyContent: "center" }}
+                      className="min-h-[44px] justify-center"
                     >
                       <ThemedText
                         numberOfLines={1}
-                        style={{ color: colors.secondary, fontSize: 16 }}
+                        className="text-[#71717a] dark:text-[#a1a1aa] text-[16px]"
                       >
                         {emailVisible ? email : masked}
                       </ThemedText>
@@ -96,11 +85,7 @@ export function AccountProfile({
                   <ThemedText
                     selectable={emailVisible || !email}
                     numberOfLines={1}
-                    style={{
-                      color: colors.secondary,
-                      fontSize: 16,
-                      flexShrink: 1,
-                    }}
+                    className="text-[#71717a] dark:text-[#a1a1aa] text-[16px] shrink"
                   >
                     {email ? (emailVisible ? email : masked) : username}
                   </ThemedText>

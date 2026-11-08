@@ -23,6 +23,8 @@ node --input-type=module -e '
   const faster = config.features?.includes("faster-ci");
   const runners = faster ? {linux: "blacksmith-2vcpu-ubuntu-2404", windows: "blacksmith-2vcpu-windows-2025", macos: "blacksmith-6vcpu-macos-26"} : {linux: "ubuntu-24.04", windows: "windows-2025", macos: "macos-26"};
   for (const [name, runner] of Object.entries(runners)) console.log(`${name}_runner=${runner}`);
+  // Universal Android builds compile four ABIs; keep lighter Linux work on two CPUs.
+  console.log(`android_runner=${faster ? "blacksmith-8vcpu-ubuntu-2404" : runners.linux}`);
   const api = path => JSON.parse(execFileSync("gh", ["api", `repos/${process.env.GH_REPO}/${path}`], {encoding: "utf8", stdio: ["ignore", "pipe", "ignore"]}));
   const changes = platform => {
     if (!process.env.PR) return paths;
@@ -38,10 +40,10 @@ node --input-type=module -e '
   };
   const shared = p => /^(bun.lock$|package.json$|disposabl.json$|turbo.json$|bunfig.toml$|patches\/|vendor\/|\.github\/(workflows\/pipeline.yml$|scripts\/(platforms.sh|disposabl.mjs|release.sh)$))/.test(p);
   const affected = (platform, dependency) => enabled.includes(platform) && changes(platform).some(p => shared(p) || dependency.test(p));
-  const mobile = /^(apps\/mobile\/|packages\/disposabl-kit\/|\.github\/scripts\/(mobile|apple)\.sh$)/;
-  for (const platform of ["android", "ios"]) console.log(`${platform}=${(platform === "ios" || process.env.EXPO_CONNECTED === "true") && affected(platform, mobile)}`);
+  const mobile = /^(apps\/mobile\/|packages\/disposabl-kit\/|\.github\/scripts\/(mobile|apple|android-runner)\.sh$)/;
+  for (const platform of ["android", "ios"]) console.log(`${platform}=${(platform === "ios" ? process.env.IOS_BUILDS_ENABLED !== "false" : process.env.EXPO_CONNECTED === "true") && affected(platform, mobile)}`);
   const production = process.env.GITHUB_EVENT_NAME === "push" && process.env.GITHUB_REF === "refs/heads/main";
-  const desktop = (production ? ["linux", "windows", "macos"] : []).filter(platform => affected(platform, /^apps\/desktop\//))
+  const desktop = (production ? ["linux", "windows", "macos"] : []).filter(platform => affected(platform, platform === "macos" ? /^(apps\/desktop\/|\.github\/scripts\/macos-release\.sh$)/ : /^apps\/desktop\//))
     .map(platform => ({platform, runner: runners[platform]}));
   console.log(`desktop=${JSON.stringify(desktop)}`);
   const packages = (production ? ["cli", "sdk"] : []).filter(name => {
