@@ -22,7 +22,7 @@
     "typecheck": "bun check",
     "lint": "bun check",
     "release": "semantic-release",
-    "prepack": "node ../disposabl-kit/server/release/verify-metadata.mjs"
+    "prepack": "node dist/verify-metadata.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",

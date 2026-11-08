@@ -27,7 +27,7 @@
     "lint": "cd ../.. && eslint --config packages/create-disposabl-app/eslint.config.ts packages/create-disposabl-app reset.ts",
     "format": "bun fmt",
     "verify:starter": "bun ../tests/starter-ci.ts",
-    "prepack": "node ../disposabl-kit/server/release/verify-metadata.mjs"
+    "prepack": "node dist/verify-metadata.mjs"
   },
   "publishConfig": {
     "access": "public"

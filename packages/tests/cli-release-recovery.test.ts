@@ -229,18 +229,19 @@ test(
     }
     const dir = mkdtempSync(join(tmpdir(), "release-metadata-"));
     const root = resolve(import.meta.dirname, "../..");
-    const helper = join(dir, "packages/disposabl-kit/server/release");
-    mkdirSync(helper, { recursive: true });
-    writeFileSync(
-      join(helper, "verify-metadata.mjs"),
-      readFileSync(
-        join(root, "packages/disposabl-kit/server/release/verify-metadata.mjs"),
-      ),
-    );
     for (const name of ["cli", "sdk", "create-disposabl-app"]) {
       const folder = join(dir, "packages", name);
       mkdirSync(join(folder, "dist"), { recursive: true });
       writeFileSync(join(folder, "dist/index.js"), "// fixture\n");
+      writeFileSync(
+        join(folder, "dist/verify-metadata.mjs"),
+        readFileSync(
+          join(
+            root,
+            "packages/disposabl-kit/server/release/verify-metadata.mjs",
+          ),
+        ),
+      );
       const manifest = JSON.parse(
         readFileSync(join(root, "packages", name, "package.json"), "utf8"),
       );
@@ -258,9 +259,9 @@ test(
           },
         );
       }
-      const pack = () =>
+      const pack = (cwd = folder) =>
         spawnSync("npm", ["pack", "--json", "--pack-destination", dir], {
-          cwd: folder,
+          cwd,
           encoding: "utf8",
           env: {
             PATH: process.env.PATH,
@@ -279,6 +280,18 @@ test(
       );
       expect(JSON.stringify(packed)).not.toContain("synthetic-secret");
       expect(packed.repository.url).not.toContain("@");
+      const extracted = join(dir, `extracted-${name}`);
+      mkdirSync(extracted);
+      execFileSync("tar", ["-xf", archive, "-C", extracted]);
+      expect(pack(join(extracted, "package")).status).toBe(0);
+      writeFileSync(
+        join(extracted, "package/package.json"),
+        JSON.stringify({ ...packed, homepage: "https://synthetic-secret@" }),
+      );
+      const invalidRepack = pack(join(extracted, "package"));
+      expect(invalidRepack.status).not.toBe(0);
+      expect(invalidRepack.stderr).toContain("Invalid URL in package metadata");
+      expect(invalidRepack.stderr).not.toContain("synthetic-secret");
       for (const [field, value] of [
         [
           "repository",

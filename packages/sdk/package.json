@@ -19,11 +19,11 @@
   },
   "scripts": {
     "generate": "openapi-ts && bun fmt src/generated",
-    "build": "bun run generate && tsc -p tsconfig.build.json",
+    "build": "bun build.ts",
     "typecheck": "bun run generate && tsc --noEmit",
     "lint": "bun check",
     "release": "semantic-release",
-    "prepack": "node ../disposabl-kit/server/release/verify-metadata.mjs"
+    "prepack": "node dist/verify-metadata.mjs"
   },
   "devDependencies": {
     "@hey-api/openapi-ts": "0.99.0",
