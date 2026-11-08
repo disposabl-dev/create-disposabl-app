@@ -28,6 +28,7 @@ test(
     if (
       ![
         ["http://127.0.0.1:3310", "http://127.0.0.1:3311"],
+        ["http://127.0.0.1:3540", "http://127.0.0.1:3541"],
         ["http://127.0.0.1:3550", "http://127.0.0.1:3551"],
       ].some(([cloud, http]) => backend === cloud && site === http)
     )
@@ -55,7 +56,7 @@ test(
       // deployed static assets. Discovery, authorization and token endpoints stay real.
       if ((await fetch(`${site}/consent`)).status === 404)
         await browser.route(
-          /^http:\/\/127\.0\.0\.1:(?:3311|3551)\/mcp\/oauth\/authorize(?:\?.*)?$/,
+          /^http:\/\/127\.0\.0\.1:(?:3311|3541|3551)\/mcp\/oauth\/authorize(?:\?.*)?$/,
           async (route) => {
             const upstream = await route.fetch();
             const location = upstream.headers.location;
@@ -94,7 +95,7 @@ test(
         child!.stderr!.on("data", (chunk: Buffer) => {
           text += chunk.toString();
           const match = text.match(
-            /http:\/\/127\.0\.0\.1:(?:3311|3551)\/[^\s]+(?=\r?\n)/,
+            /http:\/\/127\.0\.0\.1:(?:3311|3541|3551)\/[^\s]+(?=\r?\n)/,
           );
           if (match) {
             clearTimeout(timer);
@@ -123,6 +124,7 @@ test(
       await expect(
         screen.getByRole("heading", "Connect your agent"),
       ).toBeVisible();
+      await expect(screen.getByText(username, { exact: true })).toBeVisible();
       await screen.getByRole("button", "Allow", { exact: true }).tap();
       expect(await finished).toBe(0);
       const first = JSON.parse(await cli("login", "status")).currentUser;
