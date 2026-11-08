@@ -25,6 +25,8 @@ if (
 // Product-only proof harnesses must not enter generated apps. Keep the same
 // paths in the symlink validation and removal inventories.
 const productProofTests = [
+  "packages/tests/fixtures/telemetry-guard-convex",
+  "packages/tests/telemetry-guard-transactions.test.ts",
   "packages/tests/telemetry-deletion-guard.test.ts",
   "packages/tests/flows/billing-handoff-auth.e2e.ts",
   "packages/tests/fixtures/billing-handoff-browser",

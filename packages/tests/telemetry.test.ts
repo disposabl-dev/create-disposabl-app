@@ -115,6 +115,9 @@ test("capture uses stable opaque authenticated identity and approved metadata", 
 });
 
 function identityContext() {
+  const users = new Map<string, { deletionRequestedAt?: number }>(
+    ["verified-user", "different-user", "a", "b"].map((id) => [id, {}]),
+  );
   const rows = new Map<
     string,
     { _id: string; hash: string; expiresAt: number; userId?: string }
@@ -122,6 +125,7 @@ function identityContext() {
   const jobs: any[] = [];
   let bucket: any = null;
   const db = {
+    normalizeId: (_table: string, id: string) => id,
     query: (table: string) => ({
       withIndex: (_index: string, predicate: (q: any) => unknown) => {
         let hash = "";
@@ -153,12 +157,14 @@ function identityContext() {
         value,
       );
     },
-    get: async (_table: string, id: string) => rows.get(id) ?? null,
+    get: async (table: string, id: string) =>
+      (table === "users" ? users.get(id) : rows.get(id)) ?? null,
     delete: async (_table: string, id: string) => {
       rows.delete(id);
     },
   };
   return {
+    users,
     rows,
     jobs,
     exhaust: () => {
@@ -283,6 +289,16 @@ test("page ingestion issues and binds an anonymous identity only to the verified
     );
     assert.equal(events.length, count);
     delete process.env.E2E_TELEMETRY_DISABLED;
+    fixture.users.set("verified-user", { deletionRequestedAt: 1 });
+    const deniedRows = [...fixture.rows.values()].map((row) => ({ ...row }));
+    const deniedJobs = fixture.jobs.length;
+    assert.equal(
+      (await (page as any)._handler(ctx, request(anonymousId, true))).status,
+      400,
+    );
+    assert.equal(events.length, count);
+    assert.deepEqual([...fixture.rows.values()], deniedRows);
+    assert.equal(fixture.jobs.length, deniedJobs);
     user = null;
     assert.equal(
       (await (page as any)._handler(ctx, request(anonymousId, true))).status,
