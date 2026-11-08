@@ -1,15 +1,14 @@
 import { test } from "@e2e-dev/web";
 import { expect } from "e2e";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { execFile, spawn, type ChildProcess } from "node:child_process";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { promisify } from "node:util";
 import { backendUrl, root, siteUrl } from "../project";
 import { createLocalCli } from "../helpers/cli-oauth-fixture";
 
 const run = promisify(execFile);
-const backend = "http://127.0.0.1:3310";
-const site = "http://127.0.0.1:3311";
-
 // This bundles the central CLI's actual command and auth code with a local-only
 // test entry point. The published npm binary continues to use its fixed origin.
 test(
@@ -24,7 +23,14 @@ test(
       process.env.E2E_CLI_OAUTH !== "1",
       "Explicit local CLI OAuth qualification only",
     );
-    if (backendUrl() !== backend || siteUrl() !== site)
+    const backend = backendUrl();
+    const site = siteUrl();
+    if (
+      ![
+        ["http://127.0.0.1:3310", "http://127.0.0.1:3311"],
+        ["http://127.0.0.1:3550", "http://127.0.0.1:3551"],
+      ].some(([cloud, http]) => backend === cloud && site === http)
+    )
       throw new Error(
         "CLI OAuth fixture requires the designated loopback backend and site.",
       );
@@ -49,7 +55,7 @@ test(
       // deployed static assets. Discovery, authorization and token endpoints stay real.
       if ((await fetch(`${site}/consent`)).status === 404)
         await browser.route(
-          /^http:\/\/127\.0\.0\.1:3311\/mcp\/oauth\/authorize(?:\?.*)?$/,
+          /^http:\/\/127\.0\.0\.1:(?:3311|3551)\/mcp\/oauth\/authorize(?:\?.*)?$/,
           async (route) => {
             const upstream = await route.fetch();
             const location = upstream.headers.location;
@@ -88,7 +94,7 @@ test(
         child!.stderr!.on("data", (chunk: Buffer) => {
           text += chunk.toString();
           const match = text.match(
-            /http:\/\/127\.0\.0\.1:3311\/[^\s]+(?=\r?\n)/,
+            /http:\/\/127\.0\.0\.1:(?:3311|3551)\/[^\s]+(?=\r?\n)/,
           );
           if (match) {
             clearTimeout(timer);
@@ -125,8 +131,24 @@ test(
       expect(JSON.parse(await cli("login", "status")).currentUser).toEqual(
         first,
       );
+      const filename = `${createHash("sha256").update(site).digest("hex")}.json`;
+      const saved = JSON.parse(
+        await readFile(
+          join(fixture.directory, "credentials", filename),
+          "utf8",
+        ),
+      );
+      const accessToken = saved.tokens?.access_token as string;
+      expect(typeof accessToken).toBe("string");
+      const authenticatedRequest = () =>
+        fetch(`${site}/api/users/current`, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+          signal: AbortSignal.timeout(15_000),
+        });
+      expect((await authenticatedRequest()).status).toBe(200);
       await cli("logout");
       expect(JSON.parse(await cli("login", "status")).currentUser).toBe(null);
+      expect((await authenticatedRequest()).status).toBe(401);
     } finally {
       if (child && child.exitCode === null && child.signalCode === null) {
         child.kill("SIGTERM");

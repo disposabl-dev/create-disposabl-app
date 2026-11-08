@@ -8,7 +8,7 @@ const run = promisify(execFile);
 
 /** Bundle the central CLI with a test-only loopback entry, never the published binary. */
 export async function createLocalCli(root: string, site: string) {
-  if (site !== "http://127.0.0.1:3311")
+  if (!["http://127.0.0.1:3311", "http://127.0.0.1:3551"].includes(site))
     throw new Error("Expected the local CLI fixture site.");
   const tempRoot = resolve(tmpdir());
   const realHome = resolve(homedir());
