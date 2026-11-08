@@ -14,8 +14,49 @@ permissions:
   contents: read
 
 jobs:
+  cli:
+    if: github.repository == 'disposabl-dev/create-disposabl-app' && github.ref == 'refs/heads/main' && inputs.recovery_version == ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      id-token: write
+    concurrency:
+      group: npm-cli-publish
+      cancel-in-progress: false
+    defaults:
+      run:
+        working-directory: packages/cli
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          package-manager-cache: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.4"
+      - run: bun install --frozen-lockfile
+        working-directory: .
+      - name: Verify bootstrap release and tag
+        run: |
+          set -euo pipefail
+          version=$(npm view @disposabl/cli version --prefer-online)
+          git rev-parse --verify "refs/tags/@disposabl/cli@${version}^{commit}" >/dev/null
+          git merge-base --is-ancestor "refs/tags/@disposabl/cli@${version}^{commit}" HEAD
+      - run: bun run typecheck && bun run build
+      - name: Publish CLI before generator
+        run: bun run release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          npm_config_workspaces_update: "false"
+
   publish:
-    if: github.repository == 'disposabl-dev/create-disposabl-app' && github.ref == 'refs/heads/main'
+    needs: cli
+    if: always() && !cancelled() && github.repository == 'disposabl-dev/create-disposabl-app' && github.ref == 'refs/heads/main' && (inputs.recovery_version != '' || needs.cli.result == 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     defaults:
