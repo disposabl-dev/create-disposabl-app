@@ -1,4 +1,5 @@
 import { legalConfig, legalDocuments, legalIsDraft } from "../../legal";
+import type { ReactNode } from "react";
 
 export function legalHead(slug?: string) {
   const document = legalDocuments.find((item) => item.slug === slug);
@@ -17,7 +18,13 @@ export function legalHead(slug?: string) {
   };
 }
 
-export function LegalPage({ slug }: { slug?: string }) {
+export function LegalPage({
+  slug,
+  children,
+}: {
+  slug?: string;
+  children?: ReactNode;
+}) {
   const document = legalDocuments.find((item) => item.slug === slug);
   return (
     <main className="mx-auto max-w-3xl px-6 py-12">
@@ -75,6 +82,7 @@ export function LegalPage({ slug }: { slug?: string }) {
           ))}
         </nav>
       )}
+      {children}
       {(slug === "privacy-request" || slug === "delete-account") && (
         <section className="mt-9">
           <h2 className="text-xl font-semibold">Privacy contact</h2>
@@ -110,6 +118,9 @@ export function LegalFooter() {
       </a>
       <a href="/legal" className="hover:underline">
         Legal & privacy
+      </a>
+      <a href="/support" className="hover:underline">
+        Support
       </a>
     </footer>
   );

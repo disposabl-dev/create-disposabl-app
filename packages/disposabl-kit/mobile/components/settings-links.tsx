@@ -1,6 +1,7 @@
 import { Alert } from "react-native";
 import { openBrowserAsync } from "expo-web-browser";
 import config from "../../../../disposabl.json";
+import { authenticationEnabled } from "../../features";
 import {
   PreferenceRow,
   PreferenceSection,
@@ -27,6 +28,19 @@ export function SettingsLinks() {
     <PreferenceSection title="About">
       {site && (
         <>
+          {authenticationEnabled && (
+            <>
+              <PreferenceRow
+                icon={{
+                  ios: "person.crop.circle.badge.minus",
+                  android: "person_remove",
+                }}
+                label="Delete account"
+                onPress={() => void open(`${site}/legal/delete-account`)}
+              />
+              <PreferenceSeparator />
+            </>
+          )}
           <PreferenceRow
             icon={{ ios: "hand.raised", android: "privacy_tip" }}
             label="Privacy policy"

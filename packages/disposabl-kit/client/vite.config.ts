@@ -25,6 +25,7 @@ export const createRoutes = (enabled: boolean, includePricing = true) =>
       route("/legal/terms", kitRoute("legal/terms.tsx")),
       route("/legal/privacy-request", kitRoute("legal/privacy-request.tsx")),
       route("/legal/delete-account", kitRoute("legal/delete-account.tsx")),
+      route("/support", kitRoute("legal/support.tsx")),
       ...(enabled
         ? [
             route("/login", kitRoute("_auth-pages/login.tsx")),
