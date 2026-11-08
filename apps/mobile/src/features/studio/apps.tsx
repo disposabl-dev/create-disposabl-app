@@ -50,16 +50,12 @@ function OwnedApps() {
         contentInsetAdjustmentBehavior="automatic"
         className="flex-1 bg-background"
         contentContainerClassName="p-[24px] gap-[12px] pb-[48px]"
-        ListHeaderComponent={<Label variant="heading">Your apps</Label>}
         ListEmptyComponent={
           status === "LoadingFirstPage" ? (
             <ActivityIndicator accessibilityLabel="Loading apps" />
           ) : (
             <View className="gap-5 rounded-[28px] bg-card p-7">
-              <Label variant="title">Your first idea starts here.</Label>
-              <Label color={c.mutedForeground}>
-                Describe what you want to make. Follow its progress here.
-              </Label>
+              <Label variant="title">Create your first app.</Label>
               <Action
                 label="Create app"
                 onPress={() => router.push("/compose")}

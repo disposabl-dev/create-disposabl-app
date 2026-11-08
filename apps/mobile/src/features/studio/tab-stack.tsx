@@ -27,7 +27,8 @@ export function TabStack() {
             numberOfLines={1}
             adjustsFontSizeToFit
             minimumFontScale={0.75}
-            className={`text-[34px] font-bold text-foreground ${Platform.OS === "ios" ? "font-[Georgia]" : "font-serif"}`}
+            maxFontSizeMultiplier={1.3}
+            className={`max-w-[180px] text-[34px] font-bold text-foreground ${Platform.OS === "ios" ? "font-[Georgia]" : "font-serif"}`}
           >
             {titles[section] ?? route.name}
           </Text>
@@ -39,7 +40,12 @@ export function TabStack() {
           headerTitle: "",
           headerLeft: () => title,
           unstable_headerLeftItems: () => [
-            { type: "custom", element: title, hidesSharedBackground: true },
+            {
+              type: "custom",
+              element: title,
+              hidesSharedBackground: true,
+              visibilityPriority: "high",
+            },
           ],
           headerTransparent: false,
           headerShadowVisible: false,

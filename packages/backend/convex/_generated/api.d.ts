@@ -14,6 +14,7 @@ import type * as agent_api_policy from "../agent/api_policy.js";
 import type * as agent_attachments from "../agent/attachments.js";
 import type * as agent_boat from "../agent/boat.js";
 import type * as agent_bootstrap from "../agent/bootstrap.js";
+import type * as agent_credits from "../agent/credits.js";
 import type * as agent_events from "../agent/events.js";
 import type * as agent_index from "../agent/index.js";
 import type * as agent_internal from "../agent/internal.js";
@@ -96,6 +97,7 @@ declare const fullApi: ApiFromModules<{
   "agent/attachments": typeof agent_attachments;
   "agent/boat": typeof agent_boat;
   "agent/bootstrap": typeof agent_bootstrap;
+  "agent/credits": typeof agent_credits;
   "agent/events": typeof agent_events;
   "agent/index": typeof agent_index;
   "agent/internal": typeof agent_internal;

@@ -1,5 +1,4 @@
 import { VariableContextProvider } from "nativewind";
-import { ConnectionNotice } from "./connections";
 import { FlatList, View, useWindowDimensions } from "react-native";
 import { useRouter } from "expo-router";
 import { useState } from "react";
@@ -16,14 +15,12 @@ export default function HomeScreen() {
   const features = [
     {
       title: "What will you build?",
-      line: "Start with your idea.",
       action: "Create app",
       route: "/compose" as const,
       color: c.card,
     },
     {
-      title: "A little help to get started",
-      line: "APIs, agents, and your first app.",
+      title: "Find your next idea",
       action: "Explore guides",
       route: "/(tabs)/(guides)/guides" as const,
       color: c.muted,
@@ -31,7 +28,6 @@ export default function HomeScreen() {
   ];
   return (
     <Screen title="Discover">
-      <ConnectionNotice />
       <FlatList
         horizontal
         onLayout={(event) => setShelfWidth(event.nativeEvent.layout.width)}
@@ -54,7 +50,6 @@ export default function HomeScreen() {
               className="w-[var(--layout-width)] p-[28px] rounded-[28px] gap-[20px] bg-[var(--layout-background-color)]"
             >
               <Label variant="title">{item.title}</Label>
-              <Label color={c.mutedForeground}>{item.line}</Label>
               <View className="flex-row items-center gap-[12px]">
                 <View className="flex-1">
                   <Label variant="label">{item.action}</Label>
@@ -68,12 +63,6 @@ export default function HomeScreen() {
       <AppCollection
         title="Make it yours"
         apps={apps.filter((a) => a.visibility === "public")}
-      />
-      <AppCollection
-        title="Small sites, big possibilities"
-        apps={apps.filter(
-          (a) => a.visibility === "public" && a.targets.includes("web"),
-        )}
       />
     </Screen>
   );

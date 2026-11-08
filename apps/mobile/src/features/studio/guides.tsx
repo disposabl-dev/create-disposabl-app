@@ -88,6 +88,7 @@ function Shelf({
 export default function GuidesScreen() {
   const c = useTheme();
   const router = useRouter();
+  const { width, height } = useWindowDimensions();
   return (
     <Screen title="Guides" contentClassName="gap-[34px]">
       <Touch
@@ -101,7 +102,7 @@ export default function GuidesScreen() {
           <GuideCover
             title={"Your ideas.\nMade real."}
             index={3}
-            height={300}
+            height={Math.min(260, width * 0.6, height * 0.4)}
             featured
           />
           <View className="absolute left-[24px] bottom-[24px]">
@@ -112,9 +113,6 @@ export default function GuidesScreen() {
         </View>
         <View className="gap-[6px]">
           <Label variant="heading">Meet Disposabl</Label>
-          <Label color={c.mutedForeground}>
-            A place to begin. An idea to make your own.
-          </Label>
         </View>
       </Touch>
       <Shelf
@@ -128,7 +126,6 @@ export default function GuidesScreen() {
       />
       <View className="gap-[20px]">
         <Label variant="title">Mastery</Label>
-        <Label color={c.mutedForeground}>Take your next idea further.</Label>
         {guideSections
           .filter((section) => section.startsWith("Mastery"))
           .map((section, i) => {
