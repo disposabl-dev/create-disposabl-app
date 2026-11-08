@@ -152,7 +152,12 @@ test("isolated release tests disable native OTA loading even with a project conf
       ),
       [
         "expo-dev-client",
-        { toolsButton: false, skipOnboarding: true, showMenuAtLaunch: false },
+        {
+          addGeneratedScheme: false,
+          toolsButton: false,
+          skipOnboarding: true,
+          showMenuAtLaunch: false,
+        },
       ],
     );
   }
