@@ -1,0 +1,3 @@
+# Disposable telemetry guard fixture
+
+Run `python3 packages/tests/fixtures/telemetry-guard-convex/run.py` on free loopback ports 3530/3531. It creates a disposable backend, disables telemetry before sync, strips provider environment variables, and stops its own process. It invokes the product request and claim handlers inside real Convex transactions using synthetic identities; auth is mocked and telemetry transport is never invoked. The test-only clear operation represents removal of a known identity, not the product cleanup stage. Exclude this fixture and `packages/tests/telemetry-guard-transactions.test.ts` from generated starters.
