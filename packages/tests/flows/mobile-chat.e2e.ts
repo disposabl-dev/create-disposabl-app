@@ -7,6 +7,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { createRequire } from "node:module";
 import { root } from "../project";
+import { openMobile } from "../helpers/mobile";
 
 // All fixture writes are restricted to the isolated loopback backend.
 test(
@@ -213,7 +214,7 @@ test(
           { admin: true },
         );
         claims.delete(failedId);
-        await app.restart();
+        await openMobile({ app, device, screen }, true);
         await expect(
           screen.getByRole("button", "Settings", { exact: true }),
         ).toBeVisible();
