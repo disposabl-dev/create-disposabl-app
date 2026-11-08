@@ -75,7 +75,10 @@ beforeEach(async () => {
   }) as typeof fetch;
 });
 afterEach(async () => {
-  process.env = { ...originalEnv };
+  // Generated backend modules retain this object, so restore its values in place.
+  for (const key of Object.keys(process.env))
+    if (!(key in originalEnv)) delete process.env[key];
+  Object.assign(process.env, originalEnv);
   process.argv[1] = originalEntry;
   globalThis.fetch = originalFetch;
   await rm(home, { recursive: true, force: true });
