@@ -72,6 +72,26 @@ test(
         );
       return result.value;
     }
+    const boatResponse = await fetch(`${url.origin}/api/query`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Convex ${adminKey}`,
+      },
+      body: JSON.stringify({
+        path: "_system/cli/queryEnvironmentVariables:get",
+        args: { name: "BOAT_API_KEY" },
+        format: "json",
+      }),
+      signal: AbortSignal.timeout(15_000),
+    });
+    const boat = await boatResponse.json();
+    if (boat.status !== "success")
+      throw new Error("Unable to verify the isolated agent configuration.");
+    test.skip(
+      !boat.value?.value?.trim(),
+      "Remote agent configuration is absent",
+    );
     async function user() {
       const signup = await value(
         "auth:signUpWithUsernamePassword",

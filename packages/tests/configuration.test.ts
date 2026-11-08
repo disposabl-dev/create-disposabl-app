@@ -209,7 +209,8 @@ test("settings action authenticates and forwards selected architectures", async 
   let forwarded: any;
   const ctx = {
     auth: { getUserIdentity: async () => ({ subject: "session" }) },
-    runQuery: async () => ({ userId: "owner" }),
+    runQuery: async (_ref: unknown, args: any) =>
+      "sessionId" in args ? { userId: "owner" } : false,
     runAction: async (_ref: unknown, args: unknown) => {
       forwarded = args;
       return { queued: true };

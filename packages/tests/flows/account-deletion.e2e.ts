@@ -14,8 +14,12 @@ test(
       "Explicit local account deletion qualification only",
     );
     if (
-      backendUrl() !== "http://127.0.0.1:3310" ||
-      siteUrl() !== "http://127.0.0.1:3311" ||
+      ![
+        ["http://127.0.0.1:3310", "http://127.0.0.1:3311"],
+        ["http://127.0.0.1:3550", "http://127.0.0.1:3551"],
+      ].some(
+        ([backend, site]) => backendUrl() === backend && siteUrl() === site,
+      ) ||
       process.env.E2E_TELEMETRY_DISABLED !== "1"
     )
       throw new Error(
@@ -80,8 +84,12 @@ backendTest(
       "Explicit local deletion qualification only",
     );
     if (
-      backendUrl() !== "http://127.0.0.1:3310" ||
-      siteUrl() !== "http://127.0.0.1:3311" ||
+      ![
+        ["http://127.0.0.1:3310", "http://127.0.0.1:3311"],
+        ["http://127.0.0.1:3550", "http://127.0.0.1:3551"],
+      ].some(
+        ([backend, site]) => backendUrl() === backend && siteUrl() === site,
+      ) ||
       process.env.E2E_TELEMETRY_DISABLED !== "1"
     )
       throw new Error(
@@ -175,8 +183,12 @@ backendTest(
       "Explicit local deletion qualification only",
     );
     if (
-      backendUrl() !== "http://127.0.0.1:3310" ||
-      siteUrl() !== "http://127.0.0.1:3311" ||
+      ![
+        ["http://127.0.0.1:3310", "http://127.0.0.1:3311"],
+        ["http://127.0.0.1:3550", "http://127.0.0.1:3551"],
+      ].some(
+        ([backend, site]) => backendUrl() === backend && siteUrl() === site,
+      ) ||
       process.env.E2E_TELEMETRY_DISABLED !== "1"
     )
       throw new Error(

@@ -203,7 +203,8 @@ test("page ingestion issues and binds an anonymous identity only to the verified
       getUserIdentity: async () =>
         user ? { subject: "verified-session" } : null,
     },
-    runQuery: async () => ({ userId: user }),
+    runQuery: async (_ref: unknown, args: any) =>
+      "sessionId" in args ? { userId: user } : false,
     runMutation: async (_ref: unknown, args: any) =>
       (claimIdentity as any)._handler(fixture.ctx, args),
   };

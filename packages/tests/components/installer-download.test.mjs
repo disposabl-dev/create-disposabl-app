@@ -68,6 +68,7 @@ const ctx = {
     }),
   },
   runQuery: async (fn, args) => {
+    if (getFunctionName(fn) === "users/internal:deletionPending") return false;
     expect(getFunctionName(fn)).toBe("downloads/internal:candidate");
     const result = await candidate._handler(ctx, args);
     queryCalls++;
