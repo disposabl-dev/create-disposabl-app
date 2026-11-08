@@ -17,6 +17,7 @@ import {
 import config from "../../../../../disposabl.json";
 import { Pricing } from "../../../../../packages/disposabl-kit/client/routes/pricing";
 import { Button } from "@disposabl/disposabl-kit/client/components/ui/button";
+import { paymentsEnabled } from "@disposabl/disposabl-kit/features";
 
 export const Route = createFileRoute("/_providers/_authenticated/dashboard")({
   component: Dashboard,
@@ -37,7 +38,7 @@ function Dashboard() {
     return <Outlet />;
   if (!session || seenSession !== session)
     return <Connections onContinue={() => setSeenSession(session)} />;
-  if (paymentSession !== session)
+  if (paymentsEnabled && paymentSession !== session)
     return (
       <main className="mx-auto max-w-3xl space-y-6 px-6 py-12">
         <p>Payment is optional. Local mode is free.</p>
@@ -48,7 +49,7 @@ function Dashboard() {
             setPaymentSession(session);
           }}
         >
-          Continue locally
+          Continue
         </Button>
         <Link className="ml-4 text-sm underline" to="/pricing">
           View all plans

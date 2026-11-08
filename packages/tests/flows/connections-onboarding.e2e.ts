@@ -128,7 +128,7 @@ test(
 );
 
 test(
-  "connections lead to optional payment before local setup and CLI completion is preserved",
+  "connections respect payment selection before local setup and preserve CLI completion",
   { platforms: ["web"], tags: ["connections"] },
   async ({ app, screen, browser }) => {
     const origin = new URL(backendUrl());
@@ -184,20 +184,32 @@ test(
       screen.getByRole("button", "Continue", { exact: true }),
     ).toBeVisible();
     await screen.getByRole("button", "Continue", { exact: true }).tap();
-    await expect(
-      screen.getByText("Payment is optional. Local mode is free.", {
-        exact: true,
-      }),
-    ).toBeVisible();
-    await expect(screen.getByTestId("agent-onboarding")).not.toBeVisible();
-    await browser.reload();
-    await screen.getByRole("button", "Continue locally", { exact: true }).tap();
+    const paymentStep = screen.getByText(
+      "Payment is optional. Local mode is free.",
+      { exact: true },
+    );
+    if (project.features.includes("payments")) {
+      await expect(paymentStep).toBeVisible();
+      await expect(screen.getByTestId("agent-onboarding")).not.toBeVisible();
+      await browser.reload();
+      // Returning from a payment page must still allow continuation, without
+      // treating navigation or a checkout query parameter as proof of payment.
+      await app.open("/pricing");
+      await app.open("/dashboard?checkout=success");
+      await expect(paymentStep).toBeVisible();
+      await screen.getByRole("button", "Continue", { exact: true }).tap();
+    } else {
+      await expect(paymentStep).not.toBeVisible();
+      await expect(
+        screen.getByRole("heading", "Payments are unavailable", {
+          exact: true,
+        }),
+      ).not.toBeVisible();
+    }
     await expect(screen.getByTestId("agent-onboarding")).toBeVisible();
     await browser.reload();
     await expect(screen.getByTestId("agent-onboarding")).toBeVisible();
-    await expect(
-      screen.getByRole("button", "Continue locally", { exact: true }),
-    ).not.toBeVisible();
+    await expect(paymentStep).not.toBeVisible();
 
     await app.open("/dashboard/connections?origin=cli");
     await expect(
