@@ -557,3 +557,149 @@ test("web top-up preflight rechecks storefront, product, route and account indep
     ),
   );
 });
+
+test("explicit monthly offering is consistent across readiness, paywall, and web preflight", async () => {
+  const { presentMonthlyPaywall, selectMonthlyOffering } =
+    await import("../disposabl-kit/mobile/billing/paywall");
+  const monthly = {
+    product: { identifier: "monthly", subscriptionPeriod: "P1M" },
+  };
+  const other = {
+    product: { identifier: "yearly", subscriptionPeriod: "P1Y" },
+  };
+  const good = { identifier: "safe", availablePackages: [monthly] };
+  const mixed = { identifier: "mixed", availablePackages: [monthly, other] };
+  const wrong = { identifier: "wrong", availablePackages: [other] };
+  const wrongPeriod = {
+    identifier: "period",
+    availablePackages: [
+      { product: { identifier: "monthly", subscriptionPeriod: "P1Y" } },
+    ],
+  };
+  const offerings = {
+    current: mixed,
+    all: { safe: good, mixed, wrong, period: wrongPeriod },
+  };
+  const snapshot = async () => ({
+    balance: 0,
+    hasMonthlyPlan: false,
+    nativeSubscriptionsEnabled: true,
+    monthlyCheckoutPending: false,
+    mobileWebCheckoutEnabled: true,
+    customerId: "alice",
+  });
+  let current = true;
+  const sdk = {
+    canMakePayments: async () => true,
+    getStorefront: async () => ({ countryCode: "USA" }),
+    getCustomerInfo: async () => ({ activeSubscriptions: [] }),
+    getOfferings: async () => offerings,
+  };
+  let shown: unknown;
+  const show = async (offering: unknown) => {
+    shown = offering;
+    return "cancelled" as const;
+  };
+  const paywall = (id?: string) =>
+    presentMonthlyPaywall(
+      sdk as never,
+      snapshot,
+      () => current,
+      "monthly",
+      show,
+      id,
+    );
+  const web = (id?: string) =>
+    preflightWebMonthly(
+      sdk as never,
+      "ios",
+      "monthly",
+      "alice",
+      snapshot,
+      () => current,
+      id,
+    );
+  for (const id of [undefined, "missing", "wrong", "period", "mixed"]) {
+    assert.equal(
+      selectMonthlyOffering(offerings as never, "monthly", id),
+      null,
+    );
+    await assert.rejects(paywall(id), /unavailable/);
+    await assert.rejects(web(id), /unavailable/);
+  }
+  assert.equal(
+    selectMonthlyOffering(offerings as never, "monthly", "safe"),
+    good as never,
+  );
+  await paywall("safe");
+  assert.equal(shown, good);
+  await web("safe");
+  const withCurrent = { ...offerings, current: good };
+  assert.equal(
+    selectMonthlyOffering(withCurrent as never, "monthly"),
+    good as never,
+  );
+  const defaultSdk = { ...sdk, getOfferings: async () => withCurrent };
+  await presentMonthlyPaywall(
+    defaultSdk as never,
+    snapshot,
+    () => current,
+    "monthly",
+    show,
+  );
+  await preflightWebMonthly(
+    defaultSdk as never,
+    "ios",
+    "monthly",
+    "alice",
+    snapshot,
+    () => current,
+  );
+
+  const delayed = deferred();
+  const started = deferred();
+  const changingSdk = {
+    ...sdk,
+    getOfferings: async () => {
+      started.resolve();
+      await delayed.promise;
+      return offerings;
+    },
+  };
+  const pendingPaywall = presentMonthlyPaywall(
+    changingSdk as never,
+    snapshot,
+    () => current,
+    "monthly",
+    show,
+    "safe",
+  );
+  await started.promise;
+  current = false;
+  delayed.resolve();
+  await assert.rejects(pendingPaywall, /Account changed/);
+  current = true;
+  const delayedWeb = deferred();
+  const startedWeb = deferred();
+  const changingWebSdk = {
+    ...sdk,
+    getOfferings: async () => {
+      startedWeb.resolve();
+      await delayedWeb.promise;
+      return offerings;
+    },
+  };
+  const pendingWeb = preflightWebMonthly(
+    changingWebSdk as never,
+    "ios",
+    "monthly",
+    "alice",
+    snapshot,
+    () => current,
+    "safe",
+  );
+  await startedWeb.promise;
+  current = false;
+  delayedWeb.resolve();
+  await assert.rejects(pendingWeb, /Account changed/);
+});

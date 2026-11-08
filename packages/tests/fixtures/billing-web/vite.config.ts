@@ -8,6 +8,7 @@ export default defineConfig({
     "process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY": JSON.stringify("fixture"),
     "process.env.EXPO_PUBLIC_REVENUECAT_IOS_MONTHLY_PRODUCT":
       JSON.stringify("fixture-monthly"),
+    "process.env.EXPO_PUBLIC_REVENUECAT_OFFERING_ID": "undefined",
     "process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY": "undefined",
     "process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_MONTHLY_PRODUCT": "undefined",
   },

@@ -1,5 +1,5 @@
 import type Purchases from "react-native-purchases";
-import { validMonthlyOffering, type BillingSnapshot } from "./paywall";
+import { selectMonthlyOffering, type BillingSnapshot } from "./paywall";
 import { loadTopup, matchingTopupRoute, type TopupSnapshot } from "./topup";
 
 export function paymentOptions(input: {
@@ -46,6 +46,7 @@ export async function preflightWebMonthly(
     BillingSnapshot & { mobileWebCheckoutEnabled: boolean; customerId: string }
   >,
   current: () => boolean,
+  offeringId?: string,
 ) {
   const check = () => {
     if (!current()) throw new Error("Account changed.");
@@ -55,17 +56,15 @@ export async function preflightWebMonthly(
   if (latest.customerId !== customerId) throw new Error("Account changed.");
   const eligibility = await storeEligibility(sdk, platform);
   check();
-  const offering = (await sdk.getOfferings()).current;
+  const offerings = await sdk.getOfferings();
   check();
+  const offering = selectMonthlyOffering(offerings, productId, offeringId);
   const options = paymentOptions({
     platform,
     ...eligibility,
     paymentsEnabled: true,
     webCheckoutEnabled: latest.mobileWebCheckoutEnabled,
-    nativeReady:
-      latest.nativeSubscriptionsEnabled &&
-      !!offering &&
-      validMonthlyOffering(offering.availablePackages, productId),
+    nativeReady: latest.nativeSubscriptionsEnabled && !!offering,
   });
   if (!options.web) throw new Error("Website checkout is unavailable.");
   if (latest.hasMonthlyPlan !== false) throw new Error("existing_subscription");

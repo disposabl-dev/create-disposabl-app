@@ -8,7 +8,9 @@ import { useTopup } from "../../../../../packages/disposabl-kit/mobile/billing/u
 import { creditQuantity } from "../../../../../packages/disposabl-kit/payments/config";
 import { Action } from "../studio/ui";
 import {
+  monthlyOfferingId,
   presentMonthlyPaywall,
+  selectMonthlyOffering,
   type BillingSnapshot,
 } from "../../../../../packages/disposabl-kit/mobile/billing/paywall";
 
@@ -50,6 +52,45 @@ export function PaymentGate({
     Platform.OS === "ios"
       ? process.env.EXPO_PUBLIC_REVENUECAT_IOS_MONTHLY_PRODUCT
       : process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_MONTHLY_PRODUCT;
+  const [monthlyReadyFor, setMonthlyReadyFor] = useState<string | null>(null);
+  useEffect(() => {
+    if (!monthlyOfferingId?.trim() || !key || !productId) return;
+    let active = true;
+    let sequence = 0;
+    const update = async () => {
+      const request = ++sequence;
+      setMonthlyReadyFor(null);
+      try {
+        const ready = await billingSession.run(
+          customerId,
+          version.current,
+          key,
+          async (sdk) => {
+            const canPay = await sdk.canMakePayments();
+            const offerings = await sdk.getOfferings();
+            return (
+              canPay &&
+              !!selectMonthlyOffering(offerings, productId, monthlyOfferingId)
+            );
+          },
+        );
+        if (active && request === sequence && ready)
+          setMonthlyReadyFor(customerId);
+      } catch {
+        // The selected offering remains unavailable until a successful refresh.
+      }
+    };
+    void update();
+    const listener = AppState.addEventListener("change", (state) => {
+      if (state === "active") void update();
+    });
+    return () => {
+      active = false;
+      listener.remove();
+    };
+  }, [customerId, key, productId]);
+  const monthlyReady =
+    !monthlyOfferingId?.trim() || monthlyReadyFor === customerId;
   const webSnapshot = useCallback(() => snapshot({}), [snapshot]);
   const web = useWebCheckout(customerId, version, key, productId, webSnapshot);
   const topup = useTopup(customerId, version, key, webSnapshot, refresh);
@@ -57,6 +98,7 @@ export function PaymentGate({
     if (
       !key ||
       !productId ||
+      !monthlyReady ||
       !data?.nativeSubscriptionsEnabled ||
       data.hasMonthlyPlan !== false ||
       data.monthlyCheckoutPending !== false ||
@@ -71,7 +113,14 @@ export function PaymentGate({
     setError("");
     try {
       await billingSession.run(customerId, generation, key, (sdk) =>
-        presentMonthlyPaywall(sdk, () => snapshot({}), current, productId),
+        presentMonthlyPaywall(
+          sdk,
+          () => snapshot({}),
+          current,
+          productId,
+          undefined,
+          monthlyOfferingId,
+        ),
       );
       if (current()) await refresh();
     } catch (error) {
@@ -104,7 +153,8 @@ export function PaymentGate({
       {data?.nativeSubscriptionsEnabled &&
       data.hasMonthlyPlan === false &&
       key &&
-      productId ? (
+      productId &&
+      monthlyReady ? (
         <Action
           label="View subscription"
           onPress={() => void purchase()}

@@ -79,6 +79,20 @@ test("packaged starter and both generated profiles exclude product proof fixture
     for (const root of roots) {
       const mobileConfigPath = join(root, "apps/mobile/app.json");
       if (existsSync(mobileConfigPath)) {
+        const billing = await readFile(
+          join(root, "packages/disposabl-kit/mobile/billing/paywall.ts"),
+          "utf8",
+        );
+        const paymentsGuide = await readFile(
+          join(root, "packages/disposabl-kit/PAYMENTS.md"),
+          "utf8",
+        );
+        const plugin = await readFile(
+          join(root, "packages/disposabl-kit/mobile/expo-plugin.cjs"),
+          "utf8",
+        );
+        for (const source of [billing, paymentsGuide, plugin])
+          assert.match(source, /EXPO_PUBLIC_REVENUECAT_OFFERING_ID/);
         const mobileConfig = JSON.parse(
           await readFile(mobileConfigPath, "utf8"),
         );

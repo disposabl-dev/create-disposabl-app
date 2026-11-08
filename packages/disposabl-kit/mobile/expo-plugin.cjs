@@ -57,6 +57,7 @@ tasks.withType(com.facebook.react.tasks.BundleHermesCTask).configureEach {
     inputs.property("convexUrl", System.getenv("EXPO_PUBLIC_CONVEX_URL") ?: "")
     inputs.property("convexSiteUrl", System.getenv("EXPO_PUBLIC_CONVEX_SITE_URL") ?: "")
     inputs.property("revenuecatAndroidKey", System.getenv("EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY") ?: "")
+    inputs.property("revenuecatOfferingId", System.getenv("EXPO_PUBLIC_REVENUECAT_OFFERING_ID") ?: "")
     inputs.property("revenuecatAndroidMonthly", System.getenv("EXPO_PUBLIC_REVENUECAT_ANDROID_MONTHLY_PRODUCT") ?: "")
 }
 `;

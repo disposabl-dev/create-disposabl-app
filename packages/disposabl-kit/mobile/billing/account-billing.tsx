@@ -5,7 +5,11 @@ import { AppState, Linking, Platform, Text, View } from "react-native";
 import type { PurchasesPackage } from "react-native-purchases";
 import { AuthButton, authClasses } from "../components/auth-ui";
 import { billingSession } from "./session";
-import { presentMonthlyPaywall, validMonthlyOffering } from "./paywall";
+import {
+  monthlyOfferingId,
+  presentMonthlyPaywall,
+  selectMonthlyOffering,
+} from "./paywall";
 import { creditQuantity, monthlyLabel } from "../../payments/config";
 import { paymentOptions, storeEligibility } from "./policy";
 import { useWebCheckout } from "./web-checkout";
@@ -80,16 +84,14 @@ export function AccountBilling({ customerId }: { customerId: string }) {
             nativeReady: result.nativeSubscriptionsEnabled,
             webCheckoutEnabled: result.mobileWebCheckoutEnabled,
           });
+          const offering = selectMonthlyOffering(
+            store.offerings,
+            productId,
+            monthlyOfferingId,
+          );
           if (latest())
             setMonthly(
-              options.native &&
-                store.offerings.current &&
-                validMonthlyOffering(
-                  store.offerings.current.availablePackages,
-                  productId,
-                )
-                ? (store.offerings.current.availablePackages[0] ?? null)
-                : null,
+              options.native ? (offering?.availablePackages[0] ?? null) : null,
             );
         } else setMonthly(null);
         if (latest()) setRefreshError("");
@@ -171,6 +173,8 @@ export function AccountBilling({ customerId }: { customerId: string }) {
             () => getSnapshot({}),
             () => current(version),
             productId,
+            undefined,
+            monthlyOfferingId,
           );
         },
       );
