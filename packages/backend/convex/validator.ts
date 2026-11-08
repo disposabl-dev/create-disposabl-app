@@ -18,6 +18,10 @@ export const platformNames = [
 export const platform = v.union(
   ...platformNames.map((name) => v.literal(name)),
 );
+export const androidArchitecture = v.union(
+  v.literal("arm64-v8a"),
+  v.literal("x86_64"),
+);
 export const githubConnection = v.object({
   owner: v.string(),
   installationId: v.string(),
@@ -27,11 +31,13 @@ export const appFields = {
   name: v.string(),
   platforms: v.array(platform),
   features: v.optional(v.array(feature)),
+  androidArchitectures: v.optional(v.array(androidArchitecture)),
 };
 export const appArgs = {
   name: v.string(),
   platforms: v.array(platform),
   features: v.optional(v.array(feature)),
+  androidArchitectures: v.optional(v.array(androidArchitecture)),
 };
 export const appResult = v.object({
   ...appFields,
@@ -42,6 +48,7 @@ export const appResult = v.object({
 export const requestedConfiguration = {
   platforms: v.optional(v.array(platform)),
   features: v.optional(v.array(feature)),
+  androidArchitectures: v.optional(v.array(androidArchitecture)),
 };
 export const previewIdentity = { appId: v.string(), reference: v.string() };
 export const deployment = v.object({

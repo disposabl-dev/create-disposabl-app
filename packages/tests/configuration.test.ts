@@ -17,6 +17,7 @@ const app = {
   userId: "owner",
   platforms: ["web"],
   features: [],
+  androidArchitectures: ["arm64-v8a"],
 };
 const db = (row: unknown, patch: (...args: unknown[]) => unknown) => ({
   query: () => ({ withIndex: () => ({ unique: async () => row }) }),
@@ -79,7 +80,11 @@ test("only the current unexpired setup lease can commit selections", async () =>
   );
   assert.equal(saved, undefined);
   await (applyConfiguration as any)._handler(ctx, args);
-  assert.deepEqual(saved, { platforms: ["web", "ios"], features: [] });
+  assert.deepEqual(saved, {
+    platforms: ["web", "ios"],
+    features: [],
+    androidArchitectures: ["arm64-v8a"],
+  });
 });
 
 test("configuration requests persist in the conversation before account setup", async () => {
@@ -88,7 +93,7 @@ test("configuration requests persist in the conversation before account setup", 
     db: db(app, () => {
       throw new Error("Must not change applied metadata");
     }),
-    runQuery: async () => ({}),
+    runQuery: async () => app,
     runAction: async (_ref: any, args: any) => {
       prompt = args.prompt;
       return { queued: true };
@@ -102,12 +107,25 @@ test("configuration requests persist in the conversation before account setup", 
   });
   assert.match(prompt, /Requested platforms: web,ios/);
   assert.match(prompt, /Requested features: authentication,analytics/);
+  assert.match(prompt, /--android-architectures arm64-v8a/);
+  await assert.rejects(
+    (requestConfiguration as any)._handler(ctx, {
+      userId: "owner",
+      appId,
+      platforms: ["web"],
+      features: [],
+      androidArchitectures: [],
+    }),
+  );
 });
 
 test("legacy configuration mutation queues the same request when payments are disabled", async () => {
   let queued: any;
   await (requestConfigurationLegacy as any)._handler(
     {
+      db: db(app, () => {
+        throw new Error("unexpected patch");
+      }),
       runMutation: async (_ref: unknown, args: unknown) => {
         queued = args;
         return { appId, threadId: "thread", status: "processing" };

@@ -1,4 +1,8 @@
 import {
+  defaultAndroidArchitectures,
+  type AndroidArchitecture,
+} from "@disposabl/disposabl-kit/android-architectures";
+import {
   features,
   resolveFeatures,
   type Feature,
@@ -25,10 +29,17 @@ export function Details({ appId }: { appId: string }) {
         Platforms and features
       </Text>
       <Selection
-        key={JSON.stringify([app.platforms, app.features])}
+        key={JSON.stringify([
+          app.platforms,
+          app.features,
+          app.androidArchitectures,
+        ])}
         appId={appId}
         initialPlatforms={app.platforms}
         initialFeatures={app.features ?? []}
+        initialArchitectures={
+          app.androidArchitectures ?? defaultAndroidArchitectures
+        }
       />
       <Text className="text-[21px] font-bold text-foreground">
         Production releases
@@ -54,12 +65,15 @@ function Selection({
   appId,
   initialPlatforms,
   initialFeatures,
+  initialArchitectures,
 }: {
   appId: string;
   initialPlatforms: Platform[];
   initialFeatures: Feature[];
+  initialArchitectures: AndroidArchitecture[];
 }) {
   const [selected, setSelected] = useState(initialPlatforms);
+  const [architectures, setArchitectures] = useState(initialArchitectures);
   const [chosen, setChosen] = useState(initialFeatures);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -72,6 +86,7 @@ function Selection({
         appId,
         platforms: resolvePlatforms(selected),
         features: resolveFeatures(chosen),
+        androidArchitectures: architectures,
       });
       setMessage(
         "Change requested. Follow progress in Chat; current platforms remain listed until the repository configuration is applied.",
@@ -115,6 +130,47 @@ function Selection({
           </Pressable>
         ))}
       </View>
+      {selected.includes("android") && (
+        <>
+          <Text className="text-[16px] leading-[23px] text-foreground">
+            Android architectures
+          </Text>
+          <View className="flex-row flex-wrap gap-[8px]">
+            {(
+              [
+                ["arm64-v8a", "Modern phones (ARM64)"],
+                ["x86_64", "Emulators (x86_64)"],
+              ] as const
+            ).map(([id, label]) => (
+              <Pressable
+                key={id}
+                accessibilityRole="checkbox"
+                accessibilityLabel={label}
+                accessibilityState={{
+                  checked: architectures.includes(id),
+                  disabled:
+                    architectures.includes(id) && architectures.length === 1,
+                }}
+                disabled={
+                  architectures.includes(id) && architectures.length === 1
+                }
+                onPress={() =>
+                  setArchitectures(
+                    architectures.includes(id)
+                      ? architectures.filter((x) => x !== id)
+                      : [...architectures, id],
+                  )
+                }
+                className={`rounded-[24px] border px-[14px] py-[10px] ${architectures.includes(id) ? "border-foreground bg-muted" : "border-border"}`}
+              >
+                <Text className="text-[16px] leading-[23px] text-foreground">
+                  {label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </>
+      )}
       <Text className="text-[16px] leading-[23px] text-foreground">
         Features
       </Text>

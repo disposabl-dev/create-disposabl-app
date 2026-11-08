@@ -14,7 +14,13 @@ import {
   computeDebitFields,
 } from "./agent/computeValidator";
 import { pendingDelete } from "./apps/validator";
-import { deployment, platform, feature, releases } from "./validator";
+import {
+  deployment,
+  platform,
+  feature,
+  releases,
+  androidArchitecture,
+} from "./validator";
 import {
   connectionState,
   tokenProvider,
@@ -118,6 +124,7 @@ export default defineSchema({
     userId: v.string(),
     name: v.string(),
     platforms: v.array(platform),
+    androidArchitectures: v.optional(v.array(androidArchitecture)),
     features: v.optional(v.array(feature)),
     agent: v.optional(execution),
     posthogProject: v.optional(posthogProject),

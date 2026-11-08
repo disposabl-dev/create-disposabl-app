@@ -15,7 +15,12 @@ import {
   type ActionCtx,
 } from "../_generated/server";
 import { result as agentResult } from "../agent/validator";
-import { appResult, feature, platform } from "../validator";
+import {
+  appResult,
+  feature,
+  platform,
+  androidArchitecture,
+} from "../validator";
 import { requireCurrentClient } from "../agent/credits";
 
 async function requireUser(ctx: QueryCtx | MutationCtx | ActionCtx) {
@@ -55,6 +60,7 @@ export const requestConfigurationChecked = action({
     appId: v.string(),
     platforms: v.array(platform),
     features: v.array(feature),
+    androidArchitectures: v.optional(v.array(androidArchitecture)),
   },
   returns: agentResult,
   handler: async (ctx, args): Promise<Infer<typeof agentResult>> =>
@@ -69,6 +75,7 @@ export const requestConfiguration = mutation({
     appId: v.string(),
     platforms: v.array(platform),
     features: v.array(feature),
+    androidArchitectures: v.optional(v.array(androidArchitecture)),
   },
   returns: agentResult,
   handler: async (ctx, args): Promise<Infer<typeof agentResult>> => {

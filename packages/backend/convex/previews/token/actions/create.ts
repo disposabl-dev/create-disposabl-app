@@ -5,6 +5,10 @@ import {
   internalAction,
 } from "@disposabl/disposabl-kit/server/lib/functions";
 import { resolveFeatures } from "@disposabl/disposabl-kit/feature-options";
+import {
+  defaultAndroidArchitectures,
+  validateAndroidArchitectures,
+} from "@disposabl/disposabl-kit/android-architectures";
 import { validatePlatforms } from "@disposabl/disposabl-kit/platforms";
 import { v } from "convex/values";
 import { internal } from "../../../_generated/api";
@@ -55,6 +59,11 @@ export const create = internalAction({
     try {
       const current = await ctx.runQuery(internal.apps.internal.get, identity);
       const platforms = validatePlatforms(args.platforms ?? current.platforms);
+      const androidArchitectures = validateAndroidArchitectures(
+        args.androidArchitectures ??
+          current.androidArchitectures ??
+          defaultAndroidArchitectures,
+      );
       const features = resolveFeatures(args.features ?? current.features ?? []);
       const preview = { ...identity, reference: args.reference };
       await ctx.runMutation(internal.previews.internal.create, preview);
@@ -93,6 +102,7 @@ export const create = internalAction({
         ...identity,
         platforms,
         features,
+        androidArchitectures,
         until,
       });
       return {

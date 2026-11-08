@@ -10,10 +10,20 @@ import {
 } from "convex/server";
 import { ConvexError, v, type Infer } from "convex/values";
 import { scheduleTelemetry } from "@disposabl/disposabl-kit/server/lib/telemetry";
-import { appArgs, appResult, platform, feature } from "../validator";
+import {
+  appArgs,
+  appResult,
+  platform,
+  feature,
+  androidArchitecture,
+} from "../validator";
 import { resolveFeatures } from "@disposabl/disposabl-kit/feature-options";
 import { requireConnections } from "../connections/config";
 import { internal } from "../_generated/api";
+import {
+  defaultAndroidArchitectures,
+  validateAndroidArchitectures,
+} from "@disposabl/disposabl-kit/android-architectures";
 import { validatePlatforms } from "@disposabl/disposabl-kit/platforms";
 import { githubConnection } from "../validator";
 import type { Doc } from "../_generated/dataModel";
@@ -45,6 +55,9 @@ export const insert = internalMutation({
       name,
       platforms,
       features: resolveFeatures(args.features ?? []),
+      androidArchitectures: validateAndroidArchitectures(
+        args.androidArchitectures ?? defaultAndroidArchitectures,
+      ),
       expoAccountId: null,
     });
     await scheduleTelemetry(
@@ -89,11 +102,12 @@ export const update = internalMutation({
     appId: v.string(),
     platforms: v.array(platform),
     features: v.optional(v.array(feature)),
+    androidArchitectures: v.optional(v.array(androidArchitecture)),
   },
   returns: appResult,
   handler: async (
     ctx,
-    { userId, appId, platforms, features },
+    { userId, appId, platforms, features, androidArchitectures },
   ): Promise<AppResult> => {
     const app = await ownedApp(ctx, userId, appId);
     if (app.operation)
@@ -102,6 +116,11 @@ export const update = internalMutation({
       );
     const selected = validatePlatforms(platforms);
     const selectedFeatures = resolveFeatures(features ?? app.features ?? []);
+    const architectures = validateAndroidArchitectures(
+      androidArchitectures ??
+        app.androidArchitectures ??
+        defaultAndroidArchitectures,
+    );
     requireConnections(
       await ctx.runQuery(internal.connections.internal.status, {
         userId,
@@ -112,11 +131,13 @@ export const update = internalMutation({
     await ctx.db.patch("apps", app._id, {
       platforms: selected,
       features: selectedFeatures,
+      androidArchitectures: architectures,
     });
     return presentApp({
       ...app,
       platforms: selected,
       features: selectedFeatures,
+      androidArchitectures: architectures,
     });
   },
 });
@@ -128,9 +149,13 @@ export const applyConfiguration = internalMutation({
     until: v.number(),
     platforms: v.array(platform),
     features: v.array(feature),
+    androidArchitectures: v.optional(v.array(androidArchitecture)),
   },
   returns: v.null(),
-  handler: async (ctx, { userId, appId, until, platforms, features }) => {
+  handler: async (
+    ctx,
+    { userId, appId, until, platforms, features, androidArchitectures },
+  ) => {
     const app = await ownedApp(ctx, userId, appId);
     if (
       app.operation?.kind !== "setup" ||
@@ -138,7 +163,15 @@ export const applyConfiguration = internalMutation({
       until <= Date.now()
     )
       throw new ConvexError("App setup lease expired. Retry setup.");
-    await ctx.db.patch("apps", app._id, { platforms, features });
+    await ctx.db.patch("apps", app._id, {
+      platforms,
+      features,
+      androidArchitectures: validateAndroidArchitectures(
+        androidArchitectures ??
+          app.androidArchitectures ??
+          defaultAndroidArchitectures,
+      ),
+    });
     return null;
   },
 });
@@ -148,16 +181,18 @@ const configurationArgs = {
   appId: v.string(),
   platforms: v.array(platform),
   features: v.array(feature),
+  androidArchitectures: v.optional(v.array(androidArchitecture)),
 };
 function configurationPrompt(
   appId: string,
   platforms: string[],
   features: string[],
+  architectures: string[],
 ) {
   const selected = validatePlatforms(platforms);
   const selectedFeatures = resolveFeatures(features);
   return `Apply this configuration change to the existing app repository. Requested platforms: ${selected.join(",")}. Requested features: ${selectedFeatures.join(",") || "none"}.
-Read the generator version from this app's disposabl.json. Use that exact version (not latest) with the existing-project reconfiguration flow from /home/user/apps: bun create disposabl-app@<matching-version> ${appId} --platforms ${selected.join(",")} --features ${selectedFeatures.join(",") || "none"} --yes.
+Read the generator version from this app's disposabl.json. Use that exact version (not latest) with the existing-project reconfiguration flow from /home/user/apps: bun create disposabl-app@<matching-version> ${appId} --platforms ${selected.join(",")} --features ${selectedFeatures.join(",") || "none"} --android-architectures ${validateAndroidArchitectures(architectures).join(",")} --yes.
 Preserve this app ID, source customizations and user data. Restore newly selected platform/auth files using the generator; do not scaffold a replacement. Complete its existing setup/provisioning flow and run the selected-platform checks. If a template conflict or account connection blocks setup, explain the exact blocker and stop. Report applied files, setup outcome and test evidence; a queued request or metadata update alone is not completion.`;
 }
 
@@ -166,30 +201,49 @@ export const requestConfiguration = internalAction({
   platforms: true,
   args: configurationArgs,
   returns: agentResult,
-  handler: (
+  handler: async (
     ctx,
-    { userId, appId, platforms, features },
-  ): Promise<Infer<typeof agentResult>> =>
-    ctx.runAction(internal.agent.internal.sendMessage, {
+    { userId, appId, platforms, features, androidArchitectures },
+  ): Promise<Infer<typeof agentResult>> => {
+    const app = await ctx.runQuery(internal.apps.internal.get, {
       userId,
       appId,
-      prompt: configurationPrompt(appId, platforms, features),
-    }),
+    });
+    return ctx.runAction(internal.agent.internal.sendMessage, {
+      userId,
+      appId,
+      prompt: configurationPrompt(
+        appId,
+        platforms,
+        features,
+        androidArchitectures ??
+          app.androidArchitectures ??
+          defaultAndroidArchitectures,
+      ),
+    });
+  },
 });
 
-/** Only the guarded legacy public mutation calls this while payments are disabled. */
 export const requestConfigurationLegacy = internalMutation({
   args: configurationArgs,
   returns: agentResult,
-  handler: (
+  handler: async (
     ctx,
-    { userId, appId, platforms, features },
+    { userId, appId, platforms, features, androidArchitectures },
   ): Promise<Infer<typeof agentResult>> => {
     requireCurrentClient();
+    const app = await ownedApp(ctx, userId, appId);
     return ctx.runMutation(internal.agent.internal.enqueueMessage, {
       userId,
       appId,
-      prompt: configurationPrompt(appId, platforms, features),
+      prompt: configurationPrompt(
+        appId,
+        platforms,
+        features,
+        androidArchitectures ??
+          app.androidArchitectures ??
+          defaultAndroidArchitectures,
+      ),
     });
   },
 });
@@ -222,6 +276,8 @@ function presentApp(app: Doc<"apps">): AppResult {
     appId: app.appId,
     name: app.name,
     platforms: app.platforms,
+    androidArchitectures:
+      app.androidArchitectures ?? defaultAndroidArchitectures,
     features: app.features ?? [],
     ...(app.githubOwner ? { githubOwner: app.githubOwner } : {}),
     ...(app.githubRepo ? { githubRepo: app.githubRepo } : {}),
