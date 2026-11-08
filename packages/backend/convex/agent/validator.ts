@@ -27,6 +27,7 @@ export const result = v.object({
   status,
 });
 export const execution = v.object({
+  computeSessionId: v.optional(v.id("computeSessions")),
   threadId: v.string(),
   status,
   pending: v.array(v.string()),

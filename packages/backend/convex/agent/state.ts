@@ -5,6 +5,7 @@ import { components, internal } from "../_generated/api";
 import type { MutationCtx } from "../_generated/server";
 import { getThread, patchThread } from "./threads";
 import { event, thread, workerArgs } from "./validator";
+import { sessionAllows } from "./compute";
 
 async function locked(ctx: MutationCtx, args: { id: string; token: string }) {
   const current = await getThread(ctx, args.id);
@@ -60,6 +61,15 @@ export const next = internalMutation({
   handler: async (ctx, args) => {
     const current = await locked(ctx, args);
     const messageId = current.pending[0];
+    if (
+      !(await sessionAllows(
+        ctx,
+        current.computeSessionId,
+        current.userId,
+        Date.now(),
+      ))
+    )
+      return null;
     if (current.status === "stopping" || !messageId) return null;
     const [message] = await ctx.runQuery(
       components.agent.messages.getMessagesByIds,
@@ -215,6 +225,7 @@ export const finish = internalMutation({
     done: v.optional(v.boolean()),
     stopped: v.optional(v.boolean()),
     unconfirmed: v.optional(v.boolean()),
+    suspended: v.optional(v.boolean()),
     error: v.optional(v.string()),
     delay: v.optional(v.number()),
   },
@@ -224,8 +235,18 @@ export const finish = internalMutation({
     await ctx.scheduler.cancel(current.lease!.watchdog);
     let status = current.status;
     let pending = current.pending;
-    const error = args.error ?? current.error;
-    if (args.unconfirmed) {
+    const error = args.suspended
+      ? "Sandbox access ended. Add credits if needed, then send a new message after the sandbox stops."
+      : (args.error ?? current.error);
+    if (args.suspended) {
+      status = "failed";
+      for (const messageId of pending)
+        await ctx.runMutation(components.agent.messages.updateMessage, {
+          messageId,
+          patch: { status: "failed", error },
+        });
+      pending = [];
+    } else if (args.unconfirmed) {
       status = "failed";
       pending = [];
     } else if (args.error) {
@@ -252,7 +273,7 @@ export const finish = internalMutation({
       pending = [];
     } else if (args.done && current.status !== "stopping" && !pending.length)
       status = error ? "failed" : "idle";
-    if (args.stopped || args.done) {
+    if (args.stopped || args.done || args.suspended) {
       const outputs = await ctx.db
         .query("agentEvents")
         .withIndex("by_threadId_streaming", (q) =>
@@ -290,11 +311,12 @@ export const finish = internalMutation({
         ? "Boat delivery could not be confirmed. Retry abortMessage to reconcile this app's conversation; other apps were not interrupted."
         : error,
       lease: undefined,
-      delivery: args.stopped
-        ? undefined
-        : args.error || args.unconfirmed
-          ? current.delivery
-          : undefined,
+      delivery:
+        args.stopped || args.suspended
+          ? undefined
+          : args.error || args.unconfirmed
+            ? current.delivery
+            : undefined,
       stopFailures: args.stopped
         ? undefined
         : args.error

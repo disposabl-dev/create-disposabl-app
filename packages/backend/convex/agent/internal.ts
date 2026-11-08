@@ -19,6 +19,7 @@ import { resolvePlatforms } from "@disposabl/disposabl-kit/platforms";
 import { resolveFeatures } from "@disposabl/disposabl-kit/feature-options";
 import { ownedAttachments, attachmentReferences } from "./attachments";
 import { requireCredits } from "./credits";
+import { admitSession } from "./compute";
 
 export const enqueueMessage = internalMutation({
   args: { ...identityFields, ...sendArgs },
@@ -111,7 +112,12 @@ export const enqueueMessage = internalMutation({
         ],
       },
     });
+    const computeSessionId = await admitSession(ctx, userId);
     await patchThread(ctx, current, {
+      computeSessionId,
+      ...(computeSessionId !== current.computeSessionId
+        ? { promptId: undefined, delivery: undefined }
+        : {}),
       pending: [...current.pending, messageId],
       status: "processing",
       ...(current.status !== "processing"

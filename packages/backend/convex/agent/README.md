@@ -12,7 +12,19 @@ The unmodified Agent component owns threads and messages. The existing app recor
 
 ## Configuration
 
-`BOAT_API_KEY` stays on the backend. `BOAT_AGENT_ENVIRONMENT` explicitly selects the remote environment; without it, sandboxes use `noEnv: true`. Each user shares one sandbox across their apps, with a separate conversation per app. Stop requests always specify a conversation. App deletion requires the agent to be stopped and removes its history without deleting the shared sandbox.
+`BOAT_API_KEY` stays on the backend. `BOAT_AGENT_ENVIRONMENT` explicitly selects the remote environment; without it, sandboxes use `noEnv: true`. Each user shares one sandbox across their apps, with a separate conversation per app. User abort requests specify a conversation. Unfunded compute expiry stops the shared sandbox normally. App deletion requires the agent to be stopped and removes its history without deleting the shared sandbox.
+
+## Prepaid compute
+
+When payments are selected, each admission checks for at least 10 credits. Enqueue binds to one user compute session transactionally. The first worker claims a persisted debit before calling Autumn's atomic `balances.check` with `required_balance: 10` and `send_event: true`. Only a confirmed response activates a 600-second window. AI has no separate charge.
+
+At expiry a scheduled mutation starts renewal and arms recovery for a lost action. Only processing work renews; idle sessions stop without another charge. The immutable debit record prevents another worker or duplicate timer from dispatching the same charge. A timeout, malformed response, or crashed debit action puts the session on hold without automatic retry. Operators must reconcile that charge against provider evidence; no automatic hold-release operation is supplied yet. A late success cannot silently release the hold.
+
+Every start, resume, steer and prompt path checks the session. API credential issuance and authentication also require an unexpired paid window. Expiry closes admission while normal Boat stop snapshots the shared workspace. Stop calls are serialized and a session cannot close until old worker leases drain. Once closed, only a newly admitted user message creates another session. Low-credit email enqueue is recorded once per confirmed window and remains production-only.
+
+Boat's active-agent TTL extension is not the billing boundary. Normal stop and scheduler delivery are best effort: in-flight provider operations, delayed callbacks or failed snapshots can exceed the paid deadline. Never force-stop to hide that limitation. Unknown charges and unsuccessful stops remain blocked for reconciliation. Files are subject to Boat's retention policy.
+
+Payments remain disabled pending provider-sandbox and installed-client qualification. Drain existing payments-off work before enabling the feature; old queued work has no paid session. Current tests cover handler transitions and existing local backend behavior, not real debit concurrency, purchases, snapshot recovery or an exact wall-clock cutoff.
 
 ## Automatic sandbox login
 

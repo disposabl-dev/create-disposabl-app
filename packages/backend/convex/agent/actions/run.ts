@@ -14,6 +14,8 @@ import {
 import { thread } from "../validator";
 import { syncResponses } from "../events";
 import { attachmentPrompt } from "../attachments";
+import { computeAccess } from "./compute";
+import { paymentsEnabled } from "@disposabl/disposabl-kit/features";
 import {
   agentEnvironment,
   authorizeSandbox,
@@ -31,10 +33,41 @@ export const tick = internalAction({
     );
     if (!current) return null;
     const ref = sandboxRef(current.userId);
+    const canWork = async () => {
+      const access = await computeAccess(
+        ctx,
+        current.userId,
+        current.computeSessionId,
+      );
+      if (access === "ready") return true;
+      await ctx.runMutation(internal.agent.state.finish, {
+        ...lease,
+        ...(access === "blocked" ? { suspended: true } : { delay: 2000 }),
+      });
+      return false;
+    };
     let phase = "sandbox-status";
     try {
       let sandbox = await ctx.runQuery(components.boat.sandboxes.get, ref);
       if (current.status === "stopping") {
+        if (paymentsEnabled) {
+          const session =
+            current.computeSessionId &&
+            (await ctx.runQuery(internal.agent.compute.get, {
+              sessionId: current.computeSessionId,
+            }));
+          if (
+            !session ||
+            session.state !== "active" ||
+            session.paidUntil <= Date.now()
+          ) {
+            await ctx.runMutation(internal.agent.state.finish, {
+              ...lease,
+              suspended: true,
+            });
+            return null;
+          }
+        }
         phase = "stop";
         // Confirm the conversation stopped before accepting more work.
         if (sandbox?.sandboxId) {
@@ -119,12 +152,13 @@ export const tick = internalAction({
         userId: current.userId,
         appId: current.appId,
       });
+      if (!(await canWork())) return null;
       if (!sandbox?.sandboxId)
         sandbox = await boat.create(ctx, {
           ...ref,
           options: {
             type: "default",
-            ttlSeconds: 900,
+            ttlSeconds: paymentsEnabled ? 600 : 900,
             env: agentEnvironment(),
             // The configured environment supplies the operator's Codex OAuth account.
             ...(env.BOAT_AGENT_ENVIRONMENT
@@ -133,12 +167,13 @@ export const tick = internalAction({
           },
         });
       else sandbox = await boat.refresh(ctx, ref);
+      if (!(await canWork())) return null;
       if (sandbox.state === "archived") {
         try {
           sandbox = await boat.resume(ctx, {
             ...ref,
             options: {
-              ttlSeconds: 900,
+              ttlSeconds: paymentsEnabled ? 600 : 900,
               env: agentEnvironment(),
               ...(env.BOAT_AGENT_ENVIRONMENT
                 ? { environment: env.BOAT_AGENT_ENVIRONMENT }
@@ -163,6 +198,7 @@ export const tick = internalAction({
             throw error;
         }
       }
+      if (!(await canWork())) return null;
       if (["error", "deleted", "degraded"].includes(sandbox.state))
         throw new Error(
           "Agent sandbox is unavailable. Check its Boat configuration before retrying.",
@@ -209,6 +245,7 @@ export const tick = internalAction({
           { promptId: string; conversationId: string | null } | undefined;
         if (run && !run.done && conversationId) {
           phase = "steer";
+          if (!(await canWork())) return null;
           try {
             const steered = await request(sandbox.sandboxId, "/steer", {
               conversation: conversationId,
@@ -242,6 +279,7 @@ export const tick = internalAction({
           phase = "authorize-sandbox";
           await authorizeSandbox(ctx, current, lease);
           phase = "send-prompt";
+          if (!(await canWork())) return null;
           sent = await boat.prompt(ctx, {
             ...ref,
             provider: "codex",
@@ -265,6 +303,7 @@ export const tick = internalAction({
           promptId,
           conversationId,
         });
+        if (!(await canWork())) return null;
         if (stopping) {
           await request(
             sandbox.sandboxId,

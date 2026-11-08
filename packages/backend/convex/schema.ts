@@ -3,6 +3,10 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 import { profile } from "./users/validator";
 import { eventFields, execution } from "./agent/validator";
+import {
+  computeSessionFields,
+  computeDebitFields,
+} from "./agent/computeValidator";
 import { pendingDelete } from "./apps/validator";
 import { deployment, platform, feature, releases } from "./validator";
 import {
@@ -12,6 +16,12 @@ import {
 } from "./connections/validator";
 
 export default defineSchema({
+  computeSessions: defineTable(computeSessionFields).index("by_userId", [
+    "userId",
+  ]),
+  computeDebits: defineTable(computeDebitFields).index("by_sessionId", [
+    "sessionId",
+  ]),
   desktopUpdates: desktopUpdateTable,
   files: defineTable({
     owner: v.string(),
@@ -85,6 +95,10 @@ export default defineSchema({
     // App lists use creation order; conversation lists use last activity.
     // eslint-disable-next-line @convex-dev/no-duplicate-indexes
     .index("by_userId", ["userId"])
+    .index("by_computeSessionId_status", [
+      "agent.computeSessionId",
+      "agent.status",
+    ])
     .index("by_threadId", ["agent.threadId"])
     .index("by_agentAccessHash", ["agent.access.hash"])
     .index("by_userId_agentUpdatedAt", ["userId", "agent.updatedAt"]),

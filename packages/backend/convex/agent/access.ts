@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { getThread, patchThread } from "./threads";
 import { workerArgs } from "./validator";
+import { sessionAllows } from "./compute";
 
 export const accessPrefix = "disposabl_agent_";
 export async function digest(value: string) {
@@ -22,6 +23,12 @@ export const issue = internalMutation({
     const current = await getThread(ctx, id);
     if (
       !current ||
+      !(await sessionAllows(
+        ctx,
+        current.computeSessionId,
+        current.userId,
+        Date.now(),
+      )) ||
       current.status !== "processing" ||
       current.stopUnconfirmed ||
       current.lease?.token !== token ||
@@ -48,6 +55,12 @@ export const authenticate = internalQuery({
       .unique();
     if (
       !app?.agent?.access ||
+      !(await sessionAllows(
+        ctx,
+        app.agent.computeSessionId,
+        app.userId,
+        Date.now(),
+      )) ||
       app.agent.status !== "processing" ||
       app.agent.stopUnconfirmed ||
       app.agent.access.expiresAt <= Date.now() ||
