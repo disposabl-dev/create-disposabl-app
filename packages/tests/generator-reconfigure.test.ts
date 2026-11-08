@@ -318,6 +318,11 @@ test(
       await reconfigureApp(template, app, version, {
         features: "authentication",
       });
+      for (const path of [
+        "packages/tests/consent-identity.test.ts",
+        "packages/tests/components/consent-identity.test.mjs",
+      ])
+        assert.ok(existsSync(join(app, path)), path);
       assert.doesNotMatch(
         await read(app, "apps/mobile/src/app/index.tsx"),
         /PublicHomeScreen/,
@@ -360,6 +365,8 @@ test(
       for (const path of [
         "packages/disposabl-kit/client/routes/billing-login.tsx",
         "packages/disposabl-kit/client/routes/_auth-pages/login.tsx",
+        "packages/tests/consent-identity.test.ts",
+        "packages/tests/components/consent-identity.test.mjs",
         "apps/mobile/src/app/(auth)/login.tsx",
       ])
         assert.equal(existsSync(join(app, path)), false, path);

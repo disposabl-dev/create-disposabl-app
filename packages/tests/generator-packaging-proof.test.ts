@@ -85,6 +85,16 @@ test("packaged starter and generated profiles exclude product proof fixtures", a
         features: selectFeatures(features),
       });
       roots.push(destination);
+      for (const path of [
+        "packages/tests/consent-identity.test.ts",
+        "packages/tests/components/consent-identity.test.mjs",
+      ]) {
+        assert.equal(
+          existsSync(join(destination, path)),
+          features !== "none",
+          `${name}: ${path} must match authentication selection`,
+        );
+      }
     }
     for (const root of roots) {
       const mobileConfigPath = join(root, "apps/mobile/app.json");

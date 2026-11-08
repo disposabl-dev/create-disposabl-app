@@ -22,6 +22,8 @@ import {
 export const authStarterPaths = [
   "packages/disposabl-kit/client/routes/_auth-pages",
   "packages/disposabl-kit/client/routes/consent.tsx",
+  "packages/tests/consent-identity.test.ts",
+  "packages/tests/components/consent-identity.test.mjs",
   "packages/disposabl-kit/client/routes/billing-login.tsx",
   "packages/disposabl-kit/client/routes/_authenticated/change-password.tsx",
   "apps/web/src/router/_authenticated/dashboard.api-keys.tsx",
