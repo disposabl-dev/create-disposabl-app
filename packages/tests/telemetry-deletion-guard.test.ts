@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { claimIdentity as product } from "../backend/convex/telemetry";
+import { claimIdentity as product, page } from "../backend/convex/telemetry";
 import { claimIdentity as generic } from "../disposabl-kit/server/lib/telemetry";
 
 function context(user: object | null, valid = true) {
@@ -64,5 +64,51 @@ test("active owner, anonymous claim and generic starter retain issuance", async 
       "telemetryIdentities",
       "scheduler",
     ]);
+  }
+});
+
+test("page ingestion rejects a deletion racing the session check without emitting", async () => {
+  const originalEnv = { ...process.env };
+  const originalFetch = globalThis.fetch;
+  const { ctx: mutationCtx, writes } = context({ deletionRequestedAt: 1 });
+  let emissions = 0;
+  try {
+    process.env.DISPOSABL_ENVIRONMENT = "production";
+    process.env.POSTHOG_PROJECT_TOKEN = "test-token";
+    process.env.POSTHOG_HOST = "https://us.i.posthog.com";
+    delete process.env.E2E_TELEMETRY_DISABLED;
+    delete process.env.POSTHOG_ENABLED;
+    globalThis.fetch = (async () => {
+      emissions++;
+      return new Response(null, { status: 200 });
+    }) as typeof fetch;
+    const ctx = {
+      auth: { getUserIdentity: async () => ({ subject: "verified-session" }) },
+      runQuery: async (_ref: unknown, args: any) =>
+        "sessionId" in args ? { userId: "owner" } : false,
+      runMutation: async (_ref: unknown, args: any) =>
+        (product as any)._handler(mutationCtx, args),
+    };
+    const response = await (page as any)._handler(
+      ctx,
+      new Request("https://example.com/telemetry/page", {
+        method: "POST",
+        headers: { Authorization: "Bearer test" },
+        body: JSON.stringify({
+          platform: "web",
+          page: "home",
+          anonymousId: "12345678-1234-4123-8123-123456789abc",
+        }),
+      }),
+    );
+    assert.equal(response.status, 400);
+    assert.equal(emissions, 0);
+    assert.deepEqual(writes, []);
+  } finally {
+    globalThis.fetch = originalFetch;
+    for (const key of Object.keys(process.env)) {
+      if (!(key in originalEnv)) delete process.env[key];
+    }
+    Object.assign(process.env, originalEnv);
   }
 });
