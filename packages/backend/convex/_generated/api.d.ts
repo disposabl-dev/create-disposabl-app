@@ -17,6 +17,7 @@ import type * as agent_boat from "../agent/boat.js";
 import type * as agent_bootstrap from "../agent/bootstrap.js";
 import type * as agent_compute from "../agent/compute.js";
 import type * as agent_computeDebit from "../agent/computeDebit.js";
+import type * as agent_computeRecovery from "../agent/computeRecovery.js";
 import type * as agent_computeValidator from "../agent/computeValidator.js";
 import type * as agent_credits from "../agent/credits.js";
 import type * as agent_events from "../agent/events.js";
@@ -107,6 +108,7 @@ declare const fullApi: ApiFromModules<{
   "agent/bootstrap": typeof agent_bootstrap;
   "agent/compute": typeof agent_compute;
   "agent/computeDebit": typeof agent_computeDebit;
+  "agent/computeRecovery": typeof agent_computeRecovery;
   "agent/computeValidator": typeof agent_computeValidator;
   "agent/credits": typeof agent_credits;
   "agent/events": typeof agent_events;
