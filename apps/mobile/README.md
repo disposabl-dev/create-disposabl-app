@@ -215,8 +215,8 @@ the keystore certificate and Expo identity, then moves any existing `android`
 directory to a printed temporary backup path and runs a fresh Expo prebuild.
 Native customizations must be represented in Expo config/plugins; stale native
 files are never reused. A failed prebuild restores the previous directory and
-preserves partial output in the backup. Keep the upload keystore outside
-`android`; relative input paths resolve from the command's working directory.
+preserves partial output in the backup. Keep the upload keystore and bundletool
+jar outside `android`; relative input paths resolve from the command's working directory.
 The build uses the configured Android architectures and verifies the AAB's manifest,
 ABIs and upload signature. It prints the output path and SHA-256. It does not
 upload or submit the bundle. Keep signing values out of shell history and logs.

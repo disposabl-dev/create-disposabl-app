@@ -5,7 +5,9 @@ import { fileURLToPath } from "node:url";
 import { fingerprint, verifyBundle } from "./verify-play-aab.mjs";
 import { freshAndroid } from "./fresh-android.mjs";
 
-const mobile = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const mobile = realpathSync(
+  resolve(dirname(fileURLToPath(import.meta.url)), ".."),
+);
 const env = process.env;
 function required(name) {
   if (!env[name]) throw new Error(`Missing ${name}`);
@@ -56,10 +58,9 @@ for (const key of ["EXPO_PUBLIC_CONVEX_URL", "EXPO_PUBLIC_CONVEX_SITE_URL"]) {
 }
 env.BUNDLETOOL_JAR = realpathSync(required("BUNDLETOOL_JAR"));
 env.ANDROID_KEYSTORE_PATH = realpathSync(env.ANDROID_KEYSTORE_PATH);
-if (env.ANDROID_KEYSTORE_PATH.startsWith(`${mobile}${sep}android${sep}`))
-  throw new Error(
-    "Keep the upload keystore outside the generated Android project",
-  );
+for (const key of ["BUNDLETOOL_JAR", "ANDROID_KEYSTORE_PATH"])
+  if (env[key].startsWith(`${mobile}${sep}android${sep}`))
+    throw new Error(`Keep ${key} outside the generated Android project`);
 env.DISPOSABL_MOBILE_CHANNEL = "production";
 env.DISPOSABL_ANDROID_CHANNEL = "production";
 env.EXPO_NO_DOTENV = "1";

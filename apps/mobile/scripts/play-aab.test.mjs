@@ -9,11 +9,68 @@ import {
   mkdirSync,
   readFileSync,
   existsSync,
+  copyFileSync,
+  symlinkSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { verifyBundle } from "./verify-play-aab.mjs";
 import { freshAndroid } from "./fresh-android.mjs";
+
+test("Play preflight rejects tools and keys moved by native regeneration", () => {
+  const mobile = mkdtempSync(join(tmpdir(), "play-input-paths-"));
+  try {
+    mkdirSync(join(mobile, "scripts"));
+    mkdirSync(join(mobile, "android"));
+    for (const file of [
+      "play-aab.mjs",
+      "verify-play-aab.mjs",
+      "fresh-android.mjs",
+    ])
+      copyFileSync(
+        fileURLToPath(new URL(file, import.meta.url)),
+        join(mobile, "scripts", file),
+      );
+    const inside = join(mobile, "android/input");
+    const outside = join(mobile, "input");
+    const alias = join(mobile, "outside-link");
+    writeFileSync(inside, "fixture");
+    writeFileSync(outside, "fixture");
+    symlinkSync(inside, alias);
+    const env = {
+      PATH: process.env.PATH,
+      PLAY_PACKAGE_ID: "app.test",
+      PLAY_UPLOAD_CERT_SHA256: "AA".repeat(32),
+      PLAY_PREVIOUS_VERSION_CODE: "4",
+      DISPOSABL_ANDROID_VERSION_CODE: "5",
+      EXPO_PUBLIC_CONVEX_URL: "https://backend.example.test",
+      EXPO_PUBLIC_CONVEX_SITE_URL: "https://site.example.test",
+      ANDROID_KEYSTORE_PATH: outside,
+      ANDROID_KEYSTORE_PASSWORD: "fixture",
+      ANDROID_KEY_ALIAS: "fixture",
+      ANDROID_KEY_PASSWORD: "fixture",
+      BUNDLETOOL_JAR: outside,
+    };
+    for (const key of ["BUNDLETOOL_JAR", "ANDROID_KEYSTORE_PATH"])
+      for (const path of [inside, alias]) {
+        const result = spawnSync(
+          process.execPath,
+          [join(mobile, "scripts/play-aab.mjs")],
+          {
+            env: { ...env, [key]: path },
+            encoding: "utf8",
+          },
+        );
+        expect(result.status).not.toBe(0);
+        expect(result.stderr).toContain(
+          `Keep ${key} outside the generated Android project`,
+        );
+        expect(readFileSync(inside, "utf8")).toBe("fixture");
+      }
+  } finally {
+    rmSync(mobile, { recursive: true, force: true });
+  }
+});
 
 test("Play prebuild replaces stale native settings and preserves the prior project", () => {
   const mobile = mkdtempSync(join(tmpdir(), "play-prebuild-test-"));
