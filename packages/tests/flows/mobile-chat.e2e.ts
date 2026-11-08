@@ -134,6 +134,7 @@ test(
             releases: {
               android: {
                 status: "ready",
+                artifactId: 12,
                 githubReleaseUrl:
                   "https://github.com/fixture/installer/releases/tag/app-pr-1-android",
                 artifactUrl:
@@ -304,10 +305,16 @@ test(
             : screen.getByText("View build logs", { exact: true }),
         );
         await app.screenshot("chat-build-logs");
-        const download = screen.getByRole("button", "Download android", {
+        const download = screen.getByRole("button", "Download Android", {
           exact: true,
         });
         await screen.scrollUntilVisible(download);
+        if (platform === "ios")
+          await device.unstable_raw.client.command.wait({
+            stable: true,
+            quietMs: 500,
+            timeoutMs: 5000,
+          });
         await download.tap();
         // The fixture has no linked GitHub repository, so resolving stops before
         // any provider request. Verify a visible retry path, never a fake install.

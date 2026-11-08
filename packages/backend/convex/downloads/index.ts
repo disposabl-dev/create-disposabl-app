@@ -6,8 +6,8 @@ import { platform } from "../validator";
 
 export const installer = action({
   args: { appId: v.string(), platform, reference: v.optional(v.string()) },
-  returns: v.string(),
-  handler: async (ctx, args): Promise<string> => {
+  returns: v.union(v.string(), v.null()),
+  handler: async (ctx, args): Promise<string | null> => {
     const userId = await getSessionUserId(ctx);
     if (!userId) throw new ConvexError("Sign in to download your app.");
     try {
@@ -19,8 +19,6 @@ export const installer = action({
     } catch {
       // Upstream credentials and repository details must not reach the client.
     }
-    throw new ConvexError(
-      "The installer is not available. Please try again shortly.",
-    );
+    return null;
   },
 });

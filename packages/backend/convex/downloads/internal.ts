@@ -20,6 +20,7 @@ export const candidate = internalQuery({
       attempt: v.number(),
       commitSha: v.string(),
       preview: v.boolean(),
+      artifactId: v.optional(v.number()),
     }),
   ),
   handler: async (ctx, { appId, platform, userId, reference }) => {
@@ -54,7 +55,10 @@ export const candidate = internalQuery({
     if (
       latest?.status !== "ready" ||
       !latest.githubReleaseUrl ||
-      !latest.artifactUrl
+      !latest.artifactUrl ||
+      (reference !== undefined &&
+        (!Number.isSafeInteger(latest.artifactId) ||
+          (latest.artifactId ?? 0) <= 0))
     )
       return null;
     const connection = await ctx.db
@@ -74,6 +78,9 @@ export const candidate = internalQuery({
       attempt: latest.run.attempt,
       commitSha: latest.run.commitSha,
       preview: reference !== undefined,
+      ...(latest.artifactId !== undefined
+        ? { artifactId: latest.artifactId }
+        : {}),
     };
   },
 });

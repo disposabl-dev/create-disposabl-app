@@ -71,6 +71,7 @@ test(
     const repo = `fixture-${randomUUID()}`;
     const release = {
       status: "ready",
+      artifactId: 12,
       githubReleaseUrl: `https://github.com/fixture/${repo}/releases/tag/app-pr-1-android`,
       artifactUrl: `https://github.com/fixture/${repo}/releases/download/app-pr-1-android/android.apk`,
       run: {
@@ -177,8 +178,11 @@ test(
       [owner.token, { ...args, platform: "windows" }],
     ] as const) {
       const result = await call("downloads/index:installer", request, token);
-      expect(result.status).toBe("error");
-      expect(result.errorMessage.includes("server-only-token")).toBe(false);
+      if (!token) expect(result.status).toBe("error");
+      else {
+        expect(result.status).toBe("success");
+        expect(result.value).toBe(null);
+      }
     }
     const publicResponse = await fetch(
       `${site.origin}/downloads/${appId}/android?reference=${reference}`,

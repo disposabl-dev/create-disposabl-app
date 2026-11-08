@@ -2,7 +2,7 @@ import { useAuthToken } from "@convex-dev/auth/react";
 import { useAction } from "convex/react";
 import { useLayoutEffect, useRef, useState } from "react";
 import { Linking, Text, View } from "react-native";
-import type { Platform } from "@disposabl/disposabl-kit/platforms";
+import { platforms, type Platform } from "@disposabl/disposabl-kit/platforms";
 import { sessionId } from "../../../../../packages/disposabl-kit/lib/auth-session";
 import { api } from "../../../../../packages/backend/convex/_generated/api";
 import { Button, useStyles } from "./ui";
@@ -45,6 +45,7 @@ function Download({ appId, platform, reference }: Props) {
         platform,
         ...(reference !== undefined ? { reference } : {}),
       });
+      if (!url) throw new Error("Installer unavailable");
       if (active.current) await Linking.openURL(url);
     } catch {
       if (active.current)
@@ -57,7 +58,11 @@ function Download({ appId, platform, reference }: Props) {
   return (
     <View style={{ gap: 8 }}>
       <Button
-        title={busy ? "Preparing download…" : `Download ${platform}`}
+        title={
+          busy
+            ? "Preparing download…"
+            : `Download ${platforms.find((item) => item.id === platform)?.label ?? platform}`
+        }
         disabled={busy}
         onPress={() => void download()}
       />

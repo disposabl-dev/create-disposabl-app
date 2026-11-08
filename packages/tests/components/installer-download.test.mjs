@@ -14,14 +14,16 @@ let userId,
   location,
   requestCalls,
   queryCalls,
-  afterLookup;
+  afterLookup,
+  githubResponse,
+  expectedPermissions;
 const originalFetch = globalThis.fetch;
 mock.module("@convex-dev/auth/server", () => ({
   getAuthUserId: async (ctx) => ctx.userId ?? null,
 }));
 const token = mock(async (_ctx, installation, permissions, repo) => {
   expect(installation).toBe("123");
-  expect(permissions).toEqual(["contents:read"]);
+  expect(permissions).toEqual(expectedPermissions);
   expect(repo).toBe(repository);
   return "server-only-token";
 });
@@ -30,6 +32,7 @@ mock.module("../../backend/convex/github/actions/tokens", () => ({
   githubRequest: async (secret, path) => {
     expect(secret).toBe("server-only-token");
     requestCalls.push(path);
+    if (githubResponse) return githubResponse(path);
     if (path.includes("/git/ref/"))
       return { object: { type: "commit", sha: tagSha } };
     return release;
@@ -84,9 +87,12 @@ beforeEach(() => {
   queryCalls = 0;
   requestCalls = [];
   afterLookup = undefined;
+  githubResponse = undefined;
+  expectedPermissions = ["contents:read"];
   token.mockClear();
   const latest = {
     status: "ready",
+    artifactId: 12,
     githubReleaseUrl: `${base}/tag/app-pr-7-android`,
     artifactUrl: `${base}/download/app-pr-7-android/android.apk`,
     run: {
@@ -150,10 +156,10 @@ test("anonymous and different owners cannot request private or production instal
   userId = undefined;
   await expect(installer._handler(ctx, args)).rejects.toThrow("Sign in");
   userId = "someone-else";
-  await expect(installer._handler(ctx, args)).rejects.toThrow("not available");
-  await expect(
-    installer._handler(ctx, { appId, platform: "android" }),
-  ).rejects.toThrow("not available");
+  expect(await installer._handler(ctx, args)).toBeNull();
+  expect(
+    await installer._handler(ctx, { appId, platform: "android" }),
+  ).toBeNull();
   expect(token).not.toHaveBeenCalled();
 });
 
@@ -170,17 +176,17 @@ test("public HTTP downloads never select private preview records", async () => {
 });
 
 test("missing branches, disabled platforms, failed builds and deleting apps fail before credentials", async () => {
-  await expect(
-    installer._handler(ctx, { ...args, reference: "another-branch" }),
-  ).rejects.toThrow("not available");
+  expect(
+    await installer._handler(ctx, { ...args, reference: "another-branch" }),
+  ).toBeNull();
   tables.previews[0].releases.android.status = "failed";
-  await expect(installer._handler(ctx, args)).rejects.toThrow("not available");
+  expect(await installer._handler(ctx, args)).toBeNull();
   tables.previews[0].releases.android.status = "ready";
   tables.apps[0].platforms = [];
-  await expect(installer._handler(ctx, args)).rejects.toThrow("not available");
+  expect(await installer._handler(ctx, args)).toBeNull();
   tables.apps[0].platforms = ["android"];
   tables.apps[0].operation = { kind: "delete", until: Date.now() + 10_000 };
-  await expect(installer._handler(ctx, args)).rejects.toThrow("not available");
+  expect(await installer._handler(ctx, args)).toBeNull();
   expect(token).not.toHaveBeenCalled();
 });
 
@@ -191,6 +197,7 @@ test.each([
   "prerelease",
   "asset",
   "commit",
+  "replacement asset",
   "redirect",
 ])("rejects a mismatched %s", async (fault) => {
   if (fault === "repository")
@@ -203,15 +210,17 @@ test.each([
   if (fault === "asset")
     release.assets[0].browser_download_url = `${base}/download/app-pr-8-android/android.apk`;
   if (fault === "commit") tagSha = "b".repeat(40);
+  // New bytes can exist under the old URL before the publisher moves the tag.
+  if (fault === "replacement asset") release.assets[0].id = 13;
   if (fault === "redirect") location = "https://attacker.example/file.apk";
-  await expect(installer._handler(ctx, args)).rejects.toThrow("not available");
+  expect(await installer._handler(ctx, args)).toBeNull();
 });
 
 test("does not return a link when ownership or build changes while resolving", async () => {
   afterLookup = () => {
     tables.apps[0].userId = "new-owner";
   };
-  await expect(installer._handler(ctx, args)).rejects.toThrow("not available");
+  expect(await installer._handler(ctx, args)).toBeNull();
   tables.apps[0].userId = userId;
   afterLookup = () => {
     tables.previews[0].releases.android = {
@@ -219,7 +228,7 @@ test("does not return a link when ownership or build changes while resolving", a
       status: "building",
     };
   };
-  await expect(installer._handler(ctx, args)).rejects.toThrow("not available");
+  expect(await installer._handler(ctx, args)).toBeNull();
 });
 
 test("production retains its existing public download route and immutable run tag", async () => {
@@ -329,6 +338,93 @@ test("mobile presents retry guidance when opening the installer fails", async ()
   await act(async () => {
     finish(signedUrl);
   });
+  expect(renderer.root.findByType("Text").props.children).toBe(
+    "Could not open the installer. Please try again.",
+  );
+  expect(renderer.root.findByType("Button").props.disabled).toBe(false);
+});
+
+mock.module("../../backend/convex/github/actions/oidc", () => ({
+  verifyGitHubToken: async () => ({
+    event_name: "push",
+    ref: "refs/heads/main",
+    repository_id: "55",
+    run_id: "101",
+    run_attempt: "2",
+  }),
+  workflowRepository: () => repository,
+}));
+const { report } = await import("../../backend/convex/github/actions/internal");
+test("release reporting records the verified asset ID and rejects replacement races", async () => {
+  release.body = `Platform: android\nSource: ${sha}\n<!-- android ${JSON.stringify({ sha256: "a".repeat(64) })} -->\n`;
+  release.assets[0].digest = `sha256:${"a".repeat(64)}`;
+  expectedPermissions = [
+    "contents:write",
+    "actions:read",
+    "pull_requests:read",
+  ];
+  githubResponse = (path) => {
+    if (path === `/repos/${repository}`) return { id: 55 };
+    if (path.includes("/actions/runs/"))
+      return {
+        id: 101,
+        run_attempt: 2,
+        run_number: 3,
+        head_sha: sha,
+        head_branch: "main",
+        event: "push",
+        html_url: `https://github.com/${repository}/actions/runs/101`,
+        path: ".github/workflows/pipeline.yml",
+        repository: { id: 55 },
+        head_repository: { id: 55 },
+      };
+    return release;
+  };
+  const mutations = [];
+  const reportCtx = {
+    runQuery: async () => ({ ...tables.apps[0], installationId: "123" }),
+    runMutation: async (fn, value) => {
+      if (getFunctionName(fn) === "previews/internal:report")
+        mutations.push(value);
+      return null;
+    },
+  };
+  const request = {
+    appId,
+    token: "fixture-oidc",
+    platform: "android",
+    status: "ready",
+    githubReleaseUrl: release.html_url,
+    artifactUrl: release.assets[0].browser_download_url,
+  };
+  await report._handler(reportCtx, request);
+  expect(mutations[0].artifactId).toBe(12);
+  // A late report for A must not record the replacement B asset before B's
+  // release notes and tag have advanced, even though the URL is unchanged.
+  release.assets[0].id = 13;
+  release.assets[0].digest = `sha256:${"b".repeat(64)}`;
+  await expect(report._handler(reportCtx, request)).rejects.toThrow("manifest");
+  release.assets[0].id = 0;
+  await expect(report._handler(reportCtx, request)).rejects.toThrow(
+    "not published",
+  );
+  release.assets[0].id = 12;
+  release.assets[0].digest = `sha256:${"a".repeat(64)}`;
+  release.body = release.body.replace(
+    `Source: ${sha}`,
+    `Source: ${"b".repeat(40)}`,
+  );
+  await expect(report._handler(reportCtx, request)).rejects.toThrow("source");
+  expect(mutations).toHaveLength(1);
+});
+
+test("mobile shows retry guidance for an unavailable installer without a rejected action", async () => {
+  await mount();
+  await act(async () => renderer.root.findByType("Button").props.onPress());
+  await act(async () => {
+    finish(null);
+  });
+  expect(openURL).not.toHaveBeenCalled();
   expect(renderer.root.findByType("Text").props.children).toBe(
     "Could not open the installer. Please try again.",
   );

@@ -155,6 +155,7 @@ export const report = internalAction({
           throw new Error("Release belongs to another repository.");
       }
     }
+    let artifactId: number | undefined;
     if (args.githubReleaseUrl) {
       const tag = new URL(args.githubReleaseUrl).pathname.split(
         "/releases/tag/",
@@ -163,24 +164,52 @@ export const report = internalAction({
       const release = await githubRequest<{
         html_url: string;
         draft: boolean;
-        assets: { browser_download_url: string }[];
+        body: string | null;
+        assets: {
+          id: number;
+          browser_download_url: string;
+          digest: string | null;
+        }[];
       }>(
         verified.installationToken,
         `/repos/${verified.repository}/releases/tags/${encodeURIComponent(decodeURIComponent(tag))}`,
+      );
+      const asset = release.assets.find(
+        (asset) => asset.browser_download_url === args.artifactUrl,
       );
       if (
         release.draft ||
         release.html_url !== args.githubReleaseUrl ||
         (args.artifactUrl &&
-          !release.assets.some(
-            (asset) => asset.browser_download_url === args.artifactUrl,
-          ))
+          (!asset || !Number.isSafeInteger(asset.id) || asset.id <= 0))
       )
         throw new Error("Release or download is not published.");
+      if (
+        /^Source: ([a-f0-9]{40})$/m.exec(release.body ?? "")?.[1] !==
+        verified.run.commitSha
+      )
+        throw new Error("Release source does not match this workflow.");
+      if (asset && args.platform === "android") {
+        const manifest = JSON.parse(
+          /<!-- android (\{[^\n]+\}) -->/.exec(release.body ?? "")?.[1] ??
+            "null",
+        );
+        if (
+          !/^[a-f0-9]{64}$/.test(manifest?.sha256 ?? "") ||
+          asset.digest !== `sha256:${manifest.sha256}`
+        )
+          throw new Error(
+            "Android asset does not match the published manifest.",
+          );
+      }
+      // Replacing an APK creates a new asset ID even while its mutable PR tag
+      // and filename are unchanged. Pin the verified bytes to this build record.
+      artifactId = asset?.id;
     }
     const { token: _token, ...result } = args;
     await ctx.runMutation(internal.previews.internal.report, {
       ...result,
+      ...(artifactId !== undefined ? { artifactId } : {}),
       userId: verified.app.userId,
       githubOwner: verified.app.githubOwner,
       githubRepo: verified.app.githubRepo,

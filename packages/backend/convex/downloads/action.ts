@@ -22,6 +22,7 @@ type Candidate = {
   attempt: number;
   commitSha: string;
   preview: boolean;
+  artifactId?: number;
 };
 type Release = {
   html_url: string;
@@ -101,6 +102,7 @@ export const resolve = internalAction({
     const asset = release.assets.find(
       (a) =>
         a.browser_download_url === candidate.artifactUrl &&
+        (!candidate.preview || a.id === candidate.artifactId) &&
         a.state === "uploaded" &&
         suffixes[args.platform]?.some((s) => a.name.endsWith(s)) &&
         Number.isSafeInteger(a.id) &&

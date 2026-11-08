@@ -51,7 +51,11 @@ export function presentPlatforms(
   return Object.fromEntries(
     platformNames.map((name) => {
       const release = releases[platformKey(name)];
-      const { url: releasedUrl, ...latest } = release ?? {};
+      const {
+        url: releasedUrl,
+        artifactId: _artifactId,
+        ...latest
+      } = release ?? {};
       const url =
         releasedUrl ??
         (site && Object.hasOwn(routes, name) ? site + routes[name] : undefined);
@@ -184,6 +188,7 @@ export const report = internalMutation({
     run,
     platform,
     ...releaseDetails,
+    artifactId: v.optional(v.number()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {

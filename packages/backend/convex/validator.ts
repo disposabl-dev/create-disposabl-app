@@ -71,14 +71,18 @@ export const releaseDetails = {
   artifactUrl: v.optional(v.string()),
   updateUrl: v.optional(v.string()),
 };
-export const release = v.object({ ...releaseDetails, run });
+export const release = v.object({
+  ...releaseDetails,
+  artifactId: v.optional(v.number()),
+  run,
+});
 export const releases = v.record(v.string(), release);
 const platformStates = v.record(
   v.string(),
   v.object({
     enabled: v.boolean(),
     url: v.optional(v.string()),
-    latest: v.optional(release.omit("url")),
+    latest: v.optional(release.omit("url", "artifactId")),
   }),
 );
 export const previewResult = v.object({
