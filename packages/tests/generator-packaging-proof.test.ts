@@ -11,6 +11,8 @@ import {
 } from "../create-disposabl-app/options";
 
 const excluded = [
+  "packages/tests/account-deletion-transactions.test.ts",
+  "packages/tests/fixtures/account-deletion-convex",
   "packages/tests/flows/cli-oauth.e2e.ts",
   "packages/tests/helpers/cli-oauth-fixture.ts",
   "packages/tests/cli-oauth-build.test.ts",
