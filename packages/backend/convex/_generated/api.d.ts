@@ -91,6 +91,7 @@ import type * as telemetry from "../telemetry.js";
 import type * as users_deletion from "../users/deletion.js";
 import type * as users_index from "../users/index.js";
 import type * as users_internal from "../users/internal.js";
+import type * as users_mcpDeletion from "../users/mcpDeletion.js";
 import type * as users_validator from "../users/validator.js";
 import type * as validator from "../validator.js";
 
@@ -184,6 +185,7 @@ declare const fullApi: ApiFromModules<{
   "users/deletion": typeof users_deletion;
   "users/index": typeof users_index;
   "users/internal": typeof users_internal;
+  "users/mcpDeletion": typeof users_mcpDeletion;
   "users/validator": typeof users_validator;
   validator: typeof validator;
 }>;

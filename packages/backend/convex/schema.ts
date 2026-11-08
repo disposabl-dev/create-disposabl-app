@@ -7,7 +7,7 @@ import {
 import { desktopUpdateTable } from "./desktopUpdates/validator";
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
-import { profile } from "./users/validator";
+import { mcpDeletionProgress, profile } from "./users/validator";
 import { eventFields, execution } from "./agent/validator";
 import {
   computeSessionFields,
@@ -105,6 +105,7 @@ export default defineSchema({
   }).index("by_key", ["key"]),
   users: defineTable({
     deletionRequestedAt: v.optional(v.number()),
+    mcpDeletion: v.optional(mcpDeletionProgress),
     deletionStop: v.optional(
       v.object({
         state: v.union(

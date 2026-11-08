@@ -1,4 +1,5 @@
 import { deletionPending as isDeletionPending } from "./deletion";
+import { mcpDeletionProgress } from "./validator";
 import {
   paginationOptsValidator,
   paginationResultValidator,
@@ -113,6 +114,7 @@ export const deletionRequests = internalQuery({
       requestedAt: v.number(),
       status: v.literal("requested"),
       blockers: v.array(v.string()),
+      mcpDeletion: v.optional(mcpDeletionProgress),
       stopAttempt: v.optional(v.number()),
       stopUpdatedAt: v.optional(v.number()),
       stopLeaseUntil: v.optional(v.number()),
@@ -138,6 +140,7 @@ export const deletionRequests = internalQuery({
         userId: user._id,
         requestedAt: user.deletionRequestedAt!,
         status: "requested" as const,
+        ...(user.mcpDeletion ? { mcpDeletion: user.mcpDeletion } : {}),
         stop:
           user.deletionStop?.state === "running" &&
           (user.deletionStop.leaseUntil ?? 0) <= Date.now()
@@ -156,6 +159,7 @@ export const deletionRequests = internalQuery({
           "remote_stop",
           "data_cleanup",
           "provider_cleanup",
+          "mcp_attributed_cleanup_and_historical_orphans",
           "session_revocation",
         ],
       })),

@@ -1,5 +1,14 @@
 import { v } from "convex/values";
 
+export const mcpDeletionProgress = v.object({
+  state: v.union(v.literal("in_progress"), v.literal("attributed_complete")),
+  batches: v.number(),
+  requestsDeleted: v.number(),
+  tokensDeleted: v.number(),
+  grantsDeleted: v.number(),
+  updatedAt: v.number(),
+});
+
 export const profile = v.object({
   name: v.optional(v.string()),
   email: v.optional(v.string()),
