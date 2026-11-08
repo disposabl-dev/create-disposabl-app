@@ -10,6 +10,11 @@ import { v } from "convex/values";
 import { profile } from "./users/validator";
 
 export default defineSchema({
+  telemetryIdentities: defineTable({
+    hash: v.string(),
+    userId: v.optional(v.string()),
+    expiresAt: v.number(),
+  }).index("by_hash", ["hash"]),
   billingHandoffs: defineTable({
     hash: v.string(),
     userId: v.string(),

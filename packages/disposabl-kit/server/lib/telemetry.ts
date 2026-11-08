@@ -1,5 +1,7 @@
 import config from "../../../../disposabl.json";
 import { makeFunctionReference } from "convex/server";
+import { v } from "convex/values";
+import { internalMutation } from "../../../backend/convex/_generated/server";
 
 export type TelemetryEvent =
   | "api_operation"
@@ -66,6 +68,64 @@ export function telemetryEnabled(settingsOverride: AnalyticsConfig = settings) {
       host ?? "",
     )
   );
+}
+
+// The UUID is a bearer capability, not browser attestation or authorization.
+// Records expire after 30 days; an expired capability rotates without a merge.
+const identityTtl = 30 * 24 * 60 * 60 * 1000;
+const expireIdentityRef = makeFunctionReference<
+  "mutation",
+  { id: string },
+  null
+>("telemetry:expireIdentity");
+
+export const claimIdentity = internalMutation({
+  args: {
+    hash: v.optional(v.string()),
+    newHash: v.string(),
+    userId: v.optional(v.string()),
+  },
+  returns: v.boolean(),
+  handler: async (ctx, { hash, newHash, userId }) => {
+    const row = hash
+      ? await ctx.db
+          .query("telemetryIdentities")
+          .withIndex("by_hash", (q) => q.eq("hash", hash))
+          .unique()
+      : null;
+    if (
+      row &&
+      row.expiresAt > Date.now() &&
+      (!row.userId || row.userId === userId)
+    ) {
+      if (userId && !row.userId)
+        await ctx.db.patch("telemetryIdentities", row._id, { userId });
+      return true;
+    }
+    const id = await ctx.db.insert("telemetryIdentities", {
+      hash: newHash,
+      expiresAt: Date.now() + identityTtl,
+      ...(userId ? { userId } : {}),
+    });
+    await ctx.scheduler.runAfter(identityTtl, expireIdentityRef, { id });
+    return false;
+  },
+});
+
+export const expireIdentity = internalMutation({
+  args: { id: v.id("telemetryIdentities") },
+  returns: v.null(),
+  handler: async (ctx, { id }) => {
+    const row = await ctx.db.get("telemetryIdentities", id);
+    if (row && row.expiresAt <= Date.now())
+      await ctx.db.delete("telemetryIdentities", id);
+    return null;
+  },
+});
+
+/** Hash capabilities before persisting them; the raw value stays with its holder. */
+export async function hashTelemetryIdentity(value: string) {
+  return opaqueId(`disposabl:anonymous-capability:${value}`);
 }
 
 async function opaqueId(value: string) {

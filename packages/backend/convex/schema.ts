@@ -22,6 +22,11 @@ import {
 } from "./connections/validator";
 
 export default defineSchema({
+  telemetryIdentities: defineTable({
+    hash: v.string(),
+    userId: v.optional(v.string()),
+    expiresAt: v.number(),
+  }).index("by_hash", ["hash"]),
   computeSessions: defineTable(computeSessionFields).index("by_userId", [
     "userId",
   ]),

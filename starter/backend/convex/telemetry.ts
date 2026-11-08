@@ -1,10 +1,23 @@
 import { v } from "convex/values";
+import { makeFunctionReference } from "convex/server";
 import { httpAction, internalAction } from "./_generated/server";
 import { getSessionUserId } from "@disposabl/disposabl-kit/server/lib/functions";
 import {
   captureTelemetry,
+  hashTelemetryIdentity,
   telemetryEnabled,
 } from "@disposabl/disposabl-kit/server/lib/telemetry";
+
+export {
+  claimIdentity,
+  expireIdentity,
+} from "@disposabl/disposabl-kit/server/lib/telemetry";
+
+const claimIdentityRef = makeFunctionReference<
+  "mutation",
+  { hash?: string; newHash: string; userId?: string },
+  boolean
+>("telemetry:claimIdentity");
 
 const pageNames = [
   "home",
@@ -80,10 +93,15 @@ export const page = httpAction(async (ctx, request) => {
     const userId = await getSessionUserId(ctx);
     if (request.headers.has("Authorization") && !userId)
       return new Response(null, { status: 401, headers });
-    const anonymousId =
-      "anonymousId" in body
-        ? (body.anonymousId as string)
-        : crypto.randomUUID();
+    const existingId =
+      "anonymousId" in body ? (body.anonymousId as string) : undefined;
+    const issuedId = crypto.randomUUID();
+    const accepted = await ctx.runMutation(claimIdentityRef, {
+      ...(existingId ? { hash: await hashTelemetryIdentity(existingId) } : {}),
+      newHash: await hashTelemetryIdentity(issuedId),
+      ...(userId ? { userId } : {}),
+    });
+    const anonymousId = accepted && existingId ? existingId : issuedId;
     await captureTelemetry(
       body.platform === "web" ? "page_view" : "screen_view",
       { page: body.page as (typeof pageNames)[number] },

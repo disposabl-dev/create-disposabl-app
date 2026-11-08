@@ -114,11 +114,60 @@ test("capture uses stable opaque authenticated identity and approved metadata", 
   );
 });
 
-test("page ingestion verifies auth and links anonymous identity without private metadata", async () => {
-  const { page } = await import("../backend/convex/telemetry");
+function identityContext() {
+  const rows = new Map<
+    string,
+    { _id: string; hash: string; expiresAt: number; userId?: string }
+  >();
+  const jobs: any[] = [];
+  const db = {
+    query: () => ({
+      withIndex: (_index: string, predicate: (q: any) => unknown) => {
+        let hash = "";
+        predicate({
+          eq: (_field: string, value: string) => {
+            hash = value;
+          },
+        });
+        return {
+          unique: async () =>
+            [...rows.values()].find((row) => row.hash === hash) ?? null,
+        };
+      },
+    }),
+    insert: async (_table: string, value: any) => {
+      const id = `row-${rows.size + 1}`;
+      rows.set(id, { _id: id, ...value });
+      return id;
+    },
+    patch: async (_table: string, id: string, value: any) => {
+      Object.assign(rows.get(id)!, value);
+    },
+    get: async (_table: string, id: string) => rows.get(id) ?? null,
+    delete: async (_table: string, id: string) => {
+      rows.delete(id);
+    },
+  };
+  return {
+    rows,
+    jobs,
+    ctx: {
+      db,
+      scheduler: {
+        runAfter: async (...args: any[]) => {
+          jobs.push(args);
+        },
+      },
+    },
+  };
+}
+
+test("page ingestion issues and binds an anonymous identity only to the verified account", async () => {
+  const { page, claimIdentity } = await import("../backend/convex/telemetry");
   const { default: app } = await import("../../disposabl.json");
   const originalFeatures = [...app.features];
-  (app.features as string[]).push("analytics");
+  if (!app.features.includes("analytics" as never))
+    (app.features as string[]).push("analytics");
   process.env.DISPOSABL_ENVIRONMENT = "production";
   process.env.POSTHOG_PROJECT_TOKEN = "test-token";
   process.env.POSTHOG_HOST = "https://us.i.posthog.com";
@@ -129,55 +178,104 @@ test("page ingestion verifies auth and links anonymous identity without private 
     events.push(JSON.parse(String(init?.body)));
     return new Response(null, { status: 200 });
   }) as typeof fetch;
+  const fixture = identityContext();
+  let user: string | null = null;
   const ctx = {
-    auth: { getUserIdentity: async () => ({ subject: "verified-session" }) },
-    runQuery: async (_ref: unknown, args: any) => {
-      assert.equal(args.sessionId, "verified-session");
-      return { userId: "verified-user" };
+    auth: {
+      getUserIdentity: async () =>
+        user ? { subject: "verified-session" } : null,
     },
+    runQuery: async () => ({ userId: user }),
+    runMutation: async (_ref: unknown, args: any) =>
+      (claimIdentity as any)._handler(fixture.ctx, args),
   };
-  const anonymousId = "12345678-1234-4123-8123-123456789abc";
+  const request = (anonymousId?: string, authenticated = false) =>
+    new Request("https://example.com/telemetry/page", {
+      method: "POST",
+      headers: authenticated ? { Authorization: "Bearer private-token" } : {},
+      body: JSON.stringify({
+        platform: "web",
+        page: "home",
+        ...(anonymousId ? { anonymousId } : {}),
+        userId: "spoofed",
+        email: "private@example.com",
+      }),
+    });
   try {
-    const request = () =>
-      new Request("https://example.com/telemetry/page", {
-        method: "POST",
-        headers: { Authorization: "Bearer private-token" },
-        body: JSON.stringify({
-          platform: "web",
-          page: "home",
-          anonymousId,
-          userId: "spoofed",
-          email: "private@example.com",
-          url: "https://private/?token=secret",
-        }),
-      });
-    const response = await (page as any)._handler(ctx, request());
-    assert.equal(response.status, 200);
-    assert.deepEqual(await response.json(), { anonymousId });
-    assert.equal(events[0].event, "$identify");
-    assert.equal(events[1].event, "page_view");
+    const first = await (page as any)._handler(ctx, request());
+    const { anonymousId } = await first.json();
+    assert.match(anonymousId, /^[0-9a-f-]{36}$/);
+    assert.equal(events[0].event, "page_view");
+    const anonymousDistinct = events[0].properties.distinct_id;
+    user = "verified-user";
+    const login = await (page as any)._handler(ctx, request(anonymousId, true));
+    assert.equal((await login.json()).anonymousId, anonymousId);
+    assert.equal(events[1].event, "$identify");
+    assert.equal(events[1].properties.$anon_distinct_id, anonymousDistinct);
     assert.equal(
-      events[0].properties.distinct_id,
+      events[2].properties.distinct_id,
       events[1].properties.distinct_id,
     );
-    assert.match(events[0].properties.$anon_distinct_id, /^[a-f0-9]{64}$/);
     assert.doesNotMatch(
       JSON.stringify(events),
-      /private|spoofed|verified-user|12345678/,
+      /private|spoofed|verified-user/,
     );
+    const fabricated = "12345678-1234-4123-8123-123456789abc";
+    const fakeResponse = await (page as any)._handler(
+      ctx,
+      request(fabricated, true),
+    );
+    const fakeResult = await fakeResponse.json();
+    assert.notEqual(fakeResult.anonymousId, fabricated);
+    const crypto = await import("node:crypto");
+    const fabricatedDistinct = crypto
+      .createHash("sha256")
+      .update(`disposabl:test-token:anonymous:${fabricated}`)
+      .digest("hex");
+    assert.notEqual(events[3].properties.$anon_distinct_id, fabricatedDistinct);
+    user = "different-user";
+    const switched = await (page as any)._handler(
+      ctx,
+      request(anonymousId, true),
+    );
+    assert.notEqual((await switched.json()).anonymousId, anonymousId);
+    assert.notEqual(events[5].properties.$anon_distinct_id, anonymousDistinct);
     process.env.E2E_TELEMETRY_DISABLED = "1";
-    assert.equal((await (page as any)._handler(ctx, request())).status, 204);
-    assert.equal(events.length, 2);
-    delete process.env.E2E_TELEMETRY_DISABLED;
-    const invalidCtx = { ...ctx, auth: { getUserIdentity: async () => null } };
+    const count = events.length;
     assert.equal(
-      (await (page as any)._handler(invalidCtx, request())).status,
+      (await (page as any)._handler(ctx, request(anonymousId, true))).status,
+      204,
+    );
+    assert.equal(events.length, count);
+    delete process.env.E2E_TELEMETRY_DISABLED;
+    user = null;
+    assert.equal(
+      (await (page as any)._handler(ctx, request(anonymousId, true))).status,
       401,
     );
-    assert.equal(events.length, 2);
+    assert.equal(events.length, count);
   } finally {
     app.features.splice(0, app.features.length, ...originalFeatures);
   }
+});
+
+test("capabilities expire, cannot be reused by another account, and schedule bounded cleanup", async () => {
+  const { claimIdentity, expireIdentity } =
+    await import("../backend/convex/telemetry");
+  const { ctx, rows, jobs } = identityContext();
+  const claim = (hash: string | undefined, newHash: string, userId?: string) =>
+    (claimIdentity as any)._handler(ctx, { hash, newHash, userId });
+  assert.equal(await claim(undefined, "issued"), false);
+  assert.equal(await claim("issued", "unused", "a"), true);
+  assert.equal(await claim("issued", "unused", "a"), true);
+  assert.equal(await claim("issued", "second", "b"), false);
+  assert.equal(await claim("issued", "third"), false);
+  assert.equal(jobs.length, 3);
+  const original = [...rows.values()].find((row) => row.hash === "issued")!;
+  original.expiresAt = Date.now() - 1;
+  assert.equal(await claim("issued", "fourth", "a"), false);
+  await (expireIdentity as any)._handler(ctx, { id: original._id });
+  assert.equal(rows.has(original._id), false);
 });
 
 test("anonymous capture and identify use the same opaque identity", async () => {
