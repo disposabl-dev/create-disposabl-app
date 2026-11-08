@@ -1,4 +1,4 @@
-"""Disposable synthetic Convex ephemeral-cleanup fixture. Never run on shared or cloud backends."""
+"""Disposable synthetic compute-dispatch fixture. Never run on shared or cloud backends."""
 import os, pathlib, secrets, shutil, socket, subprocess, tempfile, time, urllib.request
 for port in (3540, 3541):
     with socket.socket() as probe:
@@ -27,7 +27,7 @@ for old,new in {
     if source.count(needle)!=1: raise RuntimeError('unexpected source import: '+old)
     source=source.replace(needle,'"'+new+'"')
 (work/'convex/agent/actions/productCompute.ts').write_text(source)
-(work / 'package.json').write_text('{"name":"synthetic-auth8-fixture","private":true,"dependencies":{"convex":"^1.49.0"}}')
+(work / 'package.json').write_text('{"name":"synthetic-compute-dispatch-fixture","private":true,"dependencies":{"convex":"^1.49.0"}}')
 secret=secrets.token_hex(32); name='compute-dispatch-synthetic'
 key=subprocess.check_output([str(binary),'keygen','admin-key','--instance-name',name,'--instance-secret',secret],text=True).strip()
 env={k: os.environ[k] for k in ('PATH','HOME','TMPDIR') if k in os.environ}
