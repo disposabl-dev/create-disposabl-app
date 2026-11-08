@@ -7,12 +7,13 @@ const { validateAndroidArchitectures } = require("../android-architectures.ts");
 
 // RN's default bundle inputs cover the app directory, not workspace packages.
 module.exports = (config) => {
-  const architectures = validateAndroidArchitectures(
-    require("../../../disposabl.json").androidArchitectures,
-  );
+  const app = require("../../../disposabl.json");
+  const architectures = validateAndroidArchitectures(app.androidArchitectures);
+  const payments = app.features.includes("payments");
   config.extra = {
     ...config.extra,
     disposablAndroidArchitectures: architectures,
+    disposablAndroidPayments: payments,
   };
   config = withGradleProperties(config, (mod) => {
     mod.modResults = mod.modResults.filter(
@@ -26,7 +27,7 @@ module.exports = (config) => {
     });
     return mod;
   });
-  if (require("../../../disposabl.json").features.includes("payments")) {
+  if (payments) {
     config = withAndroidManifest(config, (mod) => {
       const application = mod.modResults.manifest.application?.[0];
       const activity = application?.activity?.find(

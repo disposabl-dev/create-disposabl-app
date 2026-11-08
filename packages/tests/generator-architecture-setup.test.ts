@@ -3,11 +3,63 @@ import assert from "node:assert/strict";
 import { spawn, execFileSync } from "node:child_process";
 import { createServer } from "node:http";
 import { existsSync, readFileSync } from "node:fs";
-import { mkdtemp, rm } from "node:fs/promises";
+import {
+  copyFile,
+  mkdir,
+  mkdtemp,
+  rm,
+  symlink,
+  writeFile,
+} from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { createApp } from "../create-disposabl-app/scaffold";
 import { version } from "../create-disposabl-app/package.json";
+
+test("payments native configuration is included in Expo fingerprint inputs", async () => {
+  const root = await mkdtemp(join(tmpdir(), "mobile-payments-fingerprint-"));
+  try {
+    const kit = join(root, "packages/disposabl-kit");
+    await mkdir(join(kit, "mobile"), { recursive: true });
+    await copyFile(
+      resolve(import.meta.dirname, "../disposabl-kit/mobile/expo-plugin.cjs"),
+      join(kit, "mobile/expo-plugin.cjs"),
+    );
+    await copyFile(
+      resolve(import.meta.dirname, "../disposabl-kit/android-architectures.ts"),
+      join(kit, "android-architectures.ts"),
+    );
+    await symlink(
+      resolve(import.meta.dirname, "../../node_modules"),
+      join(root, "node_modules"),
+    );
+    const extras = [];
+    for (const features of [[], ["payments"]]) {
+      await writeFile(
+        join(root, "disposabl.json"),
+        JSON.stringify({ features }),
+      );
+      const result = execFileSync(
+        process.execPath,
+        [
+          "-e",
+          "const plugin = require(process.argv[1]); console.log(JSON.stringify(plugin({}).extra))",
+          join(kit, "mobile/expo-plugin.cjs"),
+        ],
+        { encoding: "utf8" },
+      );
+      extras.push(JSON.parse(result));
+    }
+    assert.equal(extras[0].disposablAndroidPayments, false);
+    assert.equal(extras[1].disposablAndroidPayments, true);
+    assert.deepEqual(
+      extras[0].disposablAndroidArchitectures,
+      extras[1].disposablAndroidArchitectures,
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
 
 test(
   "generator completes the architecture lease only after real CLI configuration",
