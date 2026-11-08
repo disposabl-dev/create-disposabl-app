@@ -73,7 +73,7 @@ test(
     await screen.getByRole("button", "Create a new app", { exact: true }).tap();
     await screen.getByRole("button", "Close create app", { exact: true }).tap();
     await expect(
-      screen.getByText("Meet Disposabl", { exact: true }),
+      screen.getByRole("button", "Read Meet Disposabl", { exact: true }).first(),
     ).toBeVisible();
   },
 );
