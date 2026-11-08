@@ -144,3 +144,40 @@ export const notice = internalAction({
   returns: v.null(),
   handler: (ctx, { debitId, attempt }) => deliverNotice(ctx, debitId, attempt),
 });
+
+/** Explicit operator retry; unknown stays pending until a confirmed archived response. */
+export const stopForDeletion = internalAction({
+  args: { userId: v.id("users") },
+  returns: v.null(),
+  handler: async (ctx, { userId }) => {
+    const token = crypto.randomUUID();
+    if (
+      !(await ctx.runMutation(internal.users.internal.claimDeletionStop, {
+        userId,
+        token,
+      }))
+    )
+      return null;
+    let outcome: "unknown" | "archived_observed" = "unknown";
+    try {
+      const ref = sandboxRef(userId);
+      const sandbox = await ctx.runQuery(components.boat.sandboxes.get, ref);
+      if (sandbox?.sandboxId) {
+        const refreshed = await boat.refresh(ctx, ref);
+        const stopped =
+          refreshed.state === "archived"
+            ? refreshed
+            : await boat.stop(ctx, ref);
+        if (stopped.state === "archived") outcome = "archived_observed";
+      }
+    } catch {
+      // A lost response cannot establish that the sandbox stopped.
+    }
+    await ctx.runMutation(internal.users.internal.finishDeletionStop, {
+      userId,
+      token,
+      outcome,
+    });
+    return null;
+  },
+});

@@ -41,6 +41,8 @@ export async function credential(
   userId: string,
   provider: "convex" | "expo",
 ) {
+  if (await ctx.runQuery(internal.users.internal.deletionPending, { userId }))
+    throw new ConvexError("Account deletion has been requested.");
   const connection = await ctx.runQuery(internal.connections.internal.get, {
     userId,
     provider,

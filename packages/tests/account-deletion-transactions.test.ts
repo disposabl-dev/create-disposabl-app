@@ -74,3 +74,58 @@ test(
     assert.equal((await call("status", { userId }, true)).status, "requested");
   },
 );
+
+test(
+  "stop attempts serialize, preserve uncertainty and require an explicit retry",
+  { skip: !url },
+  async () => {
+    const userId = await call("create", { label: randomUUID() });
+    await call("request", { userId, confirmation: "DELETE" });
+    const claims = await Promise.all([
+      call("claimStop", { userId, token: "first" }),
+      call("claimStop", { userId, token: "second" }),
+    ]);
+    assert.equal(claims.filter(Boolean).length, 1);
+    const token = claims[0] ? "first" : "second";
+    assert.equal(
+      await call("finishStop", {
+        userId,
+        token: "wrong",
+        outcome: "archived_observed",
+      }),
+      false,
+    );
+    await call("expireStop", { userId });
+    assert.equal(
+      await call("finishStop", { userId, token, outcome: "archived_observed" }),
+      false,
+    );
+    assert.equal(await call("claimStop", { userId, token: "retry" }), false);
+    let queue = await call("queue", {}, true);
+    assert.equal(
+      queue.page.find((row: any) => row.userId === userId).stop,
+      "unknown",
+    );
+    assert.equal(await call("claimStop", { userId, token: "retry" }), true);
+    assert.equal(
+      await call("finishStop", { userId, token: "retry", outcome: "failed" }),
+      true,
+    );
+    assert.equal(await call("claimStop", { userId, token: "final" }), true);
+    assert.equal(
+      await call("finishStop", {
+        userId,
+        token: "final",
+        outcome: "archived_observed",
+      }),
+      true,
+    );
+    queue = await call("queue", {}, true);
+    assert.equal(
+      queue.page.find((row: any) => row.userId === userId).stop,
+      "archived_observed",
+    );
+    assert.equal(await call("claimStop", { userId, token: "again" }), true);
+    assert.equal((await call("status", { userId }, true)).status, "requested");
+  },
+);

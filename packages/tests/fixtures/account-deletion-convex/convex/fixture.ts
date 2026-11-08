@@ -11,7 +11,11 @@ import {
   deletionPending,
   requireNotDeleting,
 } from "../../../../backend/convex/users/deletion";
-import { deletionRequests } from "../../../../backend/convex/users/internal";
+import {
+  deletionRequests,
+  claimDeletionStop,
+  finishDeletionStop,
+} from "../../../../backend/convex/users/internal";
 const identity = (ctx: any, userId: string | null) => ({
   ...ctx,
   auth: {
@@ -55,5 +59,32 @@ export const attemptWork = mutation({
     const user = await ctx.db.get(userId);
     await ctx.db.patch(userId, { label: user!.label + "-work" });
     return null;
+  },
+});
+
+export const claimStop = mutation({
+  args: { userId: v.id("users"), token: v.string() },
+  handler: (ctx, args) => (claimDeletionStop as any)._handler(ctx, args),
+});
+export const finishStop = mutation({
+  args: {
+    userId: v.id("users"),
+    token: v.string(),
+    outcome: v.union(
+      v.literal("unknown"),
+      v.literal("failed"),
+      v.literal("archived_observed"),
+    ),
+  },
+  handler: (ctx, args) => (finishDeletionStop as any)._handler(ctx, args),
+});
+export const expireStop = mutation({
+  args: { userId: v.id("users") },
+  handler: async (ctx, { userId }) => {
+    const user = await ctx.db.get(userId);
+    if (!user?.deletionStop) throw new Error("No attempt");
+    await ctx.db.patch(userId, {
+      deletionStop: { ...user.deletionStop, leaseUntil: Date.now() - 1 },
+    });
   },
 });

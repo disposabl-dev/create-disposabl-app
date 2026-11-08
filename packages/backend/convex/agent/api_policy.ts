@@ -24,7 +24,15 @@ export const agentApiPolicy: ApiPolicy = {
     const token = request.headers
       .get("Authorization")
       ?.match(/^Bearer\s+(.+)$/i)?.[1];
-    if (!token?.startsWith(accessPrefix)) return fallback(ctx, request);
+    if (!token?.startsWith(accessPrefix)) {
+      const user = await fallback(ctx, request);
+      if (!user) return null;
+      return (await ctx.runQuery(internal.users.internal.deletionPending, {
+        userId: user.userId,
+      }))
+        ? null
+        : user;
+    }
     if (!/^disposabl_agent_[a-f0-9]{64}$/.test(token)) return null;
     const binding = await ctx.runQuery(internal.agent.access.authenticate, {
       hash: await digest(token),
