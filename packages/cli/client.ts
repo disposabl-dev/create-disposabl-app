@@ -2,11 +2,18 @@ import { Command } from "commander";
 import { apiError } from "./errors";
 import manifest from "./package.json";
 import {
+  identify,
+  installedRelease,
+  resetIdentity,
+  telemetryConfig,
+} from "./telemetry";
+import {
   NotAuthenticated,
   accessToken,
   apiUrl,
   hasCredentials,
   login,
+  loginAccessToken,
   logout,
 } from "./auth";
 
@@ -25,16 +32,47 @@ export type Operation = {
   requestBody?: { content: { "application/json": { schema: Schema } } };
 };
 
-export function createProgram(serviceOrigin: string) {
+export function createProgram(serviceOrigin: string, centralAnalytics = false) {
   const program = new Command()
     .name(Object.keys(manifest.bin)[0])
     .version(manifest.version);
+  if (centralAnalytics)
+    program.addHelpText(
+      "after",
+      "\nDisposabl collects limited CLI usage when configured. Set DO_NOT_TRACK=1 to opt out.\n",
+    );
   const origin = () => apiUrl(serviceOrigin);
   const loginCommand = program
     .command("login")
     .option("--no-browser", "Print the login URL without opening a browser")
     .action(async (options) => {
-      await login(origin(), options.browser);
+      const base = origin();
+      if (
+        centralAnalytics &&
+        base === "https://www.disposabl.dev" &&
+        installedRelease(manifest.version)
+      )
+        await resetIdentity(true);
+      await login(base, options.browser);
+      if (
+        centralAnalytics &&
+        base === "https://www.disposabl.dev" &&
+        telemetryConfig(manifest.version)
+      ) {
+        try {
+          const token = await loginAccessToken(base);
+          if (!token) throw new Error("No login token.");
+          const response = await fetch(`${base}/api/users/current`, {
+            headers: { Authorization: `Bearer ${token}` },
+            redirect: "error",
+            signal: AbortSignal.timeout(500),
+          });
+          if (response.ok)
+            await identify(manifest.version, (await response.json())?.id);
+        } catch {
+          /* identity lookup is optional */
+        }
+      }
       console.error("Signed in.");
     });
   loginCommand
@@ -75,6 +113,12 @@ export function createProgram(serviceOrigin: string) {
     });
   program.command("logout").action(async () => {
     await logout(origin());
+    if (
+      centralAnalytics &&
+      origin() === "https://www.disposabl.dev" &&
+      installedRelease(manifest.version)
+    )
+      await resetIdentity();
     console.error("Signed out.");
   });
 

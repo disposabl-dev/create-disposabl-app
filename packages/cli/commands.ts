@@ -1,4 +1,6 @@
 import { openExpoDeletion } from "./delete";
+import { capture } from "./telemetry";
+import { version } from "./package.json";
 import { apiError } from "./errors";
 import { openUrl } from "./auth";
 import { apiUrl, SERVICE_ORIGIN } from "./origin";
@@ -24,7 +26,7 @@ export async function runCli(
   argv = process.argv,
   serviceOrigin = process.env.DISPOSABL_API_ORIGIN || SERVICE_ORIGIN,
 ) {
-  const program = createProgram(serviceOrigin);
+  const program = createProgram(serviceOrigin, true);
   const origin = () => apiUrl(serviceOrigin);
 
   async function main() {
@@ -219,5 +221,14 @@ export async function runCli(
     }
     await program.parseAsync(argv);
   }
-  await main();
+  const command = argv[2] ?? "help";
+  const central = serviceOrigin === SERVICE_ORIGIN;
+  if (central) await capture(version, "cli", command, "started");
+  try {
+    await main();
+    if (central) await capture(version, "cli", command, "success");
+  } catch (error) {
+    if (central) await capture(version, "cli", command, "failure");
+    throw error;
+  }
 }

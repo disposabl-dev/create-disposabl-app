@@ -291,3 +291,7 @@ export const hasCredentials = async (url: string) =>
   Boolean(
     process.env.DISPOSABL_API_KEY || (await load(url)).tokens?.access_token,
   );
+
+// A freshly completed login has already stored its token; do not refresh it for telemetry.
+export const loginAccessToken = async (url: string) =>
+  (await load(url)).tokens?.access_token;

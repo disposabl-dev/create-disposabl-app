@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { Command, CommanderError } from "commander";
 import * as p from "@clack/prompts";
 import { version } from "./package.json";
+import { capture } from "../cli/telemetry";
 import {
   features,
   featureDependencies,
@@ -71,7 +72,7 @@ const program = new Command("create-disposabl-app")
   .helpOption("-h, --help")
   .addHelpText(
     "after",
-    "\nPlatforms:\n  web (required), android, ios, macos, windows, linux, api, mcp, cli, typescript-sdk\n  CLI and TypeScript SDK automatically include API.\n\nOptional features:\n  authentication, docs, analytics, payments, faster-ci\n  Faster CI uses Blacksmith runners when its GitHub App is installed.\n  Analytics requires Authentication and a PostHog connection.\n  Payments requires Authentication and separate Autumn setup.\n  Authentication is enabled by default. Use --features none to disable frontend authentication.\n\nExamples:\n  bun create disposabl-app@latest\n  bun create disposabl-app@latest my-app --yes\n  bun create disposabl-app@latest my-app --platforms web,android,ios,mcp --features docs --yes\n  bun create disposabl-app@latest my-app --platforms web --features none --skip-install --json\n  bun create disposabl-app@latest --list-options --json\n\nWithout a TTY, supply an app name. App options are not prompted, but login is still required.\nPlatform and feature choices are saved in disposabl.json.\nBackend authentication code is always included. Every app checks your Disposabl login, asks you to sign in if needed, and creates an app UUID and development environment through https://www.disposabl.dev. Rerun the same command to resume an existing app.\n",
+    "\nDisposabl collects limited generator usage when configured. Set DO_NOT_TRACK=1 to opt out.\n\nPlatforms:\n  web (required), android, ios, macos, windows, linux, api, mcp, cli, typescript-sdk\n  CLI and TypeScript SDK automatically include API.\n\nOptional features:\n  authentication, docs, analytics, payments, faster-ci\n  Faster CI uses Blacksmith runners when its GitHub App is installed.\n  Analytics requires Authentication and a PostHog connection.\n  Payments requires Authentication and separate Autumn setup.\n  Authentication is enabled by default. Use --features none to disable frontend authentication.\n\nExamples:\n  bun create disposabl-app@latest\n  bun create disposabl-app@latest my-app --yes\n  bun create disposabl-app@latest my-app --platforms web,android,ios,mcp --features docs --yes\n  bun create disposabl-app@latest my-app --platforms web --features none --skip-install --json\n  bun create disposabl-app@latest --list-options --json\n\nWithout a TTY, supply an app name. App options are not prompted, but login is still required.\nPlatform and feature choices are saved in disposabl.json.\nBackend authentication code is always included. Every app checks your Disposabl login, asks you to sign in if needed, and creates an app UUID and development environment through https://www.disposabl.dev. Rerun the same command to resume an existing app.\n",
   )
   .configureOutput({ writeErr: () => {} })
   .exitOverride();
@@ -332,9 +333,21 @@ async function main() {
   }
 }
 
+await capture(version, "generator", "create", "started");
 try {
   await main();
+  await capture(version, "generator", "create", "success");
 } catch (error) {
+  await capture(
+    version,
+    "generator",
+    "create",
+    error instanceof CommanderError && error.exitCode === 0
+      ? "success"
+      : error instanceof Cancelled
+        ? "cancelled"
+        : "failure",
+  );
   if (error instanceof CommanderError && error.exitCode === 0) {
     process.exitCode = 0;
   } else if (error instanceof Cancelled) {
