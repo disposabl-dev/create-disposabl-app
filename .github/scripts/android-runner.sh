@@ -41,13 +41,20 @@ case "${1:?operation required}" in
     exit "$status"
     ;;
   prime)
-    status=0
-    timeout --signal=INT --kill-after=15s 16m ./gradlew :app:externalNativeBuildRelease --no-daemon --build-cache || status=$?
+    now=$(date +%s)
+    start=${ANDROID_PRIME_STARTED_AT:-}
+    [[ "$start" =~ ^[0-9]+$ ]] && (( start <= now )) || { echo 'Missing or invalid warmup start time.' >&2; exit 1; }
+    # The first step records the start; leave four minutes for setup-job overhead,
+    # signal handling, cache uploads and setup-gradle post-job cleanup.
+    remaining=$((start + 16 * 60 - now))
+    (( remaining > 0 )) || { echo 'Insufficient time remaining to compile and save cache.' >&2; exit 1; }
+    echo "Native compilation budget: ${remaining}s; four-minute reserve from first-step start for job overhead and cache saving."
+    timeout --signal=INT --kill-after=15s "${remaining}s" ./gradlew :app:externalNativeBuildRelease --no-daemon --build-cache
     ccache --show-stats
-    if [[ "$status" != 0 && "$status" != 124 ]]; then exit "$status"; fi
-    if [[ "$status" == 124 ]]; then echo 'Native warmup reached its time budget; saving completed compiler entries.'; fi
-    misses=$(ccache --print-stats | awk '$1 == "cache_miss" {print $2}')
-    [[ "$misses" =~ ^[0-9]+$ ]] && (( misses > 0 )) || { echo 'No compiler results were cached.' >&2; exit 1; }
+    result=$(find "${CCACHE_DIR:?}" -type f -name '*R' -size +0c -print -quit)
+    [[ -n "$result" ]] || { echo 'No compiler result was cached.' >&2; exit 1; }
+    inspection=$(ccache --inspect "$result")
+    [[ "$inspection" == *' (result)'* ]] || { echo 'Invalid compiler result.' >&2; exit 1; }
     ;;
   *) echo "Unknown operation: $1" >&2; exit 1 ;;
 esac

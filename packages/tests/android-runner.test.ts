@@ -135,44 +135,53 @@ test("Android disk preparation only removes unused hosted-runner toolchains", ()
   }
 });
 
-test("native cache warmup saves completed work after its budget but rejects real failures", () => {
+test("native warmup requires completed Gradle work, a real result, and enough remaining time", () => {
   const dir = mkdtempSync(join(tmpdir(), "android-prime-"));
   try {
     writeFileSync(
-      join(dir, "timeout"),
-      '#!/bin/sh\nprintf "%s\\n" "$*"\nexit "$TIMEOUT_RESULT"\n',
+      join(dir, "gradlew"),
+      '#!/bin/sh\nprintf "%s\\n" "$*" > "$GRADLE_CALL"\nif [ "$GRADLE_SLEEP" = 1 ]; then sleep 5; fi\nexit "$GRADLE_RESULT"\n',
       { mode: 0o755 },
     );
     writeFileSync(
       join(dir, "ccache"),
-      '#!/bin/sh\nif [ "$1" = "--print-stats" ]; then printf "cache_miss\\t%s\\n" "$CACHE_MISSES"; fi\n',
+      '#!/bin/sh\nif [ "$1" = "--inspect" ]; then echo "Entry type: 0 (result)"; fi\n',
       { mode: 0o755 },
     );
     const script = resolve(
       import.meta.dirname,
       "../../.github/scripts/android-runner.sh",
     );
-    const run = (status: number, misses: number) =>
+    const resultFile = join(dir, "testR");
+    writeFileSync(resultFile, "cached result fixture");
+    const run = (status: number, age: number, sleep = false) =>
       spawnSync("bash", [script, "prime"], {
         cwd: dir,
         encoding: "utf8",
+        timeout: 10000,
         env: {
           ...process.env,
           PATH: `${dir}:${process.env.PATH}`,
-          TIMEOUT_RESULT: String(status),
-          CACHE_MISSES: String(misses),
+          CCACHE_DIR: dir,
+          ANDROID_PRIME_STARTED_AT: String(Math.floor(Date.now() / 1000) - age),
+          GRADLE_CALL: join(dir, "gradle-call"),
+          GRADLE_RESULT: String(status),
+          GRADLE_SLEEP: sleep ? "1" : "0",
         },
       });
-    for (const status of [0, 124]) {
-      const result = run(status, 10);
-      assert.equal(result.status, 0, result.stderr);
-      assert.match(
-        result.stdout,
-        /--signal=INT --kill-after=15s 16m .*:app:externalNativeBuildRelease/,
-      );
-    }
-    assert.equal(run(42, 10).status, 42);
-    assert.equal(run(0, 0).status, 1);
+    const ok = run(0, 100);
+    assert.equal(ok.status, 0, ok.stderr);
+    assert.match(ok.stdout, /Native compilation budget: 8[0-9][0-9]s/);
+    assert.match(
+      readFileSync(join(dir, "gradle-call"), "utf8"),
+      /:app:externalNativeBuildRelease/,
+    );
+    assert.equal(run(124, 100).status, 124);
+    assert.equal(run(0, 958, true).status, 124);
+    assert.equal(run(42, 100).status, 42);
+    assert.match(run(0, 961).stderr, /Insufficient time remaining/);
+    rmSync(resultFile);
+    assert.match(run(0, 100).stderr, /No compiler result was cached/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
