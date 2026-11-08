@@ -3,6 +3,7 @@ import { readFileSync, writeFileSync, realpathSync } from "node:fs";
 import { basename, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { analyzeCommits as conventional } from "@semantic-release/commit-analyzer";
+import { verifyMetadata } from "./verify-metadata.mjs";
 
 const contract = "packages/backend/generated/openapi.json";
 const git = (cwd, ...args) =>
@@ -86,14 +87,40 @@ export async function analyzeCommits(_, context) {
   return release;
 }
 
+// Use semantic-release's original repository URL, before it injects Git credentials.
+export function publicRepositoryUrl(original) {
+  if (typeof original !== "string")
+    throw new Error("Missing original repository URL");
+  const scp = /^(?:[^@/]+@)?([^:/]+):(.+)$/.exec(original);
+  const input =
+    scp && !original.includes("://")
+      ? `https://${scp[1]}/${scp[2]}`
+      : original.replace(/^git\+/, "");
+  let url;
+  try {
+    url = new URL(input);
+  } catch {
+    throw new Error("Invalid repository URL");
+  }
+  if (!["http:", "https:", "ssh:"].includes(url.protocol))
+    throw new Error("Unsupported repository URL");
+  if (url.protocol === "ssh:") return `git+https://${url.host}${url.pathname}`;
+  url.username = "";
+  url.password = "";
+  url.search = "";
+  url.hash = "";
+  return `git+${url.href}`;
+}
+
 // Generated apps acquire their own repository metadata at release time.
 export function verifyConditions(_, { cwd, options }) {
   const path = resolve(cwd, "package.json");
   const manifest = JSON.parse(readFileSync(path, "utf8"));
   manifest.repository = {
     type: "git",
-    url: options.repositoryUrl,
+    url: publicRepositoryUrl(options.originalRepositoryURL),
     directory: `packages/${basename(cwd)}`,
   };
+  verifyMetadata(manifest);
   writeFileSync(path, JSON.stringify(manifest, null, 2) + "\n");
 }

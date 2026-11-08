@@ -18,6 +18,10 @@ const result = await Bun.build({
   external: ["commander", "@clack/core", "@clack/prompts", "picocolors"],
 });
 if (!result.success) throw new AggregateError(result.logs, "CLI build failed");
+await cp(
+  join(root, "packages/disposabl-kit/server/release/verify-metadata.mjs"),
+  join(outdir, "verify-metadata.mjs"),
+);
 const cli = await Bun.build({
   entrypoints: [join(root, "packages/cli/index.ts")],
   outdir,

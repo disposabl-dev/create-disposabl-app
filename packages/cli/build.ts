@@ -11,5 +11,9 @@ const result = await Bun.build({
       : telemetryBuildDefine("0.0.0-development", {}),
 });
 if (!result.success) throw new AggregateError(result.logs, "CLI build failed");
+await Bun.write(
+  "dist/verify-metadata.mjs",
+  Bun.file("../disposabl-kit/server/release/verify-metadata.mjs"),
+);
 
 export {};
