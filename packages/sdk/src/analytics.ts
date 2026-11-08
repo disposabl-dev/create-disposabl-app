@@ -45,7 +45,7 @@ export type SdkAnalyticsEvent<Operation extends string = SdkOperation> = {
 export function createSdkAnalytics<
   const Operation extends string = SdkOperation,
 >(config: {
-  enabled: boolean;
+  enabled?: boolean;
   environment: "production" | "development" | "test";
   e2e?: boolean;
   /** Fixed SDK operation IDs, for APIs generated from the owner's contract. */
@@ -64,7 +64,7 @@ export function createSdkAnalytics<
       globalThis as { process?: { env?: Record<string, string | undefined> } }
     ).process?.env;
     if (
-      !config.enabled ||
+      config.enabled === false ||
       config.environment !== "production" ||
       config.e2e ||
       env?.E2E_TELEMETRY_DISABLED === "1" ||

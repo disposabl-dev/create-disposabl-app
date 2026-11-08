@@ -31,7 +31,7 @@ The SDK sends no analytics by itself. An application can explicitly wrap calls a
 import { appsList, createSdkAnalytics } from "@disposabl/sdk";
 
 const analytics = createSdkAnalytics({
-  enabled: true, // use the owner's opt-in preference
+  enabled: true, // defaults to true; set false to opt out
   environment: "production", // use "development" or "test" outside production
   capture: ({ operation, outcome }) => {
     posthog.capture("sdk_operation", { operation, outcome });

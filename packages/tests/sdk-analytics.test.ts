@@ -1,8 +1,24 @@
-import { test } from "node:test";
+import { afterEach, beforeEach, test } from "node:test";
 import assert from "node:assert/strict";
 import { createSdkAnalytics } from "../sdk/src/analytics";
 
-test("SDK analytics is opt-in, production-only and disabled in E2E", async () => {
+const inheritedFlags = {
+  E2E_TELEMETRY_DISABLED: process.env.E2E_TELEMETRY_DISABLED,
+  DO_NOT_TRACK: process.env.DO_NOT_TRACK,
+};
+beforeEach(() => {
+  // These tests use in-memory sinks only; each opt-out is exercised explicitly.
+  delete process.env.E2E_TELEMETRY_DISABLED;
+  delete process.env.DO_NOT_TRACK;
+});
+afterEach(() => {
+  for (const [key, value] of Object.entries(inheritedFlags)) {
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
+});
+
+test("SDK analytics respects opt-out, production and E2E gates", async () => {
   const events: unknown[] = [];
   const capture = (event: unknown) => {
     events.push(event);
@@ -35,7 +51,6 @@ test("SDK analytics is opt-in, production-only and disabled in E2E", async () =>
 test("SDK analytics allows only operation and outcome, preserving results and errors", async () => {
   const events: unknown[] = [];
   const analytics = createSdkAnalytics({
-    enabled: true,
     environment: "production",
     capture: (event) => {
       events.push(event);
