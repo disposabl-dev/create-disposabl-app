@@ -48,6 +48,10 @@
     "authenticated": false
   },
   {
+    "path": "/support",
+    "authenticated": false
+  },
+  {
     "path": "/verify-email",
     "authenticated": false
   },
