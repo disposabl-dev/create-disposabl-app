@@ -87,7 +87,7 @@ test(
             appId,
             userId: owner.id,
             name: index ? "Chat unconfirmed" : "Chat proof",
-            platforms: ["web"],
+            platforms: ["web", "android"],
             features: ["authentication"],
             agent: {
               threadId: threads[index]._id,
@@ -132,6 +132,20 @@ test(
             reference: "preview/chat-proof",
             stage: "building",
             releases: {
+              android: {
+                status: "ready",
+                githubReleaseUrl:
+                  "https://github.com/fixture/installer/releases/tag/app-pr-1-android",
+                artifactUrl:
+                  "https://github.com/fixture/installer/releases/download/app-pr-1-android/android.apk",
+                run: {
+                  id: 1,
+                  attempt: 1,
+                  number: 1,
+                  commitSha: "0".repeat(40),
+                  url: "https://github.com/fixture/installer/actions/runs/1",
+                },
+              },
               web: {
                 status: "failed",
                 run: {
@@ -290,6 +304,20 @@ test(
             : screen.getByText("View build logs", { exact: true }),
         );
         await app.screenshot("chat-build-logs");
+        const download = screen.getByRole("button", "Download android", {
+          exact: true,
+        });
+        await screen.scrollUntilVisible(download);
+        await download.tap();
+        // The fixture has no linked GitHub repository, so resolving stops before
+        // any provider request. Verify a visible retry path, never a fake install.
+        await expect(
+          screen.getByText("Could not open the installer. Please try again.", {
+            exact: true,
+          }),
+        ).toBeVisible();
+        await expect(download).toBeEnabled();
+        await app.screenshot("chat-installer-retry");
         if (platform === "ios") {
           // A visible link does not mean its native scroll view has settled.
           await device.unstable_raw.client.command.wait({

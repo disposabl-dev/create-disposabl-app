@@ -14,6 +14,7 @@ import { Linking, Pressable, Text, View } from "react-native";
 import { api } from "../../../../../packages/backend/convex/_generated/api";
 import type { releasesResult } from "../../../../../packages/backend/convex/validator";
 import { Button, Loading, useStyles } from "./ui";
+import { InstallerButton } from "./installer-button";
 export function Details({ appId }: { appId: string }) {
   const styles = useStyles();
   const app = useQuery(api.apps.index.get, { appId });
@@ -34,7 +35,7 @@ export function Details({ appId }: { appId: string }) {
           <Text style={styles.muted}>
             Updated {new Date(release.updatedAt).toLocaleString()}
           </Text>
-          <PlatformStates states={release.platforms} />
+          <PlatformStates appId={appId} states={release.platforms} />
         </View>
       ) : (
         <Text style={styles.muted}>No production release records yet.</Text>
@@ -141,7 +142,15 @@ function Selection({
   );
 }
 type States = (typeof releasesResult)["type"]["platforms"];
-function PlatformStates({ states }: { states: States }) {
+function PlatformStates({
+  states,
+  appId,
+  reference,
+}: {
+  states: States;
+  appId: string;
+  reference?: string;
+}) {
   const [error, setError] = useState("");
   async function open(url: string) {
     setError("");
@@ -170,6 +179,19 @@ function PlatformStates({ states }: { states: States }) {
                 <Button
                   title={`Open ${name}`}
                   onPress={() => void open(state.url!)}
+                />
+              )}
+            {state.latest?.status === "ready" &&
+              state.latest.artifactUrl &&
+              state.latest.githubReleaseUrl &&
+              ["android", "ios", "macos", "windows", "linux"].includes(
+                name,
+              ) && (
+                <InstallerButton
+                  appId={appId}
+                  platform={name as Platform}
+                  reference={reference}
+                  releaseKey={JSON.stringify(state.latest)}
                 />
               )}
             {state.latest &&
@@ -224,7 +246,11 @@ function Previews({ appId }: { appId: string }) {
               Deployment: {preview.deployment.name}
             </Text>
           )}
-          <PlatformStates states={preview.platforms} />
+          <PlatformStates
+            appId={appId}
+            reference={preview.reference}
+            states={preview.platforms}
+          />
         </View>
       ))}
       <View style={styles.row}>

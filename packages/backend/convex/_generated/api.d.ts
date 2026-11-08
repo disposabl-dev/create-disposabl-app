@@ -54,6 +54,7 @@ import type * as desktopUpdates from "../desktopUpdates.js";
 import type * as desktopUpdates_validator from "../desktopUpdates/validator.js";
 import type * as downloads_action from "../downloads/action.js";
 import type * as downloads_http from "../downloads/http.js";
+import type * as downloads_index from "../downloads/index.js";
 import type * as downloads_internal from "../downloads/internal.js";
 import type * as emails from "../emails.js";
 import type * as files_index from "../files/index.js";
@@ -135,6 +136,7 @@ declare const fullApi: ApiFromModules<{
   "desktopUpdates/validator": typeof desktopUpdates_validator;
   "downloads/action": typeof downloads_action;
   "downloads/http": typeof downloads_http;
+  "downloads/index": typeof downloads_index;
   "downloads/internal": typeof downloads_internal;
   emails: typeof emails;
   "files/index": typeof files_index;
