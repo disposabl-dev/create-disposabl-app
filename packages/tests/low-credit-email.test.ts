@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { queueLowCreditNotice } from "../convex/product/lowCreditEmail";
+import { queueLowCreditNotice } from "../backend/convex/product/lowCreditEmail";
 
 const notice = {
   userId: "user",

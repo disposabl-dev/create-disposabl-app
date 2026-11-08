@@ -2,7 +2,8 @@ import { paymentsEnabled } from "@disposabl/disposabl-kit/features";
 import { billingConfig } from "@disposabl/disposabl-kit/server/billing";
 import { v } from "convex/values";
 import { components } from "../_generated/api";
-import { env, internalMutation } from "../_generated/server";
+import { env } from "../_generated/server";
+import { internalMutation } from "@disposabl/disposabl-kit/server/lib/functions";
 import { resend } from "../emails";
 
 type Notice = {

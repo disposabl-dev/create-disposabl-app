@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { apiError } from "./errors";
+import { apiError } from "../cli/errors";
 
 test("credit errors present only the trusted payment page and never a redirect", () => {
   const response = (paymentUrl: string) =>

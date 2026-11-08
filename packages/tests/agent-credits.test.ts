@@ -28,7 +28,8 @@ test("credits gate checks the actual owner balance and fails closed", async () =
     (error: any) =>
       error.data?.code === "credits_required" &&
       error.data.balance === 9 &&
-      error.data.minimum === 10,
+      error.data.minimum === 10 &&
+      error.data.paymentUrl === "https://www.disposabl.dev/pricing",
   );
   for (const request of [
     customer(null),

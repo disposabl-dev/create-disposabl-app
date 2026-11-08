@@ -37,6 +37,7 @@ export async function requireCredits(
       code: "credits_required",
       balance,
       minimum: 10,
+      paymentUrl: "https://www.disposabl.dev/pricing",
       message: "At least 10 credits are required to start work.",
     });
 }
