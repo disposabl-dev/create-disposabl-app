@@ -97,7 +97,8 @@ const config: ForgeConfig = {
   makers: [
     new MakerSquirrel({ setupIcon: 'src/assets/icon.ico' }),
     new MakerZIP({}, ['darwin']),
-    new MakerDMG({ format: 'ULFO' }),
+    // The HFS+ volume title is limited; keep app and artifact names unchanged.
+    new MakerDMG({ format: 'ULFO', title: 'Install' }),
     new MakerRpm({ options: rpmOptions }),
     new MakerDeb({
       options: { name: executableName, bin: executableName, mimeType },
