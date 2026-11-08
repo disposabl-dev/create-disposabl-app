@@ -1,0 +1,169 @@
+--- a/src/components/google/_generated/component.ts
++++ b/src/components/google/_generated/component.ts
+@@ -28,7 +28,7 @@
+         "mutation",
+         "internal",
+         { stateHash: string; ticketCodeHash: string },
+-        null | { encryptedPayload: string },
++        null | { encryptedPayload: string; authorizationStartedAt?: number },
+         Name
+       >;
+       createAuthorizationRequest: FunctionReference<
+--- a/src/lib/oauth/callback.ts
++++ b/src/lib/oauth/callback.ts
+@@ -265,6 +265,7 @@
+ 
+ /** What every component's claimed authorization request has in common. */
+ export type ClaimedRequest = {
++  authorizationStartedAt?: number;
+   stateHash: string;
+   redirectTo: string;
+   callbackUrl: string;
+@@ -277,6 +278,7 @@
+ 
+ /** The fields of a new ticket, for `mintTicket` to store. */
+ export type MintedTicket = {
++  authorizationStartedAt?: number;
+   ticketCodeHash: string;
+   encryptedPayload: string;
+ };
+@@ -430,6 +432,7 @@
+ 
+     const ticketCode = generateRandomToken();
+     await options.mintTicket(authRequest, {
++      ...(authRequest.authorizationStartedAt === undefined ? {} : { authorizationStartedAt: authRequest.authorizationStartedAt }),
+       ticketCodeHash: await sha256Hex(ticketCode),
+       encryptedPayload: await encryptTicketPayload(
+         ticketCode,
+--- a/src/lib/oauth/dbHelpers.ts
++++ b/src/lib/oauth/dbHelpers.ts
+@@ -58,7 +58,7 @@
+   Doc extends AuthorizationRequestContract,
+ >(
+   ctx: MutationCtx,
+-  fields: Omit<WithoutSystemFields<Doc>, "callbackUrl" | "expiresAt">,
++  fields: Omit<WithoutSystemFields<Doc>, "callbackUrl" | "expiresAt" | "authorizationStartedAt">,
+ ): Promise<{ callbackUrl: string }> {
+   // System env vars are only visible inside components on backends with
+   // convex/convex-backend@64c163a (July 2026); cloud always has it,
+@@ -76,6 +76,7 @@
+   await ctx.db.insert("authorizationRequests", {
+     ...fields,
+     callbackUrl,
++    authorizationStartedAt: Date.now(),
+     expiresAt: Date.now() + AUTHORIZATION_REQUEST_TTL_MS,
+   });
+   return { callbackUrl };
+@@ -159,7 +160,7 @@
+     stateHash: string;
+     match?: (ticket: Doc) => boolean;
+   },
+-): Promise<{ encryptedPayload: string } | null> {
++): Promise<{ encryptedPayload: string; authorizationStartedAt?: number } | null> {
+   // The same assertion as in claimAuthorizationRequest, for the same reason.
+   const ticket = (await ctx.db
+     .query("tickets")
+@@ -181,5 +182,5 @@
+     return null;
+   }
+   await ctx.db.delete("tickets", ticket._id);
+-  return { encryptedPayload: ticket.encryptedPayload };
++  return { encryptedPayload: ticket.encryptedPayload, ...(ticket.authorizationStartedAt === undefined ? {} : { authorizationStartedAt: ticket.authorizationStartedAt }) };
+ }
+--- a/src/lib/oauth/providerFunctions.ts
++++ b/src/lib/oauth/providerFunctions.ts
+@@ -48,7 +48,7 @@
+  */
+ const createRequestArgs = v
+   .object(authorizationRequestFields)
+-  .omit("callbackUrl", "expiresAt");
++  .omit("callbackUrl", "expiresAt", "authorizationStartedAt");
+ 
+ /** The fields of a claimed request that is still live. */
+ const claimedRequestFields = v
+@@ -121,6 +121,7 @@
+         redirectTo: claimed.doc.redirectTo,
+         callbackUrl: claimed.doc.callbackUrl,
+         codeVerifier: claimed.doc.codeVerifier,
++        ...(claimed.doc.authorizationStartedAt === undefined ? {} : { authorizationStartedAt: claimed.doc.authorizationStartedAt }),
+       };
+     },
+   });
+@@ -137,7 +138,7 @@
+       ticketCodeHash: v.string(),
+       stateHash: v.string(),
+     },
+-    returns: v.union(v.null(), v.object({ encryptedPayload: v.string() })),
++    returns: v.union(v.null(), v.object({ encryptedPayload: v.string(), authorizationStartedAt: v.optional(v.number()) })),
+     handler: async (ctx, args) =>
+       await dbHelpers.claimTicket<SharedTicketDocument>(ctx, args),
+   });
+--- a/src/lib/oauth/redemption.ts
++++ b/src/lib/oauth/redemption.ts
+@@ -144,7 +144,9 @@
+   claimTicket: (
+     ctx: MutationCtx,
+     args: { ticketCodeHash: string; stateHash: string },
+-  ) => Promise<{ encryptedPayload: string } | null>;
++  ) => Promise<{ encryptedPayload: string; authorizationStartedAt?: number } | null>;
++  /** Optional server-side consumer; undefined marks legacy tickets. */
++  checkAuthorizationStart?: (ctx: MutationCtx, profile: Profile, startedAt: number | undefined) => Promise<void>;
+   /** Map what the provider attested to the account profile. */
+   profile: (payload: Payload) => Profile;
+ }) {
+@@ -176,6 +178,8 @@
+         );
+       }
+ 
++      await options.checkAuthorizationStart?.(ctx, profile, ticket.authorizationStartedAt);
++
+       // The same redemption flow serves a first sign-in and a return visit, so
+       // resolve the identity to pick a path. This handler is a mutation, so the
+       // lookup and the write it decides on are one transaction.
+--- a/src/lib/oauth/schema.ts
++++ b/src/lib/oauth/schema.ts
+@@ -24,6 +24,8 @@
+    * ignores the parameters.
+    */
+   codeVerifier: v.string(),
++  /** Server time at original authorization start; absent on legacy records. */
++  authorizationStartedAt: v.optional(v.number()),
+   /** The callback rejects requests older than this. */
+   expiresAt: v.number(),
+ };
+@@ -41,6 +43,8 @@
+    * or server that initiated the flow.
+    */
+   stateHash: v.string(),
++  /** Inherited from the claimed request, never from a client. */
++  authorizationStartedAt: v.optional(v.number()),
+   /**
+    * sha256 of the server-minted ticket code. The raw value appears only
+    * in the callback redirect URL and is never stored.
+--- a/src/methods/google/server.ts
++++ b/src/methods/google/server.ts
+@@ -5,6 +5,7 @@
+  * @module
+  */
+ import { Infer, v } from "convex/values";
++import type { GenericMutationCtx, GenericDataModel } from "convex/server";
+ import type { UserCallbacks } from "../../lib/types.ts";
+ import type { AuthCore } from "../../server/setup.ts";
+ import { buildStartSignIn } from "../../lib/oauth/authorize.ts";
+@@ -70,6 +71,8 @@
+    * for open-redirect prevention.
+    */
+   allowedRedirectOrigins: string[];
++  /** Server-only pre-sign-in check; undefined is legacy authorization proof. */
++  checkAuthorizationStart?: (ctx: GenericMutationCtx<GenericDataModel>, profile: GoogleProfile, startedAt: number | undefined) => Promise<void>;
+   /** Optional signed state envelope for a shared callback. */
+   authorizationState?: (state: string) => Promise<string>;
+ };
+@@ -136,6 +139,7 @@
+       >({
+         providerName: PROVIDER_NAME,
+         authMutation,
++        checkAuthorizationStart: options.checkAuthorizationStart,
+         claimTicket: (ctx, args) =>
+           ctx.runMutation(options.component.provider.claimTicket, args),
+         profile: (payload) => normalizeGoogleProfile(payload.claims),

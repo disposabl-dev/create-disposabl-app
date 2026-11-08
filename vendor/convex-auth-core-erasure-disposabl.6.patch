@@ -1,0 +1,115 @@
+--- a/src/component/_generated/component.ts
++++ b/src/component/_generated/component.ts
+@@ -24,6 +24,8 @@
+ export type ComponentApi<Name extends string | undefined = string | undefined> =
+   {
+     public: {
++      beginUserErasure: FunctionReference<"mutation", "internal", {userId: string}, null, Name>;
++      purgeUserLinkedAuth: FunctionReference<"mutation", "internal", {userId: string}, {linkedRowsCleared: boolean; deletedAccounts: number; deletedSessions: number; deletedRefreshTokens: number; legacyOrphansUnverified: true}, Name>;
+       exchangeSession: FunctionReference<"mutation", "internal", {
+         sessionId: string; userId: string; accessTokenTtlSeconds: number;
+         refreshInactivityTimeoutSeconds: number; sessionMaxLifetimeSeconds: number;
+--- a/src/component/public.ts
++++ b/src/component/public.ts
+@@ -49,6 +49,14 @@
+ 
+ // --- Internal helpers ------------------------------------------------------
+ 
++async function erasedUser(ctx: QueryCtx, userId: string) {
++  return await ctx.db.query("erasedUsers").withIndex("by_userId", q => q.eq("userId", userId)).unique();
++}
++async function requireActiveUser(ctx: QueryCtx, userId: string) {
++  if (await erasedUser(ctx, userId)) throw new Error("Auth account is unavailable.");
++}
++
++
+ /** Look up an account by its provider identity. */
+ function accountByIdentity(
+   ctx: QueryCtx,
+@@ -89,6 +97,7 @@
+   userId: string,
+   ttl: TtlConfig,
+ ): Promise<TokenBundle> {
++  await requireActiveUser(ctx, userId);
+   const now = Date.now();
+   await evictLeastRecentlyRefreshedSessions(ctx, userId);
+   const sessionId = await ctx.db.insert("sessions", {
+@@ -191,6 +200,7 @@
+       profile: claims.profile,
+     },
+   });
++  await requireActiveUser(ctx, userId);
+   const { providerName } = claims;
+   const providerAccountId =
+     claims.providerAccountId === USE_USER_ID_AS_ACCOUNT_ID
+@@ -318,6 +328,7 @@
+           `A first sign-in for an identity must go through signUp.`,
+       );
+     }
++    await requireActiveUser(ctx, account.userId);
+     await notifySignIn(ctx, claims, account.userId, args.onSignInHandle);
+     return await issueSession(ctx, account._id, account.userId, ttl);
+   },
+@@ -396,7 +407,7 @@
+     const id = ctx.db.normalizeId("sessions", sessionId);
+     if (id === null) return null;
+     const session = await ctx.db.get("sessions", id);
+-    return session === null ? null : { userId: session.userId };
++    return session === null || await erasedUser(ctx, session.userId) ? null : { userId: session.userId };
+   },
+ });
+ 
+@@ -454,7 +465,7 @@
+     // `deleteSession`), so a token can outlive its session for a moment. The
+     // session ended already, thus there is nothing to refresh or revoke.
+     const session = await ctx.db.get("sessions", token.sessionId);
+-    if (session === null) return { kind: "noSession" };
++    if (session === null || await erasedUser(ctx, session.userId)) return { kind: "noSession" };
+ 
+     switch (token.state) {
+       case "spent":
+@@ -675,5 +686,34 @@
+     if (!account || account.userId !== session.userId)
+       throw new Error("Source account is no longer active.");
+     return await issueSession(ctx, session.accountId, session.userId, ttl);
++  },
++});
++
++/** App-server-only fence. Coordinate with provider-component fences in one app mutation. */
++export const beginUserErasure = mutation({
++  args: { userId: v.string() }, returns: v.null(),
++  handler: async (ctx, { userId }) => {
++    if (!userId) throw new Error("Missing user ID.");
++    if (!(await erasedUser(ctx, userId))) await ctx.db.insert("erasedUsers", { userId, requestedAt: Date.now() });
++    return null;
+   },
+ });
++/** Bounded cleanup of linked records only; older orphan refresh tokens lack a user join. */
++export const purgeUserLinkedAuth = mutation({
++  args: { userId: v.string() },
++  returns: v.object({ linkedRowsCleared: v.boolean(), deletedAccounts: v.number(), deletedSessions: v.number(), deletedRefreshTokens: v.number(), legacyOrphansUnverified: v.literal(true) }),
++  handler: async (ctx, { userId }) => {
++    if (!(await erasedUser(ctx, userId))) throw new Error("Begin auth erasure first.");
++    const session = await ctx.db.query("sessions").withIndex("by_user", q => q.eq("userId", userId)).first();
++    if (session) {
++      const tokens = await ctx.db.query("refreshTokens").withIndex("by_session_state", q => q.eq("sessionId", session._id)).take(101);
++      for (const token of tokens.slice(0, 100)) await ctx.db.delete("refreshTokens", token._id);
++      const deletedSessions = tokens.length <= 100 ? 1 : 0;
++      if (deletedSessions) await ctx.db.delete("sessions", session._id);
++      return { linkedRowsCleared: false, deletedAccounts: 0, deletedSessions, deletedRefreshTokens: Math.min(tokens.length,100), legacyOrphansUnverified: true as const };
++    }
++    const accounts = await ctx.db.query("accounts").withIndex("by_user", q => q.eq("userId", userId)).take(101);
++    for (const account of accounts.slice(0, 100)) await ctx.db.delete("accounts", account._id);
++    return { linkedRowsCleared: accounts.length <= 100, deletedAccounts: Math.min(accounts.length,100), deletedSessions: 0, deletedRefreshTokens: 0, legacyOrphansUnverified: true as const };
++  },
++});
+--- a/src/component/schema.ts
++++ b/src/component/schema.ts
+@@ -2,6 +2,7 @@
+ import { v } from "convex/values";
+ 
+ export default defineSchema({
++  erasedUsers: defineTable({ userId: v.string(), requestedAt: v.number() }).index("by_userId", ["userId"]),
+   // Maps a provider-scoped identity to an opaque app user id. The app owns the
+   // actual users table; we only store the id string it gives us back.
+   accounts: defineTable({
