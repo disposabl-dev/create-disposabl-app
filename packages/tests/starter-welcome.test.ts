@@ -131,3 +131,38 @@ test("UUID package names do not appear as app branding", () => {
   assert.equal(displayAppName("Folio"), "Folio");
   assert.equal(displayAppName("Disposabl"), "Disposabl");
 });
+
+test("iOS starter retains Expo image source selection", async () => {
+  const temp = await mkdtemp(join(tmpdir(), "starter-ios-image-"));
+  try {
+    const app = join(temp, "app");
+    await createApp(template, app, "ios-fixture", {
+      version: "test",
+      platforms: ["web", "ios"],
+      features: ["authentication"],
+    });
+    const mobile = JSON.parse(
+      await readFile(join(app, "apps/mobile/package.json"), "utf8"),
+    );
+    assert.deepEqual(mobile.expo.autolinking.ios.buildFromSource, [
+      "expo-image",
+    ]);
+    assert.ok(mobile.dependencies["expo-image"]);
+    const { stdout } = await exec(
+      "node",
+      [
+        "../../node_modules/expo-modules-autolinking/bin/expo-modules-autolinking.js",
+        "resolve",
+        "--platform",
+        "apple",
+        "--json",
+      ],
+      { cwd: resolve(import.meta.dirname, "../../apps/mobile") },
+    );
+    assert.deepEqual(JSON.parse(stdout).configuration.buildFromSource, [
+      "expo-image",
+    ]);
+  } finally {
+    await rm(temp, { recursive: true, force: true });
+  }
+});

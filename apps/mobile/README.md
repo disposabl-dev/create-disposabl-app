@@ -249,3 +249,12 @@ It does not require TestFlight or an App Store Connect app record. TestFlight is
 a separate distribution option. The pipeline never submits to the App Store.
 
 Android preview builds produce an installable APK. Production builds produce a signed installable APK. GitHub Actions builds and publishes these files; Expo hosts compatible EAS Updates.
+
+### iOS image privacy manifest
+
+The iOS Expo autolinking configuration builds `expo-image` from source so its
+SDWebImage CocoaPod supplies its own privacy resource bundle. The Expo 58
+precompiled SDWebImage framework inspected for this app did not include that
+manifest. This changes native dependencies and may increase build time; regenerate
+the native project and reinstall pods after changing it. Check the final archive
+and Xcode privacy report for each release, especially after SDK upgrades.

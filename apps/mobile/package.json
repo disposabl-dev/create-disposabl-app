@@ -70,7 +70,12 @@
         "react",
         "convex",
         "@convex-dev/auth"
-      ]
+      ],
+      "ios": {
+        "buildFromSource": [
+          "expo-image"
+        ]
+      }
     }
   }
 }
