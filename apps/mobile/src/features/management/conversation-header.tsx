@@ -115,6 +115,7 @@ export function ConversationHeader({ appId }: { appId: string }) {
             >
               <View
                 collapsable={false}
+                pointerEvents={process.env.EXPO_OS === "ios" ? "none" : "auto"}
                 accessible
                 accessibilityRole="button"
                 accessibilityLabel="Chat options"
