@@ -15,7 +15,6 @@ import { resolveFeatures } from "@disposabl/disposabl-kit/feature-options";
 import { requireConnections } from "../connections/config";
 import { internal } from "../_generated/api";
 import { validatePlatforms } from "@disposabl/disposabl-kit/platforms";
-import { assertActive } from "./operations/internal";
 import { githubConnection } from "../validator";
 import type { Doc } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
@@ -144,7 +143,7 @@ export const applyConfiguration = internalMutation({
 });
 
 /** Queue repository changes; applied selections are synchronized by generator setup. */
-export const requestConfiguration = internalMutation({
+export const requestConfiguration = internalAction({
   platforms: true,
   args: {
     ...identityFields,
@@ -157,11 +156,9 @@ export const requestConfiguration = internalMutation({
     ctx,
     { userId, appId, platforms, features },
   ): Promise<Infer<typeof agentResult>> => {
-    const app = await ownedApp(ctx, userId, appId);
-    assertActive(app);
     const selected = validatePlatforms(platforms);
     const selectedFeatures = resolveFeatures(features);
-    return ctx.runMutation(internal.agent.internal.sendMessage, {
+    return ctx.runAction(internal.agent.internal.sendMessage, {
       userId,
       appId,
       prompt: `Apply this configuration change to the existing app repository. Requested platforms: ${selected.join(",")}. Requested features: ${selectedFeatures.join(",") || "none"}.

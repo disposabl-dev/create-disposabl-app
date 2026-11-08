@@ -1,4 +1,4 @@
-import { useConvexAuth, useMutation } from "convex/react";
+import { useConvexAuth, useAction } from "convex/react";
 import { ConvexError } from "convex/values";
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
@@ -85,7 +85,7 @@ function Composer() {
   );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const send = useMutation(api.agent.index.sendMessage);
+  const send = useAction(api.agent.index.sendMessage);
   const c = useTheme();
   async function submit(text: string) {
     const fileIds = attachmentIds(attachments);

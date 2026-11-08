@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { sendMessage } from "../backend/convex/agent/internal";
+import { enqueueMessage } from "../backend/convex/agent/internal";
 
 const connected = {
   ready: true,
@@ -16,7 +16,7 @@ test("agent creation saves structured selections and resolves feature dependenci
   let prerequisites: any;
   try {
     await assert.rejects(
-      (sendMessage as any)._handler(
+      (enqueueMessage as any)._handler(
         {
           runQuery: async (_ref: unknown, args: unknown) => {
             prerequisites = args;
@@ -56,7 +56,7 @@ test("mobile creation without Expo fails before inserting or scheduling work", a
   let inserted = false;
   try {
     await assert.rejects(
-      (sendMessage as any)._handler(
+      (enqueueMessage as any)._handler(
         {
           runQuery: async () => ({ ...connected, expo: null }),
           db: {

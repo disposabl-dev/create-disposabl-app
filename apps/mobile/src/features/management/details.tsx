@@ -8,7 +8,7 @@ import {
   resolvePlatforms,
   type Platform,
 } from "@disposabl/disposabl-kit/platforms";
-import { useMutation, useQuery } from "convex/react";
+import { useAction, useQuery } from "convex/react";
 import { useState } from "react";
 import { Linking, Pressable, Text, View } from "react-native";
 import { api } from "../../../../../packages/backend/convex/_generated/api";
@@ -63,7 +63,7 @@ function Selection({
   const [chosen, setChosen] = useState(initialFeatures);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
-  const update = useMutation(api.apps.index.requestConfiguration);
+  const update = useAction(api.apps.index.requestConfiguration);
   async function save() {
     setBusy(true);
     setMessage("");

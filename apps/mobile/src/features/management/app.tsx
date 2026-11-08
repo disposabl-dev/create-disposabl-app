@@ -6,7 +6,7 @@ import { MessageBubble } from "../studio/message-bubble";
 import { MessageComposer } from "../studio/message-composer";
 import { useAttachments } from "../studio/attachments";
 import { attachmentIds } from "../studio/attachment-policy";
-import { useMutation, useQuery } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { ConvexError } from "convex/values";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { useRef, useState } from "react";
@@ -84,7 +84,7 @@ function Chat({ appId }: { appId: string }) {
     appId,
     paginationOpts: { numItems: 20, cursor },
   });
-  const send = useMutation(api.agent.index.sendMessage);
+  const send = useAction(api.agent.index.sendMessage);
   const abort = useMutation(api.agent.index.abortMessage);
   const [prompt, setPrompt] = useState("");
   const [busy, setBusy] = useState(false);

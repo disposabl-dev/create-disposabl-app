@@ -7,15 +7,16 @@ import {
 import { ConvexError, v, type Infer } from "convex/values";
 import { internal } from "../_generated/api";
 import {
-  mutation,
+  action,
   query,
   type QueryCtx,
   type MutationCtx,
+  type ActionCtx,
 } from "../_generated/server";
 import { result as agentResult } from "../agent/validator";
 import { appResult, feature, platform } from "../validator";
 
-async function requireUser(ctx: QueryCtx | MutationCtx) {
+async function requireUser(ctx: QueryCtx | MutationCtx | ActionCtx) {
   const userId = await getSessionUserId(ctx);
   if (!userId) throw new ConvexError("Sign in to manage apps.");
   return userId;
@@ -47,7 +48,7 @@ export const get = query({
     });
   },
 });
-export const requestConfiguration = mutation({
+export const requestConfiguration = action({
   args: {
     appId: v.string(),
     platforms: v.array(platform),
@@ -55,7 +56,7 @@ export const requestConfiguration = mutation({
   },
   returns: agentResult,
   handler: async (ctx, args): Promise<Infer<typeof agentResult>> =>
-    ctx.runMutation(internal.apps.internal.requestConfiguration, {
+    ctx.runAction(internal.apps.internal.requestConfiguration, {
       ...args,
       userId: await requireUser(ctx),
     }),

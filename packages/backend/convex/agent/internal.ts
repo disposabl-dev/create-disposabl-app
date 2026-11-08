@@ -2,12 +2,14 @@ import { listMessages, saveMessage } from "@convex-dev/agent";
 import {
   identityFields,
   internalMutation,
+  internalAction,
   internalQuery,
 } from "@disposabl/disposabl-kit/server/lib/functions";
 import { ConvexError, v, type Infer } from "convex/values";
 import { components, internal } from "../_generated/api";
 import { env } from "../_generated/server";
 import type { Doc } from "../_generated/dataModel";
+import type { ActionCtx } from "../_generated/server";
 import { ownedApp } from "../apps/internal";
 import { assertActive } from "../apps/operations/internal";
 import { history, historyArgs, result, sendArgs } from "./validator";
@@ -16,9 +18,9 @@ import { readThread, patchThread } from "./threads";
 import { resolvePlatforms } from "@disposabl/disposabl-kit/platforms";
 import { resolveFeatures } from "@disposabl/disposabl-kit/feature-options";
 import { ownedAttachments, attachmentReferences } from "./attachments";
+import { requireCredits } from "./credits";
 
-export const sendMessage = internalMutation({
-  platforms: true,
+export const enqueueMessage = internalMutation({
   args: { ...identityFields, ...sendArgs },
   returns: result,
   handler: async (
@@ -240,3 +242,28 @@ export const getMessages = internalQuery({
     };
   },
 });
+
+/** All API and native entry points share this authenticated, provider-backed gate. */
+export const sendMessage = internalAction({
+  platforms: true,
+  args: { ...identityFields, ...sendArgs },
+  returns: result,
+  handler: (ctx, args): Promise<Infer<typeof result>> =>
+    guardedEnqueue(ctx, args),
+});
+
+export async function guardedEnqueue(
+  ctx: ActionCtx,
+  args: { userId: string } & Infer<
+    ReturnType<typeof v.object<typeof sendArgs>>
+  >,
+  check = requireCredits,
+): Promise<Infer<typeof result>> {
+  if (args.appId)
+    await ctx.runQuery(internal.apps.internal.get, {
+      userId: args.userId,
+      appId: args.appId,
+    });
+  await check(args.userId);
+  return ctx.runMutation(internal.agent.internal.enqueueMessage, args);
+}

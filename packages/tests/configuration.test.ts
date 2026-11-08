@@ -87,10 +87,8 @@ test("configuration requests persist in the conversation before account setup", 
     db: db(app, () => {
       throw new Error("Must not change applied metadata");
     }),
-    runQuery: () => {
-      throw new Error("Connection readiness belongs to setup");
-    },
-    runMutation: async (_ref: any, args: any) => {
+    runQuery: async () => ({}),
+    runAction: async (_ref: any, args: any) => {
       prompt = args.prompt;
       return { queued: true };
     },

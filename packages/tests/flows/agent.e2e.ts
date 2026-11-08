@@ -94,7 +94,7 @@ test(
         await call(
           "agent/index:sendMessage",
           { prompt: "fixture" },
-          { mutation: true },
+          { action: true },
         )
       ).status,
     ).toBe("error");
@@ -431,7 +431,7 @@ test(
       const sent = await value(
         "agent/index:sendMessage",
         { appId, prompt: "Queued fixture prompt", fileIds: [attachmentId] },
-        { token: owner.token, mutation: true },
+        { token: owner.token, action: true },
       );
       expect(sent).toMatchObject({ appId, threadId: id, status: "processing" });
       expect(
@@ -439,7 +439,7 @@ test(
           await call(
             "agent/index:sendMessage",
             { appId, prompt: "Forbidden" },
-            { token: other.token, mutation: true },
+            { token: other.token, action: true },
           )
         ).status,
       ).toBe("error");
