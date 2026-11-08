@@ -10,6 +10,7 @@ import {
 import { existsSync } from "node:fs";
 import { basename, join, normalize } from "node:path";
 import { randomUUID } from "node:crypto";
+import { execFileSync, spawnSync } from "node:child_process";
 import { omitMobilePayments } from "./mobile-payments";
 import { validateAndroidArchitectures } from "../disposabl-kit/android-architectures";
 import {
@@ -280,6 +281,10 @@ main().catch((error) => {
       join(destination, "disposabl.json"),
       JSON.stringify(config, null, 2) + "\n",
     );
+    // Match the CLI's formatting for direct callers while keeping --skip-install
+    // usable on machines where Bun is not installed.
+    if (spawnSync("bun", ["--version"], { stdio: "ignore" }).status === 0)
+      execFileSync("bun", ["fmt"], { cwd: destination, stdio: "pipe" });
   } catch (error) {
     // Only remove the directory created by this invocation, never an existing app.
     await rm(destination, { recursive: true, force: true });

@@ -166,3 +166,45 @@ test("iOS starter retains Expo image source selection", async () => {
     await rm(temp, { recursive: true, force: true });
   }
 });
+
+test("fresh starters are formatted without changing bundled skills", async () => {
+  const temp = await mkdtemp(join(tmpdir(), "starter-format-"));
+  try {
+    for (const [name, platforms, features] of [
+      ["minimal", ["web"], []],
+      [
+        "all",
+        [
+          "web",
+          "android",
+          "ios",
+          "macos",
+          "windows",
+          "linux",
+          "api",
+          "mcp",
+          "cli",
+          "typescript-sdk",
+        ],
+        ["authentication", "payments", "analytics", "docs"],
+      ],
+    ] as const) {
+      const app = join(temp, name);
+      await createApp(template, app, `format-${name}`, {
+        version: "test",
+        platforms: [...platforms],
+        features: [...features],
+      });
+      await exec("bun", ["fmt", "--check"], { cwd: app });
+      if (name === "all") {
+        const skill = "apps/mobile/.claude/skills/eas-update/SKILL.md";
+        assert.equal(
+          await readFile(join(app, skill), "utf8"),
+          await readFile(join(template, skill), "utf8"),
+        );
+      }
+    }
+  } finally {
+    await rm(temp, { recursive: true, force: true });
+  }
+});

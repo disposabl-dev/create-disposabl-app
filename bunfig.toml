@@ -12,4 +12,5 @@ ignorePatterns = [
   "**/routeTree.gen.ts",
   "**/convex/_generated/**",
   "**/.agents/**",
+  "**/.claude/skills/**",
 ]
