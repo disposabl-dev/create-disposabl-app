@@ -1,0 +1,5 @@
+# Local paid action dispatch fixture
+
+Run `python3 packages/tests/fixtures/compute-convex/dispatch/run.py` with 3540/3541 free. This creates a new loopback deployment with telemetry disabled before sync, empty Boat configuration, no provider credentials, and stops its own backend. The fixture copies the product action source, changing only import paths and replacing `debitCompute` with a loopback-only synthetic counter. The registered product `renew` handler is re-exported unchanged. An internal claim adapter invokes the real `claimWindow` with paid mode enabled, and scheduled stop, notice, boundary and uncertainty handlers are inert. The initial fund wrapper calls the product `fund` helper with a synthetic adapter.
+
+The fixture checks competing initial actions, unknown outcomes, and duplicate, premature, stale and expired active renewal callbacks using real Convex transactions and synthetic dispatch counts. It does not contact Autumn or Boat, test provider finality, establish a hard provider stop, or establish continuous renewal. Never deploy the fixture or its public test endpoints.
