@@ -50,6 +50,8 @@
     "./server/billing-handoff": "./server/billing-handoff.ts",
     "./server/browser-session": "./server/browser-session.ts",
     "./server/billing": "./server/billing.ts",
+    "./server/revenuecat-validator": "./server/revenuecat-validator.ts",
+    "./server/revenuecat-functions": "./server/revenuecat-functions.ts",
     "./server/google": "./server/google.ts",
     "./server/lib/telemetry": "./server/lib/telemetry.ts",
     "./server/lib/functions": "./server/lib/functions.ts",

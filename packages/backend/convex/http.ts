@@ -1,3 +1,4 @@
+import { webhook as revenueCatWebhook } from "@disposabl/disposabl-kit/server/revenuecat-functions";
 import {
   page as telemetryPage,
   options as telemetryOptions,
@@ -10,6 +11,11 @@ import { desktopUpdate } from "./desktopUpdates";
 import { agentApiPolicy } from "./agent/api_policy";
 
 const http = createHttpRouter(agentApiPolicy);
+http.route({
+  path: "/revenuecat/webhook",
+  method: "POST",
+  handler: revenueCatWebhook,
+});
 http.route({ path: "/telemetry/page", method: "POST", handler: telemetryPage });
 http.route({
   path: "/telemetry/page",

@@ -1,3 +1,9 @@
+import {
+  revenueCatDeliveries,
+  revenueCatPurchases,
+  revenueCatTransfers,
+  revenueCatTransferHolds,
+} from "@disposabl/disposabl-kit/server/revenuecat-validator";
 import { desktopUpdateTable } from "./desktopUpdates/validator";
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
@@ -27,6 +33,10 @@ export default defineSchema({
       "url",
     ])
     .index("by_userId_requestId", ["userId", "requestId"]),
+  revenueCatDeliveries,
+  revenueCatTransfers,
+  revenueCatTransferHolds,
+  revenueCatPurchases,
   desktopUpdates: desktopUpdateTable,
   files: defineTable({
     owner: v.string(),
