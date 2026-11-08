@@ -1,3 +1,4 @@
+import { VariableContextProvider } from "nativewind";
 import { router, Stack } from "expo-router";
 import type { ReactNode } from "react";
 import { Pressable, ScrollView, Text } from "react-native";
@@ -11,7 +12,6 @@ export function ScreenCloseButton({
   label: string;
   onPress: () => void;
 }) {
-  const colors = usePreferenceColors();
   return process.env.EXPO_OS === "ios" ? (
     <Stack.Toolbar placement="right">
       <Stack.Toolbar.Button accessibilityLabel={label} onPress={onPress}>
@@ -28,14 +28,7 @@ export function ScreenCloseButton({
             hitSlop={12}
             onPress={onPress}
           >
-            <Text
-              style={{
-                color: colors.text,
-                fontSize: 16,
-                fontWeight: "600",
-                padding: 8,
-              }}
-            >
+            <Text className="text-[#18181b] dark:text-[#fafafa] text-[16px] font-semibold p-[8px]">
               Done
             </Text>
           </Pressable>
@@ -73,20 +66,17 @@ export function SettingsPage({
         }}
       />
       <ScreenCloseButton label="Close settings" onPress={onClose} />
-      <ScrollView
-        style={{ flex: 1, backgroundColor: colors.background }}
-        contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={{
-          paddingHorizontal: 20,
-          paddingTop: 16,
-          paddingBottom: inset.bottom + 32,
-          width: "100%",
-          maxWidth: 680,
-          alignSelf: "center",
-        }}
+      <VariableContextProvider
+        value={{ "--layout-padding-bottom": inset.bottom + 32 }}
       >
-        {children}
-      </ScrollView>
+        <ScrollView
+          className="flex-1 bg-[#fafafa] dark:bg-[#09090b]"
+          contentInsetAdjustmentBehavior="automatic"
+          contentContainerClassName="px-[20px] pt-[16px] pb-[var(--layout-padding-bottom)] w-[100%] max-w-[680px] self-center"
+        >
+          {children}
+        </ScrollView>
+      </VariableContextProvider>
     </>
   );
 }

@@ -1,3 +1,4 @@
+import { VariableContextProvider } from "nativewind";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "expo-router/react-navigation";
 import { Details } from "./details";
@@ -19,17 +20,16 @@ import {
   View,
 } from "react-native";
 import { api } from "../../../../../packages/backend/convex/_generated/api";
-import { Button, ErrorBoundary, Loading, useStyles } from "./ui";
+import { Button, ErrorBoundary, Loading } from "./ui";
 import { isNearConversationEnd } from "./conversation-scroll";
 import { ResponseProgress } from "./response-progress";
 import { ConversationHeader } from "./conversation-header";
 
 export function AppScreen() {
-  const styles = useStyles();
   const { appId } = useLocalSearchParams<{ appId: string }>();
   return (
     <ErrorBoundary>
-      <View style={styles.screen}>
+      <View className="flex-1 bg-background">
         {appId && <ConversationHeader appId={appId} />}
         {appId && <Chat key={appId} appId={appId} />}
       </View>
@@ -37,31 +37,26 @@ export function AppScreen() {
   );
 }
 export function AppDetailsScreen() {
-  const styles = useStyles();
   const insets = useSafeAreaInsets();
   const { appId } = useLocalSearchParams<{ appId: string }>();
   return (
     <ErrorBoundary>
-      <View style={styles.screen}>
-        <Stack.Screen options={{ title: "Details" }} />
-        {appId && (
-          <ScrollView
-            contentContainerStyle={[
-              styles.content,
-              {
-                width: "100%",
-                maxWidth: 820,
-                alignSelf: "center",
-                paddingLeft: Math.max(insets.left, 24),
-                paddingRight: Math.max(insets.right, 24),
-                paddingBottom: Math.max(insets.bottom, 48),
-              },
-            ]}
-          >
-            <Details appId={appId} />
-          </ScrollView>
-        )}
-      </View>
+      <VariableContextProvider
+        value={{
+          "--details-left": Math.max(insets.left, 24),
+          "--details-right": Math.max(insets.right, 24),
+          "--details-bottom": Math.max(insets.bottom, 48),
+        }}
+      >
+        <View className="flex-1 bg-background">
+          <Stack.Screen options={{ title: "Details" }} />
+          {appId && (
+            <ScrollView contentContainerClassName="w-full max-w-[820px] self-center gap-[20px] pt-[24px] pl-[var(--details-left)] pr-[var(--details-right)] pb-[var(--details-bottom)]">
+              <Details appId={appId} />
+            </ScrollView>
+          )}
+        </View>
+      </VariableContextProvider>
     </ErrorBoundary>
   );
 }
@@ -77,7 +72,6 @@ function Chat({ appId }: { appId: string }) {
     remove,
     busy: attachmentsBusy,
   } = useAttachments();
-  const styles = useStyles();
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
   const list = useRef<FlatList>(null);
@@ -151,7 +145,11 @@ function Chat({ appId }: { appId: string }) {
   }
   if (!history) return <Loading />;
   if (history.kind !== "messages")
-    return <Text style={styles.muted}>Conversation unavailable.</Text>;
+    return (
+      <Text className="text-[14px] leading-[21px] text-muted-foreground">
+        Conversation unavailable.
+      </Text>
+    );
   const running =
     history.status === "processing" || history.status === "stopping";
   const messages = [...history.page]
@@ -170,145 +168,143 @@ function Chat({ appId }: { appId: string }) {
       />
     ) : undefined;
   return (
-    <KeyboardAvoidingView
-      behavior={process.env.EXPO_OS === "ios" ? "padding" : undefined}
-      keyboardVerticalOffset={headerHeight}
-      style={{ flex: 1, marginBottom: keyboardHeight }}
+    <VariableContextProvider
+      value={{
+        "--chat-left": Math.max(insets.left, 20),
+        "--chat-right": Math.max(insets.right, 20),
+        "--composer-left": Math.max(insets.left, 24),
+        "--composer-right": Math.max(insets.right, 24),
+        "--composer-bottom": Math.max(insets.bottom, 16),
+        "--keyboard-height": keyboardHeight,
+      }}
     >
-      <FlatList
-        ref={list}
-        testID="chat-transcript"
-        style={{ flex: 1 }}
-        data={messages}
-        keyExtractor={(message) => message.id}
-        keyboardDismissMode="on-drag"
-        keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{
-          paddingLeft: Math.max(insets.left, 20),
-          paddingRight: Math.max(insets.right, 20),
-          paddingVertical: 24,
-          gap: 22,
-          width: "100%",
-          maxWidth: 820,
-          alignSelf: "center",
-        }}
-        onScrollBeginDrag={() => {
-          userScrolling.current = true;
-        }}
-        onScrollEndDrag={() => {
-          userScrolling.current = false;
-        }}
-        onMomentumScrollBegin={() => {
-          userScrolling.current = true;
-        }}
-        onMomentumScrollEnd={() => {
-          userScrolling.current = false;
-        }}
-        onScroll={({ nativeEvent }) => {
-          if (userScrolling.current && cursors.length === 1)
-            followLatest.current = isNearConversationEnd(
-              nativeEvent.contentOffset.y,
-              nativeEvent.layoutMeasurement.height,
-              nativeEvent.contentSize.height,
-            );
-        }}
-        scrollEventThrottle={16}
-        onLayout={() => {
-          if (cursors.length === 1 && followLatest.current)
-            list.current?.scrollToEnd({ animated: false });
-        }}
-        onContentSizeChange={() => {
-          if (cursors.length === 1 && followLatest.current) {
-            list.current?.scrollToEnd({ animated: false });
+      <KeyboardAvoidingView
+        behavior={process.env.EXPO_OS === "ios" ? "padding" : undefined}
+        keyboardVerticalOffset={headerHeight}
+        className="mb-[var(--keyboard-height)] flex-1"
+      >
+        <FlatList
+          ref={list}
+          testID="chat-transcript"
+          className="flex-1"
+          data={messages}
+          keyExtractor={(message) => message.id}
+          keyboardDismissMode="on-drag"
+          keyboardShouldPersistTaps="handled"
+          contentContainerClassName="w-full max-w-[820px] self-center gap-[22px] py-[24px] pl-[var(--chat-left)] pr-[var(--chat-right)]"
+          onScrollBeginDrag={() => {
+            userScrolling.current = true;
+          }}
+          onScrollEndDrag={() => {
+            userScrolling.current = false;
+          }}
+          onMomentumScrollBegin={() => {
+            userScrolling.current = true;
+          }}
+          onMomentumScrollEnd={() => {
+            userScrolling.current = false;
+          }}
+          onScroll={({ nativeEvent }) => {
+            if (userScrolling.current && cursors.length === 1)
+              followLatest.current = isNearConversationEnd(
+                nativeEvent.contentOffset.y,
+                nativeEvent.layoutMeasurement.height,
+                nativeEvent.contentSize.height,
+              );
+          }}
+          scrollEventThrottle={16}
+          onLayout={() => {
+            if (cursors.length === 1 && followLatest.current)
+              list.current?.scrollToEnd({ animated: false });
+          }}
+          onContentSizeChange={() => {
+            if (cursors.length === 1 && followLatest.current) {
+              list.current?.scrollToEnd({ animated: false });
+            }
+          }}
+          ListHeaderComponent={
+            <View className="gap-[12px]">
+              {!!history.error && (
+                <Text
+                  accessibilityRole="alert"
+                  className="text-[16px] leading-[23px] text-foreground"
+                >
+                  {history.error}
+                </Text>
+              )}
+              {!history.isDone && (
+                <Button
+                  title="Older messages"
+                  onPress={() => {
+                    followLatest.current = false;
+                    setCursors([...cursors, history.continueCursor]);
+                  }}
+                />
+              )}
+            </View>
           }
-        }}
-        ListHeaderComponent={
-          <View style={{ gap: 12 }}>
-            {!!history.error && (
-              <Text accessibilityRole="alert" style={styles.text}>
-                {history.error}
-              </Text>
-            )}
-            {!history.isDone && (
-              <Button
-                title="Older messages"
-                onPress={() => {
-                  followLatest.current = false;
-                  setCursors([...cursors, history.continueCursor]);
+          ListEmptyComponent={
+            <Text className="text-[14px] leading-[21px] text-muted-foreground">
+              No messages yet. Tell the agent what you want to build.
+            </Text>
+          }
+          renderItem={({ item, index }) => (
+            <View className="gap-[12px]">
+              {index === responseIndex && progress}
+              <MessageBubble
+                message={{
+                  role: item.role,
+                  text: item.content,
+                  attachments: item.attachments,
                 }}
               />
-            )}
-          </View>
-        }
-        ListEmptyComponent={
-          <Text style={styles.muted}>
-            No messages yet. Tell the agent what you want to build.
-          </Text>
-        }
-        renderItem={({ item, index }) => (
-          <View style={{ gap: 12 }}>
-            {index === responseIndex && progress}
-            <MessageBubble
-              message={{
-                role: item.role,
-                text: item.content,
-                attachments: item.attachments,
-              }}
-            />
-          </View>
-        )}
-        ListFooterComponent={
-          cursors.length > 1 ? (
-            <Button
-              title="Newer messages"
-              onPress={() => {
-                followLatest.current = cursors.length === 2;
-                setCursors(cursors.slice(0, -1));
-              }}
-            />
-          ) : responseIndex === -1 ? (
-            progress
-          ) : undefined
-        }
-      />
-      <View
-        style={{
-          gap: 12,
-          paddingTop: 12,
-          paddingBottom: Math.max(insets.bottom, 16),
-          width: "100%",
-          maxWidth: 820,
-          alignSelf: "center",
-          paddingLeft: Math.max(insets.left, 24),
-          paddingRight: Math.max(insets.right, 24),
-        }}
-      >
-        <MessageComposer
-          attachments={attachments}
-          onPickAttachment={(source) => void pick(source)}
-          onRemoveAttachment={(index) => void remove(attachments[index])}
-          onRetryAttachment={(index) => void retry(attachments[index])}
-          attachmentsBusy={attachmentsBusy}
-          value={prompt}
-          onChange={setPrompt}
-          onSend={(text) => void submit(text)}
-          onStop={() => void stop()}
-          stopAvailable={running || history.stopUnconfirmed}
-          stopRequired={history.stopUnconfirmed}
-          stopping={history.status === "stopping"}
-          label="Message"
-          testID="chat-message"
-          placeholder="Ask for a change…"
-          sending={busy}
-          compact
-          disabled={history.status === "stopping" || history.stopUnconfirmed}
+            </View>
+          )}
+          ListFooterComponent={
+            cursors.length > 1 ? (
+              <Button
+                title="Newer messages"
+                onPress={() => {
+                  followLatest.current = cursors.length === 2;
+                  setCursors(cursors.slice(0, -1));
+                }}
+              />
+            ) : responseIndex === -1 ? (
+              progress
+            ) : undefined
+          }
         />
-        {!!error && (
-          <Text accessibilityRole="alert" style={styles.text}>
-            {error}
-          </Text>
-        )}
-      </View>
-    </KeyboardAvoidingView>
+        <View className="w-full max-w-[820px] self-center gap-[12px] pt-[12px] pb-[var(--composer-bottom)] pl-[var(--composer-left)] pr-[var(--composer-right)]">
+          <MessageComposer
+            attachments={attachments}
+            onPickAttachment={(source) => void pick(source)}
+            onRemoveAttachment={(index) => void remove(attachments[index])}
+            onRetryAttachment={(index) => void retry(attachments[index])}
+            attachmentsBusy={attachmentsBusy}
+            value={prompt}
+            onChange={setPrompt}
+            onSend={(text) => void submit(text)}
+            onStop={() => void stop()}
+            stopAvailable={running || history.stopUnconfirmed}
+            stopRequired={history.stopUnconfirmed}
+            stopping={history.status === "stopping"}
+            label="Message"
+            testID="chat-message"
+            placeholder="Ask for a change…"
+            sending={busy}
+            compact
+            disabled={history.status === "stopping" || history.stopUnconfirmed}
+          />
+          {!!error && (
+            <Text
+              accessibilityRole="alert"
+              className="text-[16px] leading-[23px] text-foreground"
+            >
+              {error}
+            </Text>
+          )}
+        </View>
+      </KeyboardAvoidingView>
+    </VariableContextProvider>
   );
 }

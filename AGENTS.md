@@ -2,6 +2,7 @@
 
 - Keep code concise. Aim for roughly 300 lines per source file, but this is a guideline, not a hard limit. Keep related logic together; do not split files just to meet a line count.
 - Simplify related code with each change.
+- Use NativeWind classes and shared theme tokens for mobile UI. Do not add StyleSheet definitions or inline layout styles. Pass measured values through NativeWind CSS variables; keep native navigation and rendering API parameters at their integration boundary.
 
 # Testing
 

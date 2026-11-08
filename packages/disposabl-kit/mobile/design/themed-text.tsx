@@ -2,7 +2,7 @@ import { Text, type TextProps } from "react-native";
 
 import { ThemeColor } from "./theme";
 
-export type ThemedTextProps = TextProps & {
+export type ThemedTextProps = Omit<TextProps, "style"> & {
   type?:
     | "default"
     | "title"
@@ -43,18 +43,16 @@ const typeClasses: Record<NonNullable<ThemedTextProps["type"]>, string> = {
 
 export function ThemedText({
   className,
-  style,
   type = "default",
   themeColor,
   ...rest
 }: ThemedTextProps) {
   const color =
-    themeColor ?? (type === "linkPrimary" ? "primaryText" : "foreground");
+    themeColor ?? (type === "linkPrimary" ? "primaryText" : undefined);
 
   return (
     <Text
-      className={`${colorClasses[color]} ${typeClasses[type]} ${className ?? ""}`}
-      style={style}
+      className={`themed-text ${color ? colorClasses[color] : ""} ${typeClasses[type]} ${className ?? ""}`}
       {...rest}
     />
   );

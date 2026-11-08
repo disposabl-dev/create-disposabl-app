@@ -96,7 +96,7 @@ function AuthenticatedConnectionGate({
   }
   if (!required && !always) return children;
   return (
-    <View style={{ gap: 20 }}>
+    <View className="gap-[20px]">
       <ConnectionPanel
         connections={connections ?? undefined}
         busy={busy}
@@ -124,20 +124,16 @@ export function ConnectionNotice() {
       <Touch
         label="Set up your workspace"
         onPress={() => router.push("/connections")}
-        style={{ padding: 20, gap: 18 }}
+        className="p-[20px] gap-[18px]"
       >
         <View
-          style={{
-            flexDirection: stacked ? "column" : "row",
-            alignItems: stacked ? "stretch" : "center",
-            gap: 16,
-          }}
+          className={`gap-[16px] ${stacked ? "flex-col items-stretch" : "flex-row items-center"}`}
         >
-          <View style={{ flexDirection: "row", gap: 6 }}>
+          <View className="flex-row gap-[6px]">
             <ProviderMark provider="github" />
             <ProviderMark provider="convex" />
           </View>
-          <View style={{ flex: stacked ? undefined : 1, gap: 4 }}>
+          <View className={`gap-[4px] ${stacked ? "" : "flex-1"}`}>
             <Label variant="heading">
               {connections?.ready
                 ? "Ready when you are"

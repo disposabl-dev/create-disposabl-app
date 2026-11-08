@@ -13,7 +13,6 @@ import {
   PreferenceCard,
   PreferenceRow,
   PreferenceSection,
-  usePreferenceColors,
 } from "../design/preferences";
 import { ThemedText } from "../design/themed-text";
 import { api } from "../lib/convex";
@@ -92,7 +91,6 @@ function SignedInSettings({
   footer,
   onCopyEmail = copyEmail,
 }: AccountScreenProps) {
-  const colors = usePreferenceColors();
   const { isAuthenticated } = useConvexAuth();
   const user = useQuery(api.users.index.current, isAuthenticated ? {} : "skip");
   const account = useQuery(api.auth.account, isAuthenticated ? {} : "skip");
@@ -157,7 +155,7 @@ function SignedInSettings({
       {/* payments:start */}
       {isAuthenticated && user && features.paymentsEnabled && !pending && (
         <PreferenceSection title="Billing">
-          <View style={{ padding: 20 }}>
+          <View className="p-[20px]">
             <AccountBilling
               key={`${user.id}:${billingEpoch}`}
               customerId={user.id}
@@ -183,8 +181,7 @@ function SignedInSettings({
       {error && (
         <ThemedText
           accessibilityRole="alert"
-          className="mt-3"
-          style={{ color: colors.destructive }}
+          className="mt-3 text-[#dc2626] dark:text-[#f87171]"
         >
           {error}
         </ThemedText>
@@ -197,12 +194,8 @@ function SignedInSettings({
 }
 
 function Version() {
-  const colors = usePreferenceColors();
   return Constants.expoConfig?.version ? (
-    <ThemedText
-      className="mt-7 text-center"
-      style={{ color: colors.secondary, fontSize: 13 }}
-    >
+    <ThemedText className="mt-7 text-center text-[#71717a] dark:text-[#a1a1aa] text-[13px]">
       Version {Constants.expoConfig.version}
     </ThemedText>
   ) : null;

@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { Text, View } from "react-native";
-import { useTheme } from "../../../../../packages/disposabl-kit/mobile/design/use-theme";
 
 export function ResponseProgress({
   startedAt,
@@ -11,7 +10,6 @@ export function ResponseProgress({
   finishedAt?: number;
   running: boolean;
 }) {
-  const c = useTheme();
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
     if (!running) return;
@@ -34,12 +32,12 @@ export function ResponseProgress({
         ? `${seconds}s`
         : `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
   return (
-    <View style={{ gap: 12, paddingBottom: 8 }}>
-      <Text style={{ color: c.mutedForeground, fontSize: 13 }}>
+    <View className="gap-[12px] pb-[8px]">
+      <Text className="text-muted-foreground text-[13px]">
         {running ? "Working" : "Worked"}
         {duration ? ` for ${duration}` : "…"}
       </Text>
-      <View style={{ height: 1, backgroundColor: c.border }} />
+      <View className="h-[1px] bg-border" />
     </View>
   );
 }

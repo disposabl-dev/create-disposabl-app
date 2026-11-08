@@ -3,7 +3,7 @@ import { makeFunctionReference } from "convex/server";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState, Linking, Platform, Text, View } from "react-native";
 import type { PurchasesPackage } from "react-native-purchases";
-import { AuthButton, styles } from "../components/auth-ui";
+import { AuthButton, authClasses } from "../components/auth-ui";
 import { billingSession } from "./session";
 import { creditQuantity } from "../../payments/config";
 
@@ -144,16 +144,16 @@ export function AccountBilling({ customerId }: { customerId: string }) {
   }
 
   return (
-    <View style={styles.card}>
-      <Text style={styles.title}>Credits</Text>
-      <Text style={styles.body}>
+    <View className={authClasses.card}>
+      <Text className={authClasses.title}>Credits</Text>
+      <Text className={authClasses.body}>
         Available: {data?.balance ?? "unavailable"}
       </Text>
-      <Text style={styles.body}>
+      <Text className={authClasses.body}>
         {creditQuantity("monthly")} credits each monthly billing cycle.
       </Text>
       {data?.hasMonthlyPlan && (
-        <Text style={styles.body}>
+        <Text className={authClasses.body}>
           Your monthly plan is active or scheduled.
         </Text>
       )}
@@ -164,9 +164,11 @@ export function AccountBilling({ customerId }: { customerId: string }) {
           onPress={() => void transact(false)}
         />
       ) : (
-        <Text style={styles.body}>Store subscriptions are unavailable.</Text>
+        <Text className={authClasses.body}>
+          Store subscriptions are unavailable.
+        </Text>
       )}
-      <Text style={styles.body}>
+      <Text className={authClasses.body}>
         Native top-ups are not available yet. Existing credits work here.
       </Text>
       <AuthButton
@@ -183,7 +185,7 @@ export function AccountBilling({ customerId }: { customerId: string }) {
           onPress={() => void transact(true)}
         />
       )}
-      <Text style={styles.body}>
+      <Text className={authClasses.body}>
         Cancel or manage your subscription with the provider you originally
         paid. For a website purchase, use Manage website billing on the website
         pricing page.
@@ -208,9 +210,11 @@ export function AccountBilling({ customerId }: { customerId: string }) {
           }}
         />
       ))}
-      {!!refreshError && <Text style={styles.body}>{refreshError}</Text>}
+      {!!refreshError && (
+        <Text className={authClasses.body}>{refreshError}</Text>
+      )}
       {!!message && (
-        <Text accessibilityRole="alert" style={styles.body}>
+        <Text accessibilityRole="alert" className={authClasses.body}>
           {message}
         </Text>
       )}

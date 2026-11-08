@@ -1,3 +1,4 @@
+import { VariableContextProvider } from "nativewind";
 import * as Updates from "expo-updates";
 import {
   useCallback,
@@ -7,14 +8,7 @@ import {
   useState,
   type PropsWithChildren,
 } from "react";
-import {
-  Alert,
-  AppState,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Alert, AppState, Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { fetchCurrentUpdate } from "./current-update";
 import { foregroundCheck } from "./foreground-check";
@@ -108,94 +102,73 @@ export function UpdatePrompt({ children }: PropsWithChildren) {
   const visible = enabled && (isUpdatePending || state === "error");
 
   return (
-    <View style={styles.container}>
-      {children}
-      {visible && (
-        <View
-          style={[styles.notice, { bottom: Math.max(insets.bottom, 12) }]}
-          accessibilityLiveRegion="polite"
-        >
-          <View style={styles.copy}>
-            <Text style={styles.title}>
-              {state === "error"
-                ? "Could not apply the update"
-                : "An update is ready"}
-            </Text>
-            <Text style={styles.description}>
-              {state === "error"
-                ? "Could not update. Check your connection and try again."
-                : "Update now, or it will load the next time you start the app."}
-            </Text>
-          </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityState={{
-              disabled: busy || isNativeBusy,
-              busy: busy || isNativeBusy,
-            }}
-            disabled={busy || isNativeBusy}
-            style={styles.button}
-            onPress={() => {
-              const confirmationGeneration = generation.current;
-              Alert.alert(
-                "Update now?",
-                "Finish or save any unsent work before restarting.",
-                [
-                  { text: "Not now", style: "cancel" },
-                  {
-                    text: "Update now",
-                    onPress: () => {
-                      if (generation.current !== confirmationGeneration) return;
-                      if (running.current || nativeBusy.current) {
-                        Alert.alert(
-                          "Checking for updates",
-                          "Please try again when the check finishes.",
-                        );
-                        return;
-                      }
-                      void refresh(true);
-                    },
-                  },
-                ],
-              );
-            }}
+    <VariableContextProvider
+      value={{ "--update-bottom": Math.max(insets.bottom, 12) }}
+    >
+      <View className="flex-1">
+        {children}
+        {visible && (
+          <View
+            className="absolute inset-x-[16px] bottom-[var(--update-bottom)] flex-row items-center gap-[12px] rounded-[20px] bg-[#171717] p-[16px]"
+            accessibilityLiveRegion="polite"
           >
-            <Text style={styles.buttonText}>
-              {busy || isNativeBusy
-                ? "Updating..."
-                : state === "error"
-                  ? "Try again"
-                  : "Update now"}
-            </Text>
-          </Pressable>
-        </View>
-      )}
-    </View>
+            <View className="flex-1 gap-[4px]">
+              <Text className="text-[15px] font-semibold text-white">
+                {state === "error"
+                  ? "Could not apply the update"
+                  : "An update is ready"}
+              </Text>
+              <Text className="text-[13px] leading-[19px] text-[#d4d4d4]">
+                {state === "error"
+                  ? "Could not update. Check your connection and try again."
+                  : "Update now, or it will load the next time you start the app."}
+              </Text>
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{
+                disabled: busy || isNativeBusy,
+                busy: busy || isNativeBusy,
+              }}
+              disabled={busy || isNativeBusy}
+              className="min-h-[44px] justify-center rounded-[12px] bg-white px-[12px]"
+              onPress={() => {
+                const confirmationGeneration = generation.current;
+                Alert.alert(
+                  "Update now?",
+                  "Finish or save any unsent work before restarting.",
+                  [
+                    { text: "Not now", style: "cancel" },
+                    {
+                      text: "Update now",
+                      onPress: () => {
+                        if (generation.current !== confirmationGeneration)
+                          return;
+                        if (running.current || nativeBusy.current) {
+                          Alert.alert(
+                            "Checking for updates",
+                            "Please try again when the check finishes.",
+                          );
+                          return;
+                        }
+                        void refresh(true);
+                      },
+                    },
+                  ],
+                );
+              }}
+            >
+              <Text className="text-[14px] font-semibold text-[#171717]">
+                {busy || isNativeBusy
+                  ? "Updating..."
+                  : state === "error"
+                    ? "Try again"
+                    : "Update now"}
+              </Text>
+            </Pressable>
+          </View>
+        )}
+      </View>
+    </VariableContextProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  notice: {
-    position: "absolute",
-    left: 16,
-    right: 16,
-    borderRadius: 20,
-    padding: 16,
-    backgroundColor: "#171717",
-    flexDirection: "row",
-    gap: 12,
-    alignItems: "center",
-  },
-  copy: { flex: 1, gap: 4 },
-  title: { color: "#fff", fontSize: 15, fontWeight: "600" },
-  description: { color: "#d4d4d4", fontSize: 13, lineHeight: 19 },
-  button: {
-    minHeight: 44,
-    justifyContent: "center",
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    backgroundColor: "#fff",
-  },
-  buttonText: { color: "#171717", fontWeight: "600", fontSize: 14 },
-});

@@ -275,7 +275,6 @@ mock.module("react-native", () => ({
 }));
 mock.module("../../../apps/mobile/src/features/management/ui", () => ({
   Button: "Button",
-  useStyles: () => ({ text: {} }),
 }));
 const { InstallerButton } =
   await import("../../../apps/mobile/src/features/management/installer-button");

@@ -5,7 +5,7 @@ import { Linking, Text, View } from "react-native";
 import { platforms, type Platform } from "@disposabl/disposabl-kit/platforms";
 import { sessionId } from "../../../../../packages/disposabl-kit/lib/auth-session";
 import { api } from "../../../../../packages/backend/convex/_generated/api";
-import { Button, useStyles } from "./ui";
+import { Button } from "./ui";
 
 type Props = {
   appId: string;
@@ -27,7 +27,6 @@ function Download({ appId, platform, reference }: Props) {
   const [error, setError] = useState("");
   const active = useRef(false);
   const pending = useRef(false);
-  const styles = useStyles();
   useLayoutEffect(() => {
     active.current = true;
     return () => {
@@ -56,7 +55,7 @@ function Download({ appId, platform, reference }: Props) {
     }
   }
   return (
-    <View style={{ gap: 8 }}>
+    <View className="gap-[8px]">
       <Button
         title={
           busy
@@ -67,7 +66,10 @@ function Download({ appId, platform, reference }: Props) {
         onPress={() => void download()}
       />
       {!!error && (
-        <Text accessibilityRole="alert" style={styles.text}>
+        <Text
+          accessibilityRole="alert"
+          className="text-[16px] leading-[23px] text-foreground"
+        >
           {error}
         </Text>
       )}

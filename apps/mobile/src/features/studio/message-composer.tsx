@@ -1,4 +1,5 @@
-import { MenuView } from "@expo/ui/community/menu";
+import { VariableContextProvider } from "nativewind";
+import { MenuView } from "../../../../../packages/disposabl-kit/mobile/design/nativewind";
 import { useState } from "react";
 import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { useTheme } from "../../../../../packages/disposabl-kit/mobile/design/use-theme";
@@ -74,19 +75,7 @@ export function MessageComposer({
       placeholderTextColor={c.mutedForeground}
       accessibilityLabel={label}
       testID={testID}
-      style={{
-        fontSize: 17,
-        lineHeight: 24,
-        minHeight: inline ? 44 : compact ? 44 : 100,
-        maxHeight: compact ? 120 : 176,
-        width: "100%",
-        paddingLeft: inline ? 52 : 8,
-        paddingRight: inline ? 96 : 8,
-        paddingTop: 10,
-        paddingBottom: 6,
-        color: c.foreground,
-        textAlignVertical: "top",
-      }}
+      className={`w-full pt-[10px] pb-[6px] text-[17px] leading-[24px] text-foreground align-top ${inline ? "min-h-[44px] pl-[52px] pr-[96px]" : compact ? "min-h-[44px] px-[8px]" : "min-h-[100px] px-[8px]"} ${compact ? "max-h-[120px]" : "max-h-[176px]"}`}
     />
   );
   const plus = (
@@ -127,13 +116,7 @@ export function MessageComposer({
         accessibilityRole="button"
         accessibilityLabel="Add attachment"
         accessibilityState={{ disabled: blocked }}
-        style={{
-          width: 44,
-          height: 44,
-          alignItems: "center",
-          justifyContent: "center",
-          opacity: blocked ? 0.4 : 1,
-        }}
+        className={`size-[44px] items-center justify-center ${blocked ? "opacity-40" : ""}`}
       >
         <Icon name="plus" size={25} />
       </View>
@@ -147,13 +130,7 @@ export function MessageComposer({
         accessibilityState={{ disabled: blocked }}
         disabled={blocked}
         onPress={() => void dictation.start()}
-        style={{
-          width: 44,
-          height: 44,
-          alignItems: "center",
-          justifyContent: "center",
-          opacity: blocked ? 0.4 : 1,
-        }}
+        className={`size-[44px] items-center justify-center ${blocked ? "opacity-40" : ""}`}
       >
         <Icon name="mic" />
       </Pressable>
@@ -177,25 +154,10 @@ export function MessageComposer({
           if (showStop) onStop?.();
           else onSend(value);
         }}
-        style={{
-          width: 44,
-          height: 44,
-          borderRadius: 22,
-          backgroundColor: c.foreground,
-          alignItems: "center",
-          justifyContent: "center",
-          opacity: actionEnabled ? 1 : 0.4,
-        }}
+        className={`size-[44px] items-center justify-center rounded-full bg-foreground ${actionEnabled ? "" : "opacity-40"}`}
       >
         {showStop ? (
-          <View
-            style={{
-              width: 16,
-              height: 16,
-              borderRadius: 3,
-              backgroundColor: c.background,
-            }}
-          />
+          <View className="w-[16px] h-[16px] rounded-[3px] bg-background" />
         ) : (
           <Icon name="send" color={c.background} />
         )}
@@ -203,12 +165,12 @@ export function MessageComposer({
     </>
   );
   return (
-    <View style={{ gap: 8 }}>
+    <View className="gap-[8px]">
       {attachments.length > 0 && (
         <ScrollView
           horizontal
           keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{ gap: 8 }}
+          contentContainerClassName="gap-[8px]"
         >
           {attachments.map((attachment, index) => (
             <Pressable
@@ -221,19 +183,9 @@ export function MessageComposer({
                   ? onRetryAttachment(index)
                   : onRemoveAttachment(index)
               }
-              style={{
-                backgroundColor: c.card,
-                borderRadius: 16,
-                padding: 10,
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 8,
-              }}
+              className="bg-card rounded-[16px] p-[10px] flex-row items-center gap-[8px]"
             >
-              <Text
-                numberOfLines={1}
-                style={{ color: c.foreground, maxWidth: 180 }}
-              >
+              <Text numberOfLines={1} className="text-foreground max-w-[180px]">
                 {attachment.name}
                 {attachment.error
                   ? " · Retry"
@@ -249,14 +201,8 @@ export function MessageComposer({
       {attachments
         .filter((item) => item.error)
         .map((item) => (
-          <View
-            key={item.key}
-            style={{ flexDirection: "row", gap: 8, alignItems: "center" }}
-          >
-            <Text
-              accessibilityRole="alert"
-              style={{ color: c.destructive, flex: 1 }}
-            >
+          <View key={item.key} className="flex-row gap-[8px] items-center">
+            <Text accessibilityRole="alert" className="text-destructive flex-1">
               {item.error}
             </Text>
             <Pressable
@@ -270,49 +216,41 @@ export function MessageComposer({
           </View>
         ))}
       {!!dictation.error && (
-        <Text accessibilityRole="alert" style={{ color: c.destructive }}>
+        <Text accessibilityRole="alert" className="text-destructive">
           {dictation.error}
         </Text>
       )}
-      <GlassSurface style={{ padding: 6, borderRadius: 28, gap: 4 }}>
+      <GlassSurface className="p-[6px] rounded-[28px] gap-[4px]">
         {dictation.state !== "idle" ? (
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <View className="flex-row items-center gap-[8px]">
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Cancel dictation"
               onPress={dictation.cancel}
-              style={{
-                width: 44,
-                height: 44,
-                alignItems: "center",
-                justifyContent: "center",
-              }}
+              className="w-[44px] h-[44px] items-center justify-center"
             >
               <Icon name="close" />
             </Pressable>
             <View
               accessibilityLabel="Recording"
-              style={{
-                flex: 1,
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "space-around",
-              }}
+              className="flex-1 flex-row items-center justify-around"
             >
               {Array.from({ length: 20 }, (_, i) => (
-                <View
+                <VariableContextProvider
                   key={i}
-                  style={{
-                    width: 3,
-                    height:
+                  value={{
+                    "--layout-height":
                       3 +
                       Math.max(0, Math.min(1, dictation.level)) *
                         ((i % 4) + 1) *
                         4,
-                    borderRadius: 2,
-                    backgroundColor: c.mutedForeground,
                   }}
-                />
+                >
+                  <View
+                    key={i}
+                    className="w-[3px] h-[var(--layout-height)] rounded-[2px] bg-muted-foreground"
+                  />
+                </VariableContextProvider>
               ))}
             </View>
             <Pressable
@@ -320,36 +258,16 @@ export function MessageComposer({
               accessibilityLabel="Stop dictation"
               disabled={dictation.state !== "listening"}
               onPress={dictation.stop}
-              style={{
-                width: 44,
-                height: 44,
-                alignItems: "center",
-                justifyContent: "center",
-                opacity: dictation.state === "listening" ? 1 : 0.4,
-              }}
+              className={`size-[44px] items-center justify-center ${dictation.state === "listening" ? "" : "opacity-40"}`}
             >
-              <View
-                style={{
-                  width: 16,
-                  height: 16,
-                  borderRadius: 3,
-                  backgroundColor: c.foreground,
-                }}
-              />
+              <View className="w-[16px] h-[16px] rounded-[3px] bg-foreground" />
             </Pressable>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Send dictation"
               disabled={blocked || dictation.state !== "listening"}
               onPress={dictation.send}
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: 22,
-                backgroundColor: c.foreground,
-                alignItems: "center",
-                justifyContent: "center",
-              }}
+              className="w-[44px] h-[44px] rounded-[22px] bg-foreground items-center justify-center"
             >
               <Icon name="send" color={c.background} />
             </Pressable>
@@ -359,16 +277,10 @@ export function MessageComposer({
             {input}
             <View
               pointerEvents="box-none"
-              style={{
-                flexDirection: "row",
-                alignItems: "flex-end",
-                ...(inline
-                  ? { position: "absolute", left: 6, right: 6, bottom: 6 }
-                  : {}),
-              }}
+              className={`flex-row items-end ${inline ? "absolute inset-x-[6px] bottom-[6px]" : ""}`}
             >
               {plus}
-              <View pointerEvents="none" style={{ flex: 1 }} />
+              <View pointerEvents="none" className="flex-1" />
               {actions}
             </View>
           </>

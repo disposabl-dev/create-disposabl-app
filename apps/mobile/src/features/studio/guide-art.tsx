@@ -1,3 +1,4 @@
+import { VariableContextProvider } from "nativewind";
 import { View, Text } from "react-native";
 import Svg, { Circle, Path, Rect, Line } from "react-native-svg";
 
@@ -24,101 +25,97 @@ export function GuideCover({
 }) {
   const [paper, ink] = palettes[index % palettes.length]!;
   return (
-    <View
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants"
-      style={{
-        height,
-        overflow: "hidden",
-        borderRadius: featured ? 28 : 12,
-        backgroundColor: paper,
+    <VariableContextProvider
+      value={{
+        "--cover-ink": ink,
+        "--layout-height": height,
+        "--layout-border-radius": featured ? 28 : 12,
+        "--layout-background-color": paper,
       }}
     >
-      <Svg
-        width="100%"
-        height="100%"
-        viewBox="0 0 320 340"
-        preserveAspectRatio="xMidYMid slice"
-        style={{ position: "absolute" }}
+      <View
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        className="h-[var(--layout-height)] overflow-hidden rounded-[var(--layout-border-radius)] bg-[var(--layout-background-color)]"
       >
-        {index % 3 === 0 ? (
-          <>
-            {[0, 1, 2, 3, 4].map((i) => (
-              <Path
-                key={i}
-                d={`M${115 + i * 21} 370V235a${125 - i * 21} ${125 - i * 21} 0 0 1 ${250 - i * 42} 0v135`}
-                fill="none"
-                stroke={ink}
-                strokeWidth="11"
-                opacity={0.14 + i * 0.15}
-              />
-            ))}
-          </>
-        ) : index % 3 === 1 ? (
-          <>
-            <Line
-              x1="75"
-              y1="220"
-              x2="265"
-              y2="320"
-              stroke={ink}
-              strokeWidth="2"
-            />
-            <Line
-              x1="75"
-              y1="220"
-              x2="260"
-              y2="170"
-              stroke={ink}
-              strokeWidth="2"
-            />
-            <Line
-              x1="260"
-              y1="170"
-              x2="265"
-              y2="320"
-              stroke={ink}
-              strokeWidth="2"
-            />
-            <Circle cx="75" cy="220" r="54" fill={ink} />
-            <Circle cx="260" cy="170" r="38" fill={ink} opacity=".5" />
-            <Circle cx="265" cy="320" r="70" fill={ink} opacity=".22" />
-            <Circle cx="75" cy="220" r="22" fill={paper} />
-          </>
-        ) : (
-          <>
-            {[0, 1, 2, 3, 4].map((i) => (
-              <Rect
-                key={i}
-                x={46 + i * 37}
-                y={200 - i * 16}
-                width="24"
-                height={145 + i * 16}
-                rx="12"
-                fill={ink}
-                opacity={0.25 + i * 0.17}
-                transform={`rotate(28 ${58 + i * 37} 260)`}
-              />
-            ))}
-          </>
-        )}
-      </Svg>
-      <Text
-        allowFontScaling
-        maxFontSizeMultiplier={1.6}
-        style={{
-          color: ink,
-          fontSize: featured ? 43 : 34,
-          lineHeight: featured ? 46 : 38,
-          letterSpacing: -1.5,
-          fontWeight: "600",
-          padding: featured ? 28 : 20,
-          maxWidth: featured ? "88%" : "100%",
-          fontFamily: process.env.EXPO_OS === "ios" ? "Georgia" : "serif",
-        }}
-      >
-        {title}
-      </Text>
-    </View>
+        <View className="absolute inset-0">
+          <Svg
+            width="100%"
+            height="100%"
+            viewBox="0 0 320 340"
+            preserveAspectRatio="xMidYMid slice"
+          >
+            {index % 3 === 0 ? (
+              <>
+                {[0, 1, 2, 3, 4].map((i) => (
+                  <Path
+                    key={i}
+                    d={`M${115 + i * 21} 370V235a${125 - i * 21} ${125 - i * 21} 0 0 1 ${250 - i * 42} 0v135`}
+                    fill="none"
+                    stroke={ink}
+                    strokeWidth="11"
+                    opacity={0.14 + i * 0.15}
+                  />
+                ))}
+              </>
+            ) : index % 3 === 1 ? (
+              <>
+                <Line
+                  x1="75"
+                  y1="220"
+                  x2="265"
+                  y2="320"
+                  stroke={ink}
+                  strokeWidth="2"
+                />
+                <Line
+                  x1="75"
+                  y1="220"
+                  x2="260"
+                  y2="170"
+                  stroke={ink}
+                  strokeWidth="2"
+                />
+                <Line
+                  x1="260"
+                  y1="170"
+                  x2="265"
+                  y2="320"
+                  stroke={ink}
+                  strokeWidth="2"
+                />
+                <Circle cx="75" cy="220" r="54" fill={ink} />
+                <Circle cx="260" cy="170" r="38" fill={ink} opacity=".5" />
+                <Circle cx="265" cy="320" r="70" fill={ink} opacity=".22" />
+                <Circle cx="75" cy="220" r="22" fill={paper} />
+              </>
+            ) : (
+              <>
+                {[0, 1, 2, 3, 4].map((i) => (
+                  <Rect
+                    key={i}
+                    x={46 + i * 37}
+                    y={200 - i * 16}
+                    width="24"
+                    height={145 + i * 16}
+                    rx="12"
+                    fill={ink}
+                    opacity={0.25 + i * 0.17}
+                    transform={`rotate(28 ${58 + i * 37} 260)`}
+                  />
+                ))}
+              </>
+            )}
+          </Svg>
+        </View>
+        <Text
+          allowFontScaling
+          maxFontSizeMultiplier={1.6}
+          className={`font-semibold tracking-[-1.5px] text-[var(--cover-ink)] ${featured ? "max-w-[88%] p-[28px] text-[43px] leading-[46px]" : "max-w-full p-[20px] text-[34px] leading-[38px]"} ${process.env.EXPO_OS === "ios" ? "font-[Georgia]" : "font-serif"}`}
+        >
+          {title}
+        </Text>
+      </View>
+    </VariableContextProvider>
   );
 }

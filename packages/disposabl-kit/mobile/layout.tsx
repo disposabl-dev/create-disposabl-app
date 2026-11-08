@@ -4,7 +4,7 @@ import { Redirect, Stack, router, usePathname } from "expo-router";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { analyticsEnabled, authenticationEnabled } from "../features";
-import { useAuthStyles } from "./components/auth-ui";
+import { authClasses } from "./components/auth-ui";
 import { authStorage } from "./lib/auth-storage";
 import { api } from "./lib/convex";
 import { sendPageTelemetry } from "../lib/telemetry";
@@ -22,7 +22,6 @@ export function MobileLayout({ children }: { children?: ReactNode }) {
 }
 
 function BackendLayout({ children }: { children?: ReactNode }) {
-  const styles = useAuthStyles();
   const [client] = useState(() => {
     const url = process.env.EXPO_PUBLIC_CONVEX_URL;
     return url ? new ConvexReactClient(url) : null;
@@ -30,9 +29,9 @@ function BackendLayout({ children }: { children?: ReactNode }) {
 
   if (!client) {
     return (
-      <View style={[styles.screen, styles.content]}>
-        <Text style={styles.title}>Connect your backend</Text>
-        <Text style={styles.body}>
+      <View className={`${authClasses.screen} ${authClasses.content}`}>
+        <Text className={authClasses.title}>Connect your backend</Text>
+        <Text className={authClasses.body}>
           Set EXPO_PUBLIC_CONVEX_URL in apps/mobile/.env.local, then rebuild the
           app.
         </Text>
@@ -122,15 +121,14 @@ export function AuthLayout() {
 }
 
 function CloseAuth() {
-  const colors = useTheme();
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel="Close sign in"
       onPress={() => router.dismissTo("/")}
-      style={{ padding: 10 }}
+      className="p-[10px]"
     >
-      <Text style={{ color: colors.foreground, fontSize: 18 }}>✕</Text>
+      <Text className="text-foreground text-[18px]">✕</Text>
     </Pressable>
   );
 }
@@ -142,11 +140,10 @@ export function AuthenticatedLayout() {
 }
 
 function SessionLayout() {
-  const styles = useAuthStyles();
   const { isLoading, isAuthenticated } = useConvexAuth();
   if (isLoading) {
     return (
-      <View style={[styles.screen, styles.content]}>
+      <View className={`${authClasses.screen} ${authClasses.content}`}>
         <ActivityIndicator accessibilityLabel="Loading session" />
       </View>
     );

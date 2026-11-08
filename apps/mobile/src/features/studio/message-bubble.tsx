@@ -65,25 +65,17 @@ export const MessageBubble = memo(function MessageBubble({
   };
   return (
     <View
-      style={
+      className={
         user
-          ? {
-              alignSelf: "flex-end",
-              maxWidth: "86%",
-              borderRadius: 24,
-              paddingHorizontal: 20,
-              paddingVertical: 16,
-              gap: 12,
-              backgroundColor: c.foreground,
-            }
-          : { width: "100%", gap: 12 }
+          ? "self-end max-w-[86%] rounded-[24px] px-[20px] py-[16px] gap-[12px] bg-foreground"
+          : "w-[100%] gap-[12px]"
       }
     >
       {!!message.text &&
         (user ? (
           <Text
             selectable
-            style={{ color: c.background, fontSize: 17, lineHeight: 26 }}
+            className="text-background text-[17px] leading-[26px]"
           >
             {message.text}
           </Text>
@@ -107,25 +99,16 @@ export const MessageBubble = memo(function MessageBubble({
           />
         ))}
       {!!message.attachments?.length && (
-        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+        <View className="flex-row flex-wrap gap-[8px]">
           {message.attachments.map((attachment) => (
             <View
               key={attachment.id}
               accessibilityLabel={`Attachment: ${attachment.filename}`}
-              style={{
-                borderRadius: 16,
-                borderWidth: 1,
-                borderColor: user ? c.background : c.border,
-                paddingHorizontal: 12,
-                paddingVertical: 8,
-              }}
+              className={`rounded-[16px] border px-[12px] py-[8px] ${user ? "border-background" : "border-border"}`}
             >
               <Text
                 numberOfLines={1}
-                style={{
-                  color: user ? c.background : c.foreground,
-                  maxWidth: 200,
-                }}
+                className={`max-w-[200px] ${user ? "text-background" : "text-foreground"}`}
               >
                 {attachment.filename}
               </Text>

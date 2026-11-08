@@ -23,7 +23,7 @@ mock.module("../../disposabl-kit/mobile/lib/convex", () => ({
   api: { auth: {} },
 }));
 mock.module("../../disposabl-kit/mobile/components/auth-ui", () => ({
-  useAuthStyles: () => ({}),
+  authClasses: {},
 }));
 mock.module("../../disposabl-kit/mobile/components/google-button", () => ({
   GoogleButton: "Button",

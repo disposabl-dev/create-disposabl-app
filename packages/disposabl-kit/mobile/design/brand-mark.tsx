@@ -7,15 +7,7 @@ export function BrandMark() {
   if (!appName) return null;
   if (appName !== "Disposabl")
     return (
-      <Text
-        style={{
-          color: dark ? "#fff" : "#161b2e",
-          fontSize: 22,
-          fontWeight: "600",
-          textAlign: "center",
-          marginBottom: 12,
-        }}
-      >
+      <Text className="text-[#161b2e] dark:text-white text-[22px] font-semibold text-center mb-[12px]">
         {appName}
       </Text>
     );
@@ -28,7 +20,7 @@ export function BrandMark() {
       }
       accessibilityLabel="App logo"
       resizeMode="contain"
-      style={{ width: 92, height: 92, alignSelf: "center", marginBottom: 12 }}
+      className="w-[92px] h-[92px] self-center mb-[12px]"
     />
   );
 }

@@ -40,7 +40,7 @@ function ComposeEntry() {
     return <ActivityIndicator accessibilityLabel="Loading session" />;
   if (!isAuthenticated)
     return (
-      <View style={{ gap: 24 }}>
+      <View className="gap-[24px]">
         <Label variant="title">Let’s make your idea real.</Label>
         <Label>Sign in to create an app in your own accounts.</Label>
         <Action
@@ -115,7 +115,7 @@ function Composer() {
     }
   }
   return (
-    <View style={{ gap: 28 }}>
+    <View className="gap-[28px]">
       <Label variant="display">What will you build?</Label>
       <Label color={c.mutedForeground}>
         A thought, a tool, a little corner of the internet.
@@ -133,7 +133,7 @@ function Composer() {
         sending={busy}
       />
       <Label variant="heading">Make it available on</Label>
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
+      <View className="flex-row flex-wrap gap-[10px]">
         {platforms.map((platform) => (
           <Touch
             key={platform.id}
@@ -147,22 +147,10 @@ function Composer() {
                   : [...current, platform.id],
               );
             }}
-            style={{
-              borderRadius: 24,
-              paddingHorizontal: 18,
-              paddingVertical: 14,
-              backgroundColor: selected.includes(platform.id)
-                ? c.foreground
-                : c.card,
-            }}
+            className={`rounded-[24px] px-[18px] py-[14px] ${selected.includes(platform.id) ? "bg-foreground" : "bg-card"}`}
           >
             <Text
-              style={{
-                fontSize: 15,
-                color: selected.includes(platform.id)
-                  ? c.background
-                  : c.foreground,
-              }}
+              className={`text-[15px] ${selected.includes(platform.id) ? "text-background" : "text-foreground"}`}
             >
               {platform.label}
             </Text>
@@ -173,7 +161,7 @@ function Composer() {
         Every app includes a website for essentials and access.
       </Label>
       {!!error && (
-        <Text accessibilityRole="alert" style={{ color: c.destructive }}>
+        <Text accessibilityRole="alert" className="text-destructive">
           {error}
         </Text>
       )}

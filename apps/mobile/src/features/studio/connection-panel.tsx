@@ -18,16 +18,7 @@ export function ProviderMark({
 }) {
   const c = useTheme();
   return (
-    <View
-      style={{
-        width: 48,
-        height: 48,
-        borderRadius: 16,
-        backgroundColor: c.muted,
-        alignItems: "center",
-        justifyContent: "center",
-      }}
-    >
+    <View className="w-[48px] h-[48px] rounded-[16px] bg-muted items-center justify-center">
       {provider === "github" ? (
         <FontAwesome name="github" size={27} color={c.foreground} />
       ) : (
@@ -81,8 +72,8 @@ export function ConnectionPanel({
     },
   ] as const;
   return (
-    <View style={{ gap: 28 }}>
-      <View style={{ gap: 12 }}>
+    <View className="gap-[28px]">
+      <View className="gap-[12px]">
         <Label variant="eyebrow" color={c.primaryText}>
           {connections.ready ? "READY TO CREATE" : "YOUR WORKSPACE"}
         </Label>
@@ -95,17 +86,12 @@ export function ConnectionPanel({
           Connect once. Every app you create stays yours.
         </Label>
       </View>
-      <View style={{ gap: 10 }}>
-        <View style={{ flexDirection: "row", gap: 6 }}>
+      <View className="gap-[10px]">
+        <View className="flex-row gap-[6px]">
           {[0, 1].map((step) => (
             <View
               key={step}
-              style={{
-                flex: 1,
-                height: 4,
-                borderRadius: 2,
-                backgroundColor: completed > step ? c.primaryText : c.border,
-              }}
+              className={`h-[4px] flex-1 rounded-[4px] ${completed > step ? "bg-primary-text" : "bg-border"}`}
             />
           ))}
         </View>
@@ -114,13 +100,7 @@ export function ConnectionPanel({
           color={c.mutedForeground}
         >{`${completed} of 2 essentials connected`}</Label>
       </View>
-      <View
-        style={{
-          backgroundColor: c.card,
-          borderRadius: 24,
-          paddingHorizontal: 20,
-        }}
-      >
+      <View className="bg-card rounded-[24px] px-[20px]">
         {rows.map((row, index) => (
           <Pressable
             accessibilityRole="button"
@@ -128,17 +108,10 @@ export function ConnectionPanel({
             disabled={busy || !onProvider}
             onPress={() => onProvider?.(row.id)}
             key={row.id}
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 16,
-              paddingVertical: 20,
-              borderBottomWidth: index < rows.length - 1 ? 1 : 0,
-              borderBottomColor: c.border,
-            }}
+            className={`flex-row items-center gap-[16px] border-border py-[20px] ${index < rows.length - 1 ? "border-b" : ""}`}
           >
             <ProviderMark provider={row.id} />
-            <View style={{ flex: 1, gap: 4 }}>
+            <View className="flex-1 gap-[4px]">
               <Label variant="heading">{row.name}</Label>
               <Label variant="caption" color={c.mutedForeground}>
                 {row.account ??
@@ -159,29 +132,10 @@ export function ConnectionPanel({
         accessibilityState={{ disabled: busy, busy }}
         disabled={busy}
         onPress={connections.ready ? onContinue : onConnect}
-        style={({ pressed }) => ({
-          minHeight: 56,
-          borderRadius: 28,
-          paddingHorizontal: 24,
-          paddingVertical: 16,
-          backgroundColor: c.foreground,
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 12,
-          opacity: pressed || busy ? 0.65 : 1,
-        })}
+        className={`min-h-[56px] flex-row items-center justify-center gap-[12px] rounded-[28px] bg-foreground px-[24px] py-[16px] active:opacity-[0.65] ${busy ? "opacity-[0.65]" : ""}`}
       >
         {busy ? <ActivityIndicator color={c.background} /> : null}
-        <Text
-          style={{
-            color: c.background,
-            fontSize: 17,
-            fontWeight: "600",
-            flexShrink: 1,
-            textAlign: "center",
-          }}
-        >
+        <Text className="text-background text-[17px] font-semibold shrink text-center">
           {connections.ready ? "Start creating" : "Connect accounts"}
         </Text>
         <Icon name="arrow" color={c.background} size={18} />
@@ -196,15 +150,9 @@ export function ConnectionPanel({
           accessibilityRole="button"
           onPress={onManage ?? onConnect}
           disabled={busy}
-          style={{ padding: 12 }}
+          className="p-[12px]"
         >
-          <Text
-            style={{
-              textAlign: "center",
-              color: c.mutedForeground,
-              fontSize: 15,
-            }}
-          >
+          <Text className="text-center text-muted-foreground text-[15px]">
             Manage connections
           </Text>
         </Pressable>

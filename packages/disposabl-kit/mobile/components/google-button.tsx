@@ -3,7 +3,6 @@ import {
   Image,
   Platform,
   Pressable,
-  StyleSheet,
   Text,
   useColorScheme,
 } from "react-native";
@@ -26,41 +25,18 @@ export function GoogleButton({
       accessibilityState={{ disabled: disabled || pending, busy: pending }}
       disabled={disabled || pending}
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.button,
-        {
-          backgroundColor: dark ? "#131314" : "#FFFFFF",
-          borderColor: dark ? "#8E918F" : "#747775",
-          opacity: disabled || pending || pressed ? 0.6 : 1,
-        },
-      ]}
+      className={`min-h-[52px] flex-row items-center justify-center rounded-[12px] border border-[#747775] bg-white py-[14px] active:opacity-60 dark:border-[#8E918F] dark:bg-[#131314] ${Platform.OS === "ios" ? "gap-[12px] px-[16px]" : "gap-[10px] px-[12px]"} ${disabled || pending ? "opacity-60" : ""}`}
     >
       <Image
         source={require("../../lib/google-logo.png")}
-        style={styles.logo}
+        className="size-[20px]"
         resizeMode="contain"
         accessible={false}
       />
-      <Text style={[styles.label, { color }]}>
+      <Text className="text-[16px] font-medium text-[#1F1F1F] dark:text-[#E3E3E3]">
         {pending ? "Signing in..." : "Sign in with Google"}
       </Text>
       {pending && <ActivityIndicator color={color} />}
     </Pressable>
   );
 }
-
-const styles = StyleSheet.create({
-  button: {
-    minHeight: 52,
-    borderWidth: 1,
-    borderRadius: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: Platform.OS === "ios" ? 12 : 10,
-    paddingHorizontal: Platform.OS === "ios" ? 16 : 12,
-    paddingVertical: 14,
-  },
-  logo: { width: 20, height: 20 },
-  label: { fontSize: 16, fontWeight: "500" },
-});
