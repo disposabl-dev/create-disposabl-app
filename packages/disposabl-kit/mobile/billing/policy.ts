@@ -122,3 +122,21 @@ export async function preflightWebTopup(
   )
     throw new Error("Website checkout is unavailable.");
 }
+
+/** Revalidate after creating the inert handoff, before returning its URL to the caller. */
+export async function guardedWebHandoff<T>(
+  preflight: () => Promise<void>,
+  create: () => Promise<T>,
+  current: () => boolean,
+): Promise<T> {
+  const check = () => {
+    if (!current()) throw new Error("Account changed.");
+  };
+  await preflight();
+  check();
+  const result = await create();
+  check();
+  await preflight();
+  check();
+  return result;
+}
