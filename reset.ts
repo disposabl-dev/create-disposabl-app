@@ -27,6 +27,7 @@ if (
 const productProofTests = [
   "packages/tests/architecture-transactions.test.ts",
   "packages/tests/fixtures/architecture-convex",
+  "packages/tests/generator-architecture-setup.test.ts",
   "packages/tests/architecture-token.test.ts",
   "packages/tests/components/architecture-token.test.mjs",
   "packages/tests/generator-packaging-proof.test.ts",

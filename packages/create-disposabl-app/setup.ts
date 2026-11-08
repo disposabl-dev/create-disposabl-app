@@ -4,6 +4,7 @@ import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { detectReference } from "../cli/preview";
 import { resolveFeatures } from "../disposabl-kit/feature-options";
+import { validateAndroidArchitectures } from "../disposabl-kit/android-architectures";
 import { apiUrl, SERVICE_ORIGIN } from "../cli/origin";
 
 export type CliRunner = (
@@ -76,6 +77,9 @@ export async function setupApp(
   if (run === runDisposabl)
     run = (args, interactive) => runDisposabl(args, interactive, origin);
   config.features = resolveFeatures(config.features ?? []);
+  config.androidArchitectures = validateAndroidArchitectures(
+    config.androidArchitectures,
+  );
   // Persist dependencies before leaving the terminal for any connection flow.
   await writeFile(path, JSON.stringify(config, null, 2) + "\n");
   const status = (await run(["login", "status"])) as { currentUser: unknown };
@@ -117,6 +121,8 @@ export async function setupApp(
       JSON.stringify(config.platforms),
       "--features",
       JSON.stringify(config.features),
+      "--androidArchitectures",
+      JSON.stringify(config.androidArchitectures),
     ])) as { appId: string };
     config.appId = app.appId;
     await writeFile(path, JSON.stringify(config, null, 2) + "\n");
@@ -125,7 +131,7 @@ export async function setupApp(
       stdio: "pipe",
     });
   }
-  await run([
+  const configured = (await run([
     "previews",
     "token",
     "create",
@@ -137,8 +143,29 @@ export async function setupApp(
     JSON.stringify(config.platforms),
     "--features",
     JSON.stringify(config.features),
+    "--androidArchitectures",
+    JSON.stringify(config.androidArchitectures),
+    "--configurationLease",
+    "true",
     "--configure",
     directory,
+  ])) as { configured?: boolean; configurationLeaseUntil?: number };
+  if (
+    configured?.configured !== true ||
+    !Number.isSafeInteger(configured.configurationLeaseUntil) ||
+    configured.configurationLeaseUntil! <= 0
+  )
+    throw new Error(
+      "Local configuration did not return a valid setup lease. Retry setup.",
+    );
+  await run([
+    "previews",
+    "token",
+    "complete",
+    "--appId",
+    config.appId,
+    "--until",
+    String(configured.configurationLeaseUntil),
   ]);
   return config.appId as string;
 }
