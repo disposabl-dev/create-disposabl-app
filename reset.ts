@@ -25,6 +25,8 @@ if (
 // Product-only proof harnesses must not enter generated apps. Keep the same
 // paths in the symlink validation and removal inventories.
 const productProofTests = [
+  "packages/tests/flows/account-deletion.e2e.ts",
+  "packages/tests/account-deletion-stop.test.ts",
   "packages/tests/account-deletion-transactions.test.ts",
   "packages/tests/fixtures/account-deletion-convex",
   "packages/tests/flows/cli-oauth.e2e.ts",
