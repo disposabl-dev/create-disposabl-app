@@ -1,0 +1,78 @@
+diff --git a/src/components/email/_generated/component.ts b/src/components/email/_generated/component.ts
+index a1e7581..cf44b0b 100644
+--- a/src/components/email/_generated/component.ts
++++ b/src/components/email/_generated/component.ts
+@@ -269,0 +270 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
++      eraseUserBatch: FunctionReference<"mutation", "internal", { userId: string }, { emailsDeleted: number; challengesDeleted: number; complete: boolean }, Name>;
+diff --git a/src/components/email/challenge/common.ts b/src/components/email/challenge/common.ts
+index e183df6..f6a0570 100644
+--- a/src/components/email/challenge/common.ts
++++ b/src/components/email/challenge/common.ts
+@@ -394,0 +395,3 @@ export async function createChallengeAndSendEmail(
++  const challengeUserId = args.purpose.userId;
++  if (challengeUserId !== undefined && await ctx.db.query("erasedUsers").withIndex("by_userId", q => q.eq("userId", challengeUserId)).unique())
++    throw new Error("User identity has been erased");
+@@ -498,0 +502,3 @@ export async function findClaimableChallenge<Expected extends ExpectedPurpose>(
++  const challengeUserId = row.purpose.userId;
++  if (challengeUserId !== undefined && await ctx.db.query("erasedUsers").withIndex("by_userId", q => q.eq("userId", challengeUserId)).unique())
++    return claimFailure("INVALID_CHALLENGE");
+diff --git a/src/components/email/schema.ts b/src/components/email/schema.ts
+index f7f7633..17392a9 100644
+--- a/src/components/email/schema.ts
++++ b/src/components/email/schema.ts
+@@ -4,0 +5 @@ export default defineSchema({
++  erasedUsers: defineTable({ userId: v.string(), erasedAt: v.number() }).index("by_userId", ["userId"]),
+diff --git a/src/components/email/verifiedEmails.ts b/src/components/email/verifiedEmails.ts
+index 2de2e09..17ea000 100644
+--- a/src/components/email/verifiedEmails.ts
++++ b/src/components/email/verifiedEmails.ts
+@@ -116,0 +117,15 @@ export const deleteUser = mutation({
++
++/** App-server only. Establish a permanent fence and delete bounded attributed rows. */
++export const eraseUserBatch = mutation({
++  args: { userId: v.string() },
++  returns: v.object({ emailsDeleted: v.number(), challengesDeleted: v.number(), complete: v.boolean() }),
++  handler: async (ctx, { userId }) => {
++    const tombstone = await ctx.db.query("erasedUsers").withIndex("by_userId", q => q.eq("userId", userId)).unique();
++    if (!tombstone) await ctx.db.insert("erasedUsers", { userId, erasedAt: Date.now() });
++    const emails = await ctx.db.query("verifiedEmails").withIndex("by_userId", q => q.eq("userId", userId)).take(100);
++    const challenges = await ctx.db.query("challenges").withIndex("by_purpose_userId", q => q.eq("purpose.userId", userId)).take(100);
++    for (const row of emails) await ctx.db.delete("verifiedEmails", row._id);
++    for (const row of challenges) await ctx.db.delete("challenges", row._id);
++    return { emailsDeleted: emails.length, challengesDeleted: challenges.length, complete: emails.length < 100 && challenges.length < 100 };
++  },
++});
+diff --git a/src/components/username/_generated/component.ts b/src/components/username/_generated/component.ts
+index 116d150..01e0dac 100644
+--- a/src/components/username/_generated/component.ts
++++ b/src/components/username/_generated/component.ts
+@@ -26,0 +27 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
++      eraseUser: FunctionReference<"mutation", "internal", { userId: string }, { deleted: boolean }, Name>;
+diff --git a/src/components/username/public.ts b/src/components/username/public.ts
+index 20216b4..3bd14e0 100644
+--- a/src/components/username/public.ts
++++ b/src/components/username/public.ts
+@@ -38,0 +39,2 @@ export const setUsername = mutation({
++    if (await ctx.db.query("erasedUsers").withIndex("by_userId", q => q.eq("userId", userId)).unique())
++      throw new Error("User identity has been erased");
+@@ -119,0 +122,14 @@ export const deleteUsername = mutation({
++/** Permanently fence the old user ID and remove its username. App-server only. */
++export const eraseUser = mutation({
++  args: { userId: v.string() },
++  returns: v.object({ deleted: v.boolean() }),
++  handler: async (ctx, { userId }) => {
++    const tombstone = await ctx.db.query("erasedUsers").withIndex("by_userId", q => q.eq("userId", userId)).unique();
++    if (!tombstone) await ctx.db.insert("erasedUsers", { userId, erasedAt: Date.now() });
++    const row = await rowByUserId(ctx, userId);
++    if (!row) return { deleted: false };
++    await ctx.db.delete("usernames", row._id);
++    return { deleted: true };
++  },
++});
++
+diff --git a/src/components/username/schema.ts b/src/components/username/schema.ts
+index fcba693..d979bca 100644
+--- a/src/components/username/schema.ts
++++ b/src/components/username/schema.ts
+@@ -4,0 +5 @@ export default defineSchema({
++  erasedUsers: defineTable({ userId: v.string(), erasedAt: v.number() }).index("by_userId", ["userId"]),
