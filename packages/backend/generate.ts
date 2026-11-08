@@ -30,6 +30,12 @@ async function writeChanged(path: string, text: string) {
 
 /** Discover opt-in modules, validate the contract, then update both transports together. */
 export async function generate(acceptBreaking = false) {
+  // Fresh scaffolds have no route tree; page manifests must reflect current routes.
+  const routes = spawnSync(process.execPath, ["run", "generate:routes"], {
+    cwd: join(root, "../../apps/web"),
+    stdio: "inherit",
+  });
+  if (routes.status !== 0) throw new Error("Web route generation failed");
   const files = await readdir(convex, { recursive: true });
   const modules: Record<string, Record<string, unknown>> = {};
   for (const file of files.sort()) {
