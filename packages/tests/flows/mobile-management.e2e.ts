@@ -144,11 +144,15 @@ test(
     await screen.getByRole("button", "Close settings").tap();
     if (!config.features.includes("payments")) {
       await screen.getByRole("button", "Create app", { exact: true }).tap();
-      const idea = screen.getByRole("textbox", "Your app idea", { exact: true });
+      const idea = screen.getByRole("textbox", "Your app idea", {
+        exact: true,
+      });
       const draft = "A local test idea that must survive the connection gate.";
       await idea.fill(draft);
       await screen.getByRole("button", "Send message", { exact: true }).tap();
-      await expect(screen.getByRole("button", "Connect accounts")).toBeVisible();
+      await expect(
+        screen.getByRole("button", "Connect accounts"),
+      ).toBeVisible();
       await screen.getByRole("button", "Back to idea").tap();
       await expect(idea).toHaveValue(draft);
       await screen.getByRole("button", "Close create app").tap();
