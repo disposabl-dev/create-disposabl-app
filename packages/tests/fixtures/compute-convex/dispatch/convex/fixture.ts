@@ -61,6 +61,12 @@ export const expire = mutation({
   handler: (ctx, { sessionId }) =>
     ctx.db.patch(sessionId, { paidUntil: Date.now() - 1 }),
 });
+// Test-only eligible branch: production active windows stop at expiry.
+export const prepareEligibleRenewal = mutation({
+  args: { sessionId: v.id("computeSessions") },
+  handler: (ctx, { sessionId }) =>
+    ctx.db.patch(sessionId, { state: "starting" }),
+});
 export const inspect = query({
   args: { sessionId: v.id("computeSessions"), userId: v.string() },
   handler: async (ctx, { sessionId, userId }) => ({
@@ -76,10 +82,4 @@ export const inspect = query({
         .take(10)
     ).length,
   }),
-});
-
-import { debitCompute as syntheticDebit } from "./agent/actions/syntheticDebit";
-export const probe = action({
-  args: { userId: v.string() },
-  handler: (_ctx, { userId }) => syntheticDebit(userId),
 });

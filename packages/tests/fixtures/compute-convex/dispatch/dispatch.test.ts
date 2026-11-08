@@ -23,16 +23,34 @@ const a = (name: string, args: object) => call("action", name, args);
 const q = (name: string, args: object) => call("query", name, args);
 
 test(
+  "registered renew dispatches through its default adapter when the claim is eligible",
+  { skip: !base },
+  async () => {
+    const userId = "synthetic-renew-control";
+    const sessionId = await m("seed", { userId });
+    await a("fund", { sessionId });
+    const before = await q("inspect", { sessionId, userId });
+    assert.equal(before.calls, 1);
+    const expectedDebit = before.debits[0]._id;
+    await m("prepareEligibleRenewal", { sessionId });
+    await a("renew", { sessionId, expectedDebit });
+    const after = await q("inspect", { sessionId, userId });
+    assert.equal(after.calls, 2);
+    assert.equal(after.debits.length, 2);
+    assert.equal(after.session.state, "active");
+    assert.notEqual(after.session.debitId, expectedDebit);
+    assert.equal(
+      after.debits.find((debit: any) => debit._id === after.session.debitId)
+        .state,
+      "confirmed",
+    );
+  },
+);
+
+test(
   "registered renew callbacks never dispatch for active, stale or expired windows",
   { skip: !base },
   async () => {
-    const probeId = "synthetic-probe";
-    const probeSession = await m("seed", { userId: probeId });
-    assert.equal((await a("probe", { userId: probeId })).outcome, "confirmed");
-    assert.equal(
-      (await q("inspect", { sessionId: probeSession, userId: probeId })).calls,
-      1,
-    );
     const userId = "synthetic-confirmed";
     const sessionId = await m("seed", { userId });
     await Promise.all(
