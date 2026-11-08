@@ -1,6 +1,6 @@
 import { test } from "@e2e-dev/web";
 import { expect } from "e2e";
-import config from "../../../disposabl.json";
+import { authenticationEnabled } from "../../disposabl-kit/features";
 import { legalConfig } from "../../disposabl-kit/legal";
 
 for (const [path, title] of [
@@ -61,7 +61,7 @@ test(
         ),
       ).toBeVisible();
     await app.open("/legal/delete-account");
-    if (config.features.includes("authentication")) {
+    if (authenticationEnabled) {
       await expect(
         screen.getByRole("link", "Sign in", { exact: true }).last(),
       ).toBeVisible();
