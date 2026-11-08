@@ -70,15 +70,30 @@ test(
     ),
   },
   () => {
-    const configure = createRequire(import.meta.url)(
-      "../../apps/mobile/app.config.js",
-    );
-    const config = configure({ config: { scheme: ["custom", "another"] } });
-    assert.deepEqual(config.scheme, [
-      "custom",
-      "another",
-      new URL(mobileAuthReturnUrl).protocol.slice(0, -1),
-    ]);
+    const keys = [
+      "CONVEX_URL",
+      "CONVEX_SITE_URL",
+      "EXPO_PUBLIC_CONVEX_URL",
+      "EXPO_PUBLIC_CONVEX_SITE_URL",
+    ];
+    const saved = keys.map((key) => process.env[key]);
+    try {
+      for (const key of keys) delete process.env[key];
+      const configure = createRequire(import.meta.url)(
+        "../../apps/mobile/app.config.js",
+      );
+      const config = configure({ config: { scheme: ["custom", "another"] } });
+      assert.deepEqual(config.scheme, [
+        "custom",
+        "another",
+        new URL(mobileAuthReturnUrl).protocol.slice(0, -1),
+      ]);
+    } finally {
+      keys.forEach((key, index) => {
+        if (saved[index] === undefined) delete process.env[key];
+        else process.env[key] = saved[index];
+      });
+    }
   },
 );
 
