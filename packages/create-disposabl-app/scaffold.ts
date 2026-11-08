@@ -8,7 +8,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import { basename, join } from "node:path";
+import { basename, join, normalize } from "node:path";
 import { randomUUID } from "node:crypto";
 import { omitMobilePayments } from "./mobile-payments";
 import {
@@ -25,7 +25,7 @@ export const authStarterPaths = [
   "packages/disposabl-kit/client/routes/_authenticated/change-password.tsx",
   "apps/web/src/router/_authenticated/dashboard.api-keys.tsx",
   "apps/mobile/src/app/(auth)",
-];
+].map((path) => normalize(path));
 
 export async function createApp(
   template: string,

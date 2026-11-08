@@ -148,6 +148,7 @@ export async function reconfigureApp(
         features: oldFeatures,
       });
     if (
+      !disableAuth &&
       oldFeatures.includes("payments") &&
       !config.features.includes("payments")
     )
