@@ -80,24 +80,40 @@ test(
       throw new Error(
         "Agent inert fixture requires the isolated port 3550 backend.",
       );
-    const boatResponse = await fetch(`${url.origin}/api/query`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Convex ${adminKey}`,
-      },
-      body: JSON.stringify({
-        path: "_system/cli/queryEnvironmentVariables:get",
-        args: { name: "BOAT_API_KEY" },
-        format: "json",
-      }),
-      signal: AbortSignal.timeout(15_000),
-    });
-    const boat = await boatResponse.json();
-    if (boat.status !== "success")
-      throw new Error("Unable to verify the isolated agent configuration.");
-    if (boat.value?.value?.trim())
-      throw new Error("Agent fixture requires an empty Boat key.");
+    for (const name of [
+      "BOAT_API_KEY",
+      "R2_ACCOUNT_ID",
+      "R2_BUCKET_NAME",
+      "R2_ACCESS_KEY_ID",
+      "R2_SECRET_ACCESS_KEY",
+      "E2E_TELEMETRY_DISABLED",
+    ]) {
+      const response = await fetch(`${url.origin}/api/query`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Convex ${adminKey}`,
+        },
+        body: JSON.stringify({
+          path: "_system/cli/queryEnvironmentVariables:get",
+          args: { name },
+          format: "json",
+        }),
+        signal: AbortSignal.timeout(15_000),
+      });
+      const result = await response.json();
+      if (!response.ok || result.status !== "success")
+        throw new Error("Unable to verify the isolated agent configuration.");
+      const configured = result.value?.value?.trim() ?? "";
+      if (
+        name === "E2E_TELEMETRY_DISABLED"
+          ? configured !== "1"
+          : configured !== ""
+      )
+        throw new Error(
+          "Agent fixture requires disabled telemetry and no Boat or R2 configuration.",
+        );
+    }
     async function user() {
       const signup = await value(
         "auth:signUpWithUsernamePassword",
