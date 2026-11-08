@@ -208,10 +208,21 @@ test("native warmup and production use the same exact-commit cache", () => {
       { encoding: "utf8" },
     ),
   ) as {
-    jobs: { prime: { if: string; "timeout-minutes": number } };
+    jobs: {
+      prime: {
+        if: string;
+        "timeout-minutes": number;
+        env: Record<string, string>;
+      };
+    };
   };
   assert.equal(prime.jobs.prime.if, "github.ref == 'refs/heads/main'");
   assert.equal(prime.jobs.prime["timeout-minutes"], 20);
+  assert.doesNotMatch(
+    JSON.stringify(prime.jobs.prime.env),
+    /\$\{\{\s*runner\./,
+  );
+  assert.match(primeText, /CCACHE_DIR=%s\\n.*\$RUNNER_TEMP\/ccache/);
   assert.doesNotMatch(primeText, /secrets\.|id-token|publish|report/i);
   const key =
     "android-ccache-v1-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}";

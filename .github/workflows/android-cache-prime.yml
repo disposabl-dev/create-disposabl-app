@@ -18,13 +18,13 @@ jobs:
       EXPO_NO_DOTENV: "1"
       DISPOSABL_MOBILE_CHANNEL: production
       EXPO_PROJECT_ID: 00000000-0000-4000-8000-000000000001
-      CCACHE_DIR: ${{ runner.temp }}/ccache
       CCACHE_COMPILERCHECK: content
       CMAKE_C_COMPILER_LAUNCHER: ccache
       CMAKE_CXX_COMPILER_LAUNCHER: ccache
     steps:
       - name: Record warmup start
-        run: printf 'ANDROID_PRIME_STARTED_AT=%s\n' "$(date +%s)" >> "$GITHUB_ENV"
+        run: |
+          printf 'ANDROID_PRIME_STARTED_AT=%s\nCCACHE_DIR=%s\n' "$(date +%s)" "$RUNNER_TEMP/ccache" >> "$GITHUB_ENV"
       - uses: actions/checkout@v6
         with: { persist-credentials: false }
       - uses: actions/setup-node@v6
