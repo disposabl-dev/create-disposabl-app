@@ -11,6 +11,8 @@ import {
 } from "../create-disposabl-app/options";
 
 const excluded = [
+  "packages/tests/architecture-token.test.ts",
+  "packages/tests/components/architecture-token.test.mjs",
   "packages/tests/generator-packaging-proof.test.ts",
   "packages/tests/compute-provider-http.test.ts",
   "packages/tests/billing-web.config.ts",
