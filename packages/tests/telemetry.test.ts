@@ -120,8 +120,9 @@ function identityContext() {
     { _id: string; hash: string; expiresAt: number; userId?: string }
   >();
   const jobs: any[] = [];
+  let bucket: any = null;
   const db = {
-    query: () => ({
+    query: (table: string) => ({
       withIndex: (_index: string, predicate: (q: any) => unknown) => {
         let hash = "";
         predicate({
@@ -131,17 +132,26 @@ function identityContext() {
         });
         return {
           unique: async () =>
-            [...rows.values()].find((row) => row.hash === hash) ?? null,
+            table === "telemetryIssuance"
+              ? bucket
+              : ([...rows.values()].find((row) => row.hash === hash) ?? null),
         };
       },
     }),
-    insert: async (_table: string, value: any) => {
+    insert: async (table: string, value: any) => {
+      if (table === "telemetryIssuance") {
+        bucket = { _id: "bucket", ...value };
+        return "bucket";
+      }
       const id = `row-${rows.size + 1}`;
       rows.set(id, { _id: id, ...value });
       return id;
     },
-    patch: async (_table: string, id: string, value: any) => {
-      Object.assign(rows.get(id)!, value);
+    patch: async (table: string, id: string, value: any) => {
+      Object.assign(
+        table === "telemetryIssuance" ? bucket : rows.get(id)!,
+        value,
+      );
     },
     get: async (_table: string, id: string) => rows.get(id) ?? null,
     delete: async (_table: string, id: string) => {
@@ -151,6 +161,14 @@ function identityContext() {
   return {
     rows,
     jobs,
+    exhaust: () => {
+      bucket = {
+        _id: "bucket",
+        key: "global",
+        tokens: 0,
+        updatedAt: Date.now(),
+      };
+    },
     ctx: {
       db,
       scheduler: {
@@ -240,6 +258,22 @@ test("page ingestion issues and binds an anonymous identity only to the verified
     );
     assert.notEqual((await switched.json()).anonymousId, anonymousId);
     assert.notEqual(events[5].properties.$anon_distinct_id, anonymousDistinct);
+    fixture.exhaust();
+    const eventCount = events.length;
+    const rowCount = fixture.rows.size;
+    const jobCount = fixture.jobs.length;
+    assert.equal(
+      (await (page as any)._handler(ctx, request(undefined, true))).status,
+      429,
+    );
+    assert.equal(fixture.rows.size, rowCount);
+    assert.equal(fixture.jobs.length, jobCount);
+    assert.equal(events.length, eventCount);
+    user = "verified-user";
+    assert.equal(
+      (await (page as any)._handler(ctx, request(anonymousId, true))).status,
+      200,
+    );
     process.env.E2E_TELEMETRY_DISABLED = "1";
     const count = events.length;
     assert.equal(
@@ -276,6 +310,29 @@ test("capabilities expire, cannot be reused by another account, and schedule bou
   assert.equal(await claim("issued", "fourth", "a"), false);
   await (expireIdentity as any)._handler(ctx, { id: original._id });
   assert.equal(rows.has(original._id), false);
+});
+
+test("issuance budget refills at one identity per minute", async () => {
+  const { claimIdentity } = await import("../backend/convex/telemetry");
+  const fixture = identityContext();
+  const originalNow = Date.now;
+  let now = 1_000_000;
+  Date.now = () => now;
+  try {
+    fixture.exhaust();
+    const claim = (newHash: string) =>
+      (claimIdentity as any)._handler(fixture.ctx, { newHash });
+    assert.equal(await claim("first"), null);
+    now += 59_999;
+    assert.equal(await claim("first"), null);
+    now++;
+    assert.equal(await claim("first"), false);
+    assert.equal(await claim("second"), null);
+    assert.equal(fixture.rows.size, 1);
+    assert.equal(fixture.jobs.length, 1);
+  } finally {
+    Date.now = originalNow;
+  }
 });
 
 test("anonymous capture and identify use the same opaque identity", async () => {

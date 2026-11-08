@@ -17,7 +17,7 @@ export {
 const claimIdentityRef = makeFunctionReference<
   "mutation",
   { hash?: string; newHash: string; userId?: string },
-  boolean
+  boolean | null
 >("telemetry:claimIdentity");
 
 const pageNames = [
@@ -110,6 +110,7 @@ export const page = httpAction(async (ctx, request) => {
       newHash: await hashTelemetryIdentity(issuedId),
       ...(userId ? { userId } : {}),
     });
+    if (accepted === null) return new Response(null, { status: 429, headers });
     const anonymousId = accepted && existingId ? existingId : issuedId;
     await captureTelemetry(
       body.platform === "web" ? "page_view" : "screen_view",

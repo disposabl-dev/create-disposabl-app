@@ -71,6 +71,14 @@ test("reset welcome reflects selected platforms and hides disabled docs", async 
         existsSync(join(app, "packages/tests/app-telemetry.test.ts")),
         false,
       );
+      assert.equal(
+        existsSync(join(app, "packages/tests/telemetry-transactions.test.ts")),
+        false,
+      );
+      assert.equal(
+        existsSync(join(app, "packages/tests/fixtures/telemetry-convex")),
+        false,
+      );
       for (const name of [
         "sdk-analytics",
         "cli-telemetry",

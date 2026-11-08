@@ -73,6 +73,9 @@ export function telemetryEnabled(settingsOverride: AnalyticsConfig = settings) {
 // The UUID is a bearer capability, not browser attestation or authorization.
 // Records expire after 30 days; an expired capability rotates without a merge.
 const identityTtl = 30 * 24 * 60 * 60 * 1000;
+// A single global bucket bounds anonymous issuance, regardless of input ID.
+const issuanceBurst = 64;
+const issuanceRefillMs = 60_000;
 const expireIdentityRef = makeFunctionReference<
   "mutation",
   { id: string },
@@ -85,7 +88,7 @@ export const claimIdentity = internalMutation({
     newHash: v.string(),
     userId: v.optional(v.string()),
   },
-  returns: v.boolean(),
+  returns: v.union(v.boolean(), v.null()),
   handler: async (ctx, { hash, newHash, userId }) => {
     const row = hash
       ? await ctx.db
@@ -101,6 +104,31 @@ export const claimIdentity = internalMutation({
       if (userId && !row.userId)
         await ctx.db.patch("telemetryIdentities", row._id, { userId });
       return true;
+    }
+    const now = Date.now();
+    const bucket = await ctx.db
+      .query("telemetryIssuance")
+      .withIndex("by_key", (q) => q.eq("key", "global"))
+      .unique();
+    const tokens = bucket
+      ? Math.min(
+          issuanceBurst,
+          bucket.tokens +
+            Math.max(0, now - bucket.updatedAt) / issuanceRefillMs,
+        )
+      : issuanceBurst;
+    if (tokens < 1) return null;
+    if (bucket) {
+      await ctx.db.patch("telemetryIssuance", bucket._id, {
+        tokens: tokens - 1,
+        updatedAt: now,
+      });
+    } else {
+      await ctx.db.insert("telemetryIssuance", {
+        key: "global",
+        tokens: tokens - 1,
+        updatedAt: now,
+      });
     }
     const id = await ctx.db.insert("telemetryIdentities", {
       hash: newHash,
