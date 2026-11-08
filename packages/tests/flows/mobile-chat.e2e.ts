@@ -412,9 +412,9 @@ test(
         ).toBeVisible();
         const input = screen.getByTestId("chat-message");
         await input.tap();
-        await input.fill(
-          "This is a multiline draft for the local composer.\nIt stays within the available width.",
-        );
+        const draft =
+          "This is a multiline draft for the local composer.\nIt stays within the available width.";
+        await input.fill(draft);
         await expect(input).toBeFocused();
         await expect(
           screen.getByRole("button", "Send message", { exact: true }),
@@ -426,6 +426,27 @@ test(
           screen.getByRole("button", "Add attachment", { exact: true }),
         ).toBeVisible();
         await app.screenshot("chat-multiline");
+        if (platform === "android") {
+          try {
+            await device.setOrientation("landscape-left");
+            await expect(input).toHaveValue(draft);
+            await input.tap();
+            await expect(input).toBeFocused();
+            for (const label of ["Send message", "Dictation", "Add attachment"])
+              await expect(
+                screen.getByRole("button", label, { exact: true }),
+              ).toBeVisible();
+            // The test IME can be headless; keyboard overlap needs a real-IME check.
+            await app.screenshot("chat-landscape-draft");
+          } finally {
+            await device.setOrientation("portrait");
+          }
+          await expect(input).toHaveValue(draft);
+          await expect(
+            screen.getByRole("button", "Send message", { exact: true }),
+          ).toBeVisible();
+          await app.screenshot("chat-portrait-draft-restored");
+        }
         await input.fill("");
         await call(
           "agent/state:finish",
