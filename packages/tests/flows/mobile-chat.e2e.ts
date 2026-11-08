@@ -302,6 +302,12 @@ test(
           screen.getByText("Assistant", { exact: true }),
         ).toHaveCount(0);
         await app.screenshot("chat-active");
+        if (platform === "ios")
+          await device.unstable_raw.client.command.wait({
+            stable: true,
+            quietMs: 500,
+            timeoutMs: 5000,
+          });
         await screen.getByRole("button", "Chat options", { exact: true }).tap();
         await (
           platform === "ios"
@@ -427,27 +433,25 @@ test(
           screen.getByRole("button", "Add attachment", { exact: true }),
         ).toBeVisible();
         await app.screenshot("chat-multiline");
-        if (platform === "android") {
-          try {
-            await device.setOrientation("landscape-left");
-            await expect(input).toHaveValue(draft);
-            await input.tap();
-            await expect(input).toBeFocused();
-            for (const label of ["Send message", "Dictation", "Add attachment"])
-              await expect(
-                screen.getByRole("button", label, { exact: true }),
-              ).toBeVisible();
-            // The test IME can be headless; keyboard overlap needs a real-IME check.
-            await app.screenshot("chat-landscape-draft");
-          } finally {
-            await device.setOrientation("portrait");
-          }
+        try {
+          await device.setOrientation("landscape-left");
           await expect(input).toHaveValue(draft);
-          await expect(
-            screen.getByRole("button", "Send message", { exact: true }),
-          ).toBeVisible();
-          await app.screenshot("chat-portrait-draft-restored");
+          await input.tap();
+          await expect(input).toBeFocused();
+          for (const label of ["Send message", "Dictation", "Add attachment"])
+            await expect(
+              screen.getByRole("button", label, { exact: true }),
+            ).toBeVisible();
+          // The test IME can be headless; keyboard overlap needs a real-IME check.
+          await app.screenshot("chat-landscape-draft");
+        } finally {
+          await device.setOrientation("portrait");
         }
+        await expect(input).toHaveValue(draft);
+        await expect(
+          screen.getByRole("button", "Send message", { exact: true }),
+        ).toBeVisible();
+        await app.screenshot("chat-portrait-draft-restored");
         await input.fill("");
         await call(
           "agent/state:finish",

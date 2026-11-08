@@ -74,7 +74,7 @@ function Chat({ appId }: { appId: string }) {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
   const { width, height } = useWindowDimensions();
-  const compactViewport = process.env.EXPO_OS === "android" && width > height;
+  const compactViewport = width > height;
   const list = useRef<FlatList>(null);
   const followLatest = useRef(true);
   const userScrolling = useRef(false);

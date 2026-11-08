@@ -57,7 +57,7 @@ export function MessageComposer({
   const c = useTheme();
   const { width, height } = useWindowDimensions();
   // Keep controls usable in short windows, including keyboard-resized portrait.
-  const compactViewport = process.env.EXPO_OS === "android" && width > height;
+  const compactViewport = width > height;
   const [expanded, setExpanded] = useState(false);
   const inline = compact && (compactViewport || !expanded || !value);
   const actionsBusy = disabled || sending || attachmentsBusy;
