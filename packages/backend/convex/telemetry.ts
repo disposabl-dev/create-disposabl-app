@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { makeFunctionReference } from "convex/server";
 import { platform } from "./validator";
 import { httpAction, internalAction } from "./_generated/server";
-import { getSessionUserId } from "@disposabl/disposabl-kit/server/lib/functions";
+import { getActiveSessionUserId as getSessionUserId } from "./users/deletion";
 import {
   captureTelemetry,
   hashTelemetryIdentity,

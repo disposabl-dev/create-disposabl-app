@@ -1,4 +1,4 @@
-import { getSessionUserId } from "@disposabl/disposabl-kit/server/lib/functions";
+import { getActiveSessionUserId as getSessionUserId } from "../users/deletion";
 import { ConvexError, v, type Infer } from "convex/values";
 import type { ActionCtx, MutationCtx, QueryCtx } from "../_generated/server";
 import { action, mutation, query } from "../_generated/server";
@@ -16,10 +16,6 @@ import {
 async function requireUser(ctx: QueryCtx | MutationCtx | ActionCtx) {
   const id = await getSessionUserId(ctx);
   if (!id) throw new ConvexError("Sign in to manage your connections.");
-  if (
-    await ctx.runQuery(internal.users.internal.deletionPending, { userId: id })
-  )
-    throw new ConvexError("Account deletion has been requested.");
   return id;
 }
 export const status = query({

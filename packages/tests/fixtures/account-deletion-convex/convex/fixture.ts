@@ -1,3 +1,4 @@
+import { get as nativeAppGet } from "../../../../backend/convex/apps/index";
 import {
   mutationGeneric as mutation,
   queryGeneric as query,
@@ -10,6 +11,7 @@ import {
 import {
   deletionPending,
   requireNotDeleting,
+  getActiveSessionUserId,
 } from "../../../../backend/convex/users/deletion";
 import {
   deletionRequests,
@@ -86,5 +88,37 @@ export const expireStop = mutation({
     await ctx.db.patch(userId, {
       deletionStop: { ...user.deletionStop, leaseUntil: Date.now() - 1 },
     });
+  },
+});
+
+export const active = query({
+  args: { userId: v.union(v.id("users"), v.null()) },
+  handler: (ctx, { userId }) =>
+    getActiveSessionUserId({
+      ...identity(ctx, userId),
+      runQuery: async (_ref: unknown, args: any) =>
+        "sessionId" in args
+          ? userId
+            ? { userId }
+            : null
+          : deletionPending(ctx as any, args.userId),
+    } as any),
+});
+
+export const nativeApp = query({
+  args: { userId: v.union(v.id("users"), v.null()) },
+  handler: async (ctx, { userId }) => {
+    return (nativeAppGet as any)._handler(
+      {
+        ...identity(ctx, userId),
+        runQuery: async (_ref: unknown, args: any) => {
+          if ("sessionId" in args) return userId ? { userId } : null;
+          if (!("appId" in args))
+            return deletionPending(ctx as any, args.userId);
+          return { appId: args.appId, userId: args.userId };
+        },
+      },
+      { appId: "fixture" },
+    );
   },
 });
