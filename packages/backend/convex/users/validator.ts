@@ -10,8 +10,15 @@ export const mcpDeletionProgress = v.object({
 });
 
 export const authDeletionProgress = v.object({
-  state: v.literal("blocked"),
-  blocker: v.literal("remote_work_drain_unverified"),
+  state: v.union(v.literal("in_progress"), v.literal("linked_auth_cleared")),
+  batches: v.number(),
+  passwordsDeleted: v.number(),
+  accountsDeleted: v.number(),
+  sessionsDeleted: v.number(),
+  refreshTokensDeleted: v.number(),
+  passwordsCleared: v.boolean(),
+  linkedRowsCleared: v.boolean(),
+  legacyOrphansUnverified: v.literal(true),
   updatedAt: v.number(),
 });
 

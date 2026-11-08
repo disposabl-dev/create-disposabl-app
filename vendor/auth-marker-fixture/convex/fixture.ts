@@ -222,3 +222,40 @@ export const googleLookup = mutation({
       providerAccountId: a.sub,
     }),
 });
+
+// Product operator handler, exposed only by this disposable fixture.
+import { runBatch as productAuthBatch } from "../../../packages/backend/convex/users/authDeletion";
+export const requestProductDeletion = mutation({
+  args: { userId: v.id("users") },
+  handler: async (ctx, { userId }) => {
+    const requestedAt = Date.now();
+    await ctx.db.patch(userId, { deletionRequestedAt: requestedAt });
+    return requestedAt;
+  },
+});
+export const productAuthCleanup = mutation({
+  args: { userId: v.id("users"), expectedRequestedAt: v.number() },
+  handler: (ctx, args) => (productAuthBatch as any)._handler(ctx, args),
+});
+export const productAuthProgress = mutation({
+  args: { userId: v.id("users") },
+  handler: async (ctx, { userId }) =>
+    (await ctx.db.get(userId))?.authDeletion ?? null,
+});
+export const { isAuthenticated } = core;
+export const failAuthBatch = mutation({
+  args: { userId: v.id("users"), expectedRequestedAt: v.number() },
+  handler: (ctx, args) => {
+    let calls = 0;
+    return (productAuthBatch as any)._handler(
+      {
+        ...ctx,
+        runMutation: (...values: any[]) => {
+          if (++calls === 2) throw new Error("synthetic password failure");
+          return (ctx.runMutation as any)(...values);
+        },
+      },
+      args,
+    );
+  },
+});

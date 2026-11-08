@@ -25,6 +25,8 @@ if (
 // Product-only proof harnesses must not enter generated apps. Keep the same
 // paths in the symlink validation and removal inventories.
 const productProofTests = [
+  "vendor/auth-marker-fixture",
+  "vendor/convex-auth-marker.test.ts",
   "packages/tests/mcp-deletion-product.test.ts",
   "packages/tests/fixtures/mcp-deletion-product-convex",
   "packages/tests/mobile-theme-identity.test.ts",
