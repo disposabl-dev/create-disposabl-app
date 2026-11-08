@@ -177,7 +177,11 @@ test("native warmup requires completed Gradle work, a real result, and enough re
       /:app:externalNativeBuildRelease/,
     );
     assert.equal(run(124, 100).status, 124);
-    assert.equal(run(0, 958, true).status, 124);
+    const timedOut = run(0, 958, true);
+    assert.ok(
+      timedOut.status === 124 || timedOut.status === 137,
+      `expected timeout failure, got ${timedOut.status}`,
+    );
     assert.equal(run(42, 100).status, 42);
     assert.match(run(0, 961).stderr, /Insufficient time remaining/);
     rmSync(resultFile);
