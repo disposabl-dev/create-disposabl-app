@@ -3,7 +3,31 @@ import {
   queryGeneric as query,
 } from "convex/server";
 import { v } from "convex/values";
-import { resolve } from "../../../../backend/convex/agent/computeRecovery";
+import {
+  resolve,
+  resolveConflicts,
+} from "../../../../backend/convex/agent/computeRecovery";
+export const resolveConflictsHold = mutation({
+  args: {
+    currentSessionId: v.id("computeSessions"),
+    conflicts: v.array(
+      v.object({
+        sessionId: v.id("computeSessions"),
+        debitId: v.id("computeDebits"),
+        evidence: v.string(),
+      }),
+    ),
+    operator: v.string(),
+    currentDebit: v.optional(
+      v.object({
+        debitId: v.id("computeDebits"),
+        outcome: v.union(v.literal("confirmed"), v.literal("denied")),
+        evidence: v.string(),
+      }),
+    ),
+  },
+  handler: (ctx, args) => (resolveConflicts as any)._handler(ctx, args),
+});
 export const resolveHold = mutation({
   args: {
     sessionId: v.id("computeSessions"),

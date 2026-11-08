@@ -185,9 +185,22 @@ export const settle = internalMutation({
       });
       if (conflict || !debit.resolution) {
         if (current) {
+          const existing = current.conflictDebits ?? [];
+          const untracked =
+            current.untrackedConflicts ||
+            (current.reconciliationConflict && !current.conflictDebits);
+          const overflow = conflict && existing.length >= 100;
           await ctx.db.patch("computeSessions", current._id, {
             state: "hold",
-            ...(conflict ? { reconciliationConflict: true } : {}),
+            ...(conflict
+              ? {
+                  reconciliationConflict: true,
+                  conflictDebits: overflow ? existing : [...existing, debitId],
+                  ...(untracked || overflow
+                    ? { untrackedConflicts: true }
+                    : {}),
+                }
+              : {}),
           });
           if (!current.stopConfirmed)
             await ctx.scheduler.runAfter(

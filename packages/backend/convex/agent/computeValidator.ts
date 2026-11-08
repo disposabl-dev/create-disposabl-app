@@ -14,6 +14,8 @@ export const computeSessionFields = {
   stopConfirmed: v.optional(v.boolean()),
   stopLease: v.optional(v.object({ token: v.string(), until: v.number() })),
   reconciliationConflict: v.optional(v.boolean()),
+  conflictDebits: v.optional(v.array(v.id("computeDebits"))),
+  untrackedConflicts: v.optional(v.boolean()),
 };
 export const computeDebitFields = {
   sessionId: v.id("computeSessions"),
@@ -33,6 +35,13 @@ export const computeDebitFields = {
     }),
   ),
   reconciliationConflict: v.optional(v.boolean()),
+  conflictResolution: v.optional(
+    v.object({
+      evidence: v.string(),
+      operator: v.string(),
+      resolvedAt: v.number(),
+    }),
+  ),
   noticeOutcome: v.optional(
     v.union(
       v.literal("queued"),
