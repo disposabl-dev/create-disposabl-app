@@ -1,5 +1,7 @@
 # Convex Auth snapshot
 
+The current catalog selects `convex-auth-437831bd-disposabl.7.tgz`. Its bounded auth-erasure APIs and retained-data limits are documented below. Selection and local tests are not production deployment or complete account-deletion evidence. The `.3` archive and intermediate candidates are preserved as the reproducible source baseline.
+
 `convex-auth-437831bd-disposabl.3.tgz` is `@convex-dev/auth` version `2.0.0-beta.0-reboot.437831bd-disposabl.3`, built from [convex/convex-auth](https://github.com/convex/convex-auth) commit [`437831bdd0990c9faac305f60354e53aec91cd36`](https://github.com/convex/convex-auth/commit/437831bdd0990c9faac305f60354e53aec91cd36), with the changes below. The archive contains source, compiled JavaScript, declarations, and the upstream Apache 2.0 license. SHA-256: `d98796ba391859edcf95892d8a66b919fdd5f4dbc355de3ee68186525d473c87`.
 
 Relative to that commit, the only source changes under `packages/core/src` are:
