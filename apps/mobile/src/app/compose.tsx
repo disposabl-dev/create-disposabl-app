@@ -7,7 +7,9 @@ export default function Compose() {
     <>
       <ScreenCloseButton
         label="Close create app"
-        onPress={() => router.dismissTo("/")}
+        onPress={() =>
+          router.canGoBack() ? router.back() : router.replace("/")
+        }
       />
       <ManagementHome />
     </>
