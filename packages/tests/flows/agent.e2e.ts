@@ -241,6 +241,41 @@ test(
         { admin: true },
       );
       claimed = true;
+      expect(
+        await value(
+          "agent/state:claim",
+          { id, token: randomUUID() },
+          { admin: true },
+        ),
+      ).toBeNull();
+      const attachmentId = await value(
+        "files/index:upload",
+        {
+          filename: "reference.txt",
+          mediaType: "text/plain",
+          bytes: {
+            $bytes: Buffer.from("Project reference fixture").toString("base64"),
+          },
+        },
+        { token: owner.token, action: true },
+      );
+      try {
+        expect(
+          (
+            await call(
+              "agent/attachments:get",
+              { userId: other.id, ids: [attachmentId] },
+              { admin: true },
+            )
+          ).status,
+        ).toBe("error");
+      } finally {
+        await value(
+          "files/index:remove",
+          { id: attachmentId },
+          { token: owner.token, action: true },
+        );
+      }
       const grant = () =>
         value(
           "agent/access:issue",
