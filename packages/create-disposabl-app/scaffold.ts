@@ -18,6 +18,15 @@ import {
   type DisposablConfig,
 } from "./options";
 
+export const authStarterPaths = [
+  "packages/disposabl-kit/client/routes/_auth-pages",
+  "packages/disposabl-kit/client/routes/consent.tsx",
+  "packages/disposabl-kit/client/routes/billing-login.tsx",
+  "packages/disposabl-kit/client/routes/_authenticated/change-password.tsx",
+  "apps/web/src/router/_authenticated/dashboard.api-keys.tsx",
+  "apps/mobile/src/app/(auth)",
+];
+
 export async function createApp(
   template: string,
   destination: string,
@@ -98,14 +107,7 @@ export async function createApp(
     }
     if (!config.features.includes("authentication")) {
       // These are auth screens and starter examples, not backend capabilities.
-      for (const path of [
-        "packages/disposabl-kit/client/routes/_auth-pages",
-        "packages/disposabl-kit/client/routes/consent.tsx",
-        "packages/disposabl-kit/client/routes/billing-login.tsx",
-        "packages/disposabl-kit/client/routes/_authenticated/change-password.tsx",
-        "apps/web/src/router/_authenticated/dashboard.api-keys.tsx",
-        "apps/mobile/src/app/(auth)",
-      ]) {
+      for (const path of authStarterPaths) {
         await rm(join(destination, path), { recursive: true, force: true });
       }
       await writeFile(

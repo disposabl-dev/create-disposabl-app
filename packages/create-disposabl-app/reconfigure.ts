@@ -15,7 +15,7 @@ import {
   selectPlatforms,
   type DisposablConfig,
 } from "./options";
-import { createApp } from "./scaffold";
+import { authStarterPaths, createApp } from "./scaffold";
 import {
   mergePurchasesManifest,
   nativeBillingPath,
@@ -128,7 +128,18 @@ export async function reconfigureApp(
       platforms: oldPlatforms,
       features: oldFeatures,
     });
-    await createApp(template, after, name, combined);
+    const disableAuth =
+      oldFeatures.includes("authentication") &&
+      !config.features.includes("authentication");
+    await createApp(template, after, name, {
+      ...combined,
+      features: disableAuth
+        ? combined.features.filter(
+            (feature) =>
+              !["authentication", "payments", "analytics"].includes(feature),
+          )
+        : combined.features,
+    });
     if (expandedBefore !== before)
       await createApp(template, expandedBefore, name, {
         ...existing,
@@ -207,14 +218,22 @@ export async function reconfigureApp(
     for (const path of oldFiles) {
       if (
         nextFiles.has(path) ||
-        !(path.startsWith(nativeBillingPath) || path === nativeBillingTest)
+        !(
+          path.startsWith(nativeBillingPath) ||
+          path === nativeBillingTest ||
+          (disableAuth &&
+            authStarterPaths.some(
+              (authPath) =>
+                path === authPath || path.startsWith(authPath + sep),
+            ))
+        )
       )
         continue;
       const current = await safeRead(directory, path);
       if (!current) continue;
       if (!current.equals(await readFile(join(before, path))))
         throw new Error(
-          `Cannot disable payments: ${path} was customized. No files were changed.`,
+          `Cannot reconfigure: ${path} was customized. No files were changed.`,
         );
       changes.push({ path });
     }

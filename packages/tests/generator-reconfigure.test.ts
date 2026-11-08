@@ -262,6 +262,20 @@ test(
         features: "none",
         platforms: "web",
       });
+      for (const path of [
+        "packages/disposabl-kit/client/routes/billing-login.tsx",
+        "packages/disposabl-kit/client/routes/_auth-pages/login.tsx",
+        "apps/mobile/src/app/(auth)/login.tsx",
+      ])
+        assert.equal(existsSync(join(app, path)), false, path);
+      assert.match(
+        await read(app, "apps/mobile/src/app/index.tsx"),
+        /PublicHomeScreen/,
+      );
+      assert.match(
+        await read(app, "packages/backend/convex/schema.ts"),
+        /v.literal\("topup"\)/,
+      );
       assert.equal(await read(app, "custom.txt"), "keep me");
       assert.ok(await read(app, "apps/mobile/src/app/index.tsx"));
       await reconfigureApp(template, app, version, {
@@ -333,6 +347,33 @@ test(
         read(app, "packages/disposabl-kit/client/routes/_auth-pages/login.tsx"),
         /ENOENT/,
       );
+    } finally {
+      await rm(temp, { recursive: true, force: true });
+    }
+  },
+);
+
+test(
+  "disabling authentication rejects customized starter routes",
+  { timeout: 30000 },
+  async () => {
+    const temp = await mkdtemp(join(tmpdir(), "reconfigure-auth-removal-"));
+    const app = join(temp, "app");
+    try {
+      await createApp(template, app, "my-app", {
+        version,
+        platforms: ["web", "android", "ios"],
+        features: ["authentication", "payments"],
+      });
+      const path = "packages/disposabl-kit/client/routes/billing-login.tsx";
+      await writeFile(join(app, path), "custom route\n");
+      const config = await read(app, "disposabl.json");
+      await assert.rejects(
+        reconfigureApp(template, app, version, { features: "none" }),
+        /customized/,
+      );
+      assert.equal(await read(app, path), "custom route\n");
+      assert.equal(await read(app, "disposabl.json"), config);
     } finally {
       await rm(temp, { recursive: true, force: true });
     }
