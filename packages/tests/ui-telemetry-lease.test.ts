@@ -159,31 +159,87 @@ test("failed refresh stops capture and cannot revive an expired lease", async ()
   control.stop();
 });
 
-test("lease expiry stops capture while refresh hangs and ignores a late reply", async () => {
-  let calls = 0;
-  let finish!: (response: Response) => void;
+test(
+  "lease expiry stops capture while refresh hangs and ignores a late reply",
+  { timeout: 10_000 },
+  async () => {
+    let calls = 0;
+    let finish!: (response: Response) => void;
+    const events: string[] = [];
+    const control = createTelemetryLeaseController({
+      origin: "http://local",
+      transport: async () => {
+        calls++;
+        return calls === 1
+          ? reply({ expiresAt: Date.now() + 5_100 })
+          : new Promise<Response>((resolve) => {
+              finish = resolve;
+            });
+      },
+      adapter: {
+        start: () => events.push("start"),
+        stop: () => events.push("stop"),
+      },
+    });
+    control.update({ enabled: true, token: null });
+    await new Promise<void>((resolve) => setTimeout(resolve, 5_250));
+    assert.equal(calls, 2);
+    assert.deepEqual(events, ["start", "stop"]);
+    finish(reply());
+    await tick();
+    assert.deepEqual(events, ["start", "stop"]);
+    control.stop();
+  },
+);
+
+test("periodic and same-session refresh renew the adapter without resetting its session", async () => {
   const events: string[] = [];
+  let calls = 0;
   const control = createTelemetryLeaseController({
     origin: "http://local",
     transport: async () => {
       calls++;
-      return calls === 1
-        ? reply({ expiresAt: Date.now() + 5_100 })
-        : new Promise<Response>((resolve) => {
-            finish = resolve;
-          });
+      return reply({
+        identified: true,
+        expiresAt: Date.now() + (calls === 1 ? 5_100 : 30_000),
+      });
     },
     adapter: {
       start: () => events.push("start"),
+      renew: () => events.push("renew"),
       stop: () => events.push("stop"),
     },
   });
-  control.update({ enabled: true, token: null });
-  await new Promise<void>((resolve) => setTimeout(resolve, 5_250));
-  assert.equal(calls, 2);
-  assert.deepEqual(events, ["start", "stop"]);
-  finish(reply());
+  control.update({ enabled: true, token: token("same") + "a" });
+  await new Promise<void>((resolve) => setTimeout(resolve, 250));
+  assert.deepEqual(events, ["start", "renew"]);
+  control.update({ enabled: true, token: token("same") + "b" });
   await tick();
-  assert.deepEqual(events, ["start", "stop"]);
+  assert.deepEqual(events, ["start", "renew", "renew"]);
+  control.update({ enabled: true, token: token("other") });
+  assert.equal(events.at(-1), "stop");
+  await tick();
+  assert.equal(events.at(-1), "start");
+  control.stop();
+});
+
+test("a changed server identity restarts even during a same-session refresh", async () => {
+  let calls = 0;
+  const events: string[] = [];
+  const control = createTelemetryLeaseController({
+    origin: "http://local",
+    transport: async () =>
+      reply({ identified: true, distinctId: `identity-${++calls}` }),
+    adapter: {
+      start: (lease) => events.push(lease.distinctId),
+      renew: () => events.push("renew"),
+      stop: () => events.push("stop"),
+    },
+  });
+  control.update({ enabled: true, token: token("same") + "a" });
+  await tick();
+  control.update({ enabled: true, token: token("same") + "b" });
+  await tick();
+  assert.deepEqual(events, ["identity-1", "stop", "identity-2"]);
   control.stop();
 });

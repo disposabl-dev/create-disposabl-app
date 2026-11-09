@@ -123,6 +123,9 @@ export function ProductTelemetry({
       origin,
       transport: fetch,
       adapter: {
+        renew(lease) {
+          deadline = lease.expiresAt;
+        },
         start(lease) {
           live = true;
           deadline = Math.min(lease.expiresAt, Date.now() + 30_000);

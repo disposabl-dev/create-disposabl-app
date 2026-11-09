@@ -14,6 +14,7 @@ export type TelemetryLease = {
 type Adapter = {
   start: (lease: TelemetryLease) => void;
   stop: () => void;
+  renew?: (lease: TelemetryLease) => void;
 };
 
 const uuid =
@@ -58,6 +59,7 @@ export function createTelemetryLeaseController(options: {
   let refresh: ReturnType<typeof setTimeout> | undefined;
   let expiry: ReturnType<typeof setTimeout> | undefined;
   let active = false;
+  let activeLease: TelemetryLease | undefined;
 
   function stop() {
     generation++;
@@ -65,6 +67,7 @@ export function createTelemetryLeaseController(options: {
     clearTimeout(refresh);
     clearTimeout(expiry);
     refresh = expiry = undefined;
+    activeLease = undefined;
     if (active) {
       active = false;
       try {
@@ -103,9 +106,24 @@ export function createTelemetryLeaseController(options: {
         throw new Error("invalid bootstrap");
       // A delayed response must never extend local authorization past 30 seconds.
       const remaining = Math.min(lease.expiresAt - time, 30_000);
-      if (active) options.adapter.stop();
-      active = true;
-      options.adapter.start(lease);
+      const bounded = { ...lease, expiresAt: time + remaining };
+      const unchanged =
+        active &&
+        activeLease &&
+        activeLease.expiresAt > time &&
+        activeLease.projectToken === lease.projectToken &&
+        activeLease.host === lease.host &&
+        activeLease.distinctId === lease.distinctId &&
+        activeLease.anonymousId === lease.anonymousId &&
+        activeLease.identified === lease.identified;
+      if (unchanged && options.adapter.renew) {
+        options.adapter.renew(bounded);
+      } else {
+        if (active) options.adapter.stop();
+        active = true;
+        options.adapter.start(bounded);
+      }
+      activeLease = bounded;
       anonymousId = lease.anonymousId;
       clearTimeout(refresh);
       clearTimeout(expiry);
@@ -122,7 +140,19 @@ export function createTelemetryLeaseController(options: {
   return {
     update(input: { enabled: boolean; token: string | null }) {
       const changed = token !== input.token;
-      stop();
+      const sameSession =
+        token === input.token ||
+        (token !== null &&
+          input.token !== null &&
+          sessionId(token) !== null &&
+          sessionId(token) === sessionId(input.token));
+      if (input.enabled && sameSession && active) {
+        // Cancel the superseded request, but retain the original expiry fence.
+        generation++;
+        controller?.abort();
+        clearTimeout(refresh);
+        refresh = undefined;
+      } else stop();
       if (
         !input.enabled ||
         (changed &&
