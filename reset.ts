@@ -88,6 +88,7 @@ const productProofTests = [
   "packages/tests/native-inbox-transactions.test.ts",
   "packages/tests/fixtures/native-inbox-convex",
   "packages/tests/low-credit-email-integration.test.ts",
+  "packages/tests/low-credit-elapsed.test.ts",
   "packages/tests/fixtures/low-credit-convex",
 ];
 
