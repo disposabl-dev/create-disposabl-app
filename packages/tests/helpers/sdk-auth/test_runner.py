@@ -40,6 +40,18 @@ with fixture.owned_backend(command, stop_timeout=.25, stdout=fixture.subprocess.
 
 
 class RunnerCancellation(unittest.TestCase):
+    def test_helper_import_without_script_directory(self):
+        result = subprocess.run([
+            sys.executable, '-B', '-c',
+            'import importlib.util,sys; '
+            'spec=importlib.util.spec_from_file_location("sdk_runner",sys.argv[1]); '
+            'module=importlib.util.module_from_spec(spec); '
+            'spec.loader.exec_module(module); '
+            'assert callable(module.owned_backend)',
+            str(Path(__file__).with_name('run.py').resolve()),
+        ], cwd='/tmp', capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
     def check_exit(self, mode, signum=None, repeated=False):
         child_pid = None
         launcher = subprocess.Popen(

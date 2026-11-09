@@ -16,7 +16,6 @@ import urllib.request
 
 ROOT = Path(__file__).resolve().parents[4]
 BINARY = Path.home() / '.cache/convex/binaries/precompiled-2026-10-22-1447815/convex-local-backend'
-from selected_auth import verify_selected_auth
 
 
 # The supervisor stays alive after the command exits. Its PID pins the process
@@ -123,6 +122,8 @@ def owned_backend(command, *, stop_timeout=10, process_group=False, **options):
 
 
 def main():
+    from selected_auth import verify_selected_auth
+
     if shutil.disk_usage('/tmp').free < 2 * 1024**3:
         raise RuntimeError('SDK fixture requires at least 2 GiB free')
     for port in (3530, 3531):
