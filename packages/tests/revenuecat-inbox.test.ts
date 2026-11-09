@@ -24,6 +24,7 @@ import {
   dispatchBalance,
   dispatch,
   routing,
+  inspectReviewDeliveries,
 } from "../disposabl-kit/server/revenuecat-functions";
 
 import { creditQuantity } from "../disposabl-kit/payments/config";
@@ -78,6 +79,27 @@ function fixture() {
         };
         filter(q);
         return {
+          order: (direction: string) => ({
+            paginate: async (opts: {
+              cursor: string | null;
+              numItems: number;
+            }) => {
+              assert.equal(_index, "by_type");
+              assert.equal(direction, "desc");
+              const rows = tables[table]!.filter((row) =>
+                Object.entries(fields).every(
+                  ([key, value]) => row[key] === value,
+                ),
+              ).reverse();
+              const offset = Number(opts.cursor ?? 0);
+              const next = offset + opts.numItems;
+              return {
+                page: rows.slice(offset, next),
+                isDone: next >= rows.length,
+                continueCursor: String(next),
+              };
+            },
+          }),
           take: async (n: number) =>
             tables[table]!.filter((row) =>
               Object.entries(fields).every(
@@ -126,6 +148,72 @@ const scopedClaim = (balanceId: string) => ({
 });
 
 describe("RevenueCat consumable inbox", () => {
+  test("review delivery archive paginates independently of purchase state", async () => {
+    const f = fixture();
+    const id = await balanceId(event);
+    await call(receive, f.ctx, {
+      event: { ...event, type: "cancel" },
+      balanceId: id,
+    });
+    await call(receive, f.ctx, {
+      event: { ...event, deliveryId: "review-1", type: "review" },
+      balanceId: id,
+    });
+    await call(receive, f.ctx, {
+      event: { ...event, deliveryId: "review-2", type: "review" },
+      balanceId: id,
+    });
+    assert.equal(f.tables.revenueCatPurchases![0].state, "tombstone");
+    const first = await call(inspectReviewDeliveries, f.ctx, {
+      paginationOpts: { numItems: 1, cursor: null },
+    });
+    assert.deepEqual(
+      first.page.map((row: PurchaseEvent) => row.deliveryId),
+      ["review-2"],
+    );
+    assert.equal(first.isDone, false);
+    const second = await call(inspectReviewDeliveries, f.ctx, {
+      paginationOpts: { numItems: 1, cursor: first.continueCursor },
+    });
+    assert.deepEqual(
+      second.page.map((row: PurchaseEvent) => row.deliveryId),
+      ["review-1"],
+    );
+    assert.equal(second.isDone, true);
+    const refunded = fixture();
+    await call(receive, refunded.ctx, { event, balanceId: id });
+    await call(claim, refunded.ctx, scopedClaim(id));
+    await call(complete, refunded.ctx, { balanceId: id, kind: "grant" });
+    await call(receive, refunded.ctx, {
+      event: { ...event, deliveryId: "cancel", type: "cancel" },
+      balanceId: id,
+    });
+    await call(confirmFullRefund, refunded.ctx, {
+      balanceId: id,
+      evidence: "case 123",
+    });
+    await call(claim, refunded.ctx, scopedClaim(id));
+    await call(complete, refunded.ctx, { balanceId: id, kind: "refund" });
+    await call(receive, refunded.ctx, {
+      event: { ...event, deliveryId: "reversal", type: "review" },
+      balanceId: id,
+    });
+    assert.equal(refunded.tables.revenueCatPurchases![0].state, "refunded");
+    assert.equal(
+      refunded.tables.revenueCatPurchases![0].refundEvidence,
+      "case 123",
+    );
+    const archive = await call(inspectReviewDeliveries, refunded.ctx, {
+      paginationOpts: { numItems: 1, cursor: null },
+    });
+    assert.equal(archive.page[0].deliveryId, "reversal");
+    await assert.rejects(
+      call(inspectReviewDeliveries, f.ctx, {
+        paginationOpts: { numItems: 101, cursor: null },
+      }),
+      /Page size/,
+    );
+  });
   test("managed monthly events are acknowledged only for valid, disjoint configured routes", async () => {
     const monthly = { app: "app", store: "APP_STORE", product: "monthly" };
     const env = {

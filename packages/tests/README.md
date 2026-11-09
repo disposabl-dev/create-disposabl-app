@@ -31,6 +31,10 @@ The storage fallback flow (`flows/files.e2e.ts`) uses the same loopback/admin re
 
 The connections browser flow additionally exercises invalid Autumn key submission when `E2E_CONNECTIONS_ENABLED=1`. Set a temporary `CONNECTIONS_ENCRYPTION_KEY` on the isolated backend for that run; the invalid input is rejected before any Autumn request. Restore the backend setting afterward.
 
+## Published CLI OAuth qualification
+
+The opt-in `cli-oauth.e2e.ts` flow defaults to a locally bundled CLI. To qualify a previously verified installed artifact, set `E2E_CLI_EXECUTABLE` to its absolute exported executable path and `E2E_CLI_OAUTH=1`, and use an owned fresh backend on 3530/3531 with `E2E_SDK_OWNERSHIP_FILE` as described in `helpers/sdk-auth/README.md`. The executable receives the loopback `DISPOSABL_API_ORIGIN` and a private credential directory. The caller must supervise the isolated web server, enforce outbound isolation and telemetry settings, verify artifact provenance and bytes, and ensure resources are free and exclusively owned. The flow launches login with `--no-browser`, checks the actual loopback callback binding, owner and release, and uses the consent UI. It checks logout and rejection of the revoked token; it does not test expiry or independently invalid tokens. Do not run this against shared or production infrastructure.
+
 ## Email provider verification
 
 `bun run e2e run email-delivery.e2e.ts --target backend --retries 0` tests signup, email verification, a new login, and the verified account. It requires an isolated loopback backend configured with `RESEND_API_KEY` and `RESEND_FROM_EMAIL`, plus `E2E_RESEND_API_KEY` for reading the test message. This explicit provider test sends to a unique `delivered+…@resend.dev` address and polls Resend for that message and consumes one email from the sending quota. It never sends to a person. It skips when the test credential is absent. Keep credentials in the process environment and restore the backend configuration after this run before running username-based fixtures.

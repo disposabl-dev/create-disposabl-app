@@ -1,11 +1,22 @@
 // Public entrypoints exist only in this disposable local test deployment.
 import {
-  mutationGeneric as mutation,
-  queryGeneric as query,
-  internalMutationGeneric as internalMutation,
-  internalQueryGeneric as internalQuery,
+  mutationGeneric,
+  queryGeneric,
+  internalMutationGeneric,
+  internalQueryGeneric,
+  makeFunctionReference,
+  docValidator,
+  paginationOptsValidator,
+  paginationResultValidator,
+  type PaginationOptions,
+  type PaginationResult,
+  type DocumentByName,
+  type DataModelFromSchemaDefinition,
+  type MutationBuilder,
+  type QueryBuilder,
 } from "convex/server";
 import { v } from "convex/values";
+import schema from "./schema";
 import {
   receive,
   claim,
@@ -22,6 +33,26 @@ import {
   resolveRevenueCatRoute,
   selectRevenueCatRoute,
 } from "../../../../disposabl-kit/server/revenuecat-contract";
+
+type DataModel = DataModelFromSchemaDefinition<typeof schema>;
+const mutation: MutationBuilder<DataModel, "public"> = mutationGeneric;
+const query: QueryBuilder<DataModel, "public"> = queryGeneric;
+const internalMutation: MutationBuilder<DataModel, "internal"> =
+  internalMutationGeneric;
+const internalQuery: QueryBuilder<DataModel, "internal"> = internalQueryGeneric;
+
+const reviewRef = makeFunctionReference<
+  "query",
+  { paginationOpts: PaginationOptions },
+  PaginationResult<DocumentByName<DataModel, "revenueCatDeliveries">>
+>("revenuecat:inspectReviewDeliveries");
+export const inspectReviewDeliveries = query({
+  args: { paginationOpts: paginationOptsValidator },
+  returns: paginationResultValidator(
+    docValidator("revenueCatDeliveries", schema.tables.revenueCatDeliveries),
+  ),
+  handler: (ctx, args) => ctx.runQuery(reviewRef, args),
+});
 
 export const user = mutation({
   args: { label: v.string() },
