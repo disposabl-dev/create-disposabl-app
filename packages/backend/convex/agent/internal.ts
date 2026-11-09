@@ -180,7 +180,9 @@ export const abortMessage = internalMutation({
         });
     }
     const status =
-      current.status === "idle" && !current.lease ? "idle" : "stopping";
+      current.status === "idle" && !current.lease && !current.stopUnconfirmed
+        ? "idle"
+        : "stopping";
     await patchThread(ctx, current, {
       pending: [],
       status,

@@ -33,11 +33,12 @@ export const tick = internalAction({
     );
     if (!current) return null;
     const ref = sandboxRef(current.userId);
-    const canWork = async () => {
+    const canWork = async (allowActivation = false) => {
       const access = await computeAccess(
         ctx,
         current.userId,
         current.computeSessionId,
+        allowActivation,
       );
       if (access === "ready") return true;
       await ctx.runMutation(internal.agent.state.finish, {
@@ -175,27 +176,53 @@ export const tick = internalAction({
         userId: current.userId,
         appId: current.appId,
       });
-      if (!(await canWork())) return null;
-      if (!sandbox?.sandboxId)
-        sandbox = await boat.create(ctx, {
-          ...ref,
-          options: {
-            type: "default",
-            ttlSeconds: paymentsEnabled ? 600 : 900,
-            env: agentEnvironment(),
-            // The configured environment supplies the operator's Codex OAuth account.
-            ...(env.BOAT_AGENT_ENVIRONMENT
-              ? { environment: env.BOAT_AGENT_ENVIRONMENT }
-              : { noEnv: true }),
-          },
+      if (!(await canWork(true))) return null;
+      let activationClaimed = false;
+      const activation = current.computeSessionId
+        ? { sessionId: current.computeSessionId, token: lease.token }
+        : undefined;
+      if (paymentsEnabled) {
+        if (!activation) throw new Error("Paid sandbox session is missing.");
+        const decision = await ctx.runMutation(
+          internal.agent.activation.claim,
+          activation,
+        );
+        if (decision === "wait" || decision === "blocked") {
+          await ctx.runMutation(internal.agent.state.finish, {
+            ...lease,
+            ...(decision === "wait" ? { delay: 2000 } : { suspended: true }),
+          });
+          return null;
+        }
+        activationClaimed = decision === "claimed";
+      }
+      const closeArchived = async () => {
+        await ctx.runMutation(internal.agent.activation.archived, {
+          sessionId: activation!.sessionId,
         });
-      else sandbox = await boat.refresh(ctx, ref);
-      if (!(await canWork())) return null;
-      if (sandbox.state === "archived") {
-        try {
-          sandbox = await boat.resume(ctx, {
+        await ctx.runMutation(internal.agent.state.finish, {
+          ...lease,
+          suspended: true,
+        });
+      };
+      try {
+        if (!(await canWork(true))) {
+          if (activationClaimed)
+            await ctx.runMutation(
+              internal.agent.activation.uncertain,
+              activation!,
+            );
+          return null;
+        }
+        if (!sandbox?.sandboxId) {
+          if (paymentsEnabled && !activationClaimed) {
+            await closeArchived();
+            return null;
+          }
+          sandbox = await boat.create(ctx, {
             ...ref,
             options: {
+              type: "default",
               ttlSeconds: paymentsEnabled ? 600 : 900,
               env: agentEnvironment(),
               ...(env.BOAT_AGENT_ENVIRONMENT
@@ -203,10 +230,53 @@ export const tick = internalAction({
                 : { noEnv: true }),
             },
           });
-        } catch (error) {
-          // A timed-out resume may have succeeded remotely.
-          sandbox = await boat.refresh(ctx, ref);
+        } else sandbox = await boat.refresh(ctx, ref);
+        if (sandbox.state === "archived") {
+          if (paymentsEnabled && !activationClaimed) {
+            await closeArchived();
+            return null;
+          }
+          if (!(await canWork(true))) {
+            if (activationClaimed)
+              await ctx.runMutation(
+                internal.agent.activation.uncertain,
+                activation!,
+              );
+            return null;
+          }
+          try {
+            sandbox = await boat.resume(ctx, {
+              ...ref,
+              options: {
+                ttlSeconds: paymentsEnabled ? 600 : 900,
+                env: agentEnvironment(),
+                ...(env.BOAT_AGENT_ENVIRONMENT
+                  ? { environment: env.BOAT_AGENT_ENVIRONMENT }
+                  : { noEnv: true }),
+              },
+            });
+          } catch (error) {
+            // Paid activation keeps its action fence after an ambiguous response.
+            if (paymentsEnabled) throw error;
+            sandbox = await boat.refresh(ctx, ref);
+            if (
+              ![
+                "ready",
+                "idle",
+                "running",
+                "creating",
+                "init",
+                "provisioning",
+                "provisioned",
+                "cloning",
+              ].includes(sandbox.state)
+            )
+              throw error;
+          }
+        }
+        if (activationClaimed) {
           if (
+            !sandbox.sandboxId ||
             ![
               "ready",
               "idle",
@@ -216,10 +286,31 @@ export const tick = internalAction({
               "provisioning",
               "provisioned",
               "cloning",
-            ].includes(sandbox.state)
-          )
-            throw error;
+            ].includes(sandbox.state) ||
+            !(await ctx.runMutation(
+              internal.agent.activation.complete,
+              activation!,
+            ))
+          ) {
+            await ctx.runMutation(
+              internal.agent.activation.uncertain,
+              activation!,
+            );
+            await ctx.runMutation(internal.agent.state.finish, {
+              ...lease,
+              suspended: true,
+            });
+            return null;
+          }
+          activationClaimed = false;
         }
+      } catch (error) {
+        if (activationClaimed)
+          await ctx.runMutation(
+            internal.agent.activation.uncertain,
+            activation!,
+          );
+        throw error;
       }
       if (!(await canWork())) return null;
       if (["error", "deleted", "degraded"].includes(sandbox.state))

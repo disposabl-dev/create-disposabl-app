@@ -11,6 +11,7 @@ import schema from "../schema";
 import { deletionPending } from "../users/deletion";
 import { computeSessionArgs } from "./computeValidator";
 import { assertNoUnconfirmedRuns, hasUnconfirmedRuns } from "./threads";
+import { closeActivation, prepareActivation } from "./activation";
 
 export const WINDOW_MS = 600_000;
 
@@ -83,6 +84,7 @@ export async function sessionAllows(
     session &&
     session.userId === userId &&
     session.state === "active" &&
+    session.activation === "active" &&
     session.paidUntil > now,
   );
 }
@@ -148,6 +150,13 @@ export async function claimWindow(
     session.stopLease
   )
     return null;
+  if (session.state === "starting") {
+    if ((await prepareActivation(ctx, session.userId, sessionId)) !== "ready")
+      return null;
+  } else if (session.activation !== "active") {
+    await closeActivation(ctx, sessionId);
+    return null;
+  }
   if (
     (await deletionPending(ctx, session.userId)) ||
     (await hasUnconfirmedRuns(ctx, session.userId))
@@ -378,6 +387,26 @@ export const stopping = internalMutation({
     )
       return false;
     if (session.stopLease && session.stopLease.until > Date.now()) return false;
+    // Legacy actions may have started create/resume before activation claims existed.
+    if (session.activation !== "active") {
+      const worker = await ctx.db
+        .query("apps")
+        .withIndex("by_userId_agentLeaseUntil", (q) =>
+          q
+            .eq("userId", session.userId)
+            .gt("agent.lease.expiresAt", Date.now()),
+        )
+        .order("desc")
+        .first();
+      if (worker?.agent?.lease) {
+        await ctx.scheduler.runAfter(
+          Math.min(2000, worker.agent.lease.expiresAt - Date.now()),
+          internal.agent.actions.compute.stop,
+          { sessionId },
+        );
+        return false;
+      }
+    }
     if (session.activationLease && session.activationLease.until > Date.now()) {
       await ctx.scheduler.runAt(
         session.activationLease.until,

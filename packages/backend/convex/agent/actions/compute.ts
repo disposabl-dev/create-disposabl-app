@@ -47,6 +47,7 @@ export async function computeAccess(
   ctx: ActionCtx,
   userId: string,
   sessionId?: Id<"computeSessions">,
+  allowActivation = false,
 ): Promise<"ready" | "waiting" | "blocked"> {
   if (await ctx.runQuery(internal.users.internal.deletionPending, { userId }))
     return "blocked";
@@ -62,7 +63,9 @@ export async function computeAccess(
   }
   if (!session || !["starting", "active", "renewing"].includes(session.state))
     return "blocked";
-  return session.state === "active" && session.paidUntil > Date.now()
+  return session.state === "active" &&
+    session.paidUntil > Date.now() &&
+    (allowActivation || session.activation === "active")
     ? "ready"
     : "waiting";
 }
