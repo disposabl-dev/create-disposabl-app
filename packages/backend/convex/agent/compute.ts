@@ -1,3 +1,4 @@
+import { workerArgs } from "./validator";
 import { paymentsEnabled } from "@disposabl/disposabl-kit/features";
 import {
   internalMutation,
@@ -106,6 +107,7 @@ export const claim = internalMutation({
   args: {
     ...computeSessionArgs,
     expectedDebit: v.optional(v.id("computeDebits")),
+    worker: v.optional(v.object(workerArgs)),
   },
   returns: v.union(schema.doc("computeDebits"), v.null()),
   handler: (ctx, args) => claimWindow(ctx, args),
@@ -116,7 +118,12 @@ export async function claimWindow(
   {
     sessionId,
     expectedDebit,
-  }: { sessionId: Id<"computeSessions">; expectedDebit?: Id<"computeDebits"> },
+    worker,
+  }: {
+    sessionId: Id<"computeSessions">;
+    expectedDebit?: Id<"computeDebits">;
+    worker?: { id: string; token: string };
+  },
   enabled = paymentsEnabled,
 ) {
   if (!enabled) return null;
@@ -151,7 +158,10 @@ export async function claimWindow(
   )
     return null;
   if (session.state === "starting") {
-    if ((await prepareActivation(ctx, session.userId, sessionId)) !== "ready")
+    if (
+      (await prepareActivation(ctx, session.userId, sessionId, worker)) !==
+      "ready"
+    )
       return null;
   } else if (session.activation !== "active") {
     await closeActivation(ctx, sessionId);

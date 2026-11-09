@@ -220,7 +220,13 @@ test("old worker lease blocks until expired without blocking current-session lea
       lease: { ...lease, expiresAt: Date.now() + 60000 },
     },
   });
-  assert.equal(await claimActivation(f.ctx, args), "claimed");
+  assert.equal(
+    await claimActivation(f.ctx, {
+      ...args,
+      worker: { id: "own", token: "old" },
+    }),
+    "claimed",
+  );
 });
 test("expired old lease with delivery remains a durable block", async () => {
   const f = fixture();
@@ -267,5 +273,56 @@ test("activation watchdog stops expired claim without issuing a second claim", a
   assert.equal(
     await claimActivation(f.ctx, { ...args, token: "new" }),
     "blocked",
+  );
+});
+
+test("same-session old workers fence activation and stop; only the exact claimant is exempt", async () => {
+  const f = fixture();
+  const own = { id: "own", token: "new-worker" };
+  for (const [id, token] of [
+    ["own", own.token],
+    ["old", "base-worker"],
+  ]) {
+    f.rows.push({
+      _id: id,
+      appId: id,
+      table: "apps",
+      userId: "u",
+      agentRemoteUnresolved: false,
+      agentResumeBusy: true,
+      agent: {
+        threadId: id,
+        computeSessionId: "s",
+        status: "processing",
+        pending: [],
+        updatedAt: 1,
+        lease: { token, expiresAt: Date.now() + 60000, watchdog: "w" },
+      },
+    });
+  }
+  assert.equal(await claimActivation(f.ctx, { ...args, worker: own }), "wait");
+  assert.equal(f.session.activation, "fresh");
+  const old = f.rows.find((x) => x._id === "old");
+  old.agentResumeBusy = false;
+  assert.equal(await claimActivation(f.ctx, { ...args, worker: own }), "wait");
+  old.agentResumeBusy = true;
+  f.session.state = "stopping";
+  assert.equal(
+    await (stopping as any)._handler(f.ctx, { sessionId: "s", token: "stop" }),
+    false,
+  );
+  f.session.state = "active";
+  f.rows.find((x) => x._id === "old").agent.lease.expiresAt = Date.now() - 1;
+  assert.equal(await claimActivation(f.ctx, { ...args, worker: own }), "wait");
+  assert.equal(
+    await claimActivation(f.ctx, {
+      ...args,
+      worker: { ...own, token: "wrong" },
+    }),
+    "wait",
+  );
+  assert.equal(
+    await claimActivation(f.ctx, { ...args, worker: own }),
+    "claimed",
   );
 });

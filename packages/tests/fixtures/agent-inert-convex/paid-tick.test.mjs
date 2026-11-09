@@ -103,7 +103,7 @@ mock.module(paths("attachments.ts"), () => ({
 }));
 const { tick } = await import(paths("actions/run.ts"));
 const { enqueueMessageHandler } = await import(paths("internal.ts"));
-const { finish } = await import(paths("state.ts"));
+const { finish, claim: claimWorker } = await import(paths("state.ts"));
 const { settle, stopping, stopped, workBlocked } = await import(
   paths("compute.ts")
 );
@@ -300,6 +300,7 @@ function make({
       if (name.startsWith("agent/activation:"))
         return activationHandlers[name.split(":")[1]]._handler(ctx, args);
       if (name === "agent/state:claim") {
+        expect(args.activationProtocol).toBe(1);
         state.app.agent.lease = {
           token: args.token,
           expiresAt: Date.now() + 60_000,
@@ -752,4 +753,19 @@ test("lost create or resume responses retain the activation fence before stop", 
       f.state.calls.prompt + f.state.calls.network + f.state.calls.debit,
     ).toBe(0);
   }
+});
+
+test("pre-deployment paid action cannot acquire a new worker lease", async () => {
+  const { context: ctx } = make({ activation: "fresh" });
+  state.app.agent.lease = undefined;
+  const id = state.app.agent.threadId;
+  expect(await claimWorker._handler(ctx, { id, token: "old-code" })).toBeNull();
+  expect(state.app.agent.lease).toBeUndefined();
+  expect(state.calls.create + state.calls.resume).toBe(0);
+  const current = await claimWorker._handler(ctx, {
+    id,
+    token: "current-code",
+    activationProtocol: 1,
+  });
+  expect(current?.lease?.token).toBe("current-code");
 });

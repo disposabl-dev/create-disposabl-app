@@ -10,6 +10,7 @@ import {
   patchThread,
   readThread,
 } from "./threads";
+import { workerArgs } from "./validator";
 import { computeSessionArgs } from "./computeValidator";
 
 // The claiming action itself must make the provider call; handing the token to
@@ -41,6 +42,7 @@ export async function prepareActivation(
   ctx: MutationCtx,
   userId: string,
   sessionId: Id<"computeSessions">,
+  worker?: { id: string; token: string },
 ) {
   const work = await normalizeRemoteWork(ctx, userId);
   if (work.pending) return "wait" as const;
@@ -61,11 +63,15 @@ export async function prepareActivation(
     await closeActivation(ctx, sessionId);
     return "blocked" as const;
   }
-  return classifyResumeSafety(ctx, userId, sessionId);
+  return classifyResumeSafety(ctx, userId, sessionId, worker);
 }
 export async function claimActivation(
   ctx: MutationCtx,
-  args: { sessionId: Id<"computeSessions">; token: string },
+  args: {
+    sessionId: Id<"computeSessions">;
+    token: string;
+    worker?: { id: string; token: string };
+  },
 ) {
   const session = await ctx.db.get("computeSessions", args.sessionId);
   if (
@@ -87,7 +93,12 @@ export async function claimActivation(
     await closeActivation(ctx, args.sessionId);
     return "blocked" as const;
   }
-  const safety = await prepareActivation(ctx, session.userId, args.sessionId);
+  const safety = await prepareActivation(
+    ctx,
+    session.userId,
+    args.sessionId,
+    args.worker,
+  );
   if (safety !== "ready") return safety;
   await ctx.db.patch("computeSessions", args.sessionId, {
     activation: "claimed",
@@ -96,7 +107,7 @@ export async function claimActivation(
   await ctx.scheduler.runAfter(
     ACTION_FENCE_MS,
     internal.agent.activation.expired,
-    args,
+    { sessionId: args.sessionId, token: args.token },
   );
   return "claimed" as const;
 }
@@ -158,7 +169,11 @@ export async function archiveStop(
   return true;
 }
 export const claim = internalMutation({
-  args: { ...computeSessionArgs, token: v.string() },
+  args: {
+    ...computeSessionArgs,
+    token: v.string(),
+    worker: v.optional(v.object(workerArgs)),
+  },
   returns: v.union(
     v.literal("blocked"),
     v.literal("wait"),

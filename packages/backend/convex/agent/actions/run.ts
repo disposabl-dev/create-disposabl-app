@@ -29,7 +29,7 @@ export const tick = internalAction({
     const lease = { id, token: crypto.randomUUID() };
     const current: Infer<typeof thread> | null = await ctx.runMutation(
       internal.agent.state.claim,
-      lease,
+      { ...lease, activationProtocol: 1 },
     );
     if (!current) return null;
     const ref = sandboxRef(current.userId);
@@ -39,6 +39,7 @@ export const tick = internalAction({
         current.userId,
         current.computeSessionId,
         allowActivation,
+        lease,
       );
       if (access === "ready") return true;
       await ctx.runMutation(internal.agent.state.finish, {
@@ -185,7 +186,7 @@ export const tick = internalAction({
         if (!activation) throw new Error("Paid sandbox session is missing.");
         const decision = await ctx.runMutation(
           internal.agent.activation.claim,
-          activation,
+          { ...activation, worker: lease },
         );
         if (decision === "wait" || decision === "blocked") {
           await ctx.runMutation(internal.agent.state.finish, {
