@@ -1,10 +1,20 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { performance } from "node:perf_hooks";
+import { assertOwnedSdkBackend } from "./helpers/sdk-auth/ownership";
 const base = process.env.LOW_CREDIT_ELAPSED_URL;
 if (base && base !== "http://127.0.0.1:3480")
   throw new Error("Requires owned loopback backend 3480");
 const skip = !base || process.env.LOW_CREDIT_ELAPSED !== "1";
+if (!skip) {
+  assertOwnedSdkBackend({
+    markerVariable: "LOW_CREDIT_ELAPSED_OWNERSHIP_FILE",
+    ports: [3480, 3481],
+    claimDirectory: ".elapsed-claimed",
+  });
+}
+test("elapsed fixture ownership verified before mutations", { skip }, () => {});
+
 async function call(
   kind: "query" | "mutation" | "action",
   path: string,

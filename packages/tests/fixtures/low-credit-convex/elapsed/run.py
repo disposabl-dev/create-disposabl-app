@@ -26,10 +26,12 @@ def load(path, name):
 
 
 def main():
+    if sys.argv[1:] not in ([], ['--preflight']):
+        raise RuntimeError('Only --preflight is supported')
     env = {'PATH': os.environ['PATH'], 'HOME': str(Path.home()),
            'CONVEX_LOCAL_BINARY': os.environ.get('CONVEX_LOCAL_BINARY', '')}
     entry = 'import runpy,sys; runpy.run_path(sys.argv[1])["guarded"]()'
-    os.execve('/usr/bin/sandbox-exec', ['sandbox-exec', '-p', PROFILE, sys.executable, '-c', entry, __file__], env)
+    os.execve('/usr/bin/sandbox-exec', ['sandbox-exec', '-p', PROFILE, sys.executable, '-c', entry, __file__, *sys.argv[1:]], env)
 
 
 def guarded():
@@ -61,6 +63,9 @@ def run(runner, owner):
     work = Path(tempfile.mkdtemp(prefix='disposabl-low-credit-elapsed-', dir='/tmp')).resolve()
     work.chmod(0o700)
     (work / 'home').mkdir()
+    marker = work / 'ownership.json'
+    marker.write_text('{}')
+    marker.chmod(0o600)
     shutil.copytree(HERE.parent / 'convex', work / 'convex')
     (work / 'node_modules').symlink_to(ROOT / 'node_modules', target_is_directory=True)
     for path in (work / 'convex').rglob('*.ts'):
@@ -118,6 +123,8 @@ def run(runner, owner):
                 break
             except OSError: time.sleep(.1)
         else: raise RuntimeError('Backend startup timed out')
+        marker.write_text(json.dumps({'version': 1, 'launcherPid': os.getpid(),
+                                      'backendPid': proc.pid, 'database': str(work / 'db.sqlite3')}))
         body = json.dumps({'changes': [{'name': 'E2E_TELEMETRY_DISABLED', 'value': '1'}, {'name': 'BOAT_API_KEY', 'value': ''}]}).encode()
         req = urllib.request.Request('http://127.0.0.1:3480/api/update_environment_variables', data=body,
             headers={'Content-Type': 'application/json', 'Authorization': 'Convex ' + key}, method='POST')
@@ -126,9 +133,14 @@ def run(runner, owner):
         admin = env | {'CONVEX_SELF_HOSTED_URL': 'http://127.0.0.1:3480', 'CONVEX_SELF_HOSTED_ADMIN_KEY': key}
         cli = str(ROOT / 'node_modules/convex/bin/main.js')
         runner.command(owner, ['node', cli, 'dev', '--once', '--typecheck', 'disable'], cwd=work, env=admin, log=work / 'sync.log')
-        testenv = env | {'LOW_CREDIT_ELAPSED_URL': 'http://127.0.0.1:3480', 'LOW_CREDIT_ELAPSED': '1'}
-        runner.command(owner, ['bun', 'test', str(ROOT / 'packages/tests/low-credit-elapsed.test.ts')], cwd=work, env=testenv, log=work / 'tests.log')
-        print('Real elapsed renewal fixture passed', flush=True)
+        testenv = env | {'LOW_CREDIT_ELAPSED_URL': 'http://127.0.0.1:3480', 'LOW_CREDIT_ELAPSED': '1',
+                         'LOW_CREDIT_ELAPSED_OWNERSHIP_FILE': str(marker)}
+        preflight = '--preflight' in sys.argv[1:]
+        command = ['bun', 'test', str(ROOT / 'packages/tests/low-credit-elapsed.test.ts')]
+        if preflight:
+            command.extend(['--test-name-pattern', '^elapsed fixture ownership verified before mutations$'])
+        runner.command(owner, command, cwd=work, env=testenv, log=work / 'tests.log')
+        print('Ownership preflight passed; elapsed test not run' if preflight else 'Real elapsed renewal fixture passed', flush=True)
 
 
 if __name__ == '__main__':
