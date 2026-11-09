@@ -137,13 +137,18 @@ const paidScheduler = (ctx: any) => ({
         "agent/compute:uncertain",
         "agent/actions/compute:stop",
         "agent/actions/compute:notice",
+        "agent/activation:expired",
       ];
       if (!allowed.includes(getFunctionName(ref)))
         throw new Error("Unexpected paid fixture schedule");
       return ctx.scheduler.runAfter(0, anyApi.agentFixture.noop, {});
     },
     runAt: async (_time: number, ref: any) => {
-      if (getFunctionName(ref) !== "agent/compute:boundary")
+      if (
+        !["agent/compute:boundary", "agent/actions/compute:stop"].includes(
+          getFunctionName(ref),
+        )
+      )
         throw new Error("Unexpected paid fixture scheduled boundary");
       return ctx.scheduler.runAfter(0, anyApi.agentFixture.noop, {});
     },
@@ -292,5 +297,305 @@ export const paidExpire = internalMutationGeneric({
   handler: async (ctx, args) => {
     await ctx.db.patch(args.sessionId, { paidUntil: Date.now() - 1 });
     return null;
+  },
+});
+
+import {
+  claimActivation,
+  completeActivation,
+  archiveStop,
+} from "../../../../backend/convex/agent/activation";
+import { stopping } from "../../../../backend/convex/agent/compute";
+export const activationClaim = internalMutationGeneric({
+  args: { sessionId: v.id("computeSessions"), token: v.string() },
+  returns: v.any(),
+  handler: (ctx, args) => claimActivation(paidScheduler(ctx) as any, args),
+});
+export const activationComplete = internalMutationGeneric({
+  args: { sessionId: v.id("computeSessions"), token: v.string() },
+  returns: v.boolean(),
+  handler: (ctx, args) => completeActivation(paidScheduler(ctx) as any, args),
+});
+export const activationArchive = internalMutationGeneric({
+  args: { sessionId: v.id("computeSessions") },
+  returns: v.boolean(),
+  handler: (ctx, args) => archiveStop(paidScheduler(ctx) as any, args),
+});
+export const activationStop = internalMutationGeneric({
+  args: { sessionId: v.id("computeSessions"), token: v.string() },
+  returns: v.boolean(),
+  handler: (ctx, args) => (stopping as any)._handler(paidScheduler(ctx), args),
+});
+export const activationExpireLease = internalMutationGeneric({
+  args: { sessionId: v.id("computeSessions") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const row = await ctx.db.get(args.sessionId);
+    if (!row?.activationLease) throw Error("missing fixture lease");
+    await ctx.db.patch(args.sessionId, {
+      activationLease: { ...row.activationLease, until: Date.now() - 1 },
+    });
+    return null;
+  },
+});
+
+export const activationSeedLegacy = internalMutationGeneric({
+  args: { userId: v.string(), count: v.number() },
+  returns: v.null(),
+  handler: async (ctx, { userId, count }) => {
+    for (let i = 0; i < count; i++)
+      await ctx.db.insert("apps", {
+        userId,
+        appId: `legacy-${userId}-${i}`,
+        name: "Synthetic legacy",
+        platforms: ["web"],
+      });
+    return null;
+  },
+});
+export const activationLegacyDelivery = internalMutationGeneric({
+  args: { userId: v.string(), index: v.number() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const app = await ctx.db
+      .query("apps")
+      .withIndex("by_appId", (q: any) =>
+        q.eq("appId", `legacy-${args.userId}-${args.index}`),
+      )
+      .unique();
+    if (!app) throw Error("missing synthetic app");
+    await ctx.db.patch(app._id, {
+      agent: {
+        threadId: `legacy-${args.index}`,
+        status: "failed",
+        pending: [],
+        updatedAt: Date.now(),
+        delivery: "synthetic-unknown",
+      },
+      agentRemoteUnresolved: undefined,
+      agentResumeBusy: undefined,
+    });
+    return null;
+  },
+});
+
+import {
+  normalizeRemoteWork,
+  patchThread,
+  readThread,
+} from "../../../../backend/convex/agent/threads";
+import {
+  claimDeletionStop,
+  finishDeletionStop,
+} from "../../../../backend/convex/users/internal";
+import { stopped } from "../../../../backend/convex/agent/compute";
+export const activationNormalize = internalMutationGeneric({
+  args: { userId: v.string() },
+  returns: v.any(),
+  handler: (ctx, args) => normalizeRemoteWork(ctx as any, args.userId),
+});
+export const activationPatchApp = internalMutationGeneric({
+  args: { appId: v.string(), userId: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const app = await ctx.db
+      .query("apps")
+      .withIndex("by_appId", (q: any) => q.eq("appId", args.appId))
+      .unique();
+    const thread = readThread(app as any);
+    if (!thread || thread.userId !== args.userId)
+      throw Error("fixture ownership");
+    await patchThread(ctx as any, thread, {
+      delivery: "simultaneous-delivery",
+    });
+    return null;
+  },
+});
+export const activationDrainApp = internalMutationGeneric({
+  args: { appId: v.string(), userId: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const app = await ctx.db
+      .query("apps")
+      .withIndex("by_appId", (q: any) => q.eq("appId", args.appId))
+      .unique();
+    const thread = readThread(app as any);
+    if (!thread || thread.userId !== args.userId)
+      throw Error("fixture ownership");
+    await patchThread(ctx as any, thread, {
+      status: "idle",
+      pending: [],
+      lease: undefined,
+    });
+    return null;
+  },
+});
+export const activationStopComplete = internalMutationGeneric({
+  args: { sessionId: v.id("computeSessions"), token: v.string() },
+  returns: v.any(),
+  handler: (ctx, args) =>
+    (stopped as any)._handler(paidScheduler(ctx), { ...args, archived: true }),
+});
+export const deletionSeed = internalMutationGeneric({
+  args: { userId: v.id("users") },
+  returns: v.any(),
+  handler: async (ctx, { userId }) => {
+    await ctx.db.patch(userId, { deletionRequestedAt: Date.now() });
+    const old = await ctx.db.insert("computeSessions", {
+      userId,
+      state: "active",
+      paidUntil: Date.now() + 60000,
+      activation: "claimed",
+      activationLease: { token: "old", until: Date.now() + 60000 },
+    });
+    await ctx.db.insert("computeSessions", {
+      userId,
+      state: "stopped",
+      paidUntil: 0,
+    });
+    const watchdog = await ctx.scheduler.runAfter(
+      0,
+      anyApi.agentFixture.noop,
+      {},
+    );
+    const app = await ctx.db.insert("apps", {
+      userId,
+      appId: `deletion-${userId}`,
+      name: "fixture",
+      platforms: ["web"],
+      agent: {
+        threadId: "fixture",
+        status: "processing",
+        pending: [],
+        updatedAt: Date.now(),
+        lease: { token: "old-worker", watchdog, expiresAt: Date.now() + 60000 },
+      },
+    });
+    return { old, app };
+  },
+});
+export const deletionExpire = internalMutationGeneric({
+  args: { old: v.id("computeSessions"), app: v.id("apps"), kind: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    if (args.kind === "activation") {
+      const row = await ctx.db.get(args.old);
+      if (!row?.activationLease) throw Error("fixture");
+      await ctx.db.patch(args.old, {
+        activationLease: { ...row.activationLease, until: Date.now() - 1 },
+      });
+    } else {
+      const row = await ctx.db.get(args.app);
+      if (!row?.agent?.lease) throw Error("fixture");
+      await ctx.db.patch(args.app, {
+        agent: {
+          ...row.agent,
+          lease: { ...row.agent.lease, expiresAt: Date.now() - 1 },
+        },
+      });
+    }
+    return null;
+  },
+});
+export const deletionRenewWorker = internalMutationGeneric({
+  args: { app: v.id("apps") },
+  returns: v.null(),
+  handler: async (ctx, { app }) => {
+    const row = await ctx.db.get(app);
+    if (!row?.agent?.lease) throw Error("fixture");
+    await ctx.db.patch(app, {
+      agent: {
+        ...row.agent,
+        lease: { ...row.agent.lease, expiresAt: Date.now() + 60000 },
+      },
+    });
+    return null;
+  },
+});
+export const deletionClaim = internalMutationGeneric({
+  args: { userId: v.id("users"), token: v.string() },
+  returns: v.boolean(),
+  handler: (ctx, args) => (claimDeletionStop as any)._handler(ctx, args),
+});
+export const deletionFinish = internalMutationGeneric({
+  args: { userId: v.id("users"), token: v.string() },
+  returns: v.boolean(),
+  handler: (ctx, args) =>
+    (finishDeletionStop as any)._handler(ctx, {
+      ...args,
+      outcome: "archived_observed",
+    }),
+});
+
+// Model an older lease write that did not update the derived busy flag.
+export const activationSeedWorker = internalMutationGeneric({
+  args: {
+    appId: v.string(),
+    userId: v.string(),
+    sessionId: v.id("computeSessions"),
+    token: v.string(),
+    expire: v.boolean(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const app = await ctx.db
+      .query("apps")
+      .withIndex("by_appId", (q: any) => q.eq("appId", args.appId))
+      .unique();
+    if (!app?.agent || app.userId !== args.userId)
+      throw Error("fixture ownership");
+    const watchdog = await ctx.scheduler.runAfter(
+      3600000,
+      anyApi.agentFixture.noop,
+      {},
+    );
+    await ctx.db.patch(app._id, {
+      agentResumeBusy: false,
+      agentRemoteUnresolved: false,
+      agent: {
+        ...app.agent,
+        computeSessionId: args.sessionId,
+        lease: {
+          token: args.token,
+          watchdog,
+          expiresAt: Date.now() + (args.expire ? -1 : 60000),
+        },
+      },
+    });
+    return null;
+  },
+});
+
+import { claim as workerClaim } from "../../../../backend/convex/agent/state";
+export const paidWorkerClaim = internalMutationGeneric({
+  args: {
+    id: v.string(),
+    token: v.string(),
+    activationProtocol: v.optional(v.literal(1)),
+  },
+  returns: v.any(),
+  handler: async (ctx, args) => {
+    const scheduled: string[] = [];
+    const result = await (workerClaim as any)._handler(
+      {
+        ...ctx,
+        scheduler: {
+          ...ctx.scheduler,
+          runAfter: async (_delay: number, ref: any) => {
+            const name = getFunctionName(ref);
+            if (name !== "agent/actions/run:tick")
+              throw Error("unexpected claim schedule");
+            scheduled.push(name);
+            return ctx.scheduler.runAfter(
+              3600000,
+              anyApi.agentFixture.noop,
+              {},
+            );
+          },
+        },
+      },
+      args,
+    );
+    return { result, scheduled };
   },
 });

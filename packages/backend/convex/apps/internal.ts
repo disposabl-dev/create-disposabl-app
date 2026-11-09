@@ -53,6 +53,8 @@ export const insert = internalMutation({
     );
     const id = await ctx.db.insert("apps", {
       userId: args.userId,
+      agentRemoteUnresolved: false,
+      agentResumeBusy: false,
       appId: args.appId,
       name,
       platforms,

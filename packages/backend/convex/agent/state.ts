@@ -1,3 +1,4 @@
+import { paymentsEnabled } from "@disposabl/disposabl-kit/features";
 import { deletionPending } from "../users/deletion";
 import { saveMessage } from "@convex-dev/agent";
 import { internalMutation } from "@disposabl/disposabl-kit/server/lib/functions";
@@ -20,9 +21,12 @@ async function locked(ctx: MutationCtx, args: { id: string; token: string }) {
 }
 
 export const claim = internalMutation({
-  args: workerArgs,
+  args: { ...workerArgs, activationProtocol: v.optional(v.literal(1)) },
   returns: v.union(thread, v.null()),
-  handler: async (ctx, { id, token }): Promise<Infer<typeof thread> | null> => {
+  handler: async (
+    ctx,
+    { id, token, activationProtocol },
+  ): Promise<Infer<typeof thread> | null> => {
     const current = await getThread(ctx, id);
     if (
       !current ||
@@ -35,6 +39,12 @@ export const claim = internalMutation({
       !["processing", "stopping"].includes(current.status)
     )
       return null;
+    // An action retained across deployment may still use the old unfenced
+    // provider path. Hand queued paid work to the current action before leasing.
+    if (paymentsEnabled && activationProtocol !== 1) {
+      await ctx.scheduler.runAfter(0, internal.agent.actions.run.tick, { id });
+      return null;
+    }
     // A hard timeout may leave a Boat POST accepted without its response saved.
     // Stop that run rather than delivering the same prompt twice.
     const watchdog = await ctx.scheduler.runAfter(
@@ -43,7 +53,12 @@ export const claim = internalMutation({
       { id },
     );
     const patch = {
-      lease: { token, expiresAt: Date.now() + 11 * 60_000, watchdog },
+      lease: {
+        token,
+        expiresAt: Date.now() + 11 * 60_000,
+        watchdog,
+        activationProtocol,
+      },
       ...(current.delivery
         ? {
             status: "stopping" as const,

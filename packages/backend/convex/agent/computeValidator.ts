@@ -11,6 +11,17 @@ export const computeSessionFields = {
     v.literal("hold"),
   ),
   paidUntil: v.number(),
+  activation: v.optional(
+    v.union(
+      v.literal("fresh"),
+      v.literal("claimed"),
+      v.literal("active"),
+      v.literal("uncertain"),
+    ),
+  ),
+  activationLease: v.optional(
+    v.object({ token: v.string(), until: v.number() }),
+  ),
   debitId: v.optional(v.id("computeDebits")),
   stopConfirmed: v.optional(v.boolean()),
   stopLease: v.optional(v.object({ token: v.string(), until: v.number() })),

@@ -45,6 +45,7 @@ export const execution = v.object({
   access: v.optional(v.object({ hash: v.string(), expiresAt: v.number() })),
   lease: v.optional(
     v.object({
+      activationProtocol: v.optional(v.literal(1)),
       token: v.string(),
       expiresAt: v.number(),
       watchdog: v.id("_scheduled_functions"),

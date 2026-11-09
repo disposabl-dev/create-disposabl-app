@@ -33,6 +33,7 @@ test("expired stop is reported unknown and one explicit retry replaces its lease
       },
       query: () => ({
         withIndex: () => ({
+          first: async () => null,
           paginate: async () => ({
             page: [user],
             isDone: true,

@@ -63,9 +63,11 @@ export default defineSchema({
   })
     .index("by_hash", ["hash"])
     .index("by_userId", ["userId"]),
-  computeSessions: defineTable(computeSessionFields).index("by_userId", [
-    "userId",
-  ]),
+  computeSessions: defineTable(computeSessionFields)
+    // Latest-session queries require creation order rather than lease-deadline order.
+    // eslint-disable-next-line @convex-dev/no-duplicate-indexes
+    .index("by_userId", ["userId"])
+    .index("by_userId_activationUntil", ["userId", "activationLease.until"]),
   computeDebits: defineTable(computeDebitFields).index("by_sessionId", [
     "sessionId",
   ]),
@@ -180,6 +182,8 @@ export default defineSchema({
     androidArchitectures: v.optional(v.array(androidArchitecture)),
     features: v.optional(v.array(feature)),
     agent: v.optional(execution),
+    agentRemoteUnresolved: v.optional(v.boolean()),
+    agentResumeBusy: v.optional(v.boolean()),
     posthogProject: v.optional(posthogProject),
     githubOwner: v.optional(v.string()),
     githubRepo: v.optional(v.string()),
@@ -205,6 +209,21 @@ export default defineSchema({
       "agent.status",
     ])
     .index("by_userId_stopUnconfirmed", ["userId", "agent.stopUnconfirmed"])
+    .index("by_userId_agentLeaseUntil", ["userId", "agent.lease.expiresAt"])
+    .index("by_userId_leaseProtocol_until", [
+      "userId",
+      "agent.lease.activationProtocol",
+      "agent.lease.expiresAt",
+    ])
+    .index("by_userId_agentRemoteUnresolved", [
+      "userId",
+      "agentRemoteUnresolved",
+    ])
+    .index("by_userId_resumeBusy_session", [
+      "userId",
+      "agentResumeBusy",
+      "agent.computeSessionId",
+    ])
     .index("by_threadId", ["agent.threadId"])
     .index("by_agentAccessHash", ["agent.access.hash"])
     .index("by_userId_agentUpdatedAt", ["userId", "agent.updatedAt"]),

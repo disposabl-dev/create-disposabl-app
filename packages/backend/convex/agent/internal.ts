@@ -16,7 +16,12 @@ import { ownedApp } from "../apps/internal";
 import { assertActive } from "../apps/operations/internal";
 import { history, historyArgs, result, sendArgs } from "./validator";
 import { requireConnections } from "../connections/config";
-import { readThread, patchThread, assertSessionRebind } from "./threads";
+import {
+  readThread,
+  patchThread,
+  assertSessionRebind,
+  legacyCompleted,
+} from "./threads";
 import { resolvePlatforms } from "@disposabl/disposabl-kit/platforms";
 import { resolveFeatures } from "@disposabl/disposabl-kit/feature-options";
 import { ownedAttachments, attachmentReferences } from "./attachments";
@@ -67,6 +72,8 @@ export async function enqueueMessageHandler(
     const id = await ctx.db.insert("apps", {
       appId,
       userId,
+      agentRemoteUnresolved: false,
+      agentResumeBusy: false,
       name: prompt.slice(0, 80),
       platforms: selectedPlatforms,
       features: selectedFeatures,
@@ -127,18 +134,7 @@ export async function enqueueMessageHandler(
   assertSessionRebind(current, computeSessionId);
   // Before turnCompleted existed, successful completion left the prompt ID on
   // an idle, finished thread. Confirmed aborts cleared it instead.
-  const completed =
-    current.turnCompleted === undefined &&
-    current.status === "idle" &&
-    current.promptId &&
-    current.startedAt &&
-    current.finishedAt &&
-    current.finishedAt >= current.startedAt &&
-    !current.lease &&
-    !current.pending.length &&
-    !current.delivery &&
-    !current.error &&
-    !current.stopUnconfirmed;
+  const completed = legacyCompleted(current);
   await patchThread(ctx, current, {
     computeSessionId,
     ...(computeSessionId !== current.computeSessionId
@@ -184,7 +180,9 @@ export const abortMessage = internalMutation({
         });
     }
     const status =
-      current.status === "idle" && !current.lease ? "idle" : "stopping";
+      current.status === "idle" && !current.lease && !current.stopUnconfirmed
+        ? "idle"
+        : "stopping";
     await patchThread(ctx, current, {
       pending: [],
       status,
