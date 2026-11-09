@@ -152,7 +152,8 @@ export async function capture(
       "other",
       "create",
     ];
-    await send(config, "cli_command", current.userId ?? current.anonymousId, {
+    const distinctId = current.userId ?? current.anonymousId;
+    const properties = {
       product,
       command: allowed.includes(command) ? command : "other",
       outcome,
@@ -167,7 +168,23 @@ export async function capture(
         ? process.platform
         : "other",
       ...(!current.userId ? { $process_person_profile: false } : {}),
-    });
+    };
+    const pending = [send(config, "cli_command", distinctId, properties)];
+    if (outcome === "failure") {
+      // Never pass the thrown error: messages, stacks and paths may contain
+      // credentials or user content. Group this coarse, synthetic exception by
+      // the allowlisted product and command only.
+      pending.push(
+        send(config, "$exception", distinctId, {
+          ...properties,
+          $exception_list: [
+            { type: "CommandFailure", value: "Command failed" },
+          ],
+          $exception_fingerprint: `disposabl-${product}-${properties.command}`,
+        }),
+      );
+    }
+    await Promise.allSettled(pending);
   } catch {
     /* analytics must not affect the command */
   }

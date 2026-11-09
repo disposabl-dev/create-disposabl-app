@@ -351,9 +351,16 @@ async function main() {
   }
 }
 
-await capture(version, "generator", "create", "started", telemetryStatePath());
+const started = capture(
+  version,
+  "generator",
+  "create",
+  "started",
+  telemetryStatePath(),
+);
 try {
   await main();
+  await started;
   await capture(
     version,
     "generator",
@@ -362,6 +369,7 @@ try {
     telemetryStatePath(),
   );
 } catch (error) {
+  await started;
   await capture(
     version,
     "generator",

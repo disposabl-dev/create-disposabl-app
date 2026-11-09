@@ -5,11 +5,37 @@ import { createSdkAnalytics } from "../sdk/src/analytics";
 const inheritedFlags = {
   E2E_TELEMETRY_DISABLED: process.env.E2E_TELEMETRY_DISABLED,
   DO_NOT_TRACK: process.env.DO_NOT_TRACK,
+  DISPOSABL_TELEMETRY_DISABLED: process.env.DISPOSABL_TELEMETRY_DISABLED,
+  NODE_ENV: process.env.NODE_ENV,
+  BUN_ENV: process.env.BUN_ENV,
+  CI: process.env.CI,
 };
 beforeEach(() => {
   // These tests use in-memory sinks only; each opt-out is exercised explicitly.
-  delete process.env.E2E_TELEMETRY_DISABLED;
-  delete process.env.DO_NOT_TRACK;
+  for (const key of Object.keys(inheritedFlags)) delete process.env[key];
+});
+
+test("runtime opt-out and local execution override an explicit production configuration", async () => {
+  const events: unknown[] = [];
+  const analytics = createSdkAnalytics({
+    environment: "production",
+    capture: (event) => {
+      events.push(event);
+    },
+  });
+  for (const [key, value] of Object.entries({
+    NODE_ENV: "development",
+    BUN_ENV: "test",
+    CI: "true",
+    E2E_TELEMETRY_DISABLED: "1",
+    DISPOSABL_TELEMETRY_DISABLED: "1",
+    DO_NOT_TRACK: "true",
+  })) {
+    process.env[key] = value;
+    await analytics.track("appsList", async () => ({}));
+    delete process.env[key];
+  }
+  assert.deepEqual(events, []);
 });
 afterEach(() => {
   for (const [key, value] of Object.entries(inheritedFlags)) {

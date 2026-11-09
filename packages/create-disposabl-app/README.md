@@ -113,4 +113,6 @@ Before publishing the generator, `bun run --cwd packages/create-disposabl-app bu
 
 Published generator releases can collect limited Disposabl usage analytics when centrally configured. They record the generator version, operating system, package-manager category and outcome, using a random ID that can be linked to your Disposabl user ID after login. They do not collect prompts, arguments, paths, error messages, credentials or email. Set `DO_NOT_TRACK=1` or `DISPOSABL_TELEMETRY_DISABLED=1` to opt out. Local source, development, CI and E2E runs do not send events. This is separate from analytics you configure for your own app.
 
+Failed commands also send a fixed, coarse error-tracking event with no exception message or stack trace.
+
 Release builds must receive the central public PostHog project token in `DISPOSABL_CLI_POSTHOG_PROJECT_TOKEN` and its approved ingestion origin in `DISPOSABL_CLI_POSTHOG_HOST`. Both values are embedded at build time; a release build fails if they are missing. `DISPOSABL_CLI_TELEMETRY_REQUIRED=1` enforces this check for development-version qualification builds. Use the central public project token, never a personal API key or a generated app owner’s project token.

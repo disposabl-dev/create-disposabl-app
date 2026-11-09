@@ -223,13 +223,16 @@ export async function runCli(
   }
   const command = argv[2] ?? "help";
   const central = serviceOrigin === SERVICE_ORIGIN;
-  if (central)
-    await capture(version, "cli", command, "started", telemetryStatePath());
+  const started = central
+    ? capture(version, "cli", command, "started", telemetryStatePath())
+    : undefined;
   try {
     await main();
+    await started;
     if (central)
       await capture(version, "cli", command, "success", telemetryStatePath());
   } catch (error) {
+    await started;
     if (central)
       await capture(version, "cli", command, "failure", telemetryStatePath());
     throw error;

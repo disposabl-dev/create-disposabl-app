@@ -238,6 +238,21 @@ test("source, development, tests, opt out and missing or unsafe config emit noth
   expect(telemetryConfig("1.2.3", "/repo/packages/cli/index.ts")).toBeNull();
 });
 
+test("failure emits only a fixed, sanitized exception and command category", async () => {
+  await capture("1.2.3", "cli", "private-prompt-token", "failure", path());
+  expect(requests).toHaveLength(2);
+  expect(requests[1]).toMatchObject({
+    event: "$exception",
+    properties: {
+      command: "other",
+      $exception_list: [{ type: "CommandFailure", value: "Command failed" }],
+      $exception_fingerprint: "disposabl-cli-other",
+    },
+  });
+  expect(JSON.stringify(requests)).not.toContain("private-prompt-token");
+  expect(JSON.stringify(requests)).not.toContain("stacktrace");
+});
+
 test("anonymous events link on login and reset between users with only approved data", async () => {
   process.env.npm_command = "exec";
   await capture("1.2.3", "generator", "create", "started", path());
@@ -304,7 +319,10 @@ test("transport failures do not escape", async () => {
   await expect(
     identify("1.2.3", "user_123", path(), attempt),
   ).resolves.toBeUndefined();
-  expect(calls).toBe(2);
+  await expect(
+    capture("1.2.3", "generator", "create", "failure", path()),
+  ).resolves.toBeUndefined();
+  expect(calls).toBe(4);
 });
 
 test("installed release follows global bin symlinks and rejects source links", async () => {
