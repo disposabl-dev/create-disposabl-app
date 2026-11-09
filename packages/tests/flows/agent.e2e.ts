@@ -292,6 +292,8 @@ test(
           "agent/access:issue",
           {
             id,
+            userId: owner.id,
+            appId,
             token,
             hash: createHash("sha256").update(agentBearer).digest("hex"),
           },

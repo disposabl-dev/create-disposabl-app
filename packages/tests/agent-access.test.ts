@@ -124,7 +124,13 @@ test("only the current unexpired worker can issue access; sandboxes belong to us
       },
     },
   };
-  const args = { id: binding.threadId, token: "lease", hash: "a".repeat(64) };
+  const args = {
+    id: binding.threadId,
+    token: "lease",
+    userId: binding.userId,
+    appId: binding.appId,
+    hash: "a".repeat(64),
+  };
   await (issue as any)._handler(ctx, args);
   assert.equal(patch.agent.access.hash, args.hash);
   assert.equal(JSON.stringify(patch).includes(bearer), false);
@@ -179,6 +185,8 @@ test("pending deletion and missing owners reject active worker credentials", asy
     await assert.rejects(
       (issue as any)._handler(ctx, {
         id: binding.threadId,
+        userId: binding.userId,
+        appId: binding.appId,
         token: "lease",
         hash: "a".repeat(64),
       }),
