@@ -239,6 +239,282 @@ test(
   },
 );
 
+async function manualSetup() {
+  const { userId, appId, threadId } = await call("manualSeed");
+  await call("manualEnqueue", {
+    userId,
+    appId,
+    prompt: "First synthetic message",
+  });
+  const original = (await call("manualApp", { appId }, true)).agent;
+  const oldSession = original.computeSessionId;
+  await call(
+    "fundFixture",
+    { sessionId: oldSession, responseBalance: 20 },
+    false,
+    true,
+  );
+  const first = await call("session", { sessionId: oldSession }, true);
+  assert.equal((await debit(first.debitId)).state, "confirmed");
+  await call("activateFixture", { sessionId: oldSession });
+  assert.ok(await call("manualClaim", { id: threadId, token: "worker" }));
+  await call("manualSetRemote", { userId, appId });
+  const identifiers = (await call("manualApp", { appId }, true)).agent;
+  await call("shortenWindow", {
+    debitId: first.debitId,
+    paidUntil: Date.now() - 1,
+  });
+  await call(
+    "fundFixture",
+    {
+      sessionId: oldSession,
+      expectedDebit: first.debitId,
+      responseBalance: 0,
+      allowed: false,
+    },
+    false,
+    true,
+  );
+  const denied = await call("session", { sessionId: oldSession }, true);
+  assert.equal((await debit(denied.debitId)).state, "denied");
+  assert.equal(denied.state, "stopping");
+  assert.equal(
+    await call("allowed", { sessionId: oldSession, userId }, true),
+    false,
+  );
+  const after = (await call("manualApp", { appId }, true)).agent;
+  for (const key of [
+    "threadId",
+    "conversationId",
+    "promptId",
+    "cursor",
+    "computeSessionId",
+  ])
+    assert.equal(after[key], identifiers[key]);
+  assert.deepEqual(after.pending, identifiers.pending);
+  return { userId, appId, threadId, oldSession, first, denied, identifiers };
+}
+
+async function assertRejectedMessage(f: any, error: RegExp) {
+  const messages = await call("manualMessages", { threadId: f.threadId }, true);
+  assert.equal(messages.isDone, true);
+  assert.ok(messages.page.length > 0);
+  const sessions = await call("manualSessions", { userId: f.userId }, true);
+  assert.ok(sessions.length < 20);
+  await assert.rejects(
+    call("manualEnqueue", {
+      userId: f.userId,
+      appId: f.appId,
+      prompt: "Rejected synthetic message",
+    }),
+    error,
+  );
+  const after = await call("manualMessages", { threadId: f.threadId }, true);
+  assert.equal(after.isDone, true);
+  assert.deepEqual(
+    after.page.map((m: any) => m._id),
+    messages.page.map((m: any) => m._id),
+  );
+  assert.deepEqual(
+    (await call("manualSessions", { userId: f.userId }, true)).map(
+      (s: any) => s._id,
+    ),
+    sessions.map((s: any) => s._id),
+  );
+}
+
+async function confirmSyntheticArchive(f: any) {
+  const token = "synthetic-archived-stop";
+  assert.equal(
+    await call("manualStopClaim", { sessionId: f.oldSession, token }),
+    true,
+  );
+  await call("manualStopComplete", { sessionId: f.oldSession, token });
+  return token;
+}
+
+test(
+  "suspended unresolved work remains blocked after shared stop",
+  { skip },
+  async () => {
+    const before = (await emails()).length;
+    const f = await manualSetup();
+    await assertRejectedMessage(f, /stopping/);
+    const token = await confirmSyntheticArchive(f);
+    assert.equal(
+      (await call("session", { sessionId: f.oldSession }, true)).state,
+      "stopping",
+    );
+    await call("manualFinish", {
+      id: f.threadId,
+      token: "worker",
+      suspended: true,
+    });
+    const unresolved = (await call("manualApp", { appId: f.appId }, true))
+      .agent;
+    assert.equal(unresolved.lease, undefined);
+    assert.equal(unresolved.status, "failed");
+    assert.equal(unresolved.stopUnconfirmed, true);
+    assert.equal(unresolved.conversationId, f.identifiers.conversationId);
+    assert.equal(unresolved.promptId, f.identifiers.promptId);
+    assert.equal(unresolved.cursor, f.identifiers.cursor);
+    assert.equal(unresolved.turnCompleted, undefined);
+    assert.equal(unresolved.pending.length, 0);
+    assert.equal(
+      await call("manualStopClaim", { sessionId: f.oldSession, token }),
+      true,
+    );
+    await call("manualStopComplete", { sessionId: f.oldSession, token });
+    const stopped = await call("session", { sessionId: f.oldSession }, true);
+    assert.equal(stopped.state, "stopped");
+    assert.equal(stopped.stopConfirmed, true);
+    await assertRejectedMessage(
+      f,
+      /not been confirmed stopped|could not be stopped/,
+    );
+    const after = (await call("manualApp", { appId: f.appId }, true)).agent;
+    assert.equal(after.stopUnconfirmed, true);
+    assert.equal(after.promptId, f.identifiers.promptId);
+    assert.equal(after.conversationId, f.identifiers.conversationId);
+    assert.equal((await emails()).length, before);
+  },
+);
+
+test(
+  "confirmed per-run stop and shared stop permit an explicit new message",
+  { skip },
+  async () => {
+    const before = (await emails()).length;
+    const f = await manualSetup();
+    const token = await confirmSyntheticArchive(f);
+    assert.equal(
+      (await call("session", { sessionId: f.oldSession }, true)).state,
+      "stopping",
+    );
+    // A synthetic confirmed per-run stop is distinct from the shared archive response.
+    await call("manualFinish", {
+      id: f.threadId,
+      token: "worker",
+      stopped: true,
+    });
+    const completed = (await call("manualApp", { appId: f.appId }, true)).agent;
+    assert.equal(completed.status, "idle");
+    assert.equal(completed.lease, undefined);
+    assert.equal(completed.promptId, undefined);
+    assert.equal(completed.turnCompleted, true);
+    assert.equal(completed.stopUnconfirmed, undefined);
+    assert.equal(completed.conversationId, f.identifiers.conversationId);
+    assert.equal(
+      await call("manualStopClaim", { sessionId: f.oldSession, token }),
+      true,
+    );
+    await call("manualStopComplete", { sessionId: f.oldSession, token });
+    const stopped = await call("session", { sessionId: f.oldSession }, true);
+    assert.equal(stopped.state, "stopped");
+    assert.equal(stopped.stopConfirmed, true);
+    for (const [kind, error] of [
+      ["lease", /still stopping/],
+      ["pending", /still stopping/],
+      ["processing", /still stopping/],
+      ["delivery", /still stopping/],
+    ] as const) {
+      await call("manualGuard", { appId: f.appId, userId: f.userId, kind });
+      const guarded = (await call("manualApp", { appId: f.appId }, true)).agent;
+      assert.equal(Boolean(guarded.lease), kind === "lease");
+      assert.equal(guarded.pending.length, kind === "pending" ? 1 : 0);
+      assert.equal(
+        guarded.status,
+        kind === "processing" ? "processing" : "idle",
+      );
+      assert.equal(Boolean(guarded.delivery), kind === "delivery");
+      assert.equal(guarded.stopUnconfirmed, undefined);
+      await assertRejectedMessage(f, error);
+      // Enqueue can reject at admission first; exercise the rebind guard separately.
+      await assert.rejects(
+        call("manualRebind", { appId: f.appId }, true),
+        error,
+      );
+    }
+    await call("manualGuard", {
+      appId: f.appId,
+      userId: f.userId,
+      kind: "clear",
+    });
+    assert.equal(await call("manualRebind", { appId: f.appId }, true), null);
+    const oldCount = (
+      await call("debitRequests", { sessionId: f.oldSession }, true)
+    ).length;
+    assert.equal(oldCount, 2);
+    for (const expectedDebit of [f.first.debitId, f.denied.debitId])
+      await call(
+        "fundFixture",
+        { sessionId: f.oldSession, expectedDebit, responseBalance: 0 },
+        false,
+        true,
+      );
+    assert.equal(
+      (await call("debitRequests", { sessionId: f.oldSession }, true)).length,
+      oldCount,
+    );
+    assert.equal(
+      (await call("sessionDebits", { sessionId: f.oldSession }, true)).length,
+      2,
+    );
+    assert.equal(
+      (await call("session", { sessionId: f.oldSession }, true)).state,
+      "stopped",
+    );
+    assert.equal((await emails()).length, before);
+    const next = await call("manualEnqueue", {
+      userId: f.userId,
+      appId: f.appId,
+      prompt: "Resume with a new synthetic message",
+    });
+    const rebound = (await call("manualApp", { appId: f.appId }, true)).agent;
+    assert.equal(next.threadId, f.threadId);
+    assert.equal(rebound.conversationId, f.identifiers.conversationId);
+    assert.notEqual(rebound.computeSessionId, f.oldSession);
+    assert.equal(rebound.pending.length, 1);
+    assert.notEqual(rebound.pending[0], f.identifiers.pending[0]);
+    const newSession = rebound.computeSessionId;
+    await call(
+      "fundFixture",
+      { sessionId: newSession, responseBalance: 4 },
+      false,
+      true,
+    );
+    const funded = await call("session", { sessionId: newSession }, true);
+    assert.equal(funded.state, "active");
+    assert.equal((await debit(funded.debitId)).state, "confirmed");
+    assert.equal(
+      (await call("debitRequests", { sessionId: newSession }, true)).length,
+      1,
+    );
+    await deliver(funded.debitId, 4);
+    await deliver(funded.debitId, 4);
+    assert.equal((await debit(funded.debitId)).noticeOutcome, "queued");
+    assert.equal((await emails()).length, before + 1);
+    await call(
+      "fundFixture",
+      {
+        sessionId: f.oldSession,
+        expectedDebit: f.first.debitId,
+        responseBalance: 0,
+      },
+      false,
+      true,
+    );
+    assert.equal(
+      (await call("debitRequests", { sessionId: f.oldSession }, true)).length,
+      oldCount,
+    );
+    assert.equal(
+      (await call("sessionDebits", { sessionId: newSession }, true)).length,
+      1,
+    );
+  },
+);
+
 test(
   "fresh observation controls inert decisions and duplicates never add a second marker",
   { skip },
