@@ -197,7 +197,7 @@ try {
     });
     await page.waitForTimeout(300);
   }
-  await page.goto("https://fixture.invalid/", {
+  await page.goto("https://fixture.invalid/?x=SECRET_QUERY_91#SECRET_HASH_91", {
     waitUntil: "domcontentloaded",
   });
   await page.waitForFunction(
@@ -207,6 +207,12 @@ try {
     (await page.locator("body").innerText()).length > 50,
     "public application did not render",
   );
+  await page.evaluate(() => {
+    const node = document.createElement("section");
+    node.innerHTML =
+      '<p data-seeded="SECRET_PUBLIC_ATTR_91">SECRET_PUBLIC_TEXT_91</p><input value="SECRET_PUBLIC_INPUT_91"><img src="https://image.invalid/SECRET_IMAGE_91"><iframe src="https://image.invalid/SECRET_IFRAME_91"></iframe><canvas></canvas><private-app-content-marker data-sensitive>SECRET_PRIVATE_91</private-app-content-marker>';
+    document.body.append(node);
+  });
   await page.locator("body").click({ position: { x: 15, y: 100 } });
   await page.waitForTimeout(3000);
   const link = page.locator('a[href="/login"]:visible').first();
@@ -322,6 +328,11 @@ try {
       "SECRET_CLIENT_91",
       "SECRET_DEVICE_CODE_91",
       "SECRET_AFTER_OPTOUT_91",
+      "SECRET_PUBLIC_ATTR_91",
+      "SECRET_PUBLIC_TEXT_91",
+      "SECRET_PUBLIC_INPUT_91",
+      "SECRET_IMAGE_91",
+      "SECRET_IFRAME_91",
       "private-app-content-marker",
     ])
       assert.equal(
