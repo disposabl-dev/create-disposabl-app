@@ -14,7 +14,7 @@ def load(path, name):
 
 def main():
     binary = os.environ.get('CONVEX_LOCAL_BINARY', str(pathlib.Path.home()/'.cache/convex/binaries/precompiled-2026-10-22-1447815/convex-local-backend'))
-    env = {'PATH': os.environ['PATH'], 'CONVEX_LOCAL_BINARY': binary, 'AGENT_CACHED_MODULES': os.environ.get('AGENT_CACHED_MODULES', '/Users/vivekbezawada/Startups/create-disposabl-app/node_modules'), 'AGENT_SOURCE_REVISION': os.environ.get('AGENT_SOURCE_REVISION', '')}
+    env = {'PATH': os.environ['PATH'], 'CONVEX_LOCAL_BINARY': binary, 'AGENT_CACHED_MODULES': os.environ.get('AGENT_CACHED_MODULES', '/Users/vivekbezawada/Startups/create-disposabl-app/node_modules'), 'AGENT_SOURCE_REVISION': os.environ.get('AGENT_SOURCE_REVISION', ''), 'AGENT_LEGACY_ACTION': os.environ.get('AGENT_LEGACY_ACTION', '')}
     entry = 'import runpy,sys; runpy.run_path(sys.argv[1])["guarded"]()'
     os.execve('/usr/bin/sandbox-exec', ['sandbox-exec','-p',PROFILE,sys.executable,'-c',entry,__file__], env)
 
@@ -41,14 +41,14 @@ def run(runner, owner):
     sha = runner.command(owner,['git','rev-parse','HEAD'],cwd=ROOT).strip()
     if len(os.environ['AGENT_SOURCE_REVISION']) != 40 or sha != os.environ['AGENT_SOURCE_REVISION']: raise RuntimeError('Set AGENT_SOURCE_REVISION to the exact checked-out commit')
     changed=runner.command(owner,['git','status','--porcelain'],cwd=ROOT).splitlines()
-    allowed={'packages/tests/fixtures/agent-inert-convex/'+name for name in ('agentFixture.ts','paid-test.py','run.py','README.md')}
+    allowed={'packages/tests/fixtures/agent-inert-convex/'+name for name in ('agentFixture.ts','paid-test.py','run.py','README.md','legacy-action.test.mjs')}
     if any(line[3:] not in allowed for line in changed): raise RuntimeError('Unexpected checkout changes')
     work = pathlib.Path(tempfile.mkdtemp(prefix='disposabl-agent-owned-',dir='/tmp')).resolve(); work.chmod(0o700)
     source = work/'source'; source.mkdir()
     print(f'source {sha}; auth {auth["sha256"]} ({auth["files"]} files); artifacts {work}',flush=True)
     runner.command(owner,['git','archive','--format=tar','--output',str(work/'source.tar'),sha],cwd=ROOT)
     runner.command(owner,['tar','-xf',str(work/'source.tar'),'-C',str(source)])
-    for name in ('agentFixture.ts','paid-test.py','run.py','README.md'):
+    for name in ('agentFixture.ts','paid-test.py','run.py','README.md','legacy-action.test.mjs'):
         shutil.copyfile(HERE/name,source/'packages/tests/fixtures/agent-inert-convex'/name)
     modules=source/'node_modules'; modules.mkdir()
     for dep in deps.iterdir():
@@ -64,6 +64,31 @@ def run(runner, owner):
     fixture=source/'packages/backend/convex/agentFixture.ts'
     code=(source/'packages/tests/fixtures/agent-inert-convex/agentFixture.ts').read_text()
     fixture.write_text(code.replace('../../../../backend/convex/agent/','./agent/').replace('../../../../backend/convex/users/','./users/'))
+    legacy = os.environ['AGENT_LEGACY_ACTION'] == '1'
+    if legacy:
+        import re, hashlib
+        old='31b8c62ddc169d46d35b20210b0b36b3bffd2610'
+        runtime=source/'packages/tests/fixtures/agent-inert-convex/runtime'; runtime.mkdir()
+        for name, path in [('oldRun.ts','agent/actions/run.ts'),('oldCompute.ts','agent/actions/compute.ts'),('oldState.ts','agent/state.ts')]:
+            blob=subprocess.check_output(['git','show',f'{old}:packages/backend/convex/{path}'],cwd=ROOT)
+            print(f'legacy {path} sha256 {hashlib.sha256(blob).hexdigest()}',flush=True)
+            if name == 'oldState.ts':
+                (source/'packages/backend/convex/agent/legacyState.ts').write_bytes(blob)
+            else:
+                original=source/'packages/backend/convex'/path
+                def rebase(match):
+                    value=match.group(1)
+                    target=runtime/'oldCompute.ts' if name=='oldRun.ts' and value=='./compute' else (original.parent/value).resolve()
+                    return '"'+str(target)+'"'
+                (runtime/name).write_text(re.sub(r'"(\.{1,2}/[^"\n]+)"',rebase,blob.decode()))
+        with fixture.open('a') as out:
+            out.write("""
+import { claim as legacyClaimHandler } from './agent/legacyState';
+import { finish as currentFinish } from './agent/state';
+export const legacyClaim = internalMutationGeneric({ args: { id: v.string(), token: v.string() }, returns: v.any(), handler: (ctx, args) => (legacyClaimHandler as any)._handler(paidScheduler(ctx), args) });
+export const legacyFinish = internalMutationGeneric({ args: { id: v.string(), token: v.string(), delay: v.optional(v.number()), suspended: v.optional(v.boolean()), error: v.optional(v.string()) }, returns: v.any(), handler: (ctx, args) => (currentFinish as any)._handler(paidScheduler(ctx), args) });
+""")
+        config=source/'disposabl.json'; data=json.loads(config.read_text()); data['features'].append('payments'); config.write_text(json.dumps(data))
     name='agent-owned'; secret=secrets.token_hex(32)
     key=runner.command(owner,[str(binary),'keygen','admin-key','--instance-name',name,'--instance-secret',secret],env=env).strip()
     marker=work/'ownership.json'; marker.write_text('{}'); marker.chmod(0o600)
@@ -81,7 +106,7 @@ def run(runner, owner):
                 pids=subprocess.check_output(['lsof','-nP','-t',f'-iTCP:{port}','-sTCP:LISTEN'],text=True).split()
                 if set(pids)!={str(proc.pid)}: raise RuntimeError(f'Port {port} not exclusively owned')
         check_owner()
-        marker.write_text(json.dumps({'launcher':os.getpid(),'backend':proc.pid,'database':str(work/'db.sqlite3')}))
+        marker.write_text(json.dumps({'version':1,'launcherPid':os.getpid(),'backendPid':proc.pid,'launcher':os.getpid(),'backend':proc.pid,'database':str(work/'db.sqlite3')}))
         body=json.dumps({'changes':[{'name':'E2E_TELEMETRY_DISABLED','value':'1'},{'name':'BOAT_API_KEY','value':''}]}).encode()
         req=urllib.request.Request('http://127.0.0.1:3540/api/update_environment_variables',data=body,headers={'Content-Type':'application/json','Authorization':'Convex '+key},method='POST')
         with urllib.request.urlopen(req,timeout=10) as response:
@@ -95,6 +120,10 @@ def run(runner, owner):
         def command(argv,cwd,log,childenv):
             check_owner(); runner.command(owner,argv,cwd=cwd,env=childenv,log=work/log)
         command(['node',cli,'dev','--once','--typecheck','disable','--codegen','disable'],backend,'sync.log',admin)
+        if legacy:
+            command(['bun','test',str(source/'packages/tests/fixtures/agent-inert-convex/legacy-action.test.mjs')],source,'legacy-action.log',testenv|{'AGENT_FIXTURE_SOURCE':str(source)})
+            print('Legacy action regression passed',flush=True)
+            return
         command(['bun','run','e2e','run','agent.e2e.ts','--target','backend','--retries','0'],source,'e2e.log',testenv)
         command(['python3',str(source/'packages/tests/fixtures/agent-inert-convex/paid-test.py')],source,'paid.log',testenv)
         config=source/'disposabl.json'; data=json.loads(config.read_text()); data['features'].append('payments'); config.write_text(json.dumps(data))
