@@ -125,11 +125,26 @@ export async function enqueueMessageHandler(
   });
   const computeSessionId = await admitSession(ctx, userId, paid);
   assertSessionRebind(current, computeSessionId);
+  // Before turnCompleted existed, successful completion left the prompt ID on
+  // an idle, finished thread. Confirmed aborts cleared it instead.
+  const completed =
+    current.turnCompleted === undefined &&
+    current.status === "idle" &&
+    current.promptId &&
+    current.startedAt &&
+    current.finishedAt &&
+    current.finishedAt >= current.startedAt &&
+    !current.lease &&
+    !current.pending.length &&
+    !current.delivery &&
+    !current.error &&
+    !current.stopUnconfirmed;
   await patchThread(ctx, current, {
     computeSessionId,
     ...(computeSessionId !== current.computeSessionId
       ? { promptId: undefined, delivery: undefined }
       : {}),
+    ...(completed ? { promptId: undefined, turnCompleted: true } : {}),
     pending: [...current.pending, messageId],
     status: "processing",
     ...(current.status !== "processing"
