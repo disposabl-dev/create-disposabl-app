@@ -5,21 +5,18 @@ set +x
 verify_source() {
   [[ "${GITHUB_REF:-}" == refs/heads/main && "${EXPECTED_SOURCE_SHA:-}" =~ ^[0-9a-f]{40}$ ]] || { echo 'Expected a full main commit SHA' >&2; return 1; }
   [[ "$(git rev-parse HEAD)" == "$EXPECTED_SOURCE_SHA" && "${GITHUB_SHA:-}" == "$EXPECTED_SOURCE_SHA" ]] || { echo 'Checkout does not match requested source' >&2; return 1; }
-  if [[ "${1:-}" == submission ]]; then
-    # Finish the active, serialized release even if another push is queued.
-    # A rewritten main must not authorize an unrelated artifact.
-    case "$(gh api "repos/$GITHUB_REPOSITORY/compare/$EXPECTED_SOURCE_SHA...main" --jq .status)" in
-      ahead|identical) ;;
-      *) echo 'Build source is no longer on main' >&2; return 1 ;;
-    esac
-  else
-    [[ "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)" == "$EXPECTED_SOURCE_SHA" ]] || { echo 'Main moved or cannot be verified' >&2; return 1; }
-  fi
+  # Build and submit the immutable queued release even after main advances.
+  # Fail closed if main was rewritten or the ancestry lookup fails.
+  local comparison
+  comparison=$(gh api "repos/$GITHUB_REPOSITORY/compare/$EXPECTED_SOURCE_SHA...main" --jq .status) || { echo 'Cannot verify build source on main' >&2; return 1; }
+  case "$comparison" in
+    ahead|identical) ;;
+    *) echo 'Build source is no longer on main' >&2; return 1 ;;
+  esac
 }
 
 case "${1:-}" in
-  verify-source) verify_source ;;
-  verify-submission-source) verify_source submission ;;
+  verify-source|verify-submission-source) verify_source ;;
   build)
     verify_source
     [[ "${UPDATE_POLICY:-}" == disabled && -z "${EXPO_PROJECT_ID:-}" ]] || { echo 'Production updates must remain disabled' >&2; exit 1; }

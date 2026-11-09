@@ -280,7 +280,7 @@ jobs:
       CI: "1"
     steps:
       - *checkout
-      - name: Verify exact current main
+      - name: Verify release source remains on main
         run: bash .github/scripts/play-bundle.sh verify-source
       - *node
       - *bun

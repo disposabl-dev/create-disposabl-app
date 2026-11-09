@@ -1,27 +1,21 @@
 import os,subprocess,tempfile,pathlib,json,textwrap
 root=pathlib.Path(__file__).resolve().parents[2]
 tmp=pathlib.Path(tempfile.mkdtemp(prefix='play-bundle-inert-')); b=tmp/'bin';b.mkdir(); sha='a'*40
-scripts={'git':f'#!/bin/sh\necho {sha}\n','gh':f'#!/bin/sh\necho {sha}\n','bun':'#!/bin/sh\nprintf \'%s\\n\' \'{"android":{"package":"com.yastai.disposabl"},"extra":{"disposablAndroidPayments":false,"disposablAndroidArchitectures":["arm64-v8a","x86_64"]},"updates":{}}\'\n','node':'#!/bin/sh\ntest -f "$ANDROID_KEYSTORE_PATH"\ntest "$PLAY_UPLOAD_CERT_SHA256" = BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB\necho helper-invoked\n'}
+scripts={'git':f'#!/bin/sh\necho {sha}\n','gh':'#!/bin/sh\ncase "$*" in *compare*) echo "${COMPARISON-identical}" ;; *) echo "${MAIN_SHA:-'+sha+'}" ;; esac\nexit "${GH_EXIT:-0}"\n','bun':'#!/bin/sh\nprintf \'%s\\n\' \'{"android":{"package":"com.yastai.disposabl"},"extra":{"disposablAndroidPayments":false,"disposablAndroidArchitectures":["arm64-v8a","x86_64"]},"updates":{}}\'\n','node':'#!/bin/sh\ntest -f "$ANDROID_KEYSTORE_PATH"\ntest "$PLAY_UPLOAD_CERT_SHA256" = BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB\necho helper-invoked\n'}
 for name,data in scripts.items(): p=b/name;p.write_text(data);p.chmod(0o755)
 e={**os.environ,'PATH':str(b)+':/usr/bin:/bin','STORAGE_BUDGET_VERIFIED':'true','GITHUB_REF':'refs/heads/main','EXPECTED_SOURCE_SHA':sha,'GITHUB_SHA':sha,'GITHUB_REPOSITORY':'example/repo','UPDATE_POLICY':'disabled','EXPO_PROJECT_ID':'','EXPO_PUBLIC_DISPOSABL_ANALYTICS_ENABLED':'true','PLAY_UPLOAD_CERT_SHA256':'B'*64,'RUNNER_TEMP':str(tmp),'DISPOSABL_ANDROID_SIGNING':json.dumps({'keystoreBase64':'YQ==','storePassword':'synthetic-secret-one','keyAlias':'synthetic-secret-two','keyPassword':'synthetic-secret-three'})}
-for case,overrides,ok in [('valid',{},True),('wrong-sha',{'GITHUB_SHA':'b'*40},False),('analytics-disabled',{'EXPO_PUBLIC_DISPOSABL_ANALYTICS_ENABLED':'false'},False),('wrong-ref',{'GITHUB_REF':'refs/heads/other'},False),('bad-policy',{'UPDATE_POLICY':'expo'},False),('bad-signing',{'DISPOSABL_ANDROID_SIGNING':'{}'},False),('e2e',{'EXPO_PUBLIC_E2E':'true'},False)]:
+for case,overrides,ok in [('valid',{},True),('queued-main',{'COMPARISON':'ahead','MAIN_SHA':'b'*40},True),('rewritten-main',{'COMPARISON':'diverged'},False),('api-failure',{'GH_EXIT':'1'},False),('wrong-sha',{'GITHUB_SHA':'b'*40},False),('analytics-disabled',{'EXPO_PUBLIC_DISPOSABL_ANALYTICS_ENABLED':'false'},False),('wrong-ref',{'GITHUB_REF':'refs/heads/other'},False),('bad-policy',{'UPDATE_POLICY':'expo'},False),('bad-signing',{'DISPOSABL_ANDROID_SIGNING':'{}'},False),('e2e',{'EXPO_PUBLIC_E2E':'true'},False)]:
  r=subprocess.run(['bash',str(root/'.github/scripts/play-bundle.sh'),'build'],cwd=root,env={**e,**overrides},capture_output=True,text=True)
  assert (r.returncode==0)==ok,(case,r.returncode,r.stderr)
  assert not (tmp/'play-upload.jks').exists(),case
  if ok: assert 'helper-invoked' in r.stdout
  print(case,'PASS')
-# The active serialized release may finish after main advances, but a forced
-# rewrite must not authorize its artifact. New builds still require current main.
-(b/'gh').write_text('#!/bin/sh\ncase "$*" in *compare*) echo "$COMPARISON" ;; *) echo "$MAIN_SHA" ;; esac\n')
-for command,status,main,ok in [
- ('verify-source','ahead','b'*40,False),
- ('verify-submission-source','ahead','b'*40,True),
- ('verify-submission-source','identical',sha,True),
- ('verify-submission-source','diverged','b'*40,False),
- ('verify-submission-source','behind','b'*40,False),
-]:
- r=subprocess.run(['bash',str(root/'.github/scripts/play-bundle.sh'),command],cwd=root,env={**e,'COMPARISON':status,'MAIN_SHA':main},capture_output=True,text=True)
- assert (r.returncode==0)==ok,(command,status,r.stderr)
+# Every stage verifies the immutable event checkout remains on main, including
+# builds that were queued while a newer push advanced main.
+for command in ['verify-source', 'verify-submission-source']:
+ for status,api_exit,ok in [('ahead','0',True),('identical','0',True),('diverged','0',False),('behind','0',False),('','0',False),('unknown','0',False),('ahead','1',False)]:
+  r=subprocess.run(['bash',str(root/'.github/scripts/play-bundle.sh'),command],cwd=root,env={**e,'COMPARISON':status,'GH_EXIT':api_exit},capture_output=True,text=True)
+  assert (r.returncode==0)==ok,(command,status,api_exit,r.stderr)
 print('source succession PASS')
 workflow=(root/'.github/workflows/pipeline.yml').read_text()
 assert not (root/'.github/workflows/play-bundle.yml').exists()
