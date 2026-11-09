@@ -163,7 +163,7 @@ test("bundle verification rejects identity, ABI, signer and signature mismatches
     ).toThrow("ABI mismatch");
     expect(() =>
       verifyBundle({ ...args, expectedCert: "BB".repeat(32) }),
-    ).toThrow("signer does not match");
+    ).toThrow("signer does not match expected signing certificate");
     process.env.BAD_SIGNATURE = "1";
     expect(() => verifyBundle(args)).toThrow("signature verification failed");
   } finally {
@@ -204,4 +204,100 @@ test("Play build rejects stale version and E2E configuration before signing", ()
   });
   expect(e2e.status).not.toBe(0);
   expect(e2e.stderr).toContain("E2E builds cannot be uploaded");
+});
+
+test("candidate build derives signer while optional Play checks fail closed", () => {
+  const mobile = mkdtempSync(join(tmpdir(), "play-candidate-"));
+  try {
+    mkdirSync(join(mobile, "scripts"));
+    mkdirSync(join(mobile, "bin"));
+    for (const file of [
+      "play-aab.mjs",
+      "verify-play-aab.mjs",
+      "fresh-android.mjs",
+    ])
+      copyFileSync(
+        fileURLToPath(new URL(file, import.meta.url)),
+        join(mobile, "scripts", file),
+      );
+    const config = JSON.stringify({
+      android: { package: "app.test", versionCode: 5 },
+      scheme: "test",
+      extra: {
+        disposablAndroidArchitectures: ["arm64-v8a", "x86_64"],
+        disposablAndroidPayments: false,
+      },
+    });
+    const commands = {
+      keytool: `if [ "$1" = -printcert ] && [ "\${BAD_BUNDLE_CERT:-}" = 1 ]; then printf 'SHA256: ${Array(32).fill("BB").join(":")}\\n'; else printf 'SHA256: ${Array(32).fill("AA").join(":")}\\n'; fi`,
+      bun: `if [ "$4" = config ]; then printf '%s' '${config}'; else mkdir -p android/app; printf "applicationId 'app.test'\\nversionCode 5\\n" > android/app/build.gradle; printf '#!/bin/sh\\nmkdir -p app/build/outputs/bundle/release\\nprintf fixture > app/build/outputs/bundle/release/app-release.aab\\n' > android/gradlew; chmod +x android/gradlew; fi`,
+      unzip: `if [ "$1" = -p ]; then printf '%s' '${config}'; else printf 'base/lib/arm64-v8a/liba.so\\nbase/lib/x86_64/liba.so\\n'; fi`,
+      java: `if [ "$3" = dump ]; then printf '<manifest package="app.test" android:versionCode="5"><uses-sdk android:targetSdkVersion="36"/></manifest>'; fi`,
+      jarsigner: "printf 'jar verified.'",
+    };
+    for (const [name, body] of Object.entries(commands)) {
+      const path = join(mobile, "bin", name);
+      writeFileSync(path, `#!/bin/sh\n${body}\n`);
+      chmodSync(path, 0o755);
+    }
+    const input = join(mobile, "input");
+    writeFileSync(input, "fixture");
+    const env = {
+      PATH: `${join(mobile, "bin")}:${process.env.PATH}`,
+      PLAY_PACKAGE_ID: "app.test",
+      DISPOSABL_ANDROID_VERSION_CODE: "5",
+      EXPO_PUBLIC_CONVEX_URL: "https://backend.example.test",
+      EXPO_PUBLIC_CONVEX_SITE_URL: "https://site.example.test",
+      ANDROID_KEYSTORE_PATH: input,
+      ANDROID_KEYSTORE_PASSWORD: "fixture",
+      ANDROID_KEY_ALIAS: "fixture",
+      ANDROID_KEY_PASSWORD: "fixture",
+      BUNDLETOOL_JAR: input,
+    };
+    const run = (extra) =>
+      spawnSync(process.execPath, [join(mobile, "scripts/play-aab.mjs")], {
+        env: { ...env, ...extra },
+        encoding: "utf8",
+      });
+    const unchecked = run({});
+    expect(unchecked.status).toBe(0);
+    const result = JSON.parse(
+      unchecked.stdout.slice(unchecked.stdout.indexOf("{")),
+    );
+    expect(result.signingCertificateSha256).toBe("AA".repeat(32));
+    expect(result.signingCertificateSource).toBe("selected keystore");
+    expect(result.playUploadCertificate).toBe("unchecked");
+    expect(result.playPreviousVersion).toBe("unchecked");
+    expect(result.uploadCertificateSha256).toBeUndefined();
+    const matched = run({
+      PLAY_UPLOAD_CERT_SHA256: "AA".repeat(32),
+      PLAY_PREVIOUS_VERSION_CODE: "4",
+    });
+    expect(matched.status).toBe(0);
+    expect(matched.stdout).toContain("matched supplied fingerprint");
+    for (const [extra, message] of [
+      [
+        { BAD_BUNDLE_CERT: "1" },
+        "Bundle signer does not match expected signing certificate",
+      ],
+      [{ PLAY_UPLOAD_CERT_SHA256: ":" }, "Invalid upload certificate"],
+      [
+        { PLAY_UPLOAD_CERT_SHA256: "BB".repeat(32) },
+        "does not match verified Play",
+      ],
+      [{ PLAY_PREVIOUS_VERSION_CODE: "bad" }, "Invalid previous Play"],
+      [{ PLAY_PREVIOUS_VERSION_CODE: "5" }, "greater than the verified Play"],
+      [
+        { DISPOSABL_ANDROID_VERSION_CODE: "2100000001" },
+        "Invalid candidate version",
+      ],
+      [{ DISPOSABL_ANDROID_VERSION_CODE: "0" }, "Invalid candidate version"],
+    ]) {
+      const failed = run(extra);
+      expect(failed.status).not.toBe(0);
+      expect(failed.stderr).toContain(message);
+    }
+  } finally {
+    rmSync(mobile, { recursive: true, force: true });
+  }
 });
