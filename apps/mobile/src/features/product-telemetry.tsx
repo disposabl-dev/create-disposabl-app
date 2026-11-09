@@ -146,6 +146,8 @@ export function ProductTelemetry({
               isIdentifiedId: lease.identified,
             },
             captureAppLifecycleEvents: false,
+            capturePushNotificationSubscriptions: false,
+            capturePushNotificationOpened: false,
             errorTracking: { autocapture: false },
             rageClickConfig: { enabled: false },
             enableSessionReplay: false,
@@ -208,7 +210,7 @@ export function ProductTelemetry({
           send.current = undefined;
           sendAction = undefined;
           void sdk?.optOut();
-          sdk?.reset();
+          // reset() clears opt-out. The next lease creates a fresh memory-only instance.
           sdk = undefined;
         },
       },
