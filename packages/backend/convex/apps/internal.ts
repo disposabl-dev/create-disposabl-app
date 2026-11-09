@@ -29,7 +29,6 @@ import { githubConnection } from "../validator";
 import type { Doc } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 import { result as agentResult } from "../agent/validator";
-import { requireCurrentClient } from "../agent/credits";
 type AppResult = Infer<typeof appResult>;
 
 export { create } from "./actions/create";
@@ -199,30 +198,6 @@ export const requestConfiguration = internalAction({
       appId,
     });
     return ctx.runAction(internal.agent.internal.sendMessage, {
-      userId,
-      appId,
-      prompt: configurationPrompt(
-        appId,
-        platforms,
-        features,
-        androidArchitectures ??
-          app.androidArchitectures ??
-          defaultAndroidArchitectures,
-      ),
-    });
-  },
-});
-
-export const requestConfigurationLegacy = internalMutation({
-  args: configurationArgs,
-  returns: agentResult,
-  handler: async (
-    ctx,
-    { userId, appId, platforms, features, androidArchitectures },
-  ): Promise<Infer<typeof agentResult>> => {
-    requireCurrentClient();
-    const app = await ownedApp(ctx, userId, appId);
-    return ctx.runMutation(internal.agent.internal.enqueueMessage, {
       userId,
       appId,
       prompt: configurationPrompt(

@@ -1,0 +1,9 @@
+{
+  "name": "mcp-erasure-fixture",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "convex": "^1.49.0",
+    "@convex-dev/mcp": "0.1.0-alpha.7"
+  }
+}

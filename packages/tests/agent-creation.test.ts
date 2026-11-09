@@ -23,6 +23,8 @@ test("agent creation saves structured selections and resolves feature dependenci
             return connected;
           },
           db: {
+            normalizeId: () => "user",
+            get: async () => ({}),
             insert: async (_table: string, value: unknown) => {
               saved = value;
               throw new Error("fixture stops before scheduling");
@@ -60,6 +62,8 @@ test("mobile creation without Expo fails before inserting or scheduling work", a
         {
           runQuery: async () => ({ ...connected, expo: null }),
           db: {
+            normalizeId: () => "user",
+            get: async () => ({}),
             insert: async () => {
               inserted = true;
             },
@@ -70,6 +74,57 @@ test("mobile creation without Expo fails before inserting or scheduling work", a
       (error: any) => error.data?.missing?.includes("expo"),
     );
     assert.equal(inserted, false);
+  } finally {
+    if (previous === undefined) delete process.env.BOAT_API_KEY;
+    else process.env.BOAT_API_KEY = previous;
+  }
+});
+
+test("deletion request blocks new agent admission before any side effect", async () => {
+  let touched = false;
+  const ctx = {
+    db: {
+      normalizeId: () => "user",
+      get: async () => ({ deletionRequestedAt: 1 }),
+      insert: async () => {
+        touched = true;
+      },
+    },
+    runQuery: async () => {
+      touched = true;
+    },
+  };
+  await assert.rejects(
+    (enqueueMessage as any)._handler(ctx, {
+      userId: "owner",
+      prompt: "Build a planner",
+    }),
+    /Account deletion has been requested/,
+  );
+  assert.equal(touched, false);
+});
+
+test("production admission rejects an absent Boat configuration before writes", async () => {
+  const previous = process.env.BOAT_API_KEY;
+  delete process.env.BOAT_API_KEY;
+  let writes = 0;
+  try {
+    await assert.rejects(
+      (enqueueMessage as any)._handler(
+        {
+          db: {
+            normalizeId: () => "owner",
+            get: async () => ({}),
+            insert: async () => {
+              writes++;
+            },
+          },
+        },
+        { userId: "owner", prompt: "fixture" },
+      ),
+      /Remote agents are not configured/,
+    );
+    assert.equal(writes, 0);
   } finally {
     if (previous === undefined) delete process.env.BOAT_API_KEY;
     else process.env.BOAT_API_KEY = previous;

@@ -1,0 +1,4 @@
+.convex
+.env.local
+node_modules
+convex/_generated

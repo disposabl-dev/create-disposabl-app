@@ -557,3 +557,291 @@ test("web top-up preflight rechecks storefront, product, route and account indep
     ),
   );
 });
+
+test("explicit monthly offering is consistent across readiness, paywall, and web preflight", async () => {
+  const { presentMonthlyPaywall, selectMonthlyOffering } =
+    await import("../disposabl-kit/mobile/billing/paywall");
+  const monthly = {
+    product: { identifier: "monthly", subscriptionPeriod: "P1M" },
+  };
+  const other = {
+    product: { identifier: "yearly", subscriptionPeriod: "P1Y" },
+  };
+  const good = { identifier: "safe", availablePackages: [monthly] };
+  const mixed = { identifier: "mixed", availablePackages: [monthly, other] };
+  const wrong = { identifier: "wrong", availablePackages: [other] };
+  const wrongPeriod = {
+    identifier: "period",
+    availablePackages: [
+      { product: { identifier: "monthly", subscriptionPeriod: "P1Y" } },
+    ],
+  };
+  const offerings = {
+    current: mixed,
+    all: { safe: good, mixed, wrong, period: wrongPeriod },
+  };
+  const snapshot = async () => ({
+    balance: 0,
+    hasMonthlyPlan: false,
+    nativeSubscriptionsEnabled: true,
+    monthlyCheckoutPending: false,
+    mobileWebCheckoutEnabled: true,
+    customerId: "alice",
+  });
+  let current = true;
+  const sdk = {
+    canMakePayments: async () => true,
+    getStorefront: async () => ({ countryCode: "USA" }),
+    getCustomerInfo: async () => ({ activeSubscriptions: [] }),
+    getOfferings: async () => offerings,
+  };
+  let shown: unknown;
+  const show = async (offering: unknown) => {
+    shown = offering;
+    return "cancelled" as const;
+  };
+  const paywall = (id?: string) =>
+    presentMonthlyPaywall(
+      sdk as never,
+      snapshot,
+      () => current,
+      "monthly",
+      show,
+      id,
+    );
+  const web = (id?: string) =>
+    preflightWebMonthly(
+      sdk as never,
+      "ios",
+      "monthly",
+      "alice",
+      snapshot,
+      () => current,
+      id,
+    );
+  for (const id of [undefined, "missing", "wrong", "period", "mixed"]) {
+    assert.equal(
+      selectMonthlyOffering(offerings as never, "monthly", id),
+      null,
+    );
+    await assert.rejects(paywall(id), /unavailable/);
+    await assert.rejects(web(id), /unavailable/);
+  }
+  assert.equal(
+    selectMonthlyOffering(offerings as never, "monthly", "safe"),
+    good as never,
+  );
+  await paywall("safe");
+  assert.equal(shown, good);
+  await web("safe");
+  const withCurrent = { ...offerings, current: good };
+  assert.equal(
+    selectMonthlyOffering(withCurrent as never, "monthly"),
+    good as never,
+  );
+  const defaultSdk = { ...sdk, getOfferings: async () => withCurrent };
+  await presentMonthlyPaywall(
+    defaultSdk as never,
+    snapshot,
+    () => current,
+    "monthly",
+    show,
+  );
+  await preflightWebMonthly(
+    defaultSdk as never,
+    "ios",
+    "monthly",
+    "alice",
+    snapshot,
+    () => current,
+  );
+
+  const delayed = deferred();
+  const started = deferred();
+  const changingSdk = {
+    ...sdk,
+    getOfferings: async () => {
+      started.resolve();
+      await delayed.promise;
+      return offerings;
+    },
+  };
+  const pendingPaywall = presentMonthlyPaywall(
+    changingSdk as never,
+    snapshot,
+    () => current,
+    "monthly",
+    show,
+    "safe",
+  );
+  await started.promise;
+  current = false;
+  delayed.resolve();
+  await assert.rejects(pendingPaywall, /Account changed/);
+  current = true;
+  const delayedWeb = deferred();
+  const startedWeb = deferred();
+  const changingWebSdk = {
+    ...sdk,
+    getOfferings: async () => {
+      startedWeb.resolve();
+      await delayedWeb.promise;
+      return offerings;
+    },
+  };
+  const pendingWeb = preflightWebMonthly(
+    changingWebSdk as never,
+    "ios",
+    "monthly",
+    "alice",
+    snapshot,
+    () => current,
+    "safe",
+  );
+  await startedWeb.promise;
+  current = false;
+  delayedWeb.resolve();
+  await assert.rejects(pendingWeb, /Account changed/);
+});
+
+test("web handoff rechecks the storefront and account after link creation", async () => {
+  const { guardedWebHandoff, preflightWebMonthly, preflightWebTopup } =
+    await import("../disposabl-kit/mobile/billing/policy");
+  let country: string | null = "USA";
+  let storefrontError = false;
+  let restricted = false;
+  let current = true;
+  let changeRegionDuringLookup = false;
+  const monthly = {
+    product: { identifier: "monthly", subscriptionPeriod: "P1M" },
+  };
+  const offering = { availablePackages: [monthly] };
+  const product = {
+    identifier: "coins",
+    productCategory: "NON_SUBSCRIPTION",
+    productType: "CONSUMABLE",
+    priceString: "$5",
+  };
+  const sdk = {
+    canMakePayments: async () => !restricted,
+    getStorefront: async () => {
+      if (storefrontError) throw new Error("unavailable");
+      return country === null ? null : { countryCode: country };
+    },
+    getCustomerInfo: async () => ({ activeSubscriptions: [] }),
+    getOfferings: async () => {
+      if (changeRegionDuringLookup) country = "CAN";
+      return { current: null, all: { dedicated: offering } };
+    },
+    getAppUserID: async () => "alice",
+    getProducts: async () => {
+      if (changeRegionDuringLookup) country = "CAN";
+      return [product];
+    },
+    PRODUCT_CATEGORY: { NON_SUBSCRIPTION: "NON_SUBSCRIPTION" },
+  };
+  const snapshot = async () => ({
+    balance: 0,
+    customerId: "alice",
+    hasMonthlyPlan: false,
+    monthlyCheckoutPending: false,
+    nativeSubscriptionsEnabled: true,
+    mobileWebCheckoutEnabled: true,
+    nativeTopupRoutes: [{ app: "apple", store: "APP_STORE", product: "coins" }],
+  });
+  for (const kind of ["monthly", "topup"]) {
+    const preflight = () =>
+      kind === "monthly"
+        ? preflightWebMonthly(
+            sdk as never,
+            "ios",
+            "monthly",
+            "alice",
+            snapshot,
+            () => current,
+            "dedicated",
+          )
+        : preflightWebTopup(
+            sdk as never,
+            "ios",
+            "apple",
+            "coins",
+            "alice",
+            snapshot,
+            () => current,
+          );
+    let created = 0;
+    const create = async () => {
+      created++;
+      return "https://example.test/billing-login";
+    };
+    country = "USA";
+    current = true;
+    assert.equal(
+      await guardedWebHandoff(preflight, create, () => current),
+      "https://example.test/billing-login",
+    );
+    country = "CAN";
+    await assert.rejects(
+      guardedWebHandoff(preflight, create, () => current),
+      /unavailable/,
+    );
+    assert.equal(created, 1);
+    country = "USA";
+    await assert.rejects(
+      guardedWebHandoff(
+        preflight,
+        async () => {
+          country = "CAN";
+          return "link";
+        },
+        () => current,
+      ),
+      /unavailable/,
+    );
+    for (const mode of ["unknown", "error", "restricted"]) {
+      country = "USA";
+      storefrontError = false;
+      restricted = false;
+      await assert.rejects(
+        guardedWebHandoff(
+          preflight,
+          async () => {
+            if (mode === "unknown") country = null;
+            if (mode === "error") storefrontError = true;
+            if (mode === "restricted") restricted = true;
+            return "link";
+          },
+          () => current,
+        ),
+      );
+    }
+    country = "USA";
+    storefrontError = false;
+    restricted = false;
+    await assert.rejects(
+      guardedWebHandoff(
+        preflight,
+        async () => {
+          changeRegionDuringLookup = true;
+          return "link";
+        },
+        () => current,
+      ),
+      /unavailable/,
+    );
+    changeRegionDuringLookup = false;
+    country = "USA";
+    await assert.rejects(
+      guardedWebHandoff(
+        preflight,
+        async () => {
+          current = false;
+          return "link";
+        },
+        () => current,
+      ),
+      /Account changed/,
+    );
+  }
+});

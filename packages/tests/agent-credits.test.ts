@@ -1,9 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import {
-  requireCredits,
-  requireCurrentClient,
-} from "../backend/convex/agent/credits";
+import { getFunctionName } from "convex/server";
+import { requireCredits } from "../backend/convex/agent/credits";
 import { guardedEnqueue } from "../backend/convex/agent/internal";
 import { createPlatforms } from "../disposabl-kit/server/lib/platform-spec";
 import * as agent from "../backend/convex/agent/internal";
@@ -118,7 +116,9 @@ test("credits gate checks the actual owner balance and fails closed", async () =
 test("ownership and credits precede enqueue, with no public unchecked endpoint", async () => {
   const calls: string[] = [];
   const ctx = {
-    runQuery: async (_ref: unknown, args: any) => {
+    runQuery: async (ref: any, args: any) => {
+      if (getFunctionName(ref) === "users/internal:deletionPending")
+        return false;
       calls.push(`owner:${args.userId}`);
     },
     runMutation: async (_ref: unknown, args: any) => {
@@ -171,16 +171,12 @@ test("ownership and credits precede enqueue, with no public unchecked endpoint",
   );
 });
 
-test("legacy mutations remain callable only before payments are enabled", () => {
-  assert.doesNotThrow(() => requireCurrentClient(false));
-  assert.throws(
-    () => requireCurrentClient(true),
-    (error: any) => error.data?.code === "update_required",
-  );
-  assert.equal((agentNative.sendMessage as any).isMutation, true);
+test("agent guard and checked configuration contracts are retained", () => {
+  assert.equal("sendMessage" in agentNative, false);
   assert.equal((agentNative.sendMessageChecked as any).isAction, true);
-  assert.equal((appsNative.requestConfiguration as any).isMutation, true);
+  assert.equal("requestConfiguration" in appsNative, false);
   assert.equal((appsNative.requestConfigurationChecked as any).isAction, true);
+  assert.equal("requestConfigurationLegacy" in appsInternal, false);
   const platform = createPlatforms({ "apps/internal": appsInternal });
   assert.ok(
     platform.spec.some(
@@ -226,4 +222,46 @@ test("debit response is preserved through the real HTTP parser without a second 
   );
   assert.deepEqual(result, { outcome: "confirmed", responseBalance: 7 });
   assert.equal(calls, 1);
+});
+
+test("pending deletion prevents balance lookup before admission", async () => {
+  let charged = false;
+  await assert.rejects(
+    guardedEnqueue(
+      { runQuery: async () => true } as any,
+      { userId: "owner", prompt: "work" },
+      async () => {
+        charged = true;
+      },
+    ),
+    /Account deletion has been requested/,
+  );
+  assert.equal(charged, false);
+});
+
+test("paid worker tick fences provider dispatch in an isolated subprocess", async () => {
+  const { spawnSync } = await import("node:child_process");
+  const { join } = await import("node:path");
+  const result = spawnSync(
+    process.execPath,
+    [
+      "test",
+      join(
+        import.meta.dirname,
+        "fixtures/agent-inert-convex/paid-tick.test.mjs",
+      ),
+    ],
+    {
+      encoding: "utf8",
+      env: {
+        PATH: process.env.PATH,
+        HOME: process.env.HOME,
+        E2E_TELEMETRY_DISABLED: "1",
+        DO_NOT_TRACK: "1",
+        NODE_ENV: "test",
+      },
+    },
+  );
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stdout + result.stderr, /6 pass/);
 });

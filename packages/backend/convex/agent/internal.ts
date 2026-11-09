@@ -1,3 +1,5 @@
+import { paymentsEnabled } from "@disposabl/disposabl-kit/features";
+import { requireNotDeleting } from "../users/deletion";
 import { listMessages, saveMessage } from "@convex-dev/agent";
 import {
   identityFields,
@@ -9,7 +11,7 @@ import { ConvexError, v, type Infer } from "convex/values";
 import { components, internal } from "../_generated/api";
 import { env } from "../_generated/server";
 import type { Doc } from "../_generated/dataModel";
-import type { ActionCtx } from "../_generated/server";
+import type { ActionCtx, MutationCtx } from "../_generated/server";
 import { ownedApp } from "../apps/internal";
 import { assertActive } from "../apps/operations/internal";
 import { history, historyArgs, result, sendArgs } from "./validator";
@@ -21,117 +23,132 @@ import { ownedAttachments, attachmentReferences } from "./attachments";
 import { requireCredits } from "./credits";
 import { admitSession } from "./compute";
 
-export const enqueueMessage = internalMutation({
-  args: { ...identityFields, ...sendArgs },
-  returns: result,
-  handler: async (
-    ctx,
-    { userId, appId, prompt, platforms, features, fileIds = [] },
-  ): Promise<Infer<typeof result>> => {
-    prompt = prompt.trim();
-    if (!prompt || prompt.length > 32_000)
-      throw new ConvexError("Prompt must contain 1–32,000 characters.");
-    if (!env.BOAT_API_KEY)
-      throw new ConvexError("Remote agents are not configured.");
-    const attachments = await ownedAttachments(ctx, userId, fileIds);
-    let app: Doc<"apps">;
-    if (appId) {
-      if (platforms !== undefined || features !== undefined)
-        throw new ConvexError(
-          "Use the app configuration action to change an existing app's platforms or features.",
-        );
-      app = await ownedApp(ctx, userId, appId);
-      assertActive(app);
-    } else {
-      const selectedPlatforms = resolvePlatforms(platforms ?? ["web"]);
-      const selectedFeatures = resolveFeatures(features ?? ["authentication"]);
-      requireConnections(
-        await ctx.runQuery(internal.connections.internal.status, {
-          userId,
-          features: selectedFeatures,
-        }),
-        selectedPlatforms,
+const enqueueArgs = v.object({ ...identityFields, ...sendArgs });
+
+export async function enqueueMessageHandler(
+  ctx: MutationCtx,
+  {
+    userId,
+    appId,
+    prompt,
+    platforms,
+    features,
+    fileIds = [],
+  }: Infer<typeof enqueueArgs>,
+  remoteConfigured: () => boolean,
+  paid = paymentsEnabled,
+): Promise<Infer<typeof result>> {
+  await requireNotDeleting(ctx, userId);
+  prompt = prompt.trim();
+  if (!prompt || prompt.length > 32_000)
+    throw new ConvexError("Prompt must contain 1–32,000 characters.");
+  if (!remoteConfigured())
+    throw new ConvexError("Remote agents are not configured.");
+  const attachments = await ownedAttachments(ctx, userId, fileIds);
+  let app: Doc<"apps">;
+  if (appId) {
+    if (platforms !== undefined || features !== undefined)
+      throw new ConvexError(
+        "Use the app configuration action to change an existing app's platforms or features.",
       );
-      appId = crypto.randomUUID();
-      const id = await ctx.db.insert("apps", {
-        appId,
+    app = await ownedApp(ctx, userId, appId);
+    assertActive(app);
+  } else {
+    const selectedPlatforms = resolvePlatforms(platforms ?? ["web"]);
+    const selectedFeatures = resolveFeatures(features ?? ["authentication"]);
+    requireConnections(
+      await ctx.runQuery(internal.connections.internal.status, {
         userId,
-        name: prompt.slice(0, 80),
-        platforms: selectedPlatforms,
         features: selectedFeatures,
-        expoAccountId: null,
-      });
-      app = (await ctx.db.get("apps", id))!;
-    }
-    let current = readThread(app);
-    if (!current) {
-      const stored = await ctx.runMutation(
-        components.agent.threads.createThread,
-        {
-          userId,
-          title: prompt.slice(0, 80),
-        },
-      );
-      current = {
-        appId,
-        userId,
-        threadId: stored._id,
-        status: "idle",
-        pending: [],
-        updatedAt: Date.now(),
-      };
-    }
-    if (current.stopUnconfirmed)
-      throw new ConvexError(
-        "The previous remote run could not be stopped. Retry abortMessage before sending more work.",
-      );
-    if (current.status === "stopping")
-      throw new ConvexError(
-        "Wait for the agent to stop before sending another message.",
-      );
-    if (current.pending.length >= 32)
-      throw new ConvexError(
-        "Wait for the agent to receive your pending messages.",
-      );
-    const { messageId } = await saveMessage(ctx, components.agent, {
-      threadId: current.threadId,
+      }),
+      selectedPlatforms,
+    );
+    appId = crypto.randomUUID();
+    const id = await ctx.db.insert("apps", {
+      appId,
       userId,
-      message: {
-        role: "user",
-        content: [
-          { type: "text", text: prompt },
-          ...attachments.map((file) => ({
-            type: "file" as const,
-            data: {
-              type: "reference" as const,
-              reference: { disposablFile: file._id },
-            },
-            filename: file.filename,
-            mediaType: file.mediaType,
-          })),
-        ],
+      name: prompt.slice(0, 80),
+      platforms: selectedPlatforms,
+      features: selectedFeatures,
+      expoAccountId: null,
+    });
+    app = (await ctx.db.get("apps", id))!;
+  }
+  let current = readThread(app);
+  if (!current) {
+    const stored = await ctx.runMutation(
+      components.agent.threads.createThread,
+      {
+        userId,
+        title: prompt.slice(0, 80),
       },
-    });
-    const computeSessionId = await admitSession(ctx, userId);
-    assertSessionRebind(current, computeSessionId);
-    await patchThread(ctx, current, {
-      computeSessionId,
-      ...(computeSessionId !== current.computeSessionId
-        ? { promptId: undefined, delivery: undefined }
-        : {}),
-      pending: [...current.pending, messageId],
-      status: "processing",
-      ...(current.status !== "processing"
-        ? { access: undefined, startedAt: Date.now(), finishedAt: undefined }
-        : {}),
-      error: undefined,
+    );
+    current = {
+      appId,
+      userId,
+      threadId: stored._id,
+      status: "idle",
+      pending: [],
       updatedAt: Date.now(),
-    });
-    await ctx.scheduler.runAfter(0, internal.agent.actions.run.tick, {
-      id: current.threadId,
-    });
-    return { appId, threadId: current.threadId, status: "processing" };
-  },
+    };
+  }
+  if (current.stopUnconfirmed)
+    throw new ConvexError(
+      "The previous remote run could not be stopped. Retry abortMessage before sending more work.",
+    );
+  if (current.status === "stopping")
+    throw new ConvexError(
+      "Wait for the agent to stop before sending another message.",
+    );
+  if (current.pending.length >= 32)
+    throw new ConvexError(
+      "Wait for the agent to receive your pending messages.",
+    );
+  const { messageId } = await saveMessage(ctx, components.agent, {
+    threadId: current.threadId,
+    userId,
+    message: {
+      role: "user",
+      content: [
+        { type: "text", text: prompt },
+        ...attachments.map((file) => ({
+          type: "file" as const,
+          data: {
+            type: "reference" as const,
+            reference: { disposablFile: file._id },
+          },
+          filename: file.filename,
+          mediaType: file.mediaType,
+        })),
+      ],
+    },
+  });
+  const computeSessionId = await admitSession(ctx, userId, paid);
+  assertSessionRebind(current, computeSessionId);
+  await patchThread(ctx, current, {
+    computeSessionId,
+    ...(computeSessionId !== current.computeSessionId
+      ? { promptId: undefined, delivery: undefined }
+      : {}),
+    pending: [...current.pending, messageId],
+    status: "processing",
+    ...(current.status !== "processing"
+      ? { access: undefined, startedAt: Date.now(), finishedAt: undefined }
+      : {}),
+    error: undefined,
+    updatedAt: Date.now(),
+  });
+  await ctx.scheduler.runAfter(0, internal.agent.actions.run.tick, {
+    id: current.threadId,
+  });
+  return { appId, threadId: current.threadId, status: "processing" };
+}
+
+export const enqueueMessage = internalMutation({
+  args: enqueueArgs.fields,
+  returns: result,
+  handler: (ctx, args) =>
+    enqueueMessageHandler(ctx, args, () => Boolean(env.BOAT_API_KEY)),
 });
 
 export const abortMessage = internalMutation({
@@ -271,6 +288,14 @@ export async function guardedEnqueue(
       userId: args.userId,
       appId: args.appId,
     });
+  if (
+    await ctx.runQuery(internal.users.internal.deletionPending, {
+      userId: args.userId,
+    })
+  )
+    throw new ConvexError(
+      "Account deletion has been requested. Contact support for assistance.",
+    );
   await check(args.userId);
   return ctx.runMutation(internal.agent.internal.enqueueMessage, args);
 }

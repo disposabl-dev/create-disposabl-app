@@ -67,8 +67,13 @@ export function createSdkAnalytics<
       config.enabled === false ||
       config.environment !== "production" ||
       config.e2e ||
-      env?.E2E_TELEMETRY_DISABLED === "1" ||
-      env?.DO_NOT_TRACK === "1" ||
+      env?.NODE_ENV === "test" ||
+      env?.NODE_ENV === "development" ||
+      env?.BUN_ENV === "test" ||
+      !!env?.CI ||
+      !!env?.E2E_TELEMETRY_DISABLED ||
+      env?.DISPOSABL_TELEMETRY_DISABLED === "1" ||
+      ["1", "true"].includes(env?.DO_NOT_TRACK?.toLowerCase() ?? "") ||
       (typeof navigator !== "undefined" && navigator.doNotTrack === "1") ||
       !allowed.has(operation)
     )

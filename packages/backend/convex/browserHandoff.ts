@@ -20,7 +20,11 @@ async function lookup(ctx: QueryCtx, code: string) {
       q.eq("browserHandoff.hash", digest),
     )
     .unique();
-  if (!user?.browserHandoff || user.browserHandoff.expiresAt <= Date.now())
+  if (
+    !user?.browserHandoff ||
+    user.deletionRequestedAt !== undefined ||
+    user.browserHandoff.expiresAt <= Date.now()
+  )
     throw invalid();
   return user;
 }
@@ -33,7 +37,8 @@ export const create = mutation({
     const userId = await getAuthUserId(ctx);
     const identity = await ctx.auth.getUserIdentity();
     const id = userId ? ctx.db.normalizeId("users", userId) : null;
-    if (!id || !identity || !(await ctx.db.get("users", id)))
+    const user = id ? await ctx.db.get("users", id) : null;
+    if (!id || !identity || !user || user.deletionRequestedAt !== undefined)
       throw new ConvexError("Sign in to open your connections.");
     const code = btoa(
       String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))),

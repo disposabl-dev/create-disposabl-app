@@ -25,12 +25,12 @@ export const legalDocuments: LegalDocument[] = [
     slug: "delete-account",
     title: "Delete your account",
     description:
-      "Contact the publisher about deleting your account and associated information.",
+      "Learn how to request deletion of your account and associated information.",
     sections: [
       {
         title: "Request account deletion",
         paragraphs: [
-          "Use the privacy contact below to request deletion. This page does not delete your account or create a deletion receipt. The publisher must confirm how your request will be handled.",
+          "Use the available request option or contact the publisher below. A request does not itself delete your account; the publisher must confirm how it will be handled.",
           "Clearing browser storage or uninstalling an app does not delete information held by the service. Some records may be retained where applicable law requires or permits it; ask the publisher about its retention policy.",
           "Account deletion does not itself cancel an app-store subscription. Manage subscriptions through the store where you purchased them.",
         ],

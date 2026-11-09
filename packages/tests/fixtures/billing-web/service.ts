@@ -11,8 +11,12 @@ type State = {
   monthly: boolean;
   mode: string;
   attempts: { user: string; purchase: string; requestId: string }[];
+  portalCalls: string[];
+  portalCompleted: number;
+  holdPortal?: boolean;
 };
 let state: State;
+let releasePortal: (() => void) | undefined;
 const headers = {
   "access-control-allow-origin": "*",
   "access-control-allow-headers": "content-type",
@@ -28,11 +32,18 @@ Bun.serve({
       state = await req.json();
       state.used = false;
       state.attempts = [];
+      state.portalCalls = [];
+      state.portalCompleted = 0;
       return Response.json({ ok: true }, { headers });
     }
     if (url.pathname === "/state") return Response.json(state, { headers });
     if (url.pathname === "/update") {
-      Object.assign(state, await req.json());
+      const update = await req.json();
+      Object.assign(state, update);
+      if (update.releasePortal) {
+        releasePortal?.();
+        releasePortal = undefined;
+      }
       return Response.json({ ok: true }, { headers });
     }
     if (url.pathname !== "/call")
@@ -83,7 +94,9 @@ Bun.serve({
         { headers },
       );
     }
-    if (name === "billing:snapshot")
+    if (name === "billing:snapshot") {
+      if (state.mode === "snapshot-denied")
+        return new Response("account unavailable", { status: 403, headers });
       return Response.json(
         {
           customerId: user,
@@ -93,6 +106,19 @@ Bun.serve({
         },
         { headers },
       );
+    }
+    if (name === "billing:portal") {
+      state.portalCalls.push(user);
+      if (state.holdPortal)
+        await new Promise<void>((resolve) => {
+          releasePortal = resolve;
+        });
+      state.portalCompleted++;
+      return Response.json(
+        { url: "http://127.0.0.1:3450/portal" },
+        { headers },
+      );
+    }
     if (name === "billing:checkout") {
       state.attempts.push({ user, ...args });
       if (state.mode === "unknown")

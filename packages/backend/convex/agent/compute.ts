@@ -5,9 +5,10 @@ import {
 } from "@disposabl/disposabl-kit/server/lib/functions";
 import { ConvexError, v } from "convex/values";
 import { internal } from "../_generated/api";
-import type { Id } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import schema from "../schema";
+import { deletionPending } from "../users/deletion";
 import { computeSessionArgs } from "./computeValidator";
 
 export const WINDOW_MS = 600_000;
@@ -35,7 +36,9 @@ export async function admitSession(
       message:
         current.state === "hold"
           ? "A credit charge needs reconciliation. Please contact support."
-          : "Your sandbox is stopping. Send a new message after it stops.",
+          : current.state === "renewing"
+            ? "Your next compute window is being funded. Try sending your message again shortly."
+            : "Your sandbox is stopping. Send a new message after it stops.",
     });
   }
   return ctx.db.insert("computeSessions", {
@@ -92,18 +95,39 @@ export async function claimWindow(
   const session = await ctx.db.get("computeSessions", sessionId);
   if (!session || !["starting", "active"].includes(session.state)) return null;
   if (session.debitId !== expectedDebit) return null;
+  if (session.state === "starting" && expectedDebit) return null;
   if (session.state === "active") {
+    if (!expectedDebit || session.paidUntil <= 0) return null;
     if (session.paidUntil > Date.now()) return null;
-    // A debit dispatched after expiry cannot prove the balance existed at the deadline.
+  }
+  if (expectedDebit) {
+    const previous = await ctx.db.get("computeDebits", expectedDebit);
+    if (
+      previous?.state !== "confirmed" ||
+      previous.sessionId !== sessionId ||
+      (session.state === "active" && previous.paidUntil !== session.paidUntil)
+    )
+      return null;
+  }
+  const latest = await ctx.db
+    .query("computeSessions")
+    .withIndex("by_userId", (q) => q.eq("userId", session.userId))
+    .order("desc")
+    .first();
+  if (
+    latest?._id !== sessionId ||
+    session.reconciliationConflict ||
+    session.untrackedConflicts ||
+    session.stopConfirmed ||
+    session.stopLease
+  )
+    return null;
+  if (await deletionPending(ctx, session.userId)) {
     await ctx.db.patch("computeSessions", sessionId, { state: "stopping" });
     await ctx.scheduler.runAfter(0, internal.agent.actions.compute.stop, {
       sessionId,
     });
     return null;
-  }
-  if (expectedDebit) {
-    const previous = await ctx.db.get("computeDebits", expectedDebit);
-    if (previous?.state !== "confirmed") return null;
   }
   const active = await ctx.db
     .query("apps")
@@ -123,9 +147,13 @@ export async function claimWindow(
   const debitId = await ctx.db.insert("computeDebits", {
     sessionId,
     state: "dispatching",
-    paidUntil: Date.now() + WINDOW_MS,
+    // A window is granted only when this debit is confirmed.
+    paidUntil: 0,
   });
-  await ctx.db.patch("computeSessions", sessionId, { debitId });
+  await ctx.db.patch("computeSessions", sessionId, {
+    debitId,
+    ...(session.state === "active" ? { state: "renewing" as const } : {}),
+  });
   await ctx.scheduler.runAfter(60_000, internal.agent.compute.uncertain, {
     debitId,
   });
@@ -152,23 +180,26 @@ export const settle = internalMutation({
     )
       throw new Error("Invalid debit response balance.");
     const session = await ctx.db.get("computeSessions", debit.sessionId);
+    const current =
+      session &&
+      (await ctx.db
+        .query("computeSessions")
+        .withIndex("by_userId", (q) => q.eq("userId", session.userId))
+        .order("desc")
+        .first());
     const superseded = !session || session.debitId !== debitId;
-    if (debit.state !== "dispatching" || superseded) {
+    const displacedDispatch =
+      debit.state === "dispatching" && current?._id !== session?._id;
+    if (debit.state !== "dispatching" || superseded || displacedDispatch) {
       if (
         outcome !== "confirmed" ||
         debit.state === "confirmed" ||
         debit.lateConfirmation
       )
         return null;
-      const current =
-        session &&
-        (await ctx.db
-          .query("computeSessions")
-          .withIndex("by_userId", (q) => q.eq("userId", session.userId))
-          .order("desc")
-          .first());
       const conflict =
         superseded ||
+        displacedDispatch ||
         debit.state === "denied" ||
         debit.resolution?.outcome === "denied" ||
         Boolean(
@@ -186,9 +217,11 @@ export const settle = internalMutation({
       if (conflict || !debit.resolution) {
         if (current) {
           const existing = current.conflictDebits ?? [];
+          // A flagged hold without recorded conflicts cannot become recoverable
+          // merely because another conflict was subsequently recorded.
           const untracked =
             current.untrackedConflicts ||
-            (current.reconciliationConflict && !current.conflictDebits);
+            (current.reconciliationConflict && !current.conflictDebits?.length);
           const overflow = conflict && existing.length >= 100;
           await ctx.db.patch("computeSessions", current._id, {
             state: "hold",
@@ -213,25 +246,35 @@ export const settle = internalMutation({
       return null;
     }
     if (!session || session.debitId !== debitId) return null;
+    const now = Date.now();
+    const funding =
+      session.state === "starting" || session.state === "renewing";
+    const activateFunding =
+      outcome === "confirmed" &&
+      funding &&
+      (session.state === "renewing" || session.paidUntil === 0) &&
+      !session.reconciliationConflict &&
+      !session.untrackedConflicts &&
+      !session.stopConfirmed &&
+      !session.stopLease &&
+      now < debit._creationTime + 60_000 &&
+      current?._id === session._id &&
+      !(await deletionPending(ctx, session.userId));
+    const paidUntil = activateFunding ? now + WINDOW_MS : debit.paidUntil;
     await ctx.db.patch("computeDebits", debitId, {
       state: outcome,
+      ...(activateFunding ? { paidUntil } : {}),
       ...(responseBalance !== undefined ? { responseBalance } : {}),
     });
-    if (
-      outcome === "confirmed" &&
-      ["starting", "active"].includes(session.state) &&
-      (session.state === "starting" || session.paidUntil > Date.now()) &&
-      debit.paidUntil > Date.now()
-    ) {
+    if (outcome === "confirmed" && activateFunding) {
       await ctx.db.patch("computeSessions", session._id, {
         state: "active",
-        paidUntil: debit.paidUntil,
+        paidUntil,
       });
-      await ctx.scheduler.runAt(
-        debit.paidUntil,
-        internal.agent.compute.boundary,
-        { sessionId: session._id, expectedDebit: debitId },
-      );
+      await ctx.scheduler.runAt(paidUntil, internal.agent.compute.boundary, {
+        sessionId: session._id,
+        expectedDebit: debitId,
+      });
       await ctx.scheduler.runAfter(0, internal.agent.actions.compute.notice, {
         debitId,
         attempt: 0,
@@ -364,37 +407,111 @@ export const getDebit = internalQuery({
   handler: (ctx, { debitId }) => ctx.db.get("computeDebits", debitId),
 });
 
-// Terminal outcomes are recorded atomically with enqueue; failed enqueues roll back.
+// The observation is separate from the raw debit response; queueing rechecks the window.
+const noticeObservation = v.object({
+  userId: v.id("users"),
+  paidUntil: v.number(),
+  balance: v.number(),
+  observedAt: v.number(),
+});
+
+async function noticeEligibility(
+  ctx: Pick<QueryCtx, "db">,
+  debitId: Id<"computeDebits">,
+  now: number,
+) {
+  const debit = await ctx.db.get("computeDebits", debitId);
+  if (
+    !debit ||
+    debit.state !== "confirmed" ||
+    debit.noticeComplete ||
+    debit.noticeOutcome
+  )
+    return { debit, terminal: null } as const;
+  if (debit.paidUntil <= now) return { debit, terminal: "expired" } as const;
+  const session = await ctx.db.get("computeSessions", debit.sessionId);
+  if (
+    !session ||
+    session.state !== "active" ||
+    session.debitId !== debitId ||
+    session.paidUntil !== debit.paidUntil
+  )
+    return { debit, terminal: "superseded" } as const;
+  const userId = ctx.db.normalizeId("users", session.userId);
+  if (!userId) return { debit, terminal: "invalid_user" } as const;
+  const user = await ctx.db.get("users", userId);
+  if (!user || user.deletionRequestedAt !== undefined)
+    return { debit, terminal: "account_ineligible" } as const;
+  return { debit, terminal: null, userId } as const;
+}
+
+export const noticeCandidate = internalQuery({
+  args: { debitId: v.id("computeDebits"), now: v.number() },
+  returns: v.union(
+    v.null(),
+    v.object({ userId: v.id("users"), paidUntil: v.number() }),
+  ),
+  handler: async (ctx, { debitId, now }) => {
+    const result = await noticeEligibility(ctx, debitId, now);
+    return result.debit && "userId" in result && result.userId
+      ? { userId: result.userId, paidUntil: result.debit.paidUntil }
+      : null;
+  },
+});
+
+// Terminal outcomes and any queue insertion commit in the same transaction.
 export const notice = internalMutation({
-  args: { debitId: v.id("computeDebits"), failed: v.optional(v.boolean()) },
+  args: {
+    debitId: v.id("computeDebits"),
+    observation: v.optional(noticeObservation),
+    disabled: v.optional(v.boolean()),
+    failed: v.optional(v.boolean()),
+  },
   returns: v.null(),
-  handler: async (ctx, { debitId, failed }) => {
-    const debit = await ctx.db.get("computeDebits", debitId);
-    if (
-      !debit ||
-      debit.state !== "confirmed" ||
-      debit.noticeComplete ||
-      debit.noticeOutcome
-    )
+  handler: async (ctx, { debitId, observation, disabled, failed }) => {
+    const now = Date.now();
+    const result = await noticeEligibility(ctx, debitId, now);
+    if (!result.debit || (result.terminal === null && !("userId" in result)))
       return null;
-    const session = await ctx.db.get("computeSessions", debit.sessionId);
-    const userId = session && ctx.db.normalizeId("users", session.userId);
-    const outcome =
-      debit.paidUntil <= Date.now()
-        ? "expired"
-        : failed
-          ? "failed"
-          : !userId
-            ? "invalid_user"
-            : debit.responseBalance === undefined
-              ? "missing_balance"
-              : await ctx.runMutation(internal.product.lowCreditEmail.queue, {
-                  userId,
-                  windowId: debitId,
-                  paidUntil: debit.paidUntil,
-                  balance: debit.responseBalance,
-                });
-    await ctx.db.patch("computeDebits", debitId, { noticeOutcome: outcome });
+    let outcome: NonNullable<Doc<"computeDebits">["noticeOutcome"]>;
+    if (result.terminal) outcome = result.terminal;
+    else if (disabled) outcome = "disabled";
+    else if (failed) {
+      // An exhausted observer must not suppress another observation in flight.
+      // At the deadline this mutation records expiry, unless a notice won first.
+      await ctx.scheduler.runAt(
+        result.debit.paidUntil,
+        internal.agent.compute.notice,
+        { debitId, failed: true },
+      );
+      return null;
+    } else {
+      if (!observation) return null;
+      if (
+        observation.userId !== result.userId ||
+        observation.paidUntil !== result.debit.paidUntil ||
+        !Number.isFinite(observation.balance) ||
+        !Number.isSafeInteger(observation.observedAt) ||
+        observation.observedAt <= 0 ||
+        observation.observedAt > now
+      )
+        throw new Error("Invalid notice observation.");
+      outcome = await ctx.runMutation(internal.product.lowCreditEmail.queue, {
+        userId: observation.userId,
+        windowId: debitId,
+        paidUntil: observation.paidUntil,
+        balance: observation.balance,
+      });
+    }
+    await ctx.db.patch("computeDebits", debitId, {
+      noticeOutcome: outcome,
+      ...(observation && !result.terminal && !disabled && !failed
+        ? {
+            noticeBalance: observation.balance,
+            noticeObservedAt: observation.observedAt,
+          }
+        : {}),
+    });
     return null;
   },
 });

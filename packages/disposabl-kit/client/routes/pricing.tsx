@@ -9,6 +9,7 @@ import {
   useState,
 } from "react";
 import { useAuthToken } from "@convex-dev/auth/react";
+import { useConsentIdentity } from "../components/consent-identity";
 import { sessionId } from "../../lib/auth-session";
 import { paymentsEnabled } from "../../features";
 import {
@@ -99,6 +100,7 @@ function SubscriptionHelp() {
   );
 }
 function PurchasePage({ session }: { session: string | null }) {
+  const identity = useConsentIdentity();
   const [{ handoff, fromIos }] = useState(() =>
     typeof window === "undefined"
       ? handoffContext(null, "")
@@ -235,6 +237,17 @@ function PurchasePage({ session }: { session: string | null }) {
         </p>
       ) : (
         <>
+          <p aria-live="polite">
+            {identity.state === "ready" ? (
+              <>
+                Signed in as <strong>{identity.label}</strong>
+              </>
+            ) : identity.state === "loading" ? (
+              "Loading your account…"
+            ) : (
+              "Your account could not be loaded. Refresh and try again."
+            )}
+          </p>
           <p>
             Available credits:{" "}
             {balance === null ? "not yet available" : balance}{" "}

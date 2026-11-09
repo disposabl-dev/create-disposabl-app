@@ -8,7 +8,10 @@ import {
 import { makeFunctionReference, type Auth } from "convex/server";
 import { getSessionUserId } from "./lib/functions";
 import type { Id } from "../../backend/convex/_generated/dataModel";
-import type { ActionCtx } from "../../backend/convex/_generated/server";
+import type {
+  ActionCtx,
+  MutationCtx,
+} from "../../backend/convex/_generated/server";
 import {
   deleteThenForget,
   r2Config,
@@ -73,17 +76,27 @@ async function owner(ctx: { auth: Auth }) {
   if (!userId) throw new Error("Authentication required.");
   return userId;
 }
-export const register = internalMutation({
-  args: {
-    filename: v.string(),
-    mediaType: v.string(),
-    size: v.number(),
-    location,
-  },
-  returns: v.id("files"),
-  handler: async (ctx, args) =>
-    ctx.db.insert("files", { ...args, owner: await owner(ctx) }),
-});
+export type FileWriteGuard = (
+  ctx: ActionCtx | MutationCtx,
+  userId: string,
+) => Promise<void>;
+
+export const createRegister = (guard?: FileWriteGuard) =>
+  internalMutation({
+    args: {
+      filename: v.string(),
+      mediaType: v.string(),
+      size: v.number(),
+      location,
+    },
+    returns: v.id("files"),
+    handler: async (ctx, args) => {
+      const userId = await owner(ctx);
+      if (guard) await guard(ctx, userId);
+      return ctx.db.insert("files", { ...args, owner: userId });
+    },
+  });
+export const register = createRegister();
 export const getOwned = internalQuery({
   args: { id: v.id("files") },
   returns: fileValidator,
@@ -100,49 +113,52 @@ export const forget = internalMutation({
   },
 });
 
-export const upload = action({
-  args: { filename: v.string(), mediaType: v.string(), bytes: v.bytes() },
-  returns: v.id("files"),
-  handler: async (
-    ctx,
-    { filename, mediaType, bytes },
-  ): Promise<Id<"files">> => {
-    await owner(ctx);
-    validateUpload(filename, mediaType, bytes);
-    const config = r2Config(env);
-    return (await registerWithRollback(
-      async (): Promise<FileRecord["location"]> => {
-        if (config) {
-          const loc = {
-            provider: "r2" as const,
-            key: crypto.randomUUID(),
-            account: config.account,
-            bucket: config.bucket,
+export const createUpload = (guard?: FileWriteGuard) =>
+  action({
+    args: { filename: v.string(), mediaType: v.string(), bytes: v.bytes() },
+    returns: v.id("files"),
+    handler: async (
+      ctx,
+      { filename, mediaType, bytes },
+    ): Promise<Id<"files">> => {
+      const userId = await owner(ctx);
+      if (guard) await guard(ctx, userId);
+      validateUpload(filename, mediaType, bytes);
+      const config = r2Config(env);
+      return (await registerWithRollback(
+        async (): Promise<FileRecord["location"]> => {
+          if (config) {
+            const loc = {
+              provider: "r2" as const,
+              key: crypto.randomUUID(),
+              account: config.account,
+              bucket: config.bucket,
+            };
+            await r2Write(loc, env, bytes, mediaType);
+            return loc;
+          }
+          return {
+            provider: "convex",
+            storageId: await ctx.storage.store(
+              new Blob([bytes], { type: mediaType }),
+            ),
           };
-          await r2Write(loc, env, bytes, mediaType);
-          return loc;
-        }
-        return {
-          provider: "convex",
-          storageId: await ctx.storage.store(
-            new Blob([bytes], { type: mediaType }),
-          ),
-        };
-      },
-      (loc) =>
-        ctx.runMutation(registerRef, {
-          filename: filename.trim(),
-          mediaType,
-          size: bytes.byteLength,
-          location: loc,
-        }),
-      (loc) =>
-        loc.provider === "r2"
-          ? r2Delete(loc, env)
-          : ctx.storage.delete(loc.storageId),
-    )) as Id<"files">;
-  },
-});
+        },
+        (loc) =>
+          ctx.runMutation(registerRef, {
+            filename: filename.trim(),
+            mediaType,
+            size: bytes.byteLength,
+            location: loc,
+          }),
+        (loc) =>
+          loc.provider === "r2"
+            ? r2Delete(loc, env)
+            : ctx.storage.delete(loc.storageId),
+      )) as Id<"files">;
+    },
+  });
+export const upload = createUpload();
 async function resolve(ctx: ActionCtx, id: Id<"files">) {
   const file = await ctx.runQuery(getRef, { id });
   const url =

@@ -81,7 +81,11 @@ test("agent credential lookup rejects expired, stopped, failed, deleted and unco
   };
   let row: any = app;
   const ctx = {
-    db: { query: () => ({ withIndex: () => ({ unique: async () => row }) }) },
+    db: {
+      normalizeId: () => "user",
+      get: async () => ({}),
+      query: () => ({ withIndex: () => ({ unique: async () => row }) }),
+    },
   };
   const lookup = () => (authenticate as any)._handler(ctx, { hash: "fixture" });
   assert.deepEqual(await lookup(), binding);
@@ -112,13 +116,21 @@ test("only the current unexpired worker can issue access; sandboxes belong to us
   let patch: any;
   const ctx = {
     db: {
+      normalizeId: () => "user",
+      get: async () => ({}),
       query: () => ({ withIndex: () => ({ unique: async () => row }) }),
       patch: async (_table: string, _id: string, value: unknown) => {
         patch = value;
       },
     },
   };
-  const args = { id: binding.threadId, token: "lease", hash: "a".repeat(64) };
+  const args = {
+    id: binding.threadId,
+    token: "lease",
+    userId: binding.userId,
+    appId: binding.appId,
+    hash: "a".repeat(64),
+  };
   await (issue as any)._handler(ctx, args);
   assert.equal(patch.agent.access.hash, args.hash);
   assert.equal(JSON.stringify(patch).includes(bearer), false);
@@ -135,4 +147,51 @@ test("only the current unexpired worker can issue access; sandboxes belong to us
     );
   }
   assert.notDeepEqual(sandboxRef("owner"), sandboxRef("other-owner"));
+});
+
+test("pending deletion and missing owners reject active worker credentials", async () => {
+  const row = {
+    ...binding,
+    agent: {
+      threadId: binding.threadId,
+      status: "processing",
+      pending: [],
+      lease: { token: "lease", expiresAt: Date.now() + 60000 },
+      access: { expiresAt: Date.now() + 60000 },
+    },
+  };
+  let writes = 0;
+  let owner: { deletionRequestedAt: number } | null = {
+    deletionRequestedAt: 1,
+  };
+  let ownerId: string | null = "user";
+  const ctx = {
+    db: {
+      normalizeId: () => ownerId,
+      get: async () => owner,
+      query: () => ({ withIndex: () => ({ unique: async () => row }) }),
+      patch: async () => {
+        writes++;
+      },
+    },
+  };
+  for (const state of ["pending", "missing", "invalid"]) {
+    if (state !== "pending") owner = null;
+    if (state === "invalid") ownerId = null;
+    assert.equal(
+      await (authenticate as any)._handler(ctx, { hash: "fixture" }),
+      null,
+    );
+    await assert.rejects(
+      (issue as any)._handler(ctx, {
+        id: binding.threadId,
+        userId: binding.userId,
+        appId: binding.appId,
+        token: "lease",
+        hash: "a".repeat(64),
+      }),
+      /active worker lease/,
+    );
+  }
+  assert.equal(writes, 0);
 });

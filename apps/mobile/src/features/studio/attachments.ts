@@ -12,6 +12,7 @@ import {
   MAX_ATTACHMENTS,
 } from "./attachment-policy";
 import { useAttachmentLifecycle } from "./attachment-lifecycle";
+import { useCurrentConnectionSession } from "./session-current";
 
 export type Attachment = {
   key: string;
@@ -31,9 +32,11 @@ export function useAttachments() {
   const nextKey = useRef(0);
   const upload = useAction(api.files.index.upload);
   const removeFile = useAction(api.files.index.remove);
-  const lifecycle = useAttachmentLifecycle<Id<"files">>((id) =>
-    removeFile({ id }),
-  );
+  const sessionIsCurrent = useCurrentConnectionSession();
+  const lifecycle = useAttachmentLifecycle<Id<"files">>(async (id) => {
+    // Retain an orphan rather than remove it with a different account's session.
+    if (sessionIsCurrent()) await removeFile({ id });
+  });
   async function uploadOne(attachment: Attachment, token: number) {
     try {
       const file = new File(attachment.uri);

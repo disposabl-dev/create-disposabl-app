@@ -2,7 +2,7 @@ import { Logo } from "../components/logo";
 import { appName } from "../../lib/app-name";
 import { LegalFooter } from "../components/legal-page";
 import { LogOut } from "../components/ui/log-out";
-import { useState } from "react";
+import { useContext, useState } from "react";
 import { ThemeProvider } from "../lib/theme";
 import {
   createFileRoute,
@@ -21,7 +21,7 @@ import {
   paymentsEnabled,
   docsEnabled,
 } from "../../features";
-import { usePageTelemetry } from "../lib/telemetry";
+import { TelemetryOverrideContext, usePageTelemetry } from "../lib/telemetry";
 import { api } from "../../../backend/convex/_generated/api";
 
 export const Route = createFileRoute("/_providers")({
@@ -138,6 +138,23 @@ function PageTelemetry({
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   });
+  const Override = useContext(TelemetryOverrideContext);
+  return Override ? (
+    <Override pathname={pathname} token={token} ready={ready} />
+  ) : (
+    <DefaultPageTelemetry pathname={pathname} token={token} ready={ready} />
+  );
+}
+
+function DefaultPageTelemetry({
+  pathname,
+  token,
+  ready,
+}: {
+  pathname: string;
+  token: string | null;
+  ready: boolean;
+}) {
   usePageTelemetry(pathname, token, ready);
   return null;
 }

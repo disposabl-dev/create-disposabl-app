@@ -2,6 +2,7 @@ import { useState } from "react";
 import { createFileRoute, Navigate } from "@tanstack/react-router";
 import { useAction, useConvexAuth, useQuery } from "convex/react";
 import { api } from "../../../backend/convex/_generated/api";
+import { useConsentIdentity } from "../components/consent-identity";
 import { Button } from "../components/ui/button";
 
 export const Route = createFileRoute("/_providers/consent")({
@@ -22,6 +23,7 @@ function ConsentPage() {
   );
   const authorize = useAction(api.mcp.authorize);
   const { isAuthenticated, isLoading } = useConvexAuth();
+  const identity = useConsentIdentity();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [decision, setDecision] = useState<{
@@ -40,6 +42,11 @@ function ConsentPage() {
 
   const decide = async (approve: boolean) => {
     if (!requestId || pending || !request || request.status !== "pending")
+      return;
+    if (
+      approve &&
+      (identity.state !== "ready" || !isAuthenticated || isLoading)
+    )
       return;
     if (approve && request.kind === "device" && !deviceConfirmed) return;
     setPending(true);
@@ -102,6 +109,19 @@ function ConsentPage() {
           <strong>{request.clientName || request.clientId}</strong> wants to
           connect to {request.serverName}. This name is provided by the agent.
         </p>
+        {isAuthenticated && (
+          <p aria-live="polite">
+            {identity.state === "ready" ? (
+              <>
+                Signed in as <strong>{identity.label}</strong>
+              </>
+            ) : identity.state === "loading" ? (
+              "Loading your account…"
+            ) : (
+              "Your account could not be loaded. Refresh and try again."
+            )}
+          </p>
+        )}
         <section className="space-y-2" aria-label="Requested permissions">
           <h2 className="font-medium">Requested access</h2>
           {request.scopes.length ? (
@@ -159,7 +179,9 @@ function ConsentPage() {
             </Button>
             <Button
               disabled={
-                pending || (request.kind === "device" && !deviceConfirmed)
+                pending ||
+                identity.state !== "ready" ||
+                (request.kind === "device" && !deviceConfirmed)
               }
               onClick={() => decide(true)}
             >

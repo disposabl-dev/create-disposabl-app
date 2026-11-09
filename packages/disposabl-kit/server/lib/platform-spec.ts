@@ -47,9 +47,15 @@ export type ApiPolicy = {
   ) => boolean;
 };
 
+export type AccountEligibility = (
+  ctx: ToolCtx,
+  userId: string,
+) => Promise<boolean>;
+
 /** One opt-in produces the shared JSON contract and both transport adapters. */
 export function createPlatforms(
   modules: Record<string, Record<string, unknown>>,
+  eligibility?: AccountEligibility,
 ) {
   const spec: Operation[] = [];
   const tools: Record<string, ToolDefinition> = Object.create(null);
@@ -98,6 +104,8 @@ export function createPlatforms(
         args,
         returns: fn.returns,
         handler: async (ctx, input, user) => {
+          if (eligibility && !(await eligibility(ctx, user.userId)))
+            throw new ConvexError("Account is unavailable.");
           const startedAt = Date.now();
           try {
             const result = await runOperation(ctx, input, user);
@@ -186,6 +194,8 @@ export function createPlatforms(
           )
         )
           return Response.json({ error: "forbidden" }, { status: 403 });
+        if (eligibility && !(await eligibility(ctx, user.userId)))
+          return Response.json({ error: "forbidden" }, { status: 403 });
         const startedAt = Date.now();
         const header = request.headers.get("X-Disposabl-Source");
         const source = header === "cli" || header === "sdk" ? header : "api";
@@ -212,6 +222,13 @@ export function createPlatforms(
           await record("success");
         } catch (error) {
           await record("error");
+          if (
+            !(error instanceof ConvexError) &&
+            !(error instanceof SyntaxError)
+          ) {
+            console.error("platform_api_internal_error");
+            return Response.json({ error: "internal_error" }, { status: 500 });
+          }
           throw error;
         }
         return new Response(
@@ -238,7 +255,14 @@ export function createPlatforms(
           );
         if (error instanceof SyntaxError)
           return Response.json({ error: "invalid_request" }, { status: 400 });
-        console.error(error);
+        const operation = spec.find((item) => item.path === url.pathname)!;
+        const header = request.headers.get("X-Disposabl-Source");
+        await scheduleTelemetry(ctx, "api_operation", {
+          source: header === "cli" || header === "sdk" ? header : "api",
+          operation: operation.name,
+          outcome: "error",
+        });
+        console.error("platform_api_internal_error");
         return Response.json({ error: "internal_error" }, { status: 500 });
       }
     },

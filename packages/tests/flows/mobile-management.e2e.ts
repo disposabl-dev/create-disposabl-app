@@ -1,3 +1,4 @@
+import { dismissObservedSavePassword } from "../helpers/ios-save-password";
 import { openMobile } from "../helpers/mobile";
 import { test } from "@e2e-dev/mobile";
 import { expect, type TestFixtures } from "e2e";
@@ -73,7 +74,9 @@ test(
     await screen.getByRole("button", "Create a new app", { exact: true }).tap();
     await screen.getByRole("button", "Close create app", { exact: true }).tap();
     await expect(
-      screen.getByText("Meet Disposabl", { exact: true }),
+      screen
+        .getByRole("button", "Read Meet Disposabl", { exact: true })
+        .first(),
     ).toBeVisible();
   },
 );
@@ -133,6 +136,11 @@ test(
       .fill(password);
     if (platform === "ios") await screen.getByText("go", { exact: true }).tap();
     else await screen.getByRole("button", "Log in", { exact: true }).tap();
+    if (
+      platform === "ios" &&
+      process.env.E2E_IOS_SAVE_PASSWORD_DIAGNOSTIC === "1"
+    )
+      await dismissObservedSavePassword(device);
     const savePassword = screen.getByRole("button", "Not Now", { exact: true });
     await expect(
       screen.getByText(username, { exact: true }).first().or(savePassword),

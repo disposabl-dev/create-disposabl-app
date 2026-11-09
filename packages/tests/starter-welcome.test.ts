@@ -1,6 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  symlink,
+  writeFile,
+} from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -131,3 +138,140 @@ test("UUID package names do not appear as app branding", () => {
   assert.equal(displayAppName("Folio"), "Folio");
   assert.equal(displayAppName("Disposabl"), "Disposabl");
 });
+
+test("iOS starter retains Expo image source selection", async () => {
+  const temp = await mkdtemp(join(tmpdir(), "starter-ios-image-"));
+  try {
+    const app = join(temp, "app");
+    await createApp(template, app, "ios-fixture", {
+      version: "test",
+      platforms: ["web", "ios"],
+      features: ["authentication"],
+    });
+    const mobile = JSON.parse(
+      await readFile(join(app, "apps/mobile/package.json"), "utf8"),
+    );
+    assert.deepEqual(mobile.expo.autolinking.ios.buildFromSource, [
+      "expo-image",
+    ]);
+    assert.ok(mobile.dependencies["expo-image"]);
+    const { stdout } = await exec(
+      "node",
+      [
+        "../../node_modules/expo-modules-autolinking/bin/expo-modules-autolinking.js",
+        "resolve",
+        "--platform",
+        "apple",
+        "--json",
+      ],
+      { cwd: resolve(import.meta.dirname, "../../apps/mobile") },
+    );
+    assert.deepEqual(JSON.parse(stdout).configuration.buildFromSource, [
+      "expo-image",
+    ]);
+  } finally {
+    await rm(temp, { recursive: true, force: true });
+  }
+});
+
+test("fresh starters are formatted without changing bundled skills", async () => {
+  const temp = await mkdtemp(join(tmpdir(), "starter-format-"));
+  try {
+    for (const [name, platforms, features] of [
+      ["minimal", ["web"], []],
+      [
+        "all",
+        [
+          "web",
+          "android",
+          "ios",
+          "macos",
+          "windows",
+          "linux",
+          "api",
+          "mcp",
+          "cli",
+          "typescript-sdk",
+        ],
+        ["authentication", "payments", "analytics", "docs"],
+      ],
+    ] as const) {
+      const app = join(temp, name);
+      await createApp(template, app, `format-${name}`, {
+        version: "test",
+        platforms: [...platforms],
+        features: [...features],
+      });
+      await exec("bun", ["fmt", "--check"], { cwd: app });
+      if (name === "all") {
+        const skill = "apps/mobile/.claude/skills/eas-update/SKILL.md";
+        assert.equal(
+          await readFile(join(app, skill), "utf8"),
+          await readFile(join(template, skill), "utf8"),
+        );
+      }
+    }
+  } finally {
+    await rm(temp, { recursive: true, force: true });
+  }
+});
+
+test(
+  "scaffolding tolerates absent or unsupported formatters but propagates formatting failures",
+  { timeout: 15000 },
+  async () => {
+    const temp = await mkdtemp(join(tmpdir(), "starter-formatter-support-"));
+    const scaffold = resolve(
+      import.meta.dirname,
+      "../create-disposabl-app/scaffold.ts",
+    );
+    const reconfigure = resolve(
+      import.meta.dirname,
+      "../create-disposabl-app/reconfigure.ts",
+    );
+    try {
+      for (const mode of ["absent", "unsupported", "broken"]) {
+        const bin = join(temp, mode);
+        const app = join(bin, "app");
+        await mkdir(bin);
+        if (mode !== "absent")
+          await writeFile(
+            join(bin, "bun"),
+            `#!/bin/sh\ncase "$*" in\n  "--version") echo 1.0.0; exit 0;;\n  "fmt --no-script --help") exit ${mode === "broken" ? 0 : 1};;\n  *) echo 'fixture formatter failure' >&2; exit 42;;\nesac\n`,
+            { mode: 0o755 },
+          );
+        const script = `
+        import assert from "node:assert/strict";
+        import { existsSync } from "node:fs";
+        import { createApp } from ${JSON.stringify(scaffold)};
+        import { reconfigureApp } from ${JSON.stringify(reconfigure)};
+        const app = ${JSON.stringify(app)};
+        const template = ${JSON.stringify(template)};
+        const create = () => createApp(template, app, "formatter-test", {
+          version: "test", platforms: ["web"], features: []
+        });
+        if (${JSON.stringify(mode)} === "broken") {
+          await assert.rejects(create, /fixture formatter failure/);
+          assert.equal(existsSync(app), false);
+        } else {
+          await create();
+          const result = await reconfigureApp(template, app, "test", { features: "authentication" });
+          assert.ok(result.features.includes("authentication"));
+          assert.equal(existsSync(app), true);
+        }
+      `;
+        await exec(process.execPath, ["-e", script], {
+          env: {
+            NODE_ENV: "test",
+            PATH: bin,
+            HOME: temp,
+            DO_NOT_TRACK: "1",
+            E2E_TELEMETRY_DISABLED: "1",
+          },
+        });
+      }
+    } finally {
+      await rm(temp, { recursive: true, force: true });
+    }
+  },
+);

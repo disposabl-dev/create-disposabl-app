@@ -1,5 +1,8 @@
 import type Purchases from "react-native-purchases";
-import type { PurchasesOffering } from "react-native-purchases";
+import type {
+  PurchasesOffering,
+  PurchasesOfferings,
+} from "react-native-purchases";
 
 export type BillingSnapshot = {
   balance: number | null;
@@ -28,6 +31,26 @@ export function validMonthlyOffering(
   );
 }
 
+// Expo inlines this public build-time value in the mobile bundle.
+export const monthlyOfferingId = process.env.EXPO_PUBLIC_REVENUECAT_OFFERING_ID;
+
+/** Validate the complete selected offering, never a filtered package list. */
+export function selectMonthlyOffering(
+  offerings: PurchasesOfferings,
+  productId: string,
+  offeringId?: string,
+): PurchasesOffering | null {
+  const id = offeringId?.trim();
+  const offering = id
+    ? Object.hasOwn(offerings.all, id)
+      ? offerings.all[id]
+      : null
+    : offerings.current;
+  return offering && validMonthlyOffering(offering.availablePackages, productId)
+    ? offering
+    : null;
+}
+
 /** Must run inside BillingSession.run so identity changes are serialized. */
 export async function presentMonthlyPaywall(
   sdk: Store,
@@ -38,6 +61,7 @@ export async function presentMonthlyPaywall(
     offering: PurchasesOffering,
     current: () => boolean,
   ) => Promise<Outcome> = showPaywall,
+  offeringId?: string,
 ): Promise<Outcome> {
   const check = () => {
     if (!current()) throw new Error("Account changed.");
@@ -56,10 +80,10 @@ export async function presentMonthlyPaywall(
   const info = await sdk.getCustomerInfo();
   check();
   if (info.activeSubscriptions.length) throw new Error("existing_subscription");
-  const offering = (await sdk.getOfferings()).current;
+  const offerings = await sdk.getOfferings();
   check();
-  if (!offering || !validMonthlyOffering(offering.availablePackages, productId))
-    throw new Error("Store offering is unavailable.");
+  const offering = selectMonthlyOffering(offerings, productId, offeringId);
+  if (!offering) throw new Error("Store offering is unavailable.");
   const outcome = await present(offering, current);
   check();
   return outcome;

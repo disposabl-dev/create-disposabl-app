@@ -314,7 +314,6 @@ async function main() {
       setup?.installing();
       await install(directory, Boolean(setup?.live));
     }
-    if (hasBun) execFileSync("bun", ["fmt"], { cwd: directory, stdio: "pipe" });
     setup?.finish({
       installation: options.skipInstall ? "Skipped" : "Complete",
     });
@@ -352,9 +351,16 @@ async function main() {
   }
 }
 
-await capture(version, "generator", "create", "started", telemetryStatePath());
+const started = capture(
+  version,
+  "generator",
+  "create",
+  "started",
+  telemetryStatePath(),
+);
 try {
   await main();
+  await started;
   await capture(
     version,
     "generator",
@@ -363,6 +369,7 @@ try {
     telemetryStatePath(),
   );
 } catch (error) {
+  await started;
   await capture(
     version,
     "generator",

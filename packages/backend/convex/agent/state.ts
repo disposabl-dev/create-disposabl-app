@@ -1,3 +1,4 @@
+import { deletionPending } from "../users/deletion";
 import { saveMessage } from "@convex-dev/agent";
 import { internalMutation } from "@disposabl/disposabl-kit/server/lib/functions";
 import { v, type Infer } from "convex/values";
@@ -23,7 +24,11 @@ export const claim = internalMutation({
   returns: v.union(thread, v.null()),
   handler: async (ctx, { id, token }): Promise<Infer<typeof thread> | null> => {
     const current = await getThread(ctx, id);
-    if (!current || (current.lease && current.lease.expiresAt > Date.now()))
+    if (
+      !current ||
+      (await deletionPending(ctx, current.userId)) ||
+      (current.lease && current.lease.expiresAt > Date.now())
+    )
       return null;
     if (
       !current.pending.length &&
@@ -43,7 +48,7 @@ export const claim = internalMutation({
         ? {
             status: "stopping" as const,
             error:
-              "Message delivery could not be confirmed. The remote run was stopped; resend your message.",
+              "Message delivery could not be confirmed. Retry after the remote run has stopped.",
           }
         : {}),
     };
@@ -64,6 +69,7 @@ export const next = internalMutation({
   ),
   handler: async (ctx, args) => {
     const current = await locked(ctx, args);
+    if (await deletionPending(ctx, current.userId)) return null;
     const messageId = current.pending[0];
     if (
       !(await sessionAllows(
@@ -318,7 +324,7 @@ export const finish = internalMutation({
       delivery:
         args.stopped || args.suspended
           ? undefined
-          : args.error || args.unconfirmed
+          : args.error || args.unconfirmed || status === "stopping"
             ? current.delivery
             : undefined,
       stopFailures: args.stopped

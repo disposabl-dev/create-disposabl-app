@@ -1,4 +1,4 @@
-import { getSessionUserId } from "@disposabl/disposabl-kit/server/lib/functions";
+import { getActiveSessionUserId as getSessionUserId } from "../users/deletion";
 import {
   paginationOptsValidator,
   paginationResultValidator,
@@ -8,7 +8,6 @@ import { ConvexError, v, type Infer } from "convex/values";
 import { internal } from "../_generated/api";
 import {
   action,
-  mutation,
   query,
   type QueryCtx,
   type MutationCtx,
@@ -21,7 +20,6 @@ import {
   platform,
   androidArchitecture,
 } from "../validator";
-import { requireCurrentClient } from "../agent/credits";
 
 async function requireUser(ctx: QueryCtx | MutationCtx | ActionCtx) {
   const userId = await getSessionUserId(ctx);
@@ -68,22 +66,4 @@ export const requestConfigurationChecked = action({
       ...args,
       userId: await requireUser(ctx),
     }),
-});
-
-export const requestConfiguration = mutation({
-  args: {
-    appId: v.string(),
-    platforms: v.array(platform),
-    features: v.array(feature),
-    androidArchitectures: v.optional(v.array(androidArchitecture)),
-  },
-  returns: agentResult,
-  handler: async (ctx, args): Promise<Infer<typeof agentResult>> => {
-    const userId = await requireUser(ctx);
-    requireCurrentClient();
-    return ctx.runMutation(internal.apps.internal.requestConfigurationLegacy, {
-      ...args,
-      userId,
-    });
-  },
 });

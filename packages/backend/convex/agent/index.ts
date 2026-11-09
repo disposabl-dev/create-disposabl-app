@@ -1,4 +1,4 @@
-import { getSessionUserId } from "@disposabl/disposabl-kit/server/lib/functions";
+import { getActiveSessionUserId as getSessionUserId } from "../users/deletion";
 import { ConvexError, v, type Infer } from "convex/values";
 import { internal } from "../_generated/api";
 import {
@@ -10,7 +10,6 @@ import {
   type ActionCtx,
 } from "../_generated/server";
 import { history, historyArgs, result, sendArgs } from "./validator";
-import { requireCurrentClient } from "./credits";
 
 async function requireUser(ctx: QueryCtx | MutationCtx | ActionCtx) {
   const userId = await getSessionUserId(ctx);
@@ -25,18 +24,6 @@ export const sendMessageChecked = action({
       ...args,
       userId: await requireUser(ctx),
     }),
-});
-export const sendMessage = mutation({
-  args: sendArgs,
-  returns: result,
-  handler: async (ctx, args): Promise<Infer<typeof result>> => {
-    const userId = await requireUser(ctx);
-    requireCurrentClient();
-    return ctx.runMutation(internal.agent.internal.enqueueMessage, {
-      ...args,
-      userId,
-    });
-  },
 });
 export const abortMessage = mutation({
   args: { appId: v.string() },

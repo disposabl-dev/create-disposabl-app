@@ -10,14 +10,31 @@ export const boundary = internalMutationGeneric({
 
 import {
   notice as realNotice,
+  noticeCandidate as realNoticeCandidate,
   getDebit as realGetDebit,
   get as realGet,
   claimWindow,
   settle as realSettle,
 } from "../../../../../backend/convex/agent/compute";
 export const notice = internalMutationGeneric({
-  args: { debitId: v.id("computeDebits"), failed: v.optional(v.boolean()) },
+  args: {
+    debitId: v.id("computeDebits"),
+    failed: v.optional(v.boolean()),
+    disabled: v.optional(v.boolean()),
+    observation: v.optional(
+      v.object({
+        userId: v.id("users"),
+        paidUntil: v.number(),
+        balance: v.number(),
+        observedAt: v.number(),
+      }),
+    ),
+  },
   handler: (ctx, args) => (realNotice as any)._handler(ctx, args),
+});
+export const noticeCandidate = internalQueryGeneric({
+  args: { debitId: v.id("computeDebits"), now: v.number() },
+  handler: (ctx, args) => (realNoticeCandidate as any)._handler(ctx, args),
 });
 export const getDebit = internalQueryGeneric({
   args: { debitId: v.id("computeDebits") },

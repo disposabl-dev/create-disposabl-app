@@ -1,6 +1,6 @@
 ---
 name: disposabl-app
-description: Create, develop, and deliver Disposabl apps, with preview status updates and verification on the requested platforms.
+description: Create, develop, deliver, and submit Disposabl apps, with preview status updates and verification on the requested platforms.
 ---
 
 # Build a Disposabl app
@@ -20,7 +20,7 @@ bun create disposabl-app@latest my-app --platforms web,android,mcp --features au
 
 Use the requested platforms and features. Creation handles Disposabl login, required GitHub and Convex setup, and the app's scoped development environment. Resume interrupted setup in the same directory. Do not create a replacement Convex project or delete an app unless requested. Never print credentials.
 
-The CLI is bundled with `create-disposabl-app`; do not use the retired `@disposabl/cli` package. Commands below use the published CLI and work without a global install:
+The CLI is bundled with `create-disposabl-app`. Commands below use that bundled CLI and work without a global install:
 
 ```sh
 bunx --package create-disposabl-app@latest disposabl login status
@@ -36,6 +36,8 @@ For an existing app's platform or feature changes, use the separately installed 
 Choose a visual direction suited to the product. Read the `frontend-design` skill when available and read [app branding and visual design](references/design.md). If that skill is unavailable, proceed with the user's brief and report the limitation without blocking development.
 
 Read [delivery checks](references/delivery.md) before native builds or delivery repairs. Aim to show a usable web preview early; first native builds can take longer. Do not promise a build deadline.
+
+For requested App Store or Google Play submission, read [store submissions](references/store-submissions.md). Build and verify the matching store artifacts and reviewer access, then follow the requested submission and release scope.
 
 Prefer local development, builds, and verification whenever the toolchain is available. Do not push or start GitHub Actions merely to test changes. Use the existing release workflows for authorized publication.
 

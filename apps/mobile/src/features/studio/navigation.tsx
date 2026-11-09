@@ -7,7 +7,7 @@ import { useTheme } from "../../../../../packages/disposabl-kit/mobile/design/us
 import {
   useAccentColor,
   useResolvedColorScheme,
-} from "../../../../../packages/disposabl-kit/mobile/design/theme-provider";
+} from "@disposabl/disposabl-kit/mobile";
 
 export function StudioNavigation() {
   return authenticationEnabled ? <AuthenticatedNavigation /> : <Navigation />;

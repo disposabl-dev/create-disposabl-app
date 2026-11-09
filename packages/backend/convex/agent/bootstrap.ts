@@ -27,6 +27,8 @@ export async function authorizeSandbox(
     crypto.randomUUID().replaceAll("-", "");
   const expiresAt = await ctx.runMutation(internal.agent.access.issue, {
     ...lease,
+    userId: current.userId,
+    appId: current.appId,
     hash: await digest(token),
   });
   const ref = sandboxRef(current.userId);

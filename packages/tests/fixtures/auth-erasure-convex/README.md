@@ -1,0 +1,17 @@
+# Isolated auth-erasure fixture
+
+Use only a disposable loopback Convex backend on ports 3540/3541. These public fixture wrappers can create and erase synthetic identities. Never deploy them to a shared or cloud backend. Set `E2E_TELEMETRY_DISABLED=1` in both the process and backend before synchronization; use no provider credentials.
+
+Resolve the selected archive from the root `package.json` catalog and verify its bytes before preparing the fixture. Preserve the repository-relative layout when copying this fixture: its product wrapper imports the actual `packages/backend/convex/users/authDeletion.ts` handler. Extract the archive into this fixture's `authpkg/` directory, removing npm's enclosing `package/` directory. Link the installed dependencies for both the fixture and extracted package. Append the fixture-only files as follows:
+
+- `google-bridge.ts.txt` to `authpkg/src/components/google/provider.ts`.
+- `password-seed.ts.txt` to `authpkg/src/components/password/public.ts`.
+- `core-seed.ts.txt` to `authpkg/src/component/public.ts`.
+
+Synchronize only this fixture's `convex/` directory to the disposable backend, then run `python3 core-test.py` and `python3 identity-test.py` from this directory. The product handler requires the selected package’s username and email erasure components; use the combined product fixture in `../auth-identity-erasure-convex/` for that proof. Stop the owned backend afterward. The core test intentionally leaves a synthetic historical orphan to verify that the reported erasure limit is truthful. The Google bridge creates encrypted synthetic tickets without contacting Google.
+
+Historical product-test evidence called the actual operator handler through `_handler`; use the combined identity-erasure fixture above for current product orchestration. That historical proof checked rollback, concurrent batches and counters, stale requests, another user, authenticated-session and password denial, linked cleanup, identity cutoff retention, and repeat completion. Source fixtures do not independently prove compiled-runtime parity. The separate packaged-runtime qualification and retained identity limits are documented in `vendor/README.md`.
+
+`marker-runtime.test.ts.txt` is an opt-in helper, not an automatically collected test. Copy it as `marker-runtime.test.ts` beside a `package/` directory and run it with Bun, with `convex` and `convex-test` resolvable from that directory. The registered argument-boundary check uses `convex-test` (locally checked with 0.0.65); it is an in-memory simulation, not a real backend. For a prepared source overlay, verify the source matches its intended patch before running. To inspect a rebuilt package's compiled behavior, replace its `package/src/*.ts` imports with the corresponding `package/dist/*.js` paths in that disposable copy; do not substitute an older archive for the source under test.
+
+No fixture helper is included in the auth archive or generated starters. Passing these checks does not establish remote-work drain, historical orphan cleanup, provider erasure, or complete account deletion.

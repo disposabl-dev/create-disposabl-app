@@ -1,9 +1,22 @@
-import { HeadContent, Scripts, createRootRoute } from "@tanstack/react-router";
+import {
+  HeadContent,
+  Scripts,
+  createRootRoute,
+  useRouterState,
+} from "@tanstack/react-router";
 
 import site from "../../site.json";
 import { isAccountPage } from "@disposabl/disposabl-kit/lib/indexing";
 
 import appCss from "../index.css?url";
+import { TelemetryOverrideContext } from "@disposabl/disposabl-kit/client/lib/telemetry";
+import { AnalyticsPreference, ProductTelemetry } from "../telemetry";
+import { publicReplayPath } from "../telemetry-replay";
+import { useSyncExternalStore } from "react";
+
+const subscribeHydration = () => () => {};
+const clientSnapshot = () => true;
+const serverSnapshot = () => false;
 
 export const Route = createRootRoute({
   head: ({ matches }) => {
@@ -92,13 +105,28 @@ export const Route = createRootRoute({
 });
 
 function RootDocument({ children }: { children: React.ReactNode }) {
+  const pathname = useRouterState({
+    select: (state) => state.location.pathname,
+  });
+  const hydrated = useSyncExternalStore(
+    subscribeHydration,
+    clientSnapshot,
+    serverSnapshot,
+  );
   return (
     <html lang="en" data-type="software" suppressHydrationWarning>
       <head>
         <HeadContent />
       </head>
-      <body>
-        {children}
+      <body
+        data-replay-public={
+          hydrated && publicReplayPath(pathname) ? "true" : undefined
+        }
+      >
+        <TelemetryOverrideContext.Provider value={ProductTelemetry}>
+          {children}
+          <AnalyticsPreference />
+        </TelemetryOverrideContext.Provider>
         <Scripts />
       </body>
     </html>

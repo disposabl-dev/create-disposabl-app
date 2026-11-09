@@ -1,3 +1,4 @@
+import { deletionPending, requireNotDeleting } from "../users/deletion";
 import {
   identityFields,
   internalMutation,
@@ -13,6 +14,7 @@ export const refresh = internalMutation({
   },
   returns: v.boolean(),
   handler: async (ctx, { userId, previous, next }) => {
+    const pending = await deletionPending(ctx, userId);
     const row = await ctx.db
       .query("connections")
       .withIndex("by_userId_provider", (q) =>
@@ -20,6 +22,18 @@ export const refresh = internalMutation({
       )
       .unique();
     if (!row || row.token !== previous) return false;
+    if (pending) {
+      // Release an already-acquired refresh lease without writing a new token.
+      if (next === previous) {
+        await ctx.db.patch("connections", row._id, {
+          refreshingUntil: undefined,
+        });
+        return false;
+      }
+      throw new ConvexError(
+        "Account deletion has been requested or this account no longer exists.",
+      );
+    }
     if (next !== undefined) {
       await ctx.db.patch("connections", row._id, {
         token: next,
@@ -44,6 +58,7 @@ export const select = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, { userId, token, accountId, name }) => {
+    await requireNotDeleting(ctx, userId);
     const row = await ctx.db
       .query("connections")
       .withIndex("by_userId_provider", (q) =>

@@ -1,0 +1,25 @@
+import { makeFunctionReference } from "convex/server";
+import type { ActionCtx } from "../../backend/convex/_generated/server";
+
+export async function fixtureContext(enabled: boolean, getUserId: () => Promise<string | null>) {
+  if (!enabled) throw new Error("Payments are disabled.");
+  const userId = await getUserId();
+  if (!userId) throw new Error("Please sign in to use payments.");
+  return { key: "", userId, returnUrl: "http://127.0.0.1:3549/pricing" };
+}
+export async function fixtureRequest(ctx: ActionCtx, _key: string, method: string, body: Record<string, any>) {
+  if (method === "customers.get_or_create" && typeof body.customer_id === "string" && Object.keys(body).length === 1)
+    return { balances: { credits: { remaining: 42 } }, subscriptions: [] };
+  if (method !== "billing.attach" || typeof body.customer_id !== "string" || !["credits_monthly", "credits_topup"].includes(body.plan_id))
+    throw new Error("Unexpected fixture provider operation");
+  const quantity = body.feature_quantities?.[0];
+  await ctx.runMutation(makeFunctionReference<"mutation", {userId:string; planId:string; feature?:string; quantity?:number}, null>("fixtureBillingCheckout:record"), {
+    userId: body.customer_id, planId: body.plan_id,
+    ...(quantity ? { feature: quantity.feature_id, quantity: quantity.quantity } : {}),
+  });
+  return { payment_url: "https://fixture.invalid/local-test-checkout" };
+}
+export function fixtureCheckoutUrl(url: string | null) {
+  if (url !== "https://fixture.invalid/local-test-checkout") throw new Error("Unexpected fixture destination");
+  return "http://127.0.0.1:3549/local-test-checkout";
+}

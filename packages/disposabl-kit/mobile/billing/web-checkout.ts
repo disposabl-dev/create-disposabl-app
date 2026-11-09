@@ -5,12 +5,17 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState, Linking, Platform } from "react-native";
 import { billingSession } from "./session";
 import {
+  guardedWebHandoff,
   paymentOptions,
   preflightWebMonthly,
   preflightWebTopup,
   storeEligibility,
 } from "./policy";
-import { validMonthlyOffering, type BillingSnapshot } from "./paywall";
+import {
+  monthlyOfferingId,
+  selectMonthlyOffering,
+  type BillingSnapshot,
+} from "./paywall";
 import { loadTopup, matchingTopupRoute, type TopupSnapshot } from "./topup";
 
 const topupApp = process.env.EXPO_PUBLIC_REVENUECAT_IOS_APP_ID;
@@ -54,9 +59,13 @@ export function useWebCheckout(
           key,
           async (sdk) => {
             const eligibility = await storeEligibility(sdk, Platform.OS);
-            const offering = productId
-              ? (await sdk.getOfferings().catch(() => null))?.current
+            const offerings = productId
+              ? await sdk.getOfferings().catch(() => null)
               : null;
+            const offering =
+              offerings && productId
+                ? selectMonthlyOffering(offerings, productId, monthlyOfferingId)
+                : null;
             const common = {
               platform: Platform.OS,
               ...eligibility,
@@ -78,11 +87,7 @@ export function useWebCheckout(
                 ...eligibility,
                 paymentsEnabled: true,
                 webCheckoutEnabled: latest.mobileWebCheckoutEnabled,
-                nativeReady:
-                  latest.nativeSubscriptionsEnabled &&
-                  !!offering &&
-                  !!productId &&
-                  validMonthlyOffering(offering.availablePackages, productId),
+                nativeReady: latest.nativeSubscriptionsEnabled && !!offering,
               }).web,
             };
           },
@@ -129,32 +134,38 @@ export function useWebCheckout(
         generation,
         key,
         async (sdk) => {
-          if (purchase === "monthly")
-            await preflightWebMonthly(
-              sdk,
-              Platform.OS,
-              productId!,
-              customerId,
-              snapshot,
-              current,
-            );
-          else
-            await preflightWebTopup(
-              sdk,
-              Platform.OS,
-              topupApp,
-              topupProduct,
-              customerId,
-              snapshot,
-              current,
-            );
-          if (!current()) throw new Error("Account changed.");
-          const returnChannel =
-            Constants.expoConfig?.extra?.billingReturnChannel;
-          return handoff({
-            purchase,
-            ...(typeof returnChannel === "string" ? { returnChannel } : {}),
-          });
+          const preflight = () =>
+            purchase === "monthly"
+              ? preflightWebMonthly(
+                  sdk,
+                  Platform.OS,
+                  productId!,
+                  customerId,
+                  snapshot,
+                  current,
+                  monthlyOfferingId,
+                )
+              : preflightWebTopup(
+                  sdk,
+                  Platform.OS,
+                  topupApp,
+                  topupProduct,
+                  customerId,
+                  snapshot,
+                  current,
+                );
+          return guardedWebHandoff(
+            preflight,
+            () => {
+              const returnChannel =
+                Constants.expoConfig?.extra?.billingReturnChannel;
+              return handoff({
+                purchase,
+                ...(typeof returnChannel === "string" ? { returnChannel } : {}),
+              });
+            },
+            current,
+          );
         },
       );
       const parsed = new URL(handoffResult.url);

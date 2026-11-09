@@ -25,11 +25,66 @@ if (
 // Product-only proof harnesses must not enter generated apps. Keep the same
 // paths in the symlink validation and removal inventories.
 const productProofTests = [
+  "packages/tests/ui-telemetry-policy.test.ts",
+  "packages/tests/components/ui-telemetry-mobile.test.mjs",
+  "packages/tests/components/ui-telemetry-web.test.mjs",
+  "apps/web/src/telemetry.tsx",
+  "apps/web/src/telemetry-policy.ts",
+  "apps/web/src/telemetry-replay.ts",
+  "apps/mobile/src/features/product-telemetry.tsx",
+  "apps/mobile/src/features/telemetry-policy.ts",
+  "packages/tests/compute-stop.test.ts",
+  "packages/tests/auth-deletion-current.test.ts",
+  "packages/tests/flows/billing-checkout-auth.e2e.ts",
+  "packages/tests/fixtures/billing-checkout-browser",
+  "packages/tests/flows/sdk-auth.e2e.ts",
+  "packages/tests/helpers/sdk-auth",
+  "packages/tests/fixtures/starter-payment-reconfigure",
+  "packages/tests/starter-payment-reconfigure.test.ts",
+  "packages/tests/flows/support-contact.e2e.ts",
+  "packages/tests/fixtures/telemetry-http-convex",
+  "packages/tests/telemetry-http-integration.test.ts",
+  "packages/tests/fixtures/telemetry-link-convex",
+  "packages/tests/telemetry-link-transactions.test.ts",
+  "packages/tests/platform-error-telemetry.test.ts",
+  "packages/tests/cli-first-execution.test.ts",
+  "packages/tests/sdk-source-attribution.test.ts",
+  "packages/tests/fixtures/posthog-replay-browser",
+  "packages/tests/fixtures/telemetry-guard-convex",
+  "packages/tests/telemetry-guard-transactions.test.ts",
+  "packages/tests/telemetry-deletion-guard.test.ts",
+  "packages/tests/flows/billing-handoff-auth.e2e.ts",
+  "packages/tests/fixtures/billing-handoff-browser",
+  "packages/tests/billing-handoff-local.test.ts",
+  "packages/tests/fixtures/billing-handoff-local",
+  "packages/tests/ios-save-password.test.ts",
+  "packages/tests/helpers/ios-save-password.ts",
+  "packages/tests/flows/account-deletion-receipt.e2e.ts",
+  "packages/tests/legal-product-providers.test.ts",
+  "packages/tests/fixtures/file-deletion-convex",
+  "packages/tests/fixtures/ephemeral-deletion-convex",
+  "packages/tests/ephemeral-deletion-transactions.test.ts",
+  "packages/tests/fixtures/auth-identity-erasure-convex",
+  "packages/tests/fixtures/agent-inert-convex",
+  "packages/tests/fixtures/auth-erasure-convex",
+  "packages/tests/mcp-deletion-product.test.ts",
+  "packages/tests/fixtures/mcp-deletion-product-convex",
+  "packages/tests/mobile-theme-identity.test.ts",
+  "packages/tests/mcp-erasure-component.test.ts",
+  "packages/tests/fixtures/mcp-erasure-convex",
+  "packages/tests/mcp-deletion-guard.test.ts",
+  "packages/tests/account-deletion-active.test.ts",
+  "packages/tests/flows/account-deletion.e2e.ts",
+  "packages/tests/account-deletion-stop.test.ts",
+  "packages/tests/account-deletion-transactions.test.ts",
+  "packages/tests/fixtures/account-deletion-convex",
   "packages/tests/flows/cli-oauth.e2e.ts",
   "packages/tests/helpers/cli-oauth-fixture.ts",
   "packages/tests/cli-oauth-build.test.ts",
   "packages/tests/flows/desktop-real.e2e.ts",
   "packages/tests/components/desktop-real.cjs",
+  "packages/tests/billing-deletion.test.ts",
+  "packages/tests/components/billing-deletion.test.mjs",
   "packages/tests/billing-handoff-transactions.test.ts",
   "packages/tests/fixtures/billing-handoff-convex",
   "packages/tests/architecture-transactions.test.ts",
@@ -49,6 +104,7 @@ const productProofTests = [
   "packages/tests/native-inbox-transactions.test.ts",
   "packages/tests/fixtures/native-inbox-convex",
   "packages/tests/low-credit-email-integration.test.ts",
+  "packages/tests/low-credit-elapsed.test.ts",
   "packages/tests/fixtures/low-credit-convex",
 ];
 
@@ -56,20 +112,30 @@ const productProofTests = [
 // symlinks may be packaged, but reset must never read or write through a link.
 const touched = [
   ...productProofTests,
+  "packages/backend/convex/users/receipts.ts",
+  "packages/backend/convex/users/authDeletion.ts",
+  "packages/backend/convex/users/fileDeletion.ts",
+  "packages/backend/convex/users/ephemeralDeletion.ts",
+  "packages/backend/convex/users/localDeletion.ts",
   "packages/backend/convex",
   "packages/backend/generated",
   "packages/backend/package.json",
   "packages/backend/README.md",
+  "packages/tests/README.md",
   "packages/sdk/src",
   "packages/cli",
   "packages/create-disposabl-app",
   "starter",
   ".github/workflows",
   "apps/web/src/router",
+  "apps/web/package.json",
   "apps/mobile/src/app/index.tsx",
   "apps/mobile/package.json",
   "apps/mobile/app.json",
   "packages/disposabl-kit/package.json",
+  "packages/disposabl-kit/legal/publisher.ts",
+  "packages/disposabl-kit/client/components/account-deletion.tsx",
+  "packages/tests/components/account-deletion.test.mjs",
   "packages/disposabl-kit/mobile/components/use-dictation.ts",
   "packages/tests/mobile-dictation.test.ts",
   "packages/tests/components/mobile-dictation.test.mjs",
@@ -194,12 +260,12 @@ const keep = new Set([
   "auth.config.ts",
   "mcp.ts",
   "tsconfig.json",
-  "users",
   "files",
   "desktopUpdates",
   "desktopUpdates.ts",
 ]);
 for (const entry of keep) await lstat(join(convex, entry));
+await lstat(join(convex, "users"));
 for (const path of [
   "README.md",
   "convex/schema.ts",
@@ -207,6 +273,9 @@ for (const path of [
   "convex/convex.config.ts",
   "convex/_generated/api.d.ts",
   "convex/_generated/server.d.ts",
+  "convex/users/index.ts",
+  "convex/users/internal.ts",
+  "convex/users/validator.ts",
   "generated/platforms.ts",
   "generated/openapi.json",
   "generated/pages.json",
@@ -214,7 +283,17 @@ for (const path of [
   await readFile(join(root, "starter/backend", path));
 
 const starterCopies = [
+  [
+    "starter/client/account-deletion.tsx",
+    "packages/disposabl-kit/client/components/account-deletion.tsx",
+  ],
+  [
+    "starter/client/account-deletion-check.mjs",
+    "packages/tests/components/account-deletion.test.mjs",
+  ],
+  ["starter/legal/publisher.ts", "packages/disposabl-kit/legal/publisher.ts"],
   ["starter/web/index.tsx", "apps/web/src/router/index.tsx"],
+  ["starter/web/root.tsx", "apps/web/src/router/__root.tsx"],
   ["starter/cli/README.md", "packages/cli/README.md"],
   ["starter/cli/commands.ts", "packages/cli/commands.ts"],
   [
@@ -227,8 +306,27 @@ const starterCopies = [
   ["starter/mobile/mobile.e2e.ts", "packages/tests/flows/mobile.e2e.ts"],
 ] as const;
 for (const [source] of starterCopies) await readFile(join(root, source));
+const testsReadmePath = join(root, "packages/tests/README.md");
+const testsReadme = await readFile(testsReadmePath, "utf8");
+const agentFixtureParagraph =
+  /^The provider-inert agent fixture in `fixtures\/agent-inert-convex\/`[^\n]*\n\n/m;
+const passwordDiagnosticParagraph =
+  /^For the product username flow only, `E2E_IOS_SAVE_PASSWORD_DIAGNOSTIC=1`[^\n]*\n\n/m;
+const receiptFixtureParagraph =
+  /^The opt-in `flows\/account-deletion-receipt.e2e.ts`[^\n]*\n\n/m;
+if (!agentFixtureParagraph.test(testsReadme))
+  throw new Error(
+    "Starter reset inputs changed: agent fixture guidance missing.",
+  );
 
 // Generated apps start with their own origin and copy, never Disposabl's SEO.
+await Bun.write(
+  testsReadmePath,
+  testsReadme
+    .replace(agentFixtureParagraph, "")
+    .replace(passwordDiagnosticParagraph, "")
+    .replace(receiptFixtureParagraph, ""),
+);
 await Bun.write(
   join(root, "apps/web/site.json"),
   JSON.stringify(
@@ -254,6 +352,11 @@ for (const entry of await readdir(convex)) {
 }
 for (const path of [
   ...productProofTests,
+  "packages/backend/convex/users/receipts.ts",
+  "packages/backend/convex/users/authDeletion.ts",
+  "packages/backend/convex/users/fileDeletion.ts",
+  "packages/backend/convex/users/ephemeralDeletion.ts",
+  "packages/backend/convex/users/localDeletion.ts",
   "packages/tests/generator-service-origin.test.ts",
   "packages/tests/mobile-attachment-lifecycle.test.ts",
   "packages/tests/components/mobile-attachment-lifecycle.test.mjs",
@@ -351,7 +454,19 @@ lock.workspaces["packages/backend"] = {
 delete turbo.tasks["create-disposabl-app#build"];
 // Chat capture and rendering belong to the Disposabl product.
 const mobile = await json("apps/mobile/package.json");
+const web = await json("apps/web/package.json");
+delete web.dependencies["posthog-js"];
+for (const name of [
+  "posthog-react-native",
+  "@posthog/react-native-plugin",
+  "expo-application",
+  "expo-localization",
+])
+  delete mobile.dependencies[name];
 const mobileConfig = await json("apps/mobile/app.json");
+// Store listing identities belong to Disposabl, not newly generated apps.
+delete mobileConfig.expo.ios.bundleIdentifier;
+delete mobileConfig.expo.android.package;
 const kit = await json("packages/disposabl-kit/package.json");
 const chatPackages = [
   "expo-image-picker",
@@ -369,6 +484,7 @@ mobileConfig.expo.plugins = mobileConfig.expo.plugins.filter(
 );
 for (const [path, value] of [
   ["apps/mobile/package.json", mobile],
+  ["apps/web/package.json", web],
   ["apps/mobile/app.json", mobileConfig],
   ["packages/disposabl-kit/package.json", kit],
   [backendPath, backend],

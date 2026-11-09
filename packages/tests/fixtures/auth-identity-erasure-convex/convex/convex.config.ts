@@ -1,0 +1,13 @@
+import { defineApp } from "convex/server";
+import username from "../authpkg/src/components/username/convex.config.ts";
+import email from "../authpkg/src/components/email/convex.config.ts";
+import google from "../authpkg/src/components/google/convex.config.ts";
+import password from "../authpkg/src/components/password/convex.config.ts";
+import auth from "../authpkg/src/component/convex.config.ts";
+const app = defineApp();
+app.use(username);
+app.use(email);
+app.use(password);
+app.use(auth);
+app.use(google, { httpPrefix: "/oauth/google", env: { CLIENT_ID: "fixture" } });
+export default app;

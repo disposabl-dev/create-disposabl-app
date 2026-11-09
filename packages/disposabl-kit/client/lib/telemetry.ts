@@ -1,8 +1,15 @@
-import { useEffect, useRef } from "react";
+import { createContext, useEffect, useRef, type ComponentType } from "react";
 import { sessionId } from "../../lib/auth-session";
 import { analyticsEnabled } from "../../features";
 
 import { createPageTelemetry } from "../../lib/telemetry";
+
+// Product apps can replace the generic starter transport without duplicating it.
+export const TelemetryOverrideContext = createContext<ComponentType<{
+  pathname: string;
+  token: string | null;
+  ready: boolean;
+}> | null>(null);
 
 // A shared ID is safe only when its entire read/send/write transition is locked.
 // Without Web Locks, use a document-local identity rather than share stale state.

@@ -1,4 +1,4 @@
-import { getSessionUserId } from "@disposabl/disposabl-kit/server/lib/functions";
+import { getActiveSessionUserId as getSessionUserId } from "../users/deletion";
 import { v, type Infer } from "convex/values";
 import { internal } from "../_generated/api";
 import { query } from "../_generated/server";

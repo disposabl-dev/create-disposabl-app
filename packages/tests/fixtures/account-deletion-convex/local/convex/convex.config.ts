@@ -1,0 +1,13 @@
+import { defineApp } from "convex/server";
+import auth from "@convex-dev/auth/convex.config.js";
+import password from "@convex-dev/auth/components/password/convex.config.js";
+import username from "@convex-dev/auth/components/username/convex.config.js";
+import email from "@convex-dev/auth/components/email/convex.config.js";
+import mcp from "@convex-dev/mcp/convex.config.js";
+const app = defineApp();
+app.use(auth);
+app.use(password);
+app.use(username);
+app.use(email);
+app.use(mcp);
+export default app;

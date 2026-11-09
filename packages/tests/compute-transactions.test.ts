@@ -11,10 +11,12 @@ if (
     "http://localhost:3420",
     "http://127.0.0.1:3520",
     "http://localhost:3520",
+    "http://127.0.0.1:3540",
+    "http://localhost:3540",
   ].includes(url)
 )
   throw new Error(
-    "Compute fixture requires the isolated loopback deployment on port 3420 or 3520",
+    "Compute fixture requires the isolated loopback deployment on port 3420, 3520 or 3540",
   );
 async function call(name: string, args: object, query = false) {
   const response = await fetch(`${url}/api/${query ? "query" : "mutation"}`, {
@@ -29,10 +31,72 @@ async function call(name: string, args: object, query = false) {
 }
 
 test(
+  "a starting session with an existing confirmed debit cannot claim again",
+  { skip: !url },
+  async () => {
+    const userId = await call("seedUser", {});
+    const sessionId = await call("admit", { userId });
+    await call("app", { userId, sessionId, threadId: randomUUID() });
+    const debit = await call("claim", { sessionId });
+    await call("settleDebit", {
+      debitId: debit._id,
+      outcome: "confirmed",
+      responseBalance: 7,
+    });
+    await call("setStartingWithDebit", { sessionId });
+    const before = await call("debits", { sessionId }, true);
+    const sessionBefore = await call("get", { sessionId }, true);
+    const claims = await Promise.all([
+      call("claim", { sessionId }),
+      ...Array.from({ length: 5 }, () =>
+        call("claim", { sessionId, expectedDebit: debit._id }),
+      ),
+    ]);
+    assert.ok(claims.every((value) => value === null));
+    assert.deepEqual(await call("debits", { sessionId }, true), before);
+    assert.deepEqual(await call("get", { sessionId }, true), sessionBefore);
+    assert.equal(before.length, 1);
+    assert.equal(before[0].state, "confirmed");
+    assert.equal(before[0].responseBalance, 7);
+  },
+);
+
+test(
+  "a displaced in-flight confirmation fences the newer session and preserves evidence",
+  { skip: !url },
+  async () => {
+    const userId = await call("seedUser", {});
+    const old = await call("admit", { userId });
+    await call("app", { userId, sessionId: old, threadId: randomUUID() });
+    const debit = await call("claim", { sessionId: old });
+    const current = await call("seedNewerSession", { userId });
+    await Promise.all(
+      Array.from({ length: 6 }, () =>
+        call("settleDebit", {
+          debitId: debit._id,
+          outcome: "confirmed",
+          responseBalance: 3,
+        }),
+      ),
+    );
+    const held = await call("get", { sessionId: current }, true);
+    assert.equal(held.state, "hold");
+    assert.equal(held.stopConfirmed, undefined);
+    assert.equal(held.reconciliationConflict, true);
+    assert.deepEqual(held.conflictDebits, [debit._id]);
+    const [recorded] = await call("debits", { sessionId: old }, true);
+    assert.equal(recorded.state, "dispatching");
+    assert.equal(recorded.lateConfirmation.responseBalance, 3);
+    assert.equal(recorded.reconciliationConflict, true);
+    await assert.rejects(call("admit", { userId }), /reconciliation/);
+  },
+);
+
+test(
   "real Convex transactions serialize claims, boundary, stop and explicit resume",
   { skip: !url },
   async () => {
-    const userId = randomUUID(),
+    const userId = await call("seedUser", {}),
       threadId = randomUUID();
     const admissions = await Promise.all(
       Array.from({ length: 12 }, () => call("admit", { userId })),
@@ -46,17 +110,19 @@ test(
     const first = claims.filter(Boolean);
     assert.equal(first.length, 1);
     await call("settleDebit", { debitId: first[0]._id, outcome: "confirmed" });
+    const paidUntil = (await call("get", { sessionId }, true)).paidUntil;
     assert.equal(
-      await call(
-        "allowed",
-        { sessionId, userId, now: first[0].paidUntil },
-        true,
-      ),
+      await call("allowed", { sessionId, userId, now: paidUntil }, true),
       false,
     );
-    const secondDebit = await call("inFlightRenewal", { sessionId });
+    await call("expireFundedWindow", { sessionId });
+    const secondDebit = await call("claim", {
+      sessionId,
+      expectedDebit: first[0]._id,
+    });
+    assert.equal(secondDebit.paidUntil, 0);
+    assert.equal((await call("get", { sessionId }, true)).state, "renewing");
     const second = [secondDebit];
-    await call("expire", { sessionId });
     assert.equal((await call("debits", { sessionId }, true)).length, 2);
     await call("crash", { debitId: second[0]._id });
     const resolution = {
@@ -148,7 +214,7 @@ test(
       "starting",
     );
 
-    const other = randomUUID(),
+    const other = await call("seedUser", {}),
       old = await call("admit", { userId: other });
     const otherApp = await call("app", {
       userId: other,
@@ -176,7 +242,7 @@ test(
   "a provider-denied debit is recorded without granting paid time",
   { skip: !url },
   async () => {
-    const userId = randomUUID();
+    const userId = await call("seedUser", {});
     const sessionId = await call("admit", { userId });
     const appId = await call("app", {
       userId,
@@ -206,32 +272,70 @@ test(
   "expired worker cannot mutate or issue credentials",
   { skip: !url },
   async () => {
-    const userId = randomUUID(),
+    const userId = await call("seedUser", {}),
       threadId = randomUUID(),
       sessionId = await call("admit", { userId });
-    const appId = await call("app", { userId, sessionId, threadId });
+    const appRowId = await call("app", { userId, sessionId, threadId });
+    const otherUserId = await call("seedUser", {});
+    const otherSessionId = await call("admit", { userId: otherUserId });
+    const otherAppId = randomUUID();
+    await call("app", {
+      userId: otherUserId,
+      sessionId: otherSessionId,
+      threadId: otherAppId,
+    });
     const hash =
       randomUUID().replaceAll("-", "") + randomUUID().replaceAll("-", "");
-    await call("worker", { appId, token: "old", expiresAt: Date.now() - 1 });
+    const replacementHash =
+      randomUUID().replaceAll("-", "") + randomUUID().replaceAll("-", "");
+    const identity = { id: threadId, userId, appId: threadId };
+    await call("worker", {
+      appId: appRowId,
+      token: "old",
+      expiresAt: Date.now() - 1,
+    });
     await assert.rejects(
       call("appendEvents", { id: threadId, token: "old" }),
       /lease expired/,
     );
     await assert.rejects(
-      call("issueAccess", { id: threadId, token: "old", hash }),
+      call("issueAccess", { ...identity, token: "old", hash }),
       /active worker lease/,
     );
     await call("worker", {
-      appId,
+      appId: appRowId,
       token: "new",
       expiresAt: Date.now() + 60000,
     });
-    await call("issueAccess", { id: threadId, token: "new", hash });
-    assert.ok(await call("auth", { hash }, true));
-    await call("expireAccess", { appId });
+    await call("issueAccess", { ...identity, token: "new", hash });
+    const expected = { userId, appId: threadId, threadId };
+    assert.deepEqual(await call("auth", { hash }, true), expected);
+    for (const mismatch of [{ userId: otherUserId }, { appId: otherAppId }]) {
+      await assert.rejects(
+        call("issueAccess", {
+          ...identity,
+          ...mismatch,
+          token: "new",
+          hash: replacementHash,
+        }),
+      );
+      assert.deepEqual(await call("auth", { hash }, true), expected);
+      assert.equal(await call("auth", { hash: replacementHash }, true), null);
+    }
+    await call("issueAccess", {
+      ...identity,
+      token: "new",
+      hash: replacementHash,
+    });
     assert.equal(await call("auth", { hash }, true), null);
-    await call("issueAccess", { id: threadId, token: "new", hash });
-    await call("setStatus", { appId, status: "idle" });
+    assert.deepEqual(
+      await call("auth", { hash: replacementHash }, true),
+      expected,
+    );
+    await call("expireAccess", { appId: appRowId });
+    assert.equal(await call("auth", { hash: replacementHash }, true), null);
+    await call("issueAccess", { ...identity, token: "new", hash });
+    await call("setStatus", { appId: appRowId, status: "idle" });
     assert.equal(await call("auth", { hash }, true), null);
   },
 );
@@ -241,7 +345,7 @@ test(
   { skip: !url },
   async () => {
     for (const tickBeforeMessage of [true, false]) {
-      const userId = randomUUID();
+      const userId = await call("seedUser", {});
       const sessionId = await call("admit", { userId });
       const app = await call("queuedApp", { userId, sessionId });
       const debit = await call("claim", { sessionId });
@@ -299,7 +403,7 @@ test(
   "session rebind rejects undrained work even after a denied debit's stop",
   { skip: !url },
   async () => {
-    const userId = randomUUID();
+    const userId = await call("seedUser", {});
     const sessionId = await call("admit", { userId });
     const app = await call("queuedApp", { userId, sessionId });
     const debit = await call("claim", { sessionId });
@@ -326,16 +430,19 @@ test(
 );
 
 test(
-  "late confirmed renewal holds old work through stop and manual recovery",
+  "confirmation after an unknown renewal holds old work through stop and manual recovery",
   { skip: !url },
   async () => {
-    const userId = randomUUID();
+    const userId = await call("seedUser", {});
     const sessionId = await call("admit", { userId });
     const app = await call("queuedApp", { userId, sessionId });
     const first = await call("claim", { sessionId });
     await call("settleDebit", { debitId: first._id, outcome: "confirmed" });
-    const late = await call("inFlightRenewal", { sessionId });
-    await call("expire", { sessionId });
+    await call("expireFundedWindow", { sessionId });
+    const late = await call("claim", { sessionId, expectedDebit: first._id });
+    assert.equal(late.paidUntil, 0);
+    assert.equal((await call("get", { sessionId }, true)).state, "renewing");
+    await call("crash", { debitId: late._id });
     const expiredDeadline = (await call("get", { sessionId }, true)).paidUntil;
     const results = await Promise.allSettled([
       ...Array.from({ length: 8 }, () =>
@@ -358,16 +465,14 @@ test(
       false,
     );
     const debits = await call("debits", { sessionId }, true);
-    assert.equal(
-      debits.find((d: any) => d._id === late._id).state,
-      "confirmed",
-    );
+    assert.equal(debits.find((d: any) => d._id === late._id).state, "unknown");
     assert.equal(
       debits.find((d: any) => d._id === late._id).paidUntil,
       late.paidUntil,
     );
     assert.equal(
-      debits.find((d: any) => d._id === late._id).responseBalance,
+      debits.find((d: any) => d._id === late._id).lateConfirmation
+        .responseBalance,
       2,
     );
     const resolution = {
@@ -416,23 +521,74 @@ test(
 );
 
 test(
-  "expired active window stops without dispatching another debit",
+  "expired active window serializes one renewal and fences work pending confirmation",
   { skip: !url },
   async () => {
-    const userId = randomUUID();
+    const userId = await call("seedUser", {});
     const sessionId = await call("admit", { userId });
     await call("app", { userId, sessionId, threadId: randomUUID() });
     const first = await call("claim", { sessionId });
     await call("settleDebit", { debitId: first._id, outcome: "confirmed" });
-    await call("expire", { sessionId });
+    await call("expireFundedWindow", { sessionId });
     const claims = await Promise.all(
       Array.from({ length: 8 }, () =>
         call("claim", { sessionId, expectedDebit: first._id }),
       ),
     );
-    assert.ok(claims.every((claim) => claim === null));
-    assert.equal((await call("debits", { sessionId }, true)).length, 1);
-    assert.equal((await call("get", { sessionId }, true)).state, "stopping");
+    const next = claims.filter(Boolean);
+    assert.equal(next.length, 1);
+    assert.equal((await call("debits", { sessionId }, true)).length, 2);
+    assert.equal((await call("get", { sessionId }, true)).state, "renewing");
+    assert.equal(
+      await call("allowed", { sessionId, userId, now: Date.now() }, true),
+      false,
+    );
+    await assert.rejects(call("admit", { userId }));
+    const before = Date.now();
+    await call("settleDebit", {
+      debitId: next[0]._id,
+      outcome: "confirmed",
+      responseBalance: 0,
+    });
+    const session = await call("get", { sessionId }, true);
+    assert.equal(session.state, "active");
+    assert.ok(session.paidUntil >= before + 600_000);
+    assert.equal(
+      await call("allowed", { sessionId, userId, now: Date.now() }, true),
+      true,
+    );
+  },
+);
+
+test(
+  "denied and ambiguous renewal results fence the session without another charge",
+  { skip: !url },
+  async () => {
+    for (const outcome of ["denied", "unknown"] as const) {
+      const userId = await call("seedUser", {});
+      const sessionId = await call("admit", { userId });
+      await call("app", { userId, sessionId, threadId: randomUUID() });
+      const first = await call("claim", { sessionId });
+      await call("settleDebit", { debitId: first._id, outcome: "confirmed" });
+      await call("expireFundedWindow", { sessionId });
+      const renewal = await call("claim", {
+        sessionId,
+        expectedDebit: first._id,
+      });
+      await call("settleDebit", { debitId: renewal._id, outcome });
+      const session = await call("get", { sessionId }, true);
+      assert.equal(session.state, outcome === "denied" ? "stopping" : "hold");
+      assert.equal(
+        await call("allowed", { sessionId, userId, now: Date.now() }, true),
+        false,
+      );
+      assert.equal(
+        await call("claim", { sessionId, expectedDebit: renewal._id }),
+        null,
+      );
+      assert.equal((await call("debits", { sessionId }, true)).length, 2);
+      await assert.rejects(call("admit", { userId }));
+    }
   },
 );
 
@@ -441,7 +597,7 @@ test(
   { skip: !url },
   async () => {
     for (const outcome of ["confirmed", "denied"] as const) {
-      const userId = randomUUID();
+      const userId = await call("seedUser", {});
       const sessionId = await call("admit", { userId });
       const appId = await call("app", {
         userId,
@@ -480,7 +636,7 @@ test(
       "new-session",
       "new-session-dispatch",
     ]) {
-      const userId = randomUUID();
+      const userId = await call("seedUser", {});
       const sessionId = await call("admit", { userId });
       const appId = await call("app", {
         userId,
@@ -605,7 +761,7 @@ test(
   "conflict recovery requires every exact debit and preserves audit history",
   { skip: !url },
   async () => {
-    const userId = randomUUID();
+    const userId = await call("seedUser", {});
     async function deniedSession() {
       const sessionId = await call("admit", { userId });
       const appId = await call("app", {
@@ -685,7 +841,8 @@ test(
       }),
       /does not match/,
     );
-    const foreign = await call("admit", { userId: randomUUID() });
+    const foreignUserId = await call("seedUser", {});
+    const foreign = await call("admit", { userId: foreignUserId });
     await assert.rejects(
       call("resolveConflictsHold", {
         ...args,
@@ -739,7 +896,7 @@ test(
   "a new late confirmation racing conflict recovery remains held",
   { skip: !url },
   async () => {
-    const userId = randomUUID();
+    const userId = await call("seedUser", {});
     async function oldDebit() {
       const sessionId = await call("admit", { userId });
       const appId = await call("app", {
@@ -792,156 +949,161 @@ test(
   },
 );
 
-test(
-  "conflict recovery cannot bypass the current session debit",
-  { skip: !url },
-  async () => {
-    const userId = randomUUID();
-    const old = await call("admit", { userId });
-    const oldApp = await call("app", {
-      userId,
-      sessionId: old,
-      threadId: randomUUID(),
-    });
-    const debit = await call("claim", { sessionId: old });
-    await call("crash", { debitId: debit._id });
-    await call("stop", { sessionId: old, token: "old" });
-    await call("setStatus", { appId: oldApp, status: "idle" });
-    await call("stoppedResult", {
-      sessionId: old,
-      token: "old",
-      archived: true,
-    });
-    await call("resolveHold", {
-      sessionId: old,
-      debitId: debit._id,
-      outcome: "denied",
-      evidence: "denial",
-      operator: "op",
-    });
-    const currentSessionId = await call("admit", { userId });
-    const appId = await call("app", {
-      userId,
-      sessionId: currentSessionId,
-      threadId: randomUUID(),
-    });
-    const currentDebit = await call("claim", { sessionId: currentSessionId });
-    await call("settleDebit", { debitId: debit._id, outcome: "confirmed" });
-    await call("stop", { sessionId: currentSessionId, token: "stop" });
-    await call("setStatus", { appId, status: "idle" });
-    await call("stoppedResult", {
-      sessionId: currentSessionId,
-      token: "stop",
-      archived: true,
-    });
-    const args = {
-      currentSessionId,
-      conflicts: [
-        {
-          sessionId: old,
-          debitId: debit._id,
-          evidence: "provider confirmation",
-        },
-      ],
-      operator: "op",
-    };
-    await assert.rejects(
-      call("resolveConflictsHold", args),
-      /dispatch is still in flight/,
-    );
-    await call("crash", { debitId: currentDebit._id });
-    await assert.rejects(
-      call("resolveConflictsHold", args),
-      /needs matching final evidence/,
-    );
-    await call("resolveConflictsHold", {
-      ...args,
-      currentDebit: {
-        debitId: currentDebit._id,
+for (const outcome of ["unknown", "confirmed"] as const)
+  test(
+    `conflict recovery cannot bypass the current ${outcome} session debit`,
+    { skip: !url },
+    async () => {
+      const userId = await call("seedUser", {});
+      const old = await call("admit", { userId });
+      const oldApp = await call("app", {
+        userId,
+        sessionId: old,
+        threadId: randomUUID(),
+      });
+      const debit = await call("claim", { sessionId: old });
+      await call("crash", { debitId: debit._id });
+      await call("stop", { sessionId: old, token: "old" });
+      await call("setStatus", { appId: oldApp, status: "idle" });
+      await call("stoppedResult", {
+        sessionId: old,
+        token: "old",
+        archived: true,
+      });
+      await call("resolveHold", {
+        sessionId: old,
+        debitId: debit._id,
         outcome: "denied",
-        evidence: "final denial, no dispatch in flight",
-      },
-    });
-    assert.notEqual(await call("admit", { userId }), currentSessionId);
-  },
-);
-
-test(
-  "legacy untracked conflict stays held and recovery cannot alter its evidence",
-  { skip: !url },
-  async () => {
-    const userId = randomUUID();
-    const original = await call("admit", { userId });
-    const appId = await call("app", {
-      userId,
-      sessionId: original,
-      threadId: randomUUID(),
-    });
-    const first = await call("claim", { sessionId: original });
-    await call("settleDebit", { debitId: first._id, outcome: "denied" });
-    await call("stop", { sessionId: original, token: "stop" });
-    await call("setStatus", { appId, status: "idle" });
-    await call("stoppedResult", {
-      sessionId: original,
-      token: "stop",
-      archived: true,
-    });
-    const [debitId] = await call("seedDeniedDebits", {
-      sessionId: original,
-      count: 1,
-    });
-    const currentSessionId = await call("admit", { userId });
-    await call("legacyConflictHold", { sessionId: currentSessionId });
-    await call("settleDebit", {
-      debitId,
-      outcome: "confirmed",
-      responseBalance: 7,
-    });
-    await call("stop", { sessionId: currentSessionId, token: "stop" });
-    await call("stoppedResult", {
-      sessionId: currentSessionId,
-      token: "stop",
-      archived: true,
-    });
-    const sessionBefore = await call(
-      "get",
-      { sessionId: currentSessionId },
-      true,
-    );
-    const debitBefore = (
-      await call("debits", { sessionId: original }, true)
-    ).find((d: any) => d._id === debitId);
-    assert.equal(sessionBefore.untrackedConflicts, true);
-    assert.equal(debitBefore.lateConfirmation.responseBalance, 7);
-    await assert.rejects(
-      call("resolveConflictsHold", {
+        evidence: "denial",
+        operator: "op",
+      });
+      const currentSessionId = await call("admit", { userId });
+      const appId = await call("app", {
+        userId,
+        sessionId: currentSessionId,
+        threadId: randomUUID(),
+      });
+      const currentDebit = await call("claim", { sessionId: currentSessionId });
+      await call("settleDebit", { debitId: debit._id, outcome: "confirmed" });
+      await call("stop", { sessionId: currentSessionId, token: "stop" });
+      await call("setStatus", { appId, status: "idle" });
+      await call("stoppedResult", {
+        sessionId: currentSessionId,
+        token: "stop",
+        archived: true,
+      });
+      const args = {
         currentSessionId,
-        operator: "fixture",
         conflicts: [
-          { sessionId: original, debitId, evidence: "provider reference" },
+          {
+            sessionId: old,
+            debitId: debit._id,
+            evidence: "provider confirmation",
+          },
         ],
-      }),
-      /Untracked conflicts/,
-    );
-    assert.deepEqual(
-      await call("get", { sessionId: currentSessionId }, true),
-      sessionBefore,
-    );
-    assert.deepEqual(
-      (await call("debits", { sessionId: original }, true)).find(
-        (d: any) => d._id === debitId,
-      ),
-      debitBefore,
-    );
-    await assert.rejects(call("admit", { userId }), /reconciliation/);
-  },
-);
+        operator: "op",
+      };
+      await assert.rejects(
+        call("resolveConflictsHold", args),
+        /dispatch is still in flight/,
+      );
+      await call("settleDebit", { debitId: currentDebit._id, outcome });
+      await assert.rejects(
+        call("resolveConflictsHold", args),
+        /needs matching final evidence/,
+      );
+      await call("resolveConflictsHold", {
+        ...args,
+        currentDebit: {
+          debitId: currentDebit._id,
+          outcome: outcome === "confirmed" ? "confirmed" : "denied",
+          evidence: "final provider evidence, no dispatch in flight",
+        },
+      });
+      assert.notEqual(await call("admit", { userId }), currentSessionId);
+    },
+  );
+
+for (const empty of [false, true])
+  test(
+    `inconsistent ${empty ? "empty" : "missing"} conflict list stays held and preserves evidence`,
+    { skip: !url },
+    async () => {
+      const userId = await call("seedUser", {});
+      const original = await call("admit", { userId });
+      const appId = await call("app", {
+        userId,
+        sessionId: original,
+        threadId: randomUUID(),
+      });
+      const first = await call("claim", { sessionId: original });
+      await call("settleDebit", { debitId: first._id, outcome: "denied" });
+      await call("stop", { sessionId: original, token: "stop" });
+      await call("setStatus", { appId, status: "idle" });
+      await call("stoppedResult", {
+        sessionId: original,
+        token: "stop",
+        archived: true,
+      });
+      const [debitId] = await call("seedDeniedDebits", {
+        sessionId: original,
+        count: 1,
+      });
+      const currentSessionId = await call("admit", { userId });
+      await call("inconsistentConflictHold", {
+        sessionId: currentSessionId,
+        empty,
+      });
+      await call("settleDebit", {
+        debitId,
+        outcome: "confirmed",
+        responseBalance: 7,
+      });
+      await call("stop", { sessionId: currentSessionId, token: "stop" });
+      await call("stoppedResult", {
+        sessionId: currentSessionId,
+        token: "stop",
+        archived: true,
+      });
+      const sessionBefore = await call(
+        "get",
+        { sessionId: currentSessionId },
+        true,
+      );
+      const debitBefore = (
+        await call("debits", { sessionId: original }, true)
+      ).find((d: any) => d._id === debitId);
+      assert.equal(sessionBefore.untrackedConflicts, true);
+      assert.equal(debitBefore.lateConfirmation.responseBalance, 7);
+      await assert.rejects(
+        call("resolveConflictsHold", {
+          currentSessionId,
+          operator: "fixture",
+          conflicts: [
+            { sessionId: original, debitId, evidence: "provider reference" },
+          ],
+        }),
+        /Untracked conflicts/,
+      );
+      assert.deepEqual(
+        await call("get", { sessionId: currentSessionId }, true),
+        sessionBefore,
+      );
+      assert.deepEqual(
+        (await call("debits", { sessionId: original }, true)).find(
+          (d: any) => d._id === debitId,
+        ),
+        debitBefore,
+      );
+      await assert.rejects(call("admit", { userId }), /reconciliation/);
+    },
+  );
 
 test(
   "more than 100 conflicts stay held without losing provider evidence",
   { skip: !url },
   async () => {
-    const userId = randomUUID();
+    const userId = await call("seedUser", {});
     const original = await call("admit", { userId });
     const appId = await call("app", {
       userId,
@@ -1018,7 +1180,7 @@ test(
   "conflict recovery allows only fresh same-app work after draining old workers",
   { skip: !url },
   async () => {
-    const userId = randomUUID();
+    const userId = await call("seedUser", {});
     const original = await call("admit", { userId });
     const app = await call("queuedApp", { userId, sessionId: original });
     const debit = await call("claim", { sessionId: original });

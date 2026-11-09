@@ -7,7 +7,13 @@ import {
 import { desktopUpdateTable } from "./desktopUpdates/validator";
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
-import { profile } from "./users/validator";
+import {
+  authDeletionProgress,
+  fileDeletionProgress,
+  ephemeralDeletionProgress,
+  mcpDeletionProgress,
+  profile,
+} from "./users/validator";
 import { eventFields, execution } from "./agent/validator";
 import {
   computeSessionFields,
@@ -28,6 +34,13 @@ import {
 } from "./connections/validator";
 
 export default defineSchema({
+  deletionReceipts: defineTable({
+    reference: v.string(),
+    ownerId: v.string(),
+    requestedAt: v.number(),
+  })
+    .index("by_owner", ["ownerId"])
+    .index("by_reference", ["reference"]),
   telemetryIssuance: defineTable({
     key: v.literal("global"),
     tokens: v.number(),
@@ -37,7 +50,19 @@ export default defineSchema({
     hash: v.string(),
     userId: v.optional(v.string()),
     expiresAt: v.number(),
-  }).index("by_hash", ["hash"]),
+    link: v.optional(
+      v.object({
+        anonymous: v.string(),
+        distinct: v.string(),
+        eventId: v.string(),
+        createdAt: v.number(),
+        attempts: v.number(),
+        retryAfter: v.number(),
+      }),
+    ),
+  })
+    .index("by_hash", ["hash"])
+    .index("by_userId", ["userId"]),
   computeSessions: defineTable(computeSessionFields).index("by_userId", [
     "userId",
   ]),
@@ -53,7 +78,9 @@ export default defineSchema({
     browserSessionId: v.optional(v.string()),
     returnExpiresAt: v.optional(v.number()),
     expiresAt: v.number(),
-  }).index("by_hash", ["hash"]),
+  })
+    .index("by_hash", ["hash"])
+    .index("by_userId", ["userId"]),
   billingAttempts: defineTable({
     userId: v.string(),
     purchase: v.string(),
@@ -90,7 +117,9 @@ export default defineSchema({
         bucket: v.string(),
       }),
     ),
-  }),
+  })
+    .index("by_owner_provider", ["owner", "location.provider"])
+    .index("by_storageId", ["location.storageId"]),
   agentEvents: defineTable(eventFields)
     .index("by_messageId", ["messageId"])
     .index("by_threadId_taskId", ["threadId", "taskId"])
@@ -104,6 +133,25 @@ export default defineSchema({
     lease: v.optional(v.string()),
   }).index("by_key", ["key"]),
   users: defineTable({
+    deletionRequestedAt: v.optional(v.number()),
+    mcpDeletion: v.optional(mcpDeletionProgress),
+    authDeletion: v.optional(authDeletionProgress),
+    fileDeletion: v.optional(fileDeletionProgress),
+    ephemeralDeletion: v.optional(ephemeralDeletionProgress),
+    deletionStop: v.optional(
+      v.object({
+        state: v.union(
+          v.literal("running"),
+          v.literal("unknown"),
+          v.literal("failed"),
+          v.literal("archived_observed"),
+        ),
+        attempt: v.number(),
+        updatedAt: v.number(),
+        token: v.optional(v.string()),
+        leaseUntil: v.optional(v.number()),
+      }),
+    ),
     profile: v.optional(profile),
     connectionState: v.optional(connectionState),
     browserHandoff: v.optional(
@@ -113,7 +161,9 @@ export default defineSchema({
         expiresAt: v.number(),
       }),
     ),
-  }).index("by_browserHandoffHash", ["browserHandoff.hash"]),
+  })
+    .index("by_browserHandoffHash", ["browserHandoff.hash"])
+    .index("by_deletionRequestedAt", ["deletionRequestedAt"]),
   connections: defineTable({
     userId: v.string(),
     provider: tokenProvider,

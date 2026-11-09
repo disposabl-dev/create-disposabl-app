@@ -23,237 +23,355 @@ async function call(
     throw new Error(result.errorMessage ?? "Fixture request failed");
   return result.value;
 }
-const config = (changes: object = {}) =>
-  call("config", {
-    enabled: true,
-    environment: "production",
-    e2e: "0",
-    fail: false,
-    ...changes,
-  });
-const seed = (changes: object = {}) =>
+const skip = !url || process.env.LOW_CREDIT_BACKEND_E2E !== "1";
+const seed = () =>
   call("seed", {
     paidUntil: Date.now() + 300000,
     email: "verified@example.invalid",
-    ...changes,
   });
+const debit = (debitId: string) => call("debit", { debitId }, true);
+const reads = (debitId: string) => call("reads", { debitId }, true);
 const emails = () => call("emails", {}, true);
+const settle = (debitId: string, responseBalance: number) =>
+  call("settleDebit", { debitId, outcome: "confirmed", responseBalance });
+const deliver = (debitId: string, balance: number, mode = "ok", attempt = 0) =>
+  call("deliverInert", { debitId, attempt, balance, mode }, false, true);
 
+// The action options and queue are test-only injections. The backend E2E flag
+// remains enabled, the real product queue stays disabled, and markers are not emails.
 test(
-  "confirmed debit schedules notice, competing calls queue once and failure rolls back for retry",
-  { skip: !url || process.env.LOW_CREDIT_BACKEND_E2E === "1" },
+  "funding preserves its raw debit response through a later observation",
+  { skip },
   async () => {
-    await config();
-    const before = (await emails()).length;
-    const paid = await seed();
-    await call("notify", { debitId: paid.debitId });
-    assert.equal((await emails()).length, before);
-    await call("settleDebit", {
-      debitId: paid.debitId,
-      outcome: "confirmed",
-      responseBalance: 9,
-    });
-    const jobs = await call("scheduled", {}, true);
-    assert.ok(
-      jobs.some(
-        (job: any) =>
-          job.name === "agent/actions/compute.js:notice" &&
-          job.args[0].debitId === paid.debitId,
-      ),
-    );
-    await config({ fail: true });
-    await assert.rejects(
-      call("notify", { debitId: paid.debitId }),
-      /fixture queue failure/,
-    );
-    assert.equal(
-      (await call("debit", { debitId: paid.debitId }, true)).noticeOutcome,
-      undefined,
-    );
-    assert.equal((await emails()).length, before);
-    await config();
-    await call("deliver", { debitId: paid.debitId, attempt: 1 }, false, true);
-    await Promise.all(
-      Array.from({ length: 10 }, () =>
-        call("notify", { debitId: paid.debitId }),
-      ),
-    );
-    assert.equal(
-      (await call("debit", { debitId: paid.debitId }, true)).noticeOutcome,
-      "queued",
-    );
-    const sent = await emails();
-    assert.equal(sent.length, before + 1);
-    assert.equal(sent[before].to, "verified@example.invalid");
-    assert.match(sent[before].text, /files will be saved/i);
-    const direct = {
-      userId: paid.userId,
-      windowId: paid.debitId,
-      paidUntil: (await call("debit", { debitId: paid.debitId }, true))
-        .paidUntil,
-      balance: 9,
-    };
-    await Promise.all(
-      Array.from({ length: 10 }, () => call("queueDirect", direct)),
-    );
-    assert.equal((await emails()).length, before + 1);
-  },
-);
-
-test(
-  "threshold, stale and denied debits, missing email and disabled gates do not queue",
-  { skip: !url || process.env.LOW_CREDIT_BACKEND_E2E === "1" },
-  async () => {
-    await config();
-    const before = (await emails()).length;
-    const threshold = await seed();
-    assert.equal(
-      await call("actualProductQueue", {
-        userId: threshold.userId,
-        windowId: threshold.debitId,
-        paidUntil: Date.now() + 300000,
-        balance: 0,
-      }),
-      "disabled",
-    );
-    await call("settleDebit", {
-      debitId: threshold.debitId,
-      outcome: "confirmed",
-      responseBalance: 10,
-    });
-    await call("notify", { debitId: threshold.debitId });
-    const denied = await seed();
-    await call("settleDebit", { debitId: denied.debitId, outcome: "denied" });
-    await call("notify", { debitId: denied.debitId });
-    const stale = await seed();
-    await call("settleDebit", {
-      debitId: stale.debitId,
-      outcome: "confirmed",
-      responseBalance: 9,
-    });
-    await call("expire", { debitId: stale.debitId });
-    await call("notify", { debitId: stale.debitId });
-    const noEmail = await seed({ email: undefined });
-    await call("settleDebit", {
-      debitId: noEmail.debitId,
-      outcome: "confirmed",
-      responseBalance: 9,
-    });
-    await call("notify", { debitId: noEmail.debitId });
-    assert.equal(
-      (await call("debit", { debitId: noEmail.debitId }, true)).noticeOutcome,
-      "no_verified_email",
-    );
-    assert.equal(
-      (await call("debit", { debitId: stale.debitId }, true)).noticeOutcome,
-      "expired",
-    );
-    assert.equal(
-      (await call("debit", { debitId: threshold.debitId }, true)).noticeOutcome,
-      "not_low",
-    );
-    for (const overrides of [
-      { enabled: false },
-      { environment: "development" },
-      { e2e: "1" },
-    ]) {
-      await config(overrides);
-      const gated = await seed();
-      await call("settleDebit", {
-        debitId: gated.debitId,
-        outcome: "confirmed",
-        responseBalance: 9,
-      });
-      await call("notify", { debitId: gated.debitId });
-      assert.equal(
-        (await call("debit", { debitId: gated.debitId }, true)).noticeOutcome,
-        "disabled",
-      );
-    }
-    assert.equal((await emails()).length, before);
-  },
-);
-
-test(
-  "action retries a queue failure with a bound and records final failure",
-  { skip: !url || process.env.LOW_CREDIT_BACKEND_E2E === "1" },
-  async () => {
-    await config({ fail: true });
-    const paid = await seed();
-    await call("settleDebit", {
-      debitId: paid.debitId,
-      outcome: "confirmed",
-      responseBalance: 9,
-    });
-    await call("deliver", { debitId: paid.debitId, attempt: 0 }, false, true);
-    assert.equal(
-      (await call("debit", { debitId: paid.debitId }, true)).noticeOutcome,
-      undefined,
-    );
-    const jobs = await call("scheduled", {}, true);
-    assert.ok(
-      jobs.some(
-        (job: any) =>
-          job.name === "agent/actions/compute.js:notice" &&
-          job.args[0].debitId === paid.debitId &&
-          job.args[0].attempt === 1,
-      ),
-    );
-    await call("deliver", { debitId: paid.debitId, attempt: 5 }, false, true);
-    assert.equal(
-      (await call("debit", { debitId: paid.debitId }, true)).noticeOutcome,
-      "failed",
-    );
-  },
-);
-
-test(
-  "backend E2E environment prevents queueing even with fixture production enabled",
-  { skip: !url || process.env.LOW_CREDIT_BACKEND_E2E !== "1" },
-  async () => {
-    await config();
-    const before = (await emails()).length;
-    const paid = await seed();
-    await call("settleDebit", {
-      debitId: paid.debitId,
-      outcome: "confirmed",
-      responseBalance: 9,
-    });
-    await call("deliver", { debitId: paid.debitId, attempt: 0 }, false, true);
-    assert.equal(
-      (await call("debit", { debitId: paid.debitId }, true)).noticeOutcome,
-      "disabled",
-    );
-    assert.equal((await emails()).length, before);
-  },
-);
-
-test(
-  "fund action persists the synthetic HTTP response before notice action",
-  { skip: !url || process.env.LOW_CREDIT_BACKEND_E2E === "1" },
-  async () => {
-    await config();
-    const before = (await emails()).length;
-    const seeded = await call("seedUnclaimed");
+    const record = await call("seedUnclaimed");
+    const beforeFunding = Date.now();
     await call(
       "fundFixture",
-      { sessionId: seeded.sessionId, responseBalance: 4 },
+      { sessionId: record.sessionId, responseBalance: 4 },
       false,
       true,
     );
     const session = await call(
       "session",
-      { sessionId: seeded.sessionId },
+      { sessionId: record.sessionId },
       true,
     );
-    const debit = await call("debit", { debitId: session.debitId }, true);
-    assert.equal(debit.state, "confirmed");
-    assert.equal(debit.responseBalance, 4);
-    await call("deliver", { debitId: debit._id, attempt: 0 }, false, true);
-    assert.equal(
-      (await call("debit", { debitId: debit._id }, true)).noticeOutcome,
-      "queued",
+    const before = await debit(session.debitId);
+    assert.equal(before.state, "confirmed");
+    assert.equal(session.state, "active");
+    assert.equal(session.paidUntil, before.paidUntil);
+    assert.ok(before.paidUntil >= beforeFunding + 600_000);
+    assert.ok(before.paidUntil <= Date.now() + 600_000);
+    assert.equal(before.responseBalance, 4);
+    await deliver(session.debitId, 20);
+    const after = await debit(session.debitId);
+    assert.equal(after.responseBalance, 4);
+    assert.equal(after.noticeBalance, 20);
+    assert.equal(after.noticeOutcome, "not_low");
+  },
+);
+
+test(
+  "renewed low balance remains funded, queues once, then denial stops the next window",
+  { skip },
+  async () => {
+    const initialMarkers = (await emails()).length;
+    const { userId, sessionId } = await call("seedUnclaimed");
+    await call("fundFixture", { sessionId, responseBalance: 20 }, false, true);
+    const first = await call("session", { sessionId }, true);
+    await call("shortenWindow", {
+      debitId: first.debitId,
+      paidUntil: Date.now() - 1,
+    });
+    await call(
+      "fundFixture",
+      { sessionId, expectedDebit: first.debitId, responseBalance: 4 },
+      false,
+      true,
+    );
+    const renewed = await call("session", { sessionId }, true);
+    const renewalDebit = await debit(renewed.debitId);
+    assert.equal(renewed.state, "active");
+    assert.notEqual(renewed.debitId, first.debitId);
+    assert.equal(renewalDebit.state, "confirmed");
+    assert.equal(renewalDebit.responseBalance, 4);
+    assert.equal(renewed.paidUntil, renewalDebit.paidUntil);
+    assert.equal(await call("allowed", { sessionId, userId }, true), true);
+    await Promise.all(
+      Array.from({ length: 5 }, () => deliver(renewed.debitId, 4)),
+    );
+    assert.equal((await debit(renewed.debitId)).noticeOutcome, "queued");
+    assert.equal((await emails()).length, initialMarkers + 1);
+    await deliver(renewed.debitId, 4);
+    assert.equal((await emails()).length, initialMarkers + 1);
+    assert.equal(await call("allowed", { sessionId, userId }, true), true);
+    const actual = await call("actualProductQueue", {
+      userId,
+      windowId: renewed.debitId,
+      paidUntil: renewed.paidUntil,
+      balance: 4,
+    });
+    assert.equal(actual, "disabled");
+    await call("shortenWindow", {
+      debitId: renewed.debitId,
+      paidUntil: Date.now() - 1,
+    });
+    await call(
+      "fundFixture",
+      {
+        sessionId,
+        expectedDebit: renewed.debitId,
+        responseBalance: 4,
+        allowed: false,
+      },
+      false,
+      true,
+    );
+    const stopped = await call("session", { sessionId }, true);
+    assert.equal((await debit(stopped.debitId)).state, "denied");
+    assert.ok(["stopping", "stopped"].includes(stopped.state));
+    assert.equal(await call("allowed", { sessionId, userId }, true), false);
+    assert.equal((await emails()).length, initialMarkers + 1);
+  },
+);
+
+test(
+  "fresh observation controls inert decisions and duplicates never add a second marker",
+  { skip },
+  async () => {
+    const before = (await emails()).length;
+    const low = await seed();
+    await settle(low.debitId, 10);
+    await Promise.all(Array.from({ length: 8 }, () => deliver(low.debitId, 0)));
+    const row = await debit(low.debitId);
+    assert.equal(row.state, "confirmed");
+    assert.equal(row.responseBalance, 10);
+    assert.equal(row.noticeBalance, 0);
+    assert.equal(row.noticeOutcome, "queued");
+    assert.ok(row.noticeObservedAt > 0);
+    const entries = await reads(low.debitId);
+    assert.ok(entries.length >= 1);
+    assert.ok(
+      entries.every(
+        (entry: any) => entry.method === "balances.check" && entry.nonConsuming,
+      ),
     );
     assert.equal((await emails()).length, before + 1);
+    const count = entries.length;
+    await deliver(low.debitId, 0);
+    assert.equal((await reads(low.debitId)).length, count);
+    assert.equal((await emails()).length, before + 1);
+
+    const high = await seed();
+    await settle(high.debitId, 0);
+    await deliver(high.debitId, 20);
+    const highRow = await debit(high.debitId);
+    assert.equal(highRow.responseBalance, 0);
+    assert.equal(highRow.noticeBalance, 20);
+    assert.equal(highRow.noticeOutcome, "not_low");
+    assert.equal((await emails()).length, before + 1);
+  },
+);
+
+test(
+  "failed or malformed reads leave confirmed debit intact and retry only the observation",
+  { skip },
+  async () => {
+    for (const mode of ["http-error", "malformed"]) {
+      const before = (await emails()).length;
+      const record = await seed();
+      await settle(record.debitId, 10);
+      await deliver(record.debitId, 0, mode);
+      const failedRead = await debit(record.debitId);
+      assert.equal(failedRead.state, "confirmed");
+      assert.equal(failedRead.responseBalance, 10);
+      assert.equal(failedRead.noticeOutcome, undefined);
+      assert.equal(failedRead.noticeBalance, undefined);
+      const jobs = await call("scheduled", {}, true);
+      assert.ok(
+        jobs.some(
+          (job: any) =>
+            job.name === "agent/actions/compute.js:notice" &&
+            job.args[0].debitId === record.debitId &&
+            job.args[0].attempt === 1,
+        ),
+      );
+      await deliver(record.debitId, 0, "ok", 1);
+      const final = await debit(record.debitId);
+      assert.equal(final.state, "confirmed");
+      assert.equal(final.responseBalance, 10);
+      assert.equal(final.noticeBalance, 0);
+      assert.equal(final.noticeOutcome, "queued");
+      const entries = await reads(record.debitId);
+      assert.equal(entries.length, 2);
+      assert.ok(
+        entries.every(
+          (entry: any) =>
+            entry.method === "balances.check" && entry.nonConsuming,
+        ),
+      );
+      assert.equal((await emails()).length, before + 1);
+    }
+  },
+);
+
+test(
+  "pending or missing owners do not read and expiry during the read cannot queue",
+  { skip },
+  async () => {
+    const before = (await emails()).length;
+    for (const mode of ["pending", "missing"]) {
+      const record = await seed();
+      await settle(record.debitId, 10);
+      await call(
+        mode === "pending" ? "requestDeletion" : "removeSyntheticUser",
+        { userId: record.userId },
+      );
+      await deliver(record.debitId, 0);
+      assert.equal(
+        (await debit(record.debitId)).noticeOutcome,
+        "account_ineligible",
+      );
+      assert.equal((await reads(record.debitId)).length, 0);
+    }
+    const expiring = await seed();
+    await settle(expiring.debitId, 10);
+    await deliver(expiring.debitId, 0, "expire");
+    const row = await debit(expiring.debitId);
+    assert.equal(row.noticeOutcome, "expired");
+    assert.equal(row.responseBalance, 10);
+    assert.equal(row.noticeBalance, undefined);
+    assert.equal((await reads(expiring.debitId)).length, 1);
+    assert.equal((await emails()).length, before);
+  },
+);
+
+test(
+  "registered action and actual product queue stay disabled by backend E2E",
+  { skip },
+  async () => {
+    const before = (await emails()).length;
+    const record = await seed();
+    await settle(record.debitId, 0);
+    const paid = await debit(record.debitId);
+    assert.equal(
+      await call("actualProductQueue", {
+        userId: record.userId,
+        windowId: record.debitId,
+        paidUntil: paid.paidUntil,
+        balance: 0,
+      }),
+      "disabled",
+    );
+    await call("deliver", { debitId: record.debitId, attempt: 0 }, false, true);
+    assert.equal((await debit(record.debitId)).noticeOutcome, "disabled");
+    assert.equal((await reads(record.debitId)).length, 0);
+    assert.equal((await emails()).length, before);
+  },
+);
+
+test(
+  "initial debit read failure schedules a bounded retry",
+  { skip },
+  async () => {
+    const record = await seed();
+    await settle(record.debitId, 10);
+    await assert.doesNotReject(
+      call(
+        "deliverInitialReadFailure",
+        { debitId: record.debitId, attempt: 0 },
+        false,
+        true,
+      ),
+    );
+    const row = await debit(record.debitId);
+    assert.equal(row.state, "confirmed");
+    assert.equal(row.noticeOutcome, undefined);
+    const jobs = await call("scheduled", {}, true);
+    assert.ok(
+      jobs.some(
+        (job: any) =>
+          job.name === "agent/actions/compute.js:notice" &&
+          job.args[0].debitId === record.debitId &&
+          job.args[0].attempt === 1,
+      ),
+    );
+  },
+);
+
+test(
+  "an exhausted read failure cannot suppress a concurrent successful observation",
+  { skip },
+  async () => {
+    const before = (await emails()).length;
+    const record = await seed();
+    await settle(record.debitId, 10);
+    const successful = deliver(record.debitId, 0, "hold");
+    try {
+      let started = false;
+      for (let i = 0; i < 100 && !started; i++) {
+        started = (await reads(record.debitId)).some(
+          (entry: any) => entry.method === "balances.check",
+        );
+        if (!started) await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+      assert.equal(
+        started,
+        true,
+        "successful observation did not reach the barrier",
+      );
+      await deliver(record.debitId, 0, "http-error", 5);
+    } finally {
+      await call("releaseRead", { debitId: record.debitId });
+      await successful;
+    }
+    const row = await debit(record.debitId);
+    assert.equal(row.state, "confirmed");
+    assert.equal(row.responseBalance, 10);
+    assert.equal(row.noticeOutcome, "queued");
+    assert.equal(row.noticeBalance, 0);
+    assert.equal((await emails()).length, before + 1);
+  },
+);
+
+test(
+  "exhausted failure finalizes once at the paid deadline without reading or queueing",
+  { skip },
+  async () => {
+    const before = (await emails()).length;
+    const paidUntil = Date.now() + 2000;
+    const record = await call("seed", {
+      paidUntil,
+      email: "verified@example.invalid",
+    });
+    await settle(record.debitId, 10);
+    await call("shortenWindow", { debitId: record.debitId, paidUntil });
+    await deliver(record.debitId, 0, "http-error", 5);
+    assert.equal((await debit(record.debitId)).noticeOutcome, undefined);
+    const finalizers = (jobs: any[]) =>
+      jobs.filter(
+        (job: any) =>
+          job.name === "agent/compute.js:notice" &&
+          job.args[0].debitId === record.debitId &&
+          job.args[0].failed === true,
+      );
+    const scheduled = finalizers(await call("scheduled", {}, true));
+    assert.equal(scheduled.length, 1);
+    assert.equal(scheduled[0].scheduledTime, paidUntil);
+    let row;
+    for (let i = 0; i < 100; i++) {
+      row = await debit(record.debitId);
+      if (row.noticeOutcome === "expired") break;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    assert.equal(row.noticeOutcome, "expired");
+    assert.equal(row.responseBalance, 10);
+    assert.equal(row.noticeBalance, undefined);
+    assert.equal((await reads(record.debitId)).length, 1);
+    assert.equal((await emails()).length, before);
+    await call("notify", { debitId: record.debitId, failed: true });
+    assert.equal(finalizers(await call("scheduled", {}, true)).length, 1);
+    assert.equal((await reads(record.debitId)).length, 1);
+    assert.equal((await emails()).length, before);
   },
 );

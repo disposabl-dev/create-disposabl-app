@@ -340,3 +340,67 @@ test(
     expect((await attempts()).length).toBe(0);
   },
 );
+
+test(
+  "snapshot denial preserves portal access and ignores a stale session response",
+  { platforms: ["web"] },
+  async ({ app, screen, browser }) => {
+    test.skip(
+      process.env.E2E_BILLING_WEB_FIXTURE !== "1",
+      "Requires isolated billing browser fixture on ports 3450/3451",
+    );
+    await reset("topup", { mode: "snapshot-denied", holdPortal: true });
+    await app.open("/pricing");
+    await browser.evaluate(() => {
+      (window as any).fixtureSetUser("alice");
+      return null;
+    });
+    await expect(screen.getByRole("status")).toContainText(
+      "Balance is unavailable",
+    );
+    expect(
+      await screen.getByRole("button", "Choose monthly").isDisabled(),
+    ).toBe(true);
+    expect(await screen.getByRole("button", "Buy top-up").isDisabled()).toBe(
+      true,
+    );
+    expect((await attempts()).length).toBe(0);
+    await screen.getByRole("button", "Manage website billing").tap();
+    await expect
+      .poll(
+        async () =>
+          (await (await fetch(`${api}/state`)).json()).portalCalls.length,
+      )
+      .toBe(1);
+    await browser.evaluate(() => {
+      (window as any).fixtureSetUser("bob");
+      return null;
+    });
+    await expect(screen.getByRole("status")).toContainText(
+      "Balance is unavailable",
+    );
+    await update({ releasePortal: true });
+    await expect
+      .poll(
+        async () =>
+          (await (await fetch(`${api}/state`)).json()).portalCompleted,
+      )
+      .toBe(1);
+    await expect(browser).not.toHaveURL("/portal");
+    await expect(browser).toHaveURL("/pricing");
+    await screen.getByRole("button", "Manage website billing").tap();
+    await expect
+      .poll(
+        async () =>
+          (await (await fetch(`${api}/state`)).json()).portalCalls.length,
+      )
+      .toBe(2);
+    await update({ releasePortal: true });
+    await expect(
+      screen.getByRole("heading", "Fixture billing portal"),
+    ).toBeVisible();
+    const state = await (await fetch(`${api}/state`)).json();
+    expect(state.portalCalls).toEqual(["alice", "bob"]);
+    expect(state.attempts.length).toBe(0);
+  },
+);

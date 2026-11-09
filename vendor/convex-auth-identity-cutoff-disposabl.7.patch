@@ -1,0 +1,442 @@
+--- a/src/methods/google/server.ts
++++ b/src/methods/google/server.ts
+@@ -72,7 +72,11 @@
+    */
+   allowedRedirectOrigins: string[];
+   /** Server-only pre-sign-in check; undefined is legacy authorization proof. */
+-  checkAuthorizationStart?: (ctx: GenericMutationCtx<GenericDataModel>, profile: GoogleProfile, startedAt: number | undefined) => Promise<void>;
++  checkAuthorizationStart?: (
++    ctx: GenericMutationCtx<GenericDataModel>,
++    profile: GoogleProfile,
++    startedAt: number | undefined,
++  ) => Promise<void>;
+   /** Optional signed state envelope for a shared callback. */
+   authorizationState?: (state: string) => Promise<string>;
+ };
+@@ -138,6 +142,7 @@
+         { claims?: OidcClaims }
+       >({
+         providerName: PROVIDER_NAME,
++        enforceIdentityErasure: true,
+         authMutation,
+         checkAuthorizationStart: options.checkAuthorizationStart,
+         claimTicket: (ctx, args) =>
+--- a/src/component/public.ts
++++ b/src/component/public.ts
+@@ -50,13 +50,34 @@
+ // --- Internal helpers ------------------------------------------------------
+ 
+ async function erasedUser(ctx: QueryCtx, userId: string) {
+-  return await ctx.db.query("erasedUsers").withIndex("by_userId", q => q.eq("userId", userId)).unique();
++  return await ctx.db
++    .query("erasedUsers")
++    .withIndex("by_userId", (q) => q.eq("userId", userId))
++    .unique();
++}
++// Pseudonymous, stable and potentially guessable; retention policy is required.
++async function identityDigest(provider: string, account: string) {
++  return sha256Hex(JSON.stringify([provider, account]));
++}
++async function identityCutoff(
++  ctx: QueryCtx,
++  provider: string,
++  account: string,
++): Promise<number | null> {
++  const digest = await identityDigest(provider, account);
++  const tombstone = await ctx.db
++    .query("identityErasure")
++    .withIndex("by_digest", (q) => q.eq("digest", digest))
++    .unique();
++  const mapped = await accountByIdentity(ctx, provider, account);
++  const user = mapped ? await erasedUser(ctx, mapped.userId) : null;
++  return Math.max(tombstone?.cutoff ?? 0, user?.requestedAt ?? 0) || null;
+ }
+ async function requireActiveUser(ctx: QueryCtx, userId: string) {
+-  if (await erasedUser(ctx, userId)) throw new Error("Auth account is unavailable.");
++  if (await erasedUser(ctx, userId))
++    throw new Error("Auth account is unavailable.");
+ }
+ 
+-
+ /** Look up an account by its provider identity. */
+ function accountByIdentity(
+   ctx: QueryCtx,
+@@ -175,6 +196,10 @@
+   // identifier), so there is nothing to check yet; the pre-insert check below
+   // covers that path once the key is known.
+   if (claims.providerAccountId !== USE_USER_ID_AS_ACCOUNT_ID) {
++    if (
++      await identityCutoff(ctx, claims.providerName, claims.providerAccountId)
++    )
++      throw new Error("Identity registration is unavailable.");
+     const account = await accountByIdentity(
+       ctx,
+       claims.providerName,
+@@ -206,6 +231,8 @@
+     claims.providerAccountId === USE_USER_ID_AS_ACCOUNT_ID
+       ? userId
+       : claims.providerAccountId;
++  if (await identityCutoff(ctx, providerName, providerAccountId))
++    throw new Error("Identity registration is unavailable.");
+   // The last word on uniqueness, for the `USE_USER_ID_AS_ACCOUNT_ID` path,
+   // whose key is only known now. Redundant for every other path, and cheap.
+   const existingAccount = await ctx.db
+@@ -407,7 +434,9 @@
+     const id = ctx.db.normalizeId("sessions", sessionId);
+     if (id === null) return null;
+     const session = await ctx.db.get("sessions", id);
+-    return session === null || await erasedUser(ctx, session.userId) ? null : { userId: session.userId };
++    return session === null || (await erasedUser(ctx, session.userId))
++      ? null
++      : { userId: session.userId };
+   },
+ });
+ 
+@@ -465,7 +494,8 @@
+     // `deleteSession`), so a token can outlive its session for a moment. The
+     // session ended already, thus there is nothing to refresh or revoke.
+     const session = await ctx.db.get("sessions", token.sessionId);
+-    if (session === null || await erasedUser(ctx, session.userId)) return { kind: "noSession" };
++    if (session === null || (await erasedUser(ctx, session.userId)))
++      return { kind: "noSession" };
+ 
+     switch (token.state) {
+       case "spent":
+@@ -678,9 +708,14 @@
+       throw new Error("Source session is no longer active.");
+     const latest = await newestIssuedToken(ctx, session._id);
+     const now = Date.now();
+-    if (!latest ||
+-        refreshTokenInactivityExpiresAt(latest, ttl.refreshInactivityTimeoutSeconds) <= now ||
+-        sessionMaxLifetimeExpiresAt(session, ttl.sessionMaxLifetimeSeconds) <= now)
++    if (
++      !latest ||
++      refreshTokenInactivityExpiresAt(
++        latest,
++        ttl.refreshInactivityTimeoutSeconds,
++      ) <= now ||
++      sessionMaxLifetimeExpiresAt(session, ttl.sessionMaxLifetimeSeconds) <= now
++    )
+       throw new Error("Source session has expired.");
+     const account = await ctx.db.get("accounts", session.accountId);
+     if (!account || account.userId !== session.userId)
+@@ -691,29 +726,107 @@
+ 
+ /** App-server-only fence. Coordinate with provider-component fences in one app mutation. */
+ export const beginUserErasure = mutation({
+-  args: { userId: v.string() }, returns: v.null(),
++  args: { userId: v.string() },
++  returns: v.null(),
+   handler: async (ctx, { userId }) => {
+     if (!userId) throw new Error("Missing user ID.");
+-    if (!(await erasedUser(ctx, userId))) await ctx.db.insert("erasedUsers", { userId, requestedAt: Date.now() });
++    if (!(await erasedUser(ctx, userId)))
++      await ctx.db.insert("erasedUsers", { userId, requestedAt: Date.now() });
+     return null;
+   },
+ });
+ /** Bounded cleanup of linked records only; older orphan refresh tokens lack a user join. */
+ export const purgeUserLinkedAuth = mutation({
+   args: { userId: v.string() },
+-  returns: v.object({ linkedRowsCleared: v.boolean(), deletedAccounts: v.number(), deletedSessions: v.number(), deletedRefreshTokens: v.number(), legacyOrphansUnverified: v.literal(true) }),
++  returns: v.object({
++    linkedRowsCleared: v.boolean(),
++    deletedAccounts: v.number(),
++    deletedSessions: v.number(),
++    deletedRefreshTokens: v.number(),
++    legacyOrphansUnverified: v.literal(true),
++  }),
+   handler: async (ctx, { userId }) => {
+-    if (!(await erasedUser(ctx, userId))) throw new Error("Begin auth erasure first.");
+-    const session = await ctx.db.query("sessions").withIndex("by_user", q => q.eq("userId", userId)).first();
++    if (!(await erasedUser(ctx, userId)))
++      throw new Error("Begin auth erasure first.");
++    const receipt = await ctx.db
++      .query("sessionCleanupReceipts")
++      .withIndex("by_user", (q) => q.eq("userId", userId))
++      .first();
++    if (receipt) {
++      const tokens = await ctx.db
++        .query("refreshTokens")
++        .withIndex("by_session_state", (q) =>
++          q.eq("sessionId", receipt.sessionId),
++        )
++        .take(101);
++      for (const token of tokens.slice(0, 100))
++        await ctx.db.delete("refreshTokens", token._id);
++      if (tokens.length <= 100)
++        await ctx.db.delete("sessionCleanupReceipts", receipt._id);
++      return {
++        linkedRowsCleared: false,
++        deletedAccounts: 0,
++        deletedSessions: 0,
++        deletedRefreshTokens: Math.min(tokens.length, 100),
++        legacyOrphansUnverified: true as const,
++      };
++    }
++    const session = await ctx.db
++      .query("sessions")
++      .withIndex("by_user", (q) => q.eq("userId", userId))
++      .first();
+     if (session) {
+-      const tokens = await ctx.db.query("refreshTokens").withIndex("by_session_state", q => q.eq("sessionId", session._id)).take(101);
+-      for (const token of tokens.slice(0, 100)) await ctx.db.delete("refreshTokens", token._id);
++      const tokens = await ctx.db
++        .query("refreshTokens")
++        .withIndex("by_session_state", (q) => q.eq("sessionId", session._id))
++        .take(101);
++      for (const token of tokens.slice(0, 100))
++        await ctx.db.delete("refreshTokens", token._id);
+       const deletedSessions = tokens.length <= 100 ? 1 : 0;
+       if (deletedSessions) await ctx.db.delete("sessions", session._id);
+-      return { linkedRowsCleared: false, deletedAccounts: 0, deletedSessions, deletedRefreshTokens: Math.min(tokens.length,100), legacyOrphansUnverified: true as const };
++      return {
++        linkedRowsCleared: false,
++        deletedAccounts: 0,
++        deletedSessions,
++        deletedRefreshTokens: Math.min(tokens.length, 100),
++        legacyOrphansUnverified: true as const,
++      };
+     }
+-    const accounts = await ctx.db.query("accounts").withIndex("by_user", q => q.eq("userId", userId)).take(101);
+-    for (const account of accounts.slice(0, 100)) await ctx.db.delete("accounts", account._id);
+-    return { linkedRowsCleared: accounts.length <= 100, deletedAccounts: Math.min(accounts.length,100), deletedSessions: 0, deletedRefreshTokens: 0, legacyOrphansUnverified: true as const };
++    const accounts = await ctx.db
++      .query("accounts")
++      .withIndex("by_user", (q) => q.eq("userId", userId))
++      .take(101);
++    const cutoff = (await erasedUser(ctx, userId))!.requestedAt;
++    for (const account of accounts.slice(0, 100)) {
++      const digest = await identityDigest(
++        account.provider,
++        account.providerAccountId,
++      );
++      const prior = await ctx.db
++        .query("identityErasure")
++        .withIndex("by_digest", (q) => q.eq("digest", digest))
++        .unique();
++      if (prior)
++        await ctx.db.patch("identityErasure", prior._id, {
++          cutoff: Math.max(prior.cutoff, cutoff),
++        });
++      else await ctx.db.insert("identityErasure", { digest, cutoff });
++      await ctx.db.delete("accounts", account._id);
++    }
++    return {
++      linkedRowsCleared: accounts.length <= 100,
++      deletedAccounts: Math.min(accounts.length, 100),
++      deletedSessions: 0,
++      deletedRefreshTokens: 0,
++      legacyOrphansUnverified: true as const,
++    };
+   },
+ });
++
++/** App-server query: returns a cutoff while a mapped owner is fenced and after mapping purge. */
++export const getIdentityErasureCutoff = query({
++  args: { provider: v.string(), providerAccountId: v.string() },
++  returns: v.union(v.number(), v.null()),
++  handler: (ctx, { provider, providerAccountId }) =>
++    identityCutoff(ctx, provider, providerAccountId),
++});
+--- a/src/component/schema.ts
++++ b/src/component/schema.ts
+@@ -2,7 +2,20 @@
+ import { v } from "convex/values";
+ 
+ export default defineSchema({
+-  erasedUsers: defineTable({ userId: v.string(), requestedAt: v.number() }).index("by_userId", ["userId"]),
++  erasedUsers: defineTable({
++    userId: v.string(),
++    requestedAt: v.number(),
++  }).index("by_userId", ["userId"]),
++  identityErasure: defineTable({
++    digest: v.string(),
++    cutoff: v.number(),
++  }).index("by_digest", ["digest"]),
++  sessionCleanupReceipts: defineTable({
++    userId: v.string(),
++    sessionId: v.id("sessions"),
++  })
++    .index("by_user", ["userId"])
++    .index("by_session", ["sessionId"]),
+   // Maps a provider-scoped identity to an opaque app user id. The app owns the
+   // actual users table; we only store the id string it gives us back.
+   accounts: defineTable({
+--- a/src/component/sessions.ts
++++ b/src/component/sessions.ts
+@@ -146,9 +146,17 @@
+ ): Promise<void> {
+   // `delete` throws on an id that is already gone, and the session may have
+   // been deleted by whoever we raced, which also scheduled its tokens.
+-  if ((await ctx.db.get("sessions", sessionId)) === null) {
+-    return;
+-  }
++  const session = await ctx.db.get("sessions", sessionId);
++  if (session === null) return;
++  const receipt = await ctx.db
++    .query("sessionCleanupReceipts")
++    .withIndex("by_session", (q) => q.eq("sessionId", sessionId))
++    .unique();
++  if (!receipt)
++    await ctx.db.insert("sessionCleanupReceipts", {
++      userId: session.userId,
++      sessionId,
++    });
+   await ctx.db.delete("sessions", sessionId);
+   await ctx.scheduler.runAfter(0, internal.sessions.deleteSessionTokens, {
+     sessionId,
+@@ -176,6 +184,13 @@
+     for (const row of tokens) {
+       await ctx.db.delete("refreshTokens", row._id);
+     }
++    if (tokens.length < TOKEN_DELETION_BATCH_SIZE) {
++      const receipt = await ctx.db
++        .query("sessionCleanupReceipts")
++        .withIndex("by_session", (q) => q.eq("sessionId", sessionId))
++        .unique();
++      if (receipt) await ctx.db.delete("sessionCleanupReceipts", receipt._id);
++    }
+     if (tokens.length === TOKEN_DELETION_BATCH_SIZE) {
+       await ctx.scheduler.runAfter(0, internal.sessions.deleteSessionTokens, {
+         sessionId,
+--- a/src/component/_generated/component.ts
++++ b/src/component/_generated/component.ts
+@@ -24,12 +24,51 @@
+ export type ComponentApi<Name extends string | undefined = string | undefined> =
+   {
+     public: {
+-      beginUserErasure: FunctionReference<"mutation", "internal", {userId: string}, null, Name>;
+-      purgeUserLinkedAuth: FunctionReference<"mutation", "internal", {userId: string}, {linkedRowsCleared: boolean; deletedAccounts: number; deletedSessions: number; deletedRefreshTokens: number; legacyOrphansUnverified: true}, Name>;
+-      exchangeSession: FunctionReference<"mutation", "internal", {
+-        sessionId: string; userId: string; accessTokenTtlSeconds: number;
+-        refreshInactivityTimeoutSeconds: number; sessionMaxLifetimeSeconds: number;
+-      }, { accessToken: string; refreshToken: string; refreshTokenExpiresAt: number; userId: string }, Name>;
++      getIdentityErasureCutoff: FunctionReference<
++        "query",
++        "internal",
++        { provider: string; providerAccountId: string },
++        number | null,
++        Name
++      >;
++      beginUserErasure: FunctionReference<
++        "mutation",
++        "internal",
++        { userId: string },
++        null,
++        Name
++      >;
++      purgeUserLinkedAuth: FunctionReference<
++        "mutation",
++        "internal",
++        { userId: string },
++        {
++          linkedRowsCleared: boolean;
++          deletedAccounts: number;
++          deletedSessions: number;
++          deletedRefreshTokens: number;
++          legacyOrphansUnverified: true;
++        },
++        Name
++      >;
++      exchangeSession: FunctionReference<
++        "mutation",
++        "internal",
++        {
++          sessionId: string;
++          userId: string;
++          accessTokenTtlSeconds: number;
++          refreshInactivityTimeoutSeconds: number;
++          sessionMaxLifetimeSeconds: number;
++        },
++        {
++          accessToken: string;
++          refreshToken: string;
++          refreshTokenExpiresAt: number;
++          userId: string;
++        },
++        Name
++      >;
+ 
+       getSession: FunctionReference<
+         "query",
+--- a/src/server/setup.ts
++++ b/src/server/setup.ts
+@@ -392,6 +392,24 @@
+           },
+           createUserHandle: await createFunctionHandle(createUser),
+         });
++      },
++      assertAuthorizationStart: async (
++        providerAccountId: string,
++        startedAt: number | undefined,
++      ): Promise<void> => {
++        const cutoff = await ctx.runQuery(
++          component.public.getIdentityErasureCutoff,
++          { provider: name, providerAccountId },
++        );
++        if (cutoff !== null) {
++          if (startedAt === undefined || startedAt <= cutoff)
++            throw new Error(
++              "Authorization predates account erasure or lacks proof.",
++            );
++          throw new Error(
++            "Registration for this identity is unavailable pending an explicit re-registration ceremony.",
++          );
++        }
+       },
+       resolveUserId: async (
+         providerAccountId: string,
+--- a/src/lib/types.ts
++++ b/src/lib/types.ts
+@@ -367,6 +367,10 @@
+    * Returns `null` when no user id is found for the account.
+    */
+   resolveUserId(providerAccountId: string): Promise<string | null>;
++  assertAuthorizationStart(
++    providerAccountId: string,
++    startedAt: number | undefined,
++  ): Promise<void>;
+   /**
+    * Revokes every session of the signed-in user other than the current one
+    * (the JWT's subject). Returns the number of active (non-expired)
+--- a/src/lib/oauth/redemption.ts
++++ b/src/lib/oauth/redemption.ts
+@@ -144,9 +144,17 @@
+   claimTicket: (
+     ctx: MutationCtx,
+     args: { ticketCodeHash: string; stateHash: string },
+-  ) => Promise<{ encryptedPayload: string; authorizationStartedAt?: number } | null>;
++  ) => Promise<{
++    encryptedPayload: string;
++    authorizationStartedAt?: number;
++  } | null>;
++  enforceIdentityErasure?: boolean;
+   /** Optional server-side consumer; undefined marks legacy tickets. */
+-  checkAuthorizationStart?: (ctx: MutationCtx, profile: Profile, startedAt: number | undefined) => Promise<void>;
++  checkAuthorizationStart?: (
++    ctx: MutationCtx,
++    profile: Profile,
++    startedAt: number | undefined,
++  ) => Promise<void>;
+   /** Map what the provider attested to the account profile. */
+   profile: (payload: Payload) => Profile;
+ }) {
+@@ -178,7 +186,16 @@
+         );
+       }
+ 
+-      await options.checkAuthorizationStart?.(ctx, profile, ticket.authorizationStartedAt);
++      if (options.enforceIdentityErasure)
++        await ctx.convexAuth.assertAuthorizationStart(
++          profile.id,
++          ticket.authorizationStartedAt,
++        );
++      await options.checkAuthorizationStart?.(
++        ctx,
++        profile,
++        ticket.authorizationStartedAt,
++      );
+ 
+       // The same redemption flow serves a first sign-in and a return visit, so
+       // resolve the identity to pick a path. This handler is a mutation, so the

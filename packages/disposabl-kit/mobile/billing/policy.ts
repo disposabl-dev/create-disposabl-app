@@ -1,5 +1,5 @@
 import type Purchases from "react-native-purchases";
-import { validMonthlyOffering, type BillingSnapshot } from "./paywall";
+import { selectMonthlyOffering, type BillingSnapshot } from "./paywall";
 import { loadTopup, matchingTopupRoute, type TopupSnapshot } from "./topup";
 
 export function paymentOptions(input: {
@@ -46,6 +46,7 @@ export async function preflightWebMonthly(
     BillingSnapshot & { mobileWebCheckoutEnabled: boolean; customerId: string }
   >,
   current: () => boolean,
+  offeringId?: string,
 ) {
   const check = () => {
     if (!current()) throw new Error("Account changed.");
@@ -53,26 +54,24 @@ export async function preflightWebMonthly(
   const latest = await snapshot();
   check();
   if (latest.customerId !== customerId) throw new Error("Account changed.");
-  const eligibility = await storeEligibility(sdk, platform);
+  const offerings = await sdk.getOfferings();
   check();
-  const offering = (await sdk.getOfferings()).current;
+  const offering = selectMonthlyOffering(offerings, productId, offeringId);
+  if (latest.hasMonthlyPlan !== false) throw new Error("existing_subscription");
+  const customer = await sdk.getCustomerInfo();
+  check();
+  if (customer.activeSubscriptions.length)
+    throw new Error("existing_subscription");
+  const eligibility = await storeEligibility(sdk, platform);
   check();
   const options = paymentOptions({
     platform,
     ...eligibility,
     paymentsEnabled: true,
     webCheckoutEnabled: latest.mobileWebCheckoutEnabled,
-    nativeReady:
-      latest.nativeSubscriptionsEnabled &&
-      !!offering &&
-      validMonthlyOffering(offering.availablePackages, productId),
+    nativeReady: latest.nativeSubscriptionsEnabled && !!offering,
   });
   if (!options.web) throw new Error("Website checkout is unavailable.");
-  if (latest.hasMonthlyPlan !== false) throw new Error("existing_subscription");
-  const customer = await sdk.getCustomerInfo();
-  check();
-  if (customer.activeSubscriptions.length)
-    throw new Error("existing_subscription");
 }
 
 /** The matching route and real consumable must still exist at the moment of handoff. */
@@ -105,12 +104,12 @@ export async function preflightWebTopup(
     !matchingTopupRoute(latest, platform, app, productId)
   )
     throw new Error("Top-up unavailable.");
-  const eligibility = await storeEligibility(sdk, platform);
-  check();
   if ((await sdk.getAppUserID()) !== customerId)
     throw new Error("Account changed.");
   check();
   const product = await loadTopup(sdk, platform, productId!);
+  check();
+  const eligibility = await storeEligibility(sdk, platform);
   check();
   if (
     !paymentOptions({
@@ -122,4 +121,22 @@ export async function preflightWebTopup(
     }).web
   )
     throw new Error("Website checkout is unavailable.");
+}
+
+/** Revalidate after creating the inert handoff, before returning its URL to the caller. */
+export async function guardedWebHandoff<T>(
+  preflight: () => Promise<void>,
+  create: () => Promise<T>,
+  current: () => boolean,
+): Promise<T> {
+  const check = () => {
+    if (!current()) throw new Error("Account changed.");
+  };
+  await preflight();
+  check();
+  const result = await create();
+  check();
+  await preflight();
+  check();
+  return result;
 }

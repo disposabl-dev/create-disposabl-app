@@ -1,3 +1,4 @@
+import { requireNotDeleting } from "../users/deletion";
 import {
   identityFields,
   internalMutation,
@@ -14,6 +15,7 @@ export const connect = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, { userId, owner, installationId, organization }) => {
+    await requireNotDeleting(ctx, userId);
     if (!/^[a-zA-Z0-9-]+$/.test(owner) || !/^\d+$/.test(installationId))
       throw new ConvexError("Invalid GitHub installation.");
     owner = owner.toLowerCase();

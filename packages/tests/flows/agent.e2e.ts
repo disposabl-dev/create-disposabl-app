@@ -72,6 +72,58 @@ test(
         );
       return result.value;
     }
+    test.skip(
+      process.env.E2E_AGENT_INERT_FIXTURE !== "1",
+      "Requires the disposable provider-inert agent fixture",
+    );
+    if (
+      ![
+        ["http://127.0.0.1:3530", "http://127.0.0.1:3531"],
+        ["http://127.0.0.1:3540", "http://127.0.0.1:3541"],
+      ].some(([backend, site]) => url.origin === backend && siteUrl() === site)
+    )
+      throw new Error(
+        "Agent inert fixture requires matched isolated ports 3530/3531 or 3540/3541.",
+      );
+    for (const name of [
+      "BOAT_API_KEY",
+      "R2_ACCOUNT_ID",
+      "R2_BUCKET_NAME",
+      "R2_ACCESS_KEY_ID",
+      "R2_SECRET_ACCESS_KEY",
+      "AUTUMN_SECRET_KEY",
+      "POSTHOG_PROJECT_TOKEN",
+      "RESEND_API_KEY",
+      "AUTH_GOOGLE_CLIENT_SECRET",
+      "REVENUECAT_WEBHOOK_AUTH",
+      "E2E_TELEMETRY_DISABLED",
+    ]) {
+      const response = await fetch(`${url.origin}/api/query`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Convex ${adminKey}`,
+        },
+        body: JSON.stringify({
+          path: "_system/cli/queryEnvironmentVariables:get",
+          args: { name },
+          format: "json",
+        }),
+        signal: AbortSignal.timeout(15_000),
+      });
+      const result = await response.json();
+      if (!response.ok || result.status !== "success")
+        throw new Error("Unable to verify the isolated agent configuration.");
+      const configured = result.value?.value?.trim() ?? "";
+      if (
+        name === "E2E_TELEMETRY_DISABLED"
+          ? configured !== "1"
+          : configured !== ""
+      )
+        throw new Error(
+          "Agent fixture requires disabled telemetry and empty provider configuration.",
+        );
+    }
     async function user() {
       const signup = await value(
         "auth:signUpWithUsernamePassword",
@@ -209,28 +261,71 @@ test(
     }
     let claimed = false;
     try {
-      const claim = await value(
-        "agent/state:claim",
-        { id, token },
+      await value(
+        "agentFixture:seedLease",
+        { appId, userId: owner.id, token },
         { admin: true },
       );
       claimed = true;
-      expect(claim).toMatchObject({
-        appId,
-        threadId: id,
-        status: "processing",
-        lease: { token },
-      });
+      expect(
+        await value(
+          "agent/state:claim",
+          { id, token: randomUUID() },
+          { admin: true },
+        ),
+      ).toBeNull();
+      const attachmentId = await value(
+        "files/index:upload",
+        {
+          filename: "reference.txt",
+          mediaType: "text/plain",
+          bytes: {
+            $bytes: Buffer.from("Project reference fixture").toString("base64"),
+          },
+        },
+        { token: owner.token, action: true },
+      );
+      expect(
+        (
+          await call(
+            "agent/attachments:get",
+            { userId: other.id, ids: [attachmentId] },
+            { admin: true },
+          )
+        ).status,
+      ).toBe("error");
       const grant = () =>
         value(
           "agent/access:issue",
           {
             id,
+            userId: owner.id,
+            appId,
             token,
             hash: createHash("sha256").update(agentBearer).digest("hex"),
           },
           { admin: true },
         );
+      for (const mismatch of [
+        { userId: other.id, appId },
+        { userId: owner.id, appId: randomUUID() },
+      ]) {
+        expect(
+          (
+            await call(
+              "agent/access:issue",
+              {
+                id,
+                token,
+                hash: createHash("sha256").update(agentBearer).digest("hex"),
+                ...mismatch,
+              },
+              { admin: true },
+            )
+          ).status,
+        ).toBe("error");
+      }
+      expect((await rest("apps/get", { appId })).status).not.toBe(200);
       await grant();
       expect((await rest("apps/get", { appId })).status).toBe(200);
       function cliStatus(bearer: string, expiresAt = Date.now() + 14_400_000) {
@@ -318,13 +413,6 @@ test(
       expect(cliStatus(previousBearer)).toBeNull();
       expect((await rest("apps/get", { appId })).status).toBe(200);
       expect(
-        await value(
-          "agent/state:claim",
-          { id, token: randomUUID() },
-          { admin: true },
-        ),
-      ).toBeNull();
-      expect(
         (
           await call(
             "agent/state:append",
@@ -407,81 +495,98 @@ test(
         cursor: "cursor-1",
         lease: { token },
       });
-      // The held lease keeps the scheduled worker from contacting Boat.
-      const attachmentId = await value(
-        "files/index:upload",
-        {
-          filename: "reference.txt",
-          mediaType: "text/plain",
-          bytes: {
-            $bytes: Buffer.from("Project reference fixture").toString("base64"),
-          },
-        },
-        { token: owner.token, action: true },
-      );
+      const queueArgs = {
+        appId,
+        prompt: "Queued fixture prompt",
+        fileIds: [attachmentId],
+      };
       expect(
         (
           await call(
-            "agent/attachments:get",
-            { userId: other.id, ids: [attachmentId] },
+            "agentFixture:enqueue",
+            { ...queueArgs, userId: other.id, fileIds: [] },
             { admin: true },
           )
         ).status,
       ).toBe("error");
-      const sent = await value(
-        "agent/index:sendMessageChecked",
-        { appId, prompt: "Queued fixture prompt", fileIds: [attachmentId] },
-        { token: owner.token, action: true },
+      const otherAttachment = await value(
+        "files/index:upload",
+        {
+          filename: "other.txt",
+          mediaType: "text/plain",
+          bytes: {
+            $bytes: Buffer.from("other user fixture").toString("base64"),
+          },
+        },
+        { token: other.token, action: true },
       );
-      expect(sent).toMatchObject({ appId, threadId: id, status: "processing" });
       expect(
         (
           await call(
-            "agent/index:sendMessageChecked",
-            { appId, prompt: "Forbidden" },
-            { token: other.token, action: true },
+            "agentFixture:enqueue",
+            { ...queueArgs, userId: owner.id, fileIds: [otherAttachment] },
+            { admin: true },
           )
         ).status,
       ).toBe("error");
-      const stopping = await value(
-        "agent/index:abortMessage",
-        { appId },
-        { token: owner.token, mutation: true },
+      await value(
+        "files/index:remove",
+        { id: otherAttachment },
+        { token: other.token, action: true },
       );
-      expect(stopping.status).toBe("stopping");
+      expect(
+        await value(
+          "agentFixture:enqueue",
+          { ...queueArgs, userId: owner.id },
+          { admin: true },
+        ),
+      ).toMatchObject({ appId, threadId: id, status: "processing" });
+      expect(
+        (
+          await call(
+            "agentFixture:stop",
+            { appId, userId: other.id },
+            { admin: true },
+          )
+        ).status,
+      ).toBe("error");
+      expect(
+        await value(
+          "agentFixture:stop",
+          { appId, userId: owner.id },
+          { admin: true },
+        ),
+      ).toMatchObject({ status: "stopping" });
       expect((await rest("apps/get", { appId })).status).toBe(401);
-      const messages = await value(
+      const queuedHistory = await value(
         "agent/index:getMessages",
         { appId },
         { token: owner.token },
       );
-      expect(
-        messages.page.find(
-          (m: { content: string }) => m.content === "Queued fixture prompt",
-        ).attachments,
-      ).toEqual([
+      const queued = queuedHistory.page.find(
+        (m: { content: string }) => m.content === "Queued fixture prompt",
+      );
+      expect(queued.status).toBe("failed");
+      expect(queued.attachments).toEqual([
         {
           id: attachmentId,
           filename: "reference.txt",
           mediaType: "text/plain",
         },
       ]);
-      expect(
-        messages.page.find(
-          (m: { content: string }) => m.content === "Queued fixture prompt",
-        ).status,
-      ).toBe("failed");
       await value(
         "agent/state:finish",
         { id, token, stopped: true },
         { admin: true },
       );
-      claimed = false;
       await value(
         "files/index:remove",
         { id: attachmentId },
         { token: owner.token, action: true },
       );
+      claimed = false;
+      expect((await rest("apps/get", { appId })).status).toBe(401);
+      expect(cliStatus(agentBearer)).toBeNull();
       const aborted = await value(
         "agent/index:abortMessage",
         { appId },

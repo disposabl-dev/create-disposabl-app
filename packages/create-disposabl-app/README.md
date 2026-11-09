@@ -25,6 +25,8 @@ Use the app name you chose instead of `my-app`. Your website opens automatically
 
 You can also launch setup with npm, pnpm, or Yarn 2+. The generated project still requires Bun. Tests need Node.js 22.22.3 or newer on Node 22, or Node.js 24.8 or newer.
 
+Scaffolding skips automatic formatting when Bun's formatter is unavailable. After installing the project's pinned Bun version, run `bun fmt` to format those files.
+
 | Tool | Command                                |
 | ---- | -------------------------------------- |
 | npm  | `npx create-disposabl-app@latest`      |
@@ -110,5 +112,7 @@ Faster CI selects an eight-vCPU Linux runner for universal Android builds and a 
 Before publishing the generator, `bun run --cwd packages/create-disposabl-app build && bun run --cwd packages/create-disposabl-app verify:starter` creates fresh minimal-web, Web + Android, mobile-without-authentication, and all-platform projects. Each follows the CLI's formatting and installation steps, then runs the first CI frozen install, `bun run check`, its retained unit tests, and web and selected CLI/SDK builds. Pass `web-minimal`, `web-android`, `mobile-minimal`, or `all-platforms` after `verify:starter` to check one selection. These checks use no provider credentials and do not provision or deploy resources. Native builds and installed-app behavior still need the platform checks below.
 
 Published generator releases can collect limited Disposabl usage analytics when centrally configured. They record the generator version, operating system, package-manager category and outcome, using a random ID that can be linked to your Disposabl user ID after login. They do not collect prompts, arguments, paths, error messages, credentials or email. Set `DO_NOT_TRACK=1` or `DISPOSABL_TELEMETRY_DISABLED=1` to opt out. Local source, development, CI and E2E runs do not send events. This is separate from analytics you configure for your own app.
+
+Failed commands also send a fixed, coarse error-tracking event with no exception message or stack trace.
 
 Release builds must receive the central public PostHog project token in `DISPOSABL_CLI_POSTHOG_PROJECT_TOKEN` and its approved ingestion origin in `DISPOSABL_CLI_POSTHOG_HOST`. Both values are embedded at build time; a release build fails if they are missing. `DISPOSABL_CLI_TELEMETRY_REQUIRED=1` enforces this check for development-version qualification builds. Use the central public project token, never a personal API key or a generated app owner’s project token.

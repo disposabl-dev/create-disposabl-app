@@ -19,6 +19,16 @@ export default defineSchema({
     hash: v.string(),
     userId: v.optional(v.string()),
     expiresAt: v.number(),
+    link: v.optional(
+      v.object({
+        anonymous: v.string(),
+        distinct: v.string(),
+        eventId: v.string(),
+        createdAt: v.number(),
+        attempts: v.number(),
+        retryAfter: v.number(),
+      }),
+    ),
   }).index("by_hash", ["hash"]),
   billingHandoffs: defineTable({
     hash: v.string(),

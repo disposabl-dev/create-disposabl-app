@@ -23,7 +23,8 @@
     "react-dom": "catalog:",
     "tailwindcss": "^4.3.5",
     "convex": "catalog:",
-    "@convex-dev/auth": "catalog:"
+    "@convex-dev/auth": "catalog:",
+    "posthog-js": "catalog:"
   },
   "devDependencies": {
     "@tanstack/devtools-vite": "^0.8.6",

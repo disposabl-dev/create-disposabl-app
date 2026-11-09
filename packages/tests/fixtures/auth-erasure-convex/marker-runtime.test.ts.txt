@@ -1,0 +1,318 @@
+import { test, expect } from "bun:test";
+import { makeFunctionReference } from "convex/server";
+import {
+  insertAuthorizationRequest,
+  claimAuthorizationRequest,
+  insertTicket,
+  claimTicket,
+} from "./package/src/lib/oauth/dbHelpers.ts";
+
+test("server-owned authorization start survives delayed callback and fresh flow", async () => {
+  const oldDate = Date.now,
+    oldSite = process.env.CONVEX_SITE_URL;
+  let now = 1000;
+  Date.now = () => now;
+  process.env.CONVEX_SITE_URL = "https://fixture.convex.site";
+  const rows = new Map<string, any>();
+  let n = 0;
+  const ctx = {
+    db: {
+      insert: async (table: string, value: any) => {
+        const id = String(++n);
+        rows.set(id, { ...value, _id: id, table });
+        return id;
+      },
+      delete: async (_table: string, id: string) => {
+        rows.delete(id);
+      },
+      query: (table: string) => ({
+        withIndex: (_name: string, filter: any) => {
+          let key = "",
+            value = "";
+          filter({
+            eq: (k: string, v: string) => {
+              key = k;
+              value = v;
+              return {};
+            },
+          });
+          return {
+            unique: async () =>
+              [...rows.values()].find(
+                (r) => r.table === table && r[key] === value,
+              ) ?? null,
+          };
+        },
+      }),
+    },
+  } as any;
+  try {
+    async function begin(state: string) {
+      await insertAuthorizationRequest(ctx, {
+        stateHash: state,
+        redirectTo: "https://fixture.test",
+        codeVerifier: "verifier",
+      } as any);
+    }
+    async function callback(state: string) {
+      const r = await claimAuthorizationRequest(ctx, state);
+      if (!r || r.expired) throw new Error("missing request");
+      await insertTicket(ctx, {
+        stateHash: state,
+        ticketCodeHash: `ticket-${state}`,
+        encryptedPayload: "fixture",
+        authorizationStartedAt: r.doc.authorizationStartedAt,
+      } as any);
+    }
+    await begin("old");
+    now = 2000;
+    await callback("old");
+    await begin("new");
+    now = 3000;
+    await callback("new");
+    expect(
+      (
+        await claimTicket(ctx, {
+          stateHash: "old",
+          ticketCodeHash: "ticket-old",
+        })
+      )?.authorizationStartedAt,
+    ).toBe(1000);
+    expect(
+      (
+        await claimTicket(ctx, {
+          stateHash: "new",
+          ticketCodeHash: "ticket-new",
+        })
+      )?.authorizationStartedAt,
+    ).toBe(2000);
+    for (const marker of [undefined, "invalid", Number.NaN]) {
+      await expect(
+        insertTicket(ctx, {
+          stateHash: "malformed",
+          ticketCodeHash: "malformed",
+          encryptedPayload: "fixture",
+          authorizationStartedAt: marker,
+        } as any),
+      ).rejects.toThrow("OAuth authorization start is missing");
+    }
+    await ctx.db.insert("authorizationRequests", {
+      stateHash: "bad-request",
+      redirectTo: "https://fixture.test",
+      callbackUrl: "https://fixture.test/oauth/callback",
+      codeVerifier: "verifier",
+      expiresAt: now + 1000,
+    });
+    await expect(claimAuthorizationRequest(ctx, "bad-request")).rejects.toThrow(
+      "OAuth authorization start is missing",
+    );
+    await ctx.db.insert("tickets", {
+      stateHash: "bad-state",
+      ticketCodeHash: "bad-ticket",
+      encryptedPayload: "fixture",
+      expiresAt: now + 1000,
+    });
+    await expect(
+      claimTicket(ctx, {
+        stateHash: "bad-state",
+        ticketCodeHash: "bad-ticket",
+      }),
+    ).rejects.toThrow("OAuth authorization start is missing");
+  } finally {
+    Date.now = oldDate;
+    if (oldSite === undefined) delete process.env.CONVEX_SITE_URL;
+    else process.env.CONVEX_SITE_URL = oldSite;
+  }
+});
+
+test("a malformed callback request cannot exchange or mint a ticket", async () => {
+  const { runCallback } = await import("./package/src/lib/oauth/callback.ts");
+  let minted = false;
+  const response = await runCallback({
+    path: "/oauth/google/callback",
+    params: {
+      state: "fixture-state",
+      code: "fixture-code",
+      error: null,
+      errorDescription: null,
+    },
+    claim: async () =>
+      ({
+        expired: false,
+        stateHash: "server-state-hash",
+        redirectTo: "https://fixture.test/return",
+        callbackUrl: "https://fixture.convex.site/oauth/google/callback",
+        codeVerifier: "server-verifier",
+      }) as any,
+    mintTicket: async () => {
+      minted = true;
+      return null;
+    },
+    exchangeConfig: () => {
+      throw new Error("must not exchange");
+    },
+    redirectStatus: 302,
+  });
+  expect(response.status).toBe(400);
+  expect(minted).toBe(false);
+});
+
+test("callback carries server request marker through inert exchange", async () => {
+  const { runCallback } = await import("./package/src/lib/oauth/callback.ts");
+  const previous = globalThis.fetch;
+  let verifier = "",
+    calls = 0;
+  globalThis.fetch = async (_input, init) => {
+    calls++;
+    if (calls % 2 === 1) {
+      verifier =
+        new URLSearchParams(init?.body as string).get("code_verifier") ?? "";
+      return Response.json({ access_token: "fixture" });
+    }
+    return Response.json({ id: "synthetic" });
+  };
+  try {
+    for (const startedAt of [1000, 2000]) {
+      let minted: any;
+      const response = await runCallback({
+        path: "/oauth/google/callback",
+        params: {
+          state: "fixture-state",
+          code: "fixture-code",
+          error: null,
+          errorDescription: null,
+        },
+        claim: async () => ({
+          expired: false,
+          stateHash: "server-state-hash",
+          redirectTo: "https://fixture.test/return",
+          callbackUrl: "https://fixture.convex.site/oauth/google/callback",
+          codeVerifier: "server-verifier",
+          authorizationStartedAt: startedAt,
+        }),
+        mintTicket: async (_request, ticket) => {
+          minted = ticket;
+          return null;
+        },
+        exchangeConfig: () => ({
+          providerName: "fixture",
+          tokenEndpoint: "https://fixture.test/token",
+          clientId: "fixture",
+          clientSecret: () => "fixture",
+          userInfoEndpoints: { profile: "https://fixture.test/user" },
+        }),
+        redirectStatus: 302,
+      });
+      expect(response.status).toBe(302);
+      expect(minted.authorizationStartedAt).toBe(startedAt);
+      expect(verifier).toBe("server-verifier");
+    }
+    expect(calls).toBe(4);
+  } finally {
+    globalThis.fetch = previous;
+  }
+});
+
+test("OAuth authorization creation validators do not accept a client marker", async () => {
+  for (const provider of ["google", "github", "apple", "oauth"]) {
+    const { createAuthorizationRequest } = await import(
+      `./package/src/components/${provider}/provider.ts`
+    );
+    const args = JSON.parse((createAuthorizationRequest as any).exportArgs());
+    expect(Object.keys(args.value)).not.toContain("authorizationStartedAt");
+    for (const field of ["codeVerifier", "redirectTo", "stateHash"])
+      expect(Object.keys(args.value)).toContain(field);
+  }
+});
+
+test("registered OAuth creation rejects a caller-supplied marker", async () => {
+  const { convexTest } = await import("convex-test");
+  const schema = (await import("./package/src/components/google/schema.ts"))
+    .default;
+  const modules = {
+    "./_generated/api.ts": () =>
+      import("./package/src/components/google/_generated/api.ts"),
+    "./provider.ts": () =>
+      import("./package/src/components/google/provider.ts"),
+  };
+  const fixture = convexTest(schema, modules);
+  const create = makeFunctionReference<"mutation">(
+    "provider:createAuthorizationRequest",
+  );
+  const args = {
+    stateHash: "synthetic-state",
+    redirectTo: "https://fixture.test/return",
+    codeVerifier: "synthetic-verifier",
+  };
+  await expect(
+    fixture.mutation(create, { ...args, authorizationStartedAt: 1 }),
+  ).rejects.toThrow(/Unexpected field.*authorizationStartedAt/);
+  const rows = await fixture.run(async (ctx) =>
+    ctx.db.query("authorizationRequests").collect(),
+  );
+  expect(rows).toHaveLength(0);
+  const oldSite = process.env.CONVEX_SITE_URL;
+  const oldClient = process.env.CLIENT_ID;
+  try {
+    process.env.CONVEX_SITE_URL = "https://fixture.convex.site/oauth/google";
+    process.env.CLIENT_ID = "synthetic";
+    await fixture.mutation(create, args);
+    const created = await fixture.run(async (ctx) =>
+      ctx.db.query("authorizationRequests").collect(),
+    );
+    expect(created).toHaveLength(1);
+    expect(Number.isFinite(created[0].authorizationStartedAt)).toBe(true);
+    expect(created[0].authorizationStartedAt).not.toBe(1);
+  } finally {
+    if (oldSite === undefined) delete process.env.CONVEX_SITE_URL;
+    else process.env.CONVEX_SITE_URL = oldSite;
+    if (oldClient === undefined) delete process.env.CLIENT_ID;
+    else process.env.CLIENT_ID = oldClient;
+  }
+});
+
+test("malformed ticket markers cannot reach identity or session helpers", async () => {
+  const { buildCompleteSignIn } =
+    await import("./package/src/lib/oauth/redemption.ts");
+  for (const marker of [undefined, null, "invalid", NaN, Infinity]) {
+    const calls: string[] = [];
+    const handler = buildCompleteSignIn({
+      providerName: "fixture",
+      authMutation: ((definition: any) => definition.handler) as any,
+      claimTicket: async () =>
+        ({
+          encryptedPayload: "invalid-payload",
+          authorizationStartedAt: marker,
+        }) as any,
+      enforceIdentityErasure: true,
+      checkAuthorizationStart: async () => {
+        calls.push("check");
+      },
+      profile: () => {
+        calls.push("profile");
+        return { id: "fixture" };
+      },
+    }) as any;
+    const ctx = {
+      convexAuth: {
+        assertAuthorizationStart: async () => {
+          calls.push("cutoff");
+        },
+        resolveUserId: async () => {
+          calls.push("resolve");
+          return null;
+        },
+        completeSignUp: async () => {
+          calls.push("signup");
+        },
+        completeSignIn: async () => {
+          calls.push("signin");
+        },
+      },
+    };
+    await expect(
+      handler(ctx, { code: "fixture-code", state: "fixture-state" }),
+    ).rejects.toThrow("OAuth authorization start is missing");
+    expect(calls).toEqual([]);
+  }
+});

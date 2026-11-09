@@ -191,6 +191,37 @@ Backend URLs are available to mobile code through
 `process.env.EXPO_PUBLIC_CONVEX_SITE_URL`. The distribution workflow supplies
 them to the same native authentication flow used during development.
 
+## Local Google Play bundle
+
+The normal release workflow continues to produce installable APKs. For a Play
+upload, first verify the existing listing package ID, highest uploaded version
+code, and upload certificate SHA-256 in Play Console. For a new listing, use
+its confirmed package ID and `0` as the previous version. Do not use a debug
+key for a Play submission.
+
+Use a dedicated local checkout configured for the confirmed package and version.
+The script generates a fresh production Android project. Configure the intended
+production backend URLs explicitly and set these environment variables:
+
+- `PLAY_PACKAGE_ID`, `PLAY_PREVIOUS_VERSION_CODE`, `PLAY_UPLOAD_CERT_SHA256`
+- `DISPOSABL_ANDROID_VERSION_CODE` (greater than the previous version)
+- `EXPO_PUBLIC_CONVEX_URL`, `EXPO_PUBLIC_CONVEX_SITE_URL` (HTTPS)
+- `ANDROID_KEYSTORE_PATH`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`,
+  `ANDROID_KEY_PASSWORD`
+- `BUNDLETOOL_JAR`, the local path to the official standalone bundletool jar
+
+Run `node apps/mobile/scripts/play-aab.mjs` from the repository root. It checks
+the keystore certificate and Expo identity, then moves any existing `android`
+directory to a printed temporary backup path and runs a fresh Expo prebuild.
+Native customizations must be represented in Expo config/plugins; stale native
+files are never reused. A failed prebuild restores the previous directory and
+preserves partial output in the backup. Keep the upload keystore and bundletool
+jar outside `android`; relative input paths resolve from the command's working directory.
+The build uses the configured Android architectures and verifies the AAB's manifest,
+ABIs and upload signature. It prints the output path and SHA-256. It does not
+upload or submit the bundle. Keep signing values out of shell history and logs.
+A debug-signed or E2E bundle is not a Play release.
+
 ## iOS
 
 When iOS is enabled and affected, the Web runner checks the latest
@@ -218,3 +249,12 @@ It does not require TestFlight or an App Store Connect app record. TestFlight is
 a separate distribution option. The pipeline never submits to the App Store.
 
 Android preview builds produce an installable APK. Production builds produce a signed installable APK. GitHub Actions builds and publishes these files; Expo hosts compatible EAS Updates.
+
+### iOS image privacy manifest
+
+The iOS Expo autolinking configuration builds `expo-image` from source so its
+SDWebImage CocoaPod supplies its own privacy resource bundle. The Expo 58
+precompiled SDWebImage framework inspected for this app did not include that
+manifest. This changes native dependencies and may increase build time; regenerate
+the native project and reinstall pods after changing it. Check the final archive
+and Xcode privacy report for each release, especially after SDK upgrades.

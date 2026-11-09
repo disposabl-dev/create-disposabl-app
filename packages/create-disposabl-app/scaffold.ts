@@ -10,6 +10,7 @@ import {
 import { existsSync } from "node:fs";
 import { basename, join, normalize } from "node:path";
 import { randomUUID } from "node:crypto";
+import { execFileSync, spawnSync } from "node:child_process";
 import { omitMobilePayments } from "./mobile-payments";
 import { validateAndroidArchitectures } from "../disposabl-kit/android-architectures";
 import {
@@ -22,6 +23,8 @@ import {
 export const authStarterPaths = [
   "packages/disposabl-kit/client/routes/_auth-pages",
   "packages/disposabl-kit/client/routes/consent.tsx",
+  "packages/tests/consent-identity.test.ts",
+  "packages/tests/components/consent-identity.test.mjs",
   "packages/disposabl-kit/client/routes/billing-login.tsx",
   "packages/disposabl-kit/client/routes/_authenticated/change-password.tsx",
   "apps/web/src/router/_authenticated/dashboard.api-keys.tsx",
@@ -278,6 +281,18 @@ main().catch((error) => {
       join(destination, "disposabl.json"),
       JSON.stringify(config, null, 2) + "\n",
     );
+    // Formatting is optional without a compatible Bun, including direct calls
+    // and reconfiguration snapshots. A supported formatter's errors still fail.
+    if (
+      spawnSync("bun", ["fmt", "--no-script", "--help"], {
+        cwd: destination,
+        stdio: "ignore",
+      }).status === 0
+    )
+      execFileSync("bun", ["fmt", "--no-script"], {
+        cwd: destination,
+        stdio: "pipe",
+      });
   } catch (error) {
     // Only remove the directory created by this invocation, never an existing app.
     await rm(destination, { recursive: true, force: true });

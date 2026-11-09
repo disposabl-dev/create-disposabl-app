@@ -192,8 +192,9 @@ function Chat({ appId }: { appId: string }) {
           customerId={user.id}
           data={billing}
           refresh={refreshBalance}
-          proceed={() => void submit(prompt)}
+          proceed={() => setPayment(false)}
           cancel={() => setPayment(false)}
+          resume
         />
       </View>
     ) : (

@@ -10,5 +10,9 @@ export { SettingsPage, ScreenCloseButton } from "./components/settings-page";
 export { LoginScreen } from "./screens/login";
 export { SignupScreen } from "./screens/signup";
 export { ChangePasswordScreen } from "./screens/change-password";
+export {
+  useAccentColor,
+  useResolvedColorScheme,
+} from "./design/theme-provider";
 
 export { ForgotPasswordScreen } from "./screens/forgot-password";

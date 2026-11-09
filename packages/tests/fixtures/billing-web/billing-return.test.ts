@@ -21,6 +21,8 @@ const base = require("../../../../apps/mobile/app.json").expo;
 
 test("billing schemes are channel-specific and preserve existing sign-in schemes", () => {
   const old = process.env.DISPOSABL_MOBILE_CHANNEL;
+  const oldE2e = process.env.EXPO_PUBLIC_E2E;
+  const oldScheme = process.env.E2E_ANDROID_SCHEME;
   const temp = mkdtempSync(join(tmpdir(), "billing-config-"));
   mkdirSync(join(temp, "apps/mobile"), { recursive: true });
   copyFileSync(
@@ -60,6 +62,14 @@ test("billing schemes are channel-specific and preserve existing sign-in schemes
     }
     assert.equal(prod.extra.billingReturnChannel, "production");
     assert.equal(preview.extra.billingReturnChannel, "preview");
+    process.env.EXPO_PUBLIC_E2E = "true";
+    process.env.E2E_ANDROID_SCHEME = "isolated-test-scheme";
+    const isolated = configure({ config: base });
+    assert.deepEqual(isolated.scheme, ["isolated-test-scheme", q]);
+    assert.equal(isolated.extra.billingReturnChannel, "preview");
+    assert.equal(isolated.updates.enabled, false);
+    delete process.env.EXPO_PUBLIC_E2E;
+    delete process.env.E2E_ANDROID_SCHEME;
     select(["authentication"]);
     const disabledAgain = configure({ config: base });
     assert.deepEqual(disabledAgain.scheme, off.scheme);
@@ -83,6 +93,10 @@ test("billing schemes are channel-specific and preserve existing sign-in schemes
       `${p}://billing-return?other=1`,
     );
   } finally {
+    if (oldE2e === undefined) delete process.env.EXPO_PUBLIC_E2E;
+    else process.env.EXPO_PUBLIC_E2E = oldE2e;
+    if (oldScheme === undefined) delete process.env.E2E_ANDROID_SCHEME;
+    else process.env.E2E_ANDROID_SCHEME = oldScheme;
     if (old === undefined) delete process.env.DISPOSABL_MOBILE_CHANNEL;
     else process.env.DISPOSABL_MOBILE_CHANNEL = old;
     rmSync(temp, { recursive: true, force: true });

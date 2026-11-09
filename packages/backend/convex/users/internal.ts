@@ -1,3 +1,14 @@
+import { deletionPending as isDeletionPending } from "./deletion";
+import {
+  authDeletionProgress,
+  fileDeletionProgress,
+  ephemeralDeletionProgress,
+  mcpDeletionProgress,
+} from "./validator";
+import {
+  paginationOptsValidator,
+  paginationResultValidator,
+} from "convex/server";
 import {
   identityFields,
   internalQuery,
@@ -98,3 +109,134 @@ function displayProfile(profile: GoogleProfile) {
       : {}),
   };
 }
+
+/** Internal operator queue: requested means cleanup and remote stop remain unconfirmed. */
+export const deletionRequests = internalQuery({
+  args: { paginationOpts: paginationOptsValidator },
+  returns: paginationResultValidator(
+    v.object({
+      userId: v.id("users"),
+      requestedAt: v.number(),
+      status: v.literal("requested"),
+      blockers: v.array(v.string()),
+      mcpDeletion: v.optional(mcpDeletionProgress),
+      authDeletion: v.optional(authDeletionProgress),
+      fileDeletion: v.optional(fileDeletionProgress),
+      ephemeralDeletion: v.optional(ephemeralDeletionProgress),
+      stopAttempt: v.optional(v.number()),
+      stopUpdatedAt: v.optional(v.number()),
+      stopLeaseUntil: v.optional(v.number()),
+      stop: v.union(
+        v.literal("pending"),
+        v.literal("running"),
+        v.literal("unknown"),
+        v.literal("failed"),
+        v.literal("archived_observed"),
+      ),
+    }),
+  ),
+  handler: async (ctx, { paginationOpts }) => {
+    const result = await ctx.db
+      .query("users")
+      .withIndex("by_deletionRequestedAt", (q) =>
+        q.gt("deletionRequestedAt", 0),
+      )
+      .paginate(paginationOpts);
+    return {
+      ...result,
+      page: result.page.map((user) => ({
+        userId: user._id,
+        requestedAt: user.deletionRequestedAt!,
+        status: "requested" as const,
+        ...(user.mcpDeletion ? { mcpDeletion: user.mcpDeletion } : {}),
+        ...(user.authDeletion ? { authDeletion: user.authDeletion } : {}),
+        ...(user.fileDeletion ? { fileDeletion: user.fileDeletion } : {}),
+        ...(user.ephemeralDeletion
+          ? { ephemeralDeletion: user.ephemeralDeletion }
+          : {}),
+        stop:
+          user.deletionStop?.state === "running" &&
+          (user.deletionStop.leaseUntil ?? 0) <= Date.now()
+            ? ("unknown" as const)
+            : (user.deletionStop?.state ?? ("pending" as const)),
+        ...(user.deletionStop
+          ? {
+              stopAttempt: user.deletionStop.attempt,
+              stopUpdatedAt: user.deletionStop.updatedAt,
+              ...(user.deletionStop.leaseUntil
+                ? { stopLeaseUntil: user.deletionStop.leaseUntil }
+                : {}),
+            }
+          : {}),
+        blockers: [
+          "remote_stop",
+          "data_cleanup",
+          "provider_cleanup",
+          "mcp_attributed_cleanup_and_historical_orphans",
+          "session_revocation",
+        ],
+      })),
+    };
+  },
+});
+
+export const deletionPending = internalQuery({
+  args: identityFields,
+  returns: v.boolean(),
+  handler: (ctx, { userId }) => isDeletionPending(ctx, userId),
+});
+
+/** One explicit operator invocation can replace an expired attempt. */
+export const claimDeletionStop = internalMutation({
+  args: { userId: v.id("users"), token: v.string() },
+  returns: v.boolean(),
+  handler: async (ctx, { userId, token }) => {
+    const user = await ctx.db.get("users", userId);
+    if (!user?.deletionRequestedAt || !token)
+      throw new ConvexError("Deletion request not found.");
+    const stop = user.deletionStop;
+    if (stop?.state === "running" && (stop.leaseUntil ?? 0) > Date.now())
+      return false;
+    await ctx.db.patch("users", userId, {
+      deletionStop: {
+        state: "running",
+        attempt: (stop?.attempt ?? 0) + 1,
+        updatedAt: Date.now(),
+        token,
+        leaseUntil: Date.now() + 600000,
+      },
+    });
+    return true;
+  },
+});
+export const finishDeletionStop = internalMutation({
+  args: {
+    userId: v.id("users"),
+    token: v.string(),
+    outcome: v.union(
+      v.literal("unknown"),
+      v.literal("failed"),
+      v.literal("archived_observed"),
+    ),
+  },
+  returns: v.boolean(),
+  handler: async (ctx, { userId, token, outcome }) => {
+    const user = await ctx.db.get("users", userId);
+    const stop = user?.deletionStop;
+    if (
+      !user?.deletionRequestedAt ||
+      stop?.state !== "running" ||
+      stop.token !== token ||
+      (stop.leaseUntil ?? 0) <= Date.now()
+    )
+      return false;
+    await ctx.db.patch("users", userId, {
+      deletionStop: {
+        state: outcome,
+        attempt: stop.attempt,
+        updatedAt: Date.now(),
+      },
+    });
+    return true;
+  },
+});

@@ -6,6 +6,7 @@ import { env, type ActionCtx } from "../../_generated/server";
 import type { Doc, Id } from "../../_generated/dataModel";
 import { boat, sandboxRef } from "../boat";
 import { debitCompute } from "../computeDebit";
+import { observeNoticeBalance } from "../noticeBalance";
 import { computeSessionArgs } from "../computeValidator";
 
 export async function fund(
@@ -47,6 +48,8 @@ export async function computeAccess(
   userId: string,
   sessionId?: Id<"computeSessions">,
 ): Promise<"ready" | "waiting" | "blocked"> {
+  if (await ctx.runQuery(internal.users.internal.deletionPending, { userId }))
+    return "blocked";
   if (!paymentsEnabled) return "ready";
   if (!sessionId) return "blocked";
   let session = await ctx.runQuery(internal.agent.compute.get, { sessionId });
@@ -55,7 +58,7 @@ export async function computeAccess(
     await fund(ctx, sessionId);
     session = await ctx.runQuery(internal.agent.compute.get, { sessionId });
   }
-  if (!session || !["starting", "active"].includes(session.state))
+  if (!session || !["starting", "active", "renewing"].includes(session.state))
     return "blocked";
   return session.state === "active" && session.paidUntil > Date.now()
     ? "ready"
@@ -83,12 +86,13 @@ export const stop = internalAction({
     let archived = false;
     try {
       let sandbox = await ctx.runQuery(components.boat.sandboxes.get, ref);
+      // A missing local reference cannot rule out a remote sandbox.
       if (sandbox?.sandboxId) {
         sandbox = await boat.refresh(ctx, ref);
         if (sandbox.state !== "archived") sandbox = await boat.stop(ctx, ref);
         if (sandbox.state !== "archived") return null;
+        archived = true;
       }
-      archived = true;
     } catch {
       // Recovery was scheduled before the call. Never infer a successful snapshot.
       console.error("compute_stop_unconfirmed");
@@ -103,26 +107,62 @@ export const stop = internalAction({
   },
 });
 
-/** Retries only queue failures, at most five times and only within the paid window. */
+/** Retry only the non-consuming observation and queue, never the debit. */
 export async function deliverNotice(
   ctx: ActionCtx,
   debitId: Id<"computeDebits">,
   attempt: number,
+  options: {
+    enabled: boolean;
+    environment?: string;
+    e2e?: string;
+    key?: string;
+    observe: (userId: string, key?: string) => Promise<number>;
+  } = {
+    enabled: paymentsEnabled,
+    environment: env.DISPOSABL_ENVIRONMENT,
+    // eslint-disable-next-line @convex-dev/no-process-env
+    e2e: process.env.E2E_TELEMETRY_DISABLED,
+    key: env.AUTUMN_SECRET_KEY,
+    observe: observeNoticeBalance,
+  },
 ) {
-  const debit = await ctx.runQuery(internal.agent.compute.getDebit, {
-    debitId,
-  });
-  if (
-    !debit ||
-    debit.state !== "confirmed" ||
-    debit.noticeComplete ||
-    debit.noticeOutcome
-  )
-    return null;
+  let debit: Doc<"computeDebits"> | null | undefined;
   try {
-    await ctx.runMutation(internal.agent.compute.notice, { debitId });
+    debit = await ctx.runQuery(internal.agent.compute.getDebit, { debitId });
+    if (
+      !debit ||
+      debit.state !== "confirmed" ||
+      debit.noticeComplete ||
+      debit.noticeOutcome
+    )
+      return null;
+    if (
+      !options.enabled ||
+      options.environment !== "production" ||
+      options.e2e === "1"
+    ) {
+      await ctx.runMutation(internal.agent.compute.notice, {
+        debitId,
+        disabled: true,
+      });
+      return null;
+    }
+    const candidate = await ctx.runQuery(
+      internal.agent.compute.noticeCandidate,
+      { debitId, now: Date.now() },
+    );
+    if (!candidate) {
+      await ctx.runMutation(internal.agent.compute.notice, { debitId });
+      return null;
+    }
+    const balance = await options.observe(candidate.userId, options.key);
+    await ctx.runMutation(internal.agent.compute.notice, {
+      debitId,
+      observation: { ...candidate, balance, observedAt: Date.now() },
+    });
   } catch {
-    if (attempt < 5 && debit.paidUntil > Date.now())
+    if (attempt < 5 && (!debit || debit.paidUntil > Date.now()))
       await ctx.scheduler.runAfter(
         30_000,
         internal.agent.actions.compute.notice,
@@ -141,4 +181,41 @@ export const notice = internalAction({
   args: { debitId: v.id("computeDebits"), attempt: v.number() },
   returns: v.null(),
   handler: (ctx, { debitId, attempt }) => deliverNotice(ctx, debitId, attempt),
+});
+
+/** Explicit operator retry; unknown stays pending until a confirmed archived response. */
+export const stopForDeletion = internalAction({
+  args: { userId: v.id("users") },
+  returns: v.null(),
+  handler: async (ctx, { userId }) => {
+    const token = crypto.randomUUID();
+    if (
+      !(await ctx.runMutation(internal.users.internal.claimDeletionStop, {
+        userId,
+        token,
+      }))
+    )
+      return null;
+    let outcome: "unknown" | "archived_observed" = "unknown";
+    try {
+      const ref = sandboxRef(userId);
+      const sandbox = await ctx.runQuery(components.boat.sandboxes.get, ref);
+      if (sandbox?.sandboxId) {
+        const refreshed = await boat.refresh(ctx, ref);
+        const stopped =
+          refreshed.state === "archived"
+            ? refreshed
+            : await boat.stop(ctx, ref);
+        if (stopped.state === "archived") outcome = "archived_observed";
+      }
+    } catch {
+      // A lost response cannot establish that the sandbox stopped.
+    }
+    await ctx.runMutation(internal.users.internal.finishDeletionStop, {
+      userId,
+      token,
+      outcome,
+    });
+    return null;
+  },
 });

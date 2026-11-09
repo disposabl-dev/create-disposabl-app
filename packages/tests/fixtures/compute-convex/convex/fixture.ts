@@ -52,6 +52,22 @@ export const admit = mutation({
   args: { userId: v.string() },
   handler: (ctx, { userId }) => admitSession(ctx as any, userId, true),
 });
+export const seedUser = mutation({
+  args: {},
+  returns: v.id("users"),
+  handler: (ctx) => ctx.db.insert("users", {}),
+});
+// Model a displaced in-flight dispatch without inventing a confirmed provider stop.
+export const seedNewerSession = mutation({
+  args: { userId: v.string() },
+  returns: v.id("computeSessions"),
+  handler: (ctx, { userId }) =>
+    ctx.db.insert("computeSessions", {
+      userId,
+      state: "starting",
+      paidUntil: 0,
+    }),
+});
 export const app = mutation({
   args: {
     userId: v.string(),
@@ -80,19 +96,15 @@ export const claim = mutation({
   },
   handler: (ctx, a) => claimWindow(ctx as any, a, true),
 });
-// Models a renewal already dispatched by the previous implementation.
-export const inFlightRenewal = mutation({
+// Model an inconsistent starting session while preserving the confirmed debit.
+export const setStartingWithDebit = mutation({
   args: { sessionId: v.id("computeSessions") },
   handler: async (ctx, { sessionId }) => {
     const session = await ctx.db.get(sessionId);
-    if (!session || session.state !== "active") throw new Error("Not active");
-    const debitId = await ctx.db.insert("computeDebits", {
-      sessionId,
-      state: "dispatching",
-      paidUntil: Date.now() + 600_000,
-    });
-    await ctx.db.patch(sessionId, { debitId });
-    return ctx.db.get(debitId);
+    const debit = session?.debitId && (await ctx.db.get(session.debitId));
+    if (!session || session.state !== "active" || debit?.state !== "confirmed")
+      throw new Error("Expected a confirmed active session");
+    await ctx.db.patch(sessionId, { state: "starting", paidUntil: 0 });
   },
 });
 export const boundary = mutation({
@@ -134,13 +146,31 @@ export const expire = mutation({
   args: { sessionId: v.id("computeSessions") },
   handler: (ctx, a) => ctx.db.patch(a.sessionId, { paidUntil: Date.now() - 1 }),
 });
+// Move both sides of a confirmed synthetic window to its boundary.
+export const expireFundedWindow = mutation({
+  args: { sessionId: v.id("computeSessions") },
+  handler: async (ctx, { sessionId }) => {
+    const session = await ctx.db.get(sessionId);
+    const debit = session?.debitId && (await ctx.db.get(session.debitId));
+    if (
+      !session ||
+      session.state !== "active" ||
+      !debit ||
+      debit.state !== "confirmed"
+    )
+      throw new Error("Expected a confirmed active window");
+    const paidUntil = Date.now() - 1;
+    await ctx.db.patch(sessionId, { paidUntil });
+    await ctx.db.patch(debit._id, { paidUntil });
+  },
+});
 export const beginStop = mutation({
   args: { sessionId: v.id("computeSessions") },
   handler: (ctx, { sessionId }) =>
     ctx.db.patch(sessionId, { state: "stopping" }),
 });
 
-// Test-only records representing old denied operations and a pre-association hold.
+// Test-only denied operations for late-confirmation and overflow scenarios.
 export const seedDeniedDebits = mutation({
   args: { sessionId: v.id("computeSessions"), count: v.number() },
   handler: async (ctx, { sessionId, count }) => {
@@ -158,13 +188,13 @@ export const seedDeniedDebits = mutation({
     return ids;
   },
 });
-export const legacyConflictHold = mutation({
-  args: { sessionId: v.id("computeSessions") },
-  handler: (ctx, { sessionId }) =>
+export const inconsistentConflictHold = mutation({
+  args: { sessionId: v.id("computeSessions"), empty: v.boolean() },
+  handler: (ctx, { sessionId, empty }) =>
     ctx.db.patch(sessionId, {
       state: "hold",
       reconciliationConflict: true,
-      conflictDebits: undefined,
+      conflictDebits: empty ? [] : undefined,
       untrackedConflicts: undefined,
     }),
 });
@@ -215,7 +245,13 @@ export const appendEvents = mutation({
   handler: (ctx, a) => (append as any)._handler(ctx, { ...a, events: [] }),
 });
 export const issueAccess = mutation({
-  args: { id: v.string(), token: v.string(), hash: v.string() },
+  args: {
+    id: v.string(),
+    token: v.string(),
+    userId: v.string(),
+    appId: v.string(),
+    hash: v.string(),
+  },
   handler: (ctx, a) => (issue as any)._handler(ctx, a),
 });
 export const auth = query({

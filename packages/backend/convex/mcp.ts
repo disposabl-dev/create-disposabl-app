@@ -1,8 +1,10 @@
-// Convex only exposes functions exported from the backend's convex/ directory.
-export {
+// Product capability issuance is fenced; existing connections can still be revoked.
+import { createMcpApi } from "@disposabl/disposabl-kit/server/http";
+import { accountEligibility } from "./agent/api_policy";
+export const {
   authorize,
   createApiKey,
   getAuthRequest,
   listConnections,
   revokeConnection,
-} from "@disposabl/disposabl-kit/server/http";
+} = createMcpApi(accountEligibility);
