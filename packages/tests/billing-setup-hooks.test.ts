@@ -35,11 +35,11 @@ test("CI uses the deployed target, runs setup before upload and stops on setup f
     join(root, ".github/workflows/pipeline.yml"),
     "utf8",
   );
-  const deploy = workflow
-    .match(
-      /      - name: Deploy\n[\s\S]*?        run: \|\n((?:          .*\n)+)/,
-    )?.[1]
-    .replace(/^ {10}/gm, "");
+  const parsed = Bun.YAML.parse(workflow) as {
+    jobs: { web: { steps: Array<{ name?: string; run?: string }> } };
+  };
+  const deploy = parsed.jobs.web.steps.find((step) => step.name === "Deploy")?.run;
+  assert.equal(typeof deploy, "string");
   assert.ok(deploy);
   const temp = await mkdtemp(join(tmpdir(), "billing-deploy-hook-"));
   try {
