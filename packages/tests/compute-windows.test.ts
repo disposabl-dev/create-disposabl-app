@@ -224,6 +224,39 @@ test("normal stop serializes calls, waits for workers and requires an explicit n
   assert.equal(await stop("stale"), false);
 });
 
+test("an unconfirmed stop stays fenced and schedules a retry for denied or unknown debits", async () => {
+  for (const outcome of ["denied", "unknown"] as const) {
+    const f = await running();
+    await (settle as any)._handler(f.ctx, {
+      debitId: f.debit._id,
+      outcome,
+    });
+    assert.equal(
+      await (stopping as any)._handler(f.ctx, {
+        sessionId: f.sessionId,
+        token: "attempt",
+      }),
+      true,
+    );
+    const before = f.scheduled.length;
+    await (stopped as any)._handler(f.ctx, {
+      sessionId: f.sessionId,
+      token: "attempt",
+      archived: false,
+    });
+    const session = f.rows.get(f.sessionId);
+    assert.equal(session.state, outcome === "unknown" ? "hold" : "stopping");
+    assert.notEqual(session.stopConfirmed, true);
+    assert.equal(session.stopLease, undefined);
+    assert.ok(
+      f.scheduled
+        .slice(before)
+        .some((job) => job.name === "agent/actions/compute:stop"),
+    );
+    await assert.rejects(admitSession(f.ctx, "owner", true));
+  }
+});
+
 test("boundary recovery is armed before renewal; notices cannot replay after completion", async () => {
   const f = await running();
   await (settle as any)._handler(f.ctx, {

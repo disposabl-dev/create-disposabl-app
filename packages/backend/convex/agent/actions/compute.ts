@@ -86,12 +86,13 @@ export const stop = internalAction({
     let archived = false;
     try {
       let sandbox = await ctx.runQuery(components.boat.sandboxes.get, ref);
+      // A missing local reference cannot rule out a remote sandbox.
       if (sandbox?.sandboxId) {
         sandbox = await boat.refresh(ctx, ref);
         if (sandbox.state !== "archived") sandbox = await boat.stop(ctx, ref);
         if (sandbox.state !== "archived") return null;
+        archived = true;
       }
-      archived = true;
     } catch {
       // Recovery was scheduled before the call. Never infer a successful snapshot.
       console.error("compute_stop_unconfirmed");
