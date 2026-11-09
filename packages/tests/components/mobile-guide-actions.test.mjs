@@ -156,7 +156,11 @@ test("featured, shelf and mastery handlers each emit one fixed action", async ()
   await touch("Read Meet Disposabl");
   await touch("Read secret-marker-title");
   await touch("Explore Test");
-  expect(pushes).toHaveLength(3);
+  expect(pushes).toEqual([
+    { pathname: "/guide-detail", params: { id: "welcome" } },
+    { pathname: "/guide-detail", params: { id: "secret-marker-id" } },
+    { pathname: "/guide-detail", params: { id: "third" } },
+  ]);
   expect(events.map((e) => e.properties.action)).toEqual([
     "open_guide",
     "open_guide",
@@ -180,11 +184,9 @@ test("lesson controls ignore bounds; valid previous and next emit once, scrollin
     "open_guide",
   ]);
   await act(async () =>
-    renderer.root
-      .findByType("FlatList")
-      .props.onMomentumScrollEnd({
-        nativeEvent: { contentOffset: { y: 700 } },
-      }),
+    renderer.root.findByType("FlatList").props.onMomentumScrollEnd({
+      nativeEvent: { contentOffset: { y: 700 } },
+    }),
   );
   expect(events).toHaveLength(2);
 });
@@ -193,6 +195,16 @@ test("capture failure cannot interrupt navigation", async () => {
   captureThrows = true;
   await touch("Read secret-marker-title");
   expect(pushes).toHaveLength(1);
+  expect(events).toHaveLength(0);
+});
+test("capture failure cannot interrupt lesson controls", async () => {
+  await mount(GuideDetailScreen);
+  await layout();
+  captureThrows = true;
+  const actions = renderer.root.findAllByType("Action");
+  await act(async () => actions[1].props.onPress());
+  await act(async () => actions[2].props.onPress());
+  expect(scrolls).toEqual([{ index: 1 }, { index: 0 }]);
   expect(events).toHaveLength(0);
 });
 test("expired lease, opt-out and E2E suppress actions while navigation continues", async () => {

@@ -56,6 +56,8 @@ const productProofTests = [
   "packages/tests/mobile-payment-attempts.test.ts",
   "packages/tests/components/mobile-guide-actions.test.mjs",
   "packages/tests/mobile-guide-actions.test.ts",
+  "packages/tests/components/web-billing-attempts.test.mjs",
+  "packages/tests/web-billing-attempts.test.ts",
   "packages/tests/components/web-key-actions.test.mjs",
   "packages/tests/web-key-actions.test.ts",
   "packages/tests/mobile-product-actions.test.ts",
