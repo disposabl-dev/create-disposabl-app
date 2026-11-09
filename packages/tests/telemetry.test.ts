@@ -1,5 +1,7 @@
 import { afterEach, test } from "node:test";
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
+import appConfig from "../../disposabl.json";
 import {
   captureTelemetry,
   telemetryEnabled,
@@ -11,8 +13,14 @@ import {
 
 const originalFetch = globalThis.fetch;
 const originalEnv = { ...process.env };
+const originalFeatures = [...appConfig.features];
+// Only the product implements account deletion; generated starters do not.
+const hasDeletionGuard = existsSync(
+  new URL("../backend/convex/users/deletion.ts", import.meta.url),
+);
 afterEach(() => {
   globalThis.fetch = originalFetch;
+  appConfig.features.splice(0, appConfig.features.length, ...originalFeatures);
   for (const key of Object.keys(process.env)) {
     if (!(key in originalEnv)) delete process.env[key];
   }
@@ -432,7 +440,7 @@ test("bootstrap issues opaque identities, links once, rotates accounts, and fail
           request(switched.anonymousId, true),
         )
       ).status,
-      401,
+      hasDeletionGuard ? 401 : 200,
     );
     deleting = false;
     user = null;
@@ -510,6 +518,8 @@ test("capabilities expire, cannot be reused by another account, and schedule bou
 });
 
 test("link delivery retries one stable event and acknowledges only successful transport", async () => {
+  if (!appConfig.features.includes("analytics" as never))
+    (appConfig.features as string[]).push("analytics");
   const { claimIdentity, getLink, beginLink, finishLink, deliverLink } =
     await import("../backend/convex/telemetry");
   process.env.DISPOSABL_ENVIRONMENT = "production";
@@ -563,7 +573,9 @@ test("link delivery retries one stable event and acknowledges only successful tr
   assert.equal(bodies.length, 2);
 });
 
-test("link delivery makes no request while disabled or when the owner is deleting", async () => {
+test("link delivery respects disabled capture and the available owner guard", async () => {
+  if (!appConfig.features.includes("analytics" as never))
+    (appConfig.features as string[]).push("analytics");
   const { claimIdentity, getLink, beginLink, finishLink, deliverLink } =
     await import("../backend/convex/telemetry");
   process.env.DISPOSABL_ENVIRONMENT = "production";
@@ -610,11 +622,13 @@ test("link delivery makes no request while disabled or when the owner is deletin
   delete process.env.E2E_TELEMETRY_DISABLED;
   deleting = true;
   await (deliverLink as any)._handler(actionCtx, { id: row._id });
-  assert.equal(calls, 0);
-  assert.equal(row.link.attempts, 1);
+  assert.equal(calls, hasDeletionGuard ? 0 : 1);
+  assert.equal(row.link?.attempts, hasDeletionGuard ? 1 : undefined);
 });
 
 test("link delivery stops after five failed attempts and leaves its pending record", async () => {
+  if (!appConfig.features.includes("analytics" as never))
+    (appConfig.features as string[]).push("analytics");
   const { claimIdentity, getLink, beginLink, finishLink, deliverLink } =
     await import("../backend/convex/telemetry");
   process.env.DISPOSABL_ENVIRONMENT = "production";
