@@ -16,4 +16,6 @@ await Bun.write(
   Bun.file("../disposabl-kit/server/release/verify-metadata.mjs"),
 );
 
+await Bun.write("LICENSE", Bun.file("../../LICENSE"));
+
 export {};
