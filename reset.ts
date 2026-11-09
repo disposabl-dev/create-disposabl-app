@@ -279,6 +279,9 @@ if (
   throw new Error("Starter product release boundary changed.");
 delete pipeline.jobs["android-play"];
 pipeline.jobs.web.if = "needs.changes.outputs.changed == 'true'";
+pipeline.jobs.web.steps = pipeline.jobs.web.steps?.filter(
+  (step) => step.name !== "Check product release guards",
+);
 for (const step of pipeline.jobs.web.steps ?? [])
   if (["Expo", "Channel", "Fingerprint"].includes(step.name ?? ""))
     step.if = "needs.changes.outputs.android == 'true'";

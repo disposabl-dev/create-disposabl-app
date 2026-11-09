@@ -113,6 +113,11 @@ jobs:
           if [[ '${{ github.event_name }}' == pull_request ]]; then node .github/scripts/disposabl.mjs report cli,typescript-sdk blocked 'Packages publish after merge to main.'; fi
       - name: Check
         run: bun run check
+      - name: Check product release guards
+        if: github.repository == 'disposabl-dev/create-disposabl-app'
+        run: |
+          E2E_TELEMETRY_DISABLED=1 DO_NOT_TRACK=1 bun test packages/tests/package-release.test.ts
+          python3 .github/scripts/play-bundle.test.py
       - name: Build selected clients
         run: |
           for package in cli sdk; do
@@ -287,8 +292,9 @@ jobs:
           DISPOSABL_ANDROID_SIGNING: ${{ secrets.DISPOSABL_ANDROID_SIGNING }}
           BUNDLETOOL_JAR: ${{ runner.temp }}/bundletool.jar
         run: |
-          [[ "$GITHUB_RUN_NUMBER" =~ ^[1-9][0-9]*$ && "$GITHUB_RUN_NUMBER" -le 2099999000 ]] || { echo 'Invalid pipeline run number' >&2; exit 1; }
-          export DISPOSABL_ANDROID_VERSION_CODE=$((1000 + GITHUB_RUN_NUMBER))
+          [[ "$GITHUB_RUN_NUMBER" =~ ^[1-9][0-9]*$ && "$GITHUB_RUN_NUMBER" -le 20999989 ]] || { echo 'Invalid pipeline run number' >&2; exit 1; }
+          [[ "$GITHUB_RUN_ATTEMPT" =~ ^[1-9][0-9]?$ ]] || { echo 'Invalid pipeline attempt' >&2; exit 1; }
+          export DISPOSABL_ANDROID_VERSION_CODE=$((1000 + 100 * GITHUB_RUN_NUMBER + GITHUB_RUN_ATTEMPT))
           echo "Candidate version code: $DISPOSABL_ANDROID_VERSION_CODE; availability on Play remains unchecked."
           bash .github/scripts/play-bundle.sh build
       - name: Submit production bundle to Play
@@ -301,7 +307,7 @@ jobs:
         run: |
           : "${EXPO_TOKEN:?Expo token is required for submission}"
           : "${EXPO_PROJECT_ID:?Verified Expo submission project ID is required}"
-          bash "$GITHUB_WORKSPACE/.github/scripts/play-bundle.sh" verify-source
+          bash "$GITHUB_WORKSPACE/.github/scripts/play-bundle.sh" verify-submission-source
           bun x eas-cli@27.2.0 submit --platform android --profile production --path android/app/build/outputs/bundle/release/app-release.aab --non-interactive --wait
           echo 'Expo reports a completed submission. Play review and rollout are separate.' >> "$GITHUB_STEP_SUMMARY"
   android-failure:
