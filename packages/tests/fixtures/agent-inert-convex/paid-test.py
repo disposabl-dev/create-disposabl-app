@@ -57,6 +57,12 @@ call('paidConfirm',{'debitId':confirmed_debit['_id']})
 state=call('paidInspect',{'userId':confirmed_user,'appId':confirmed_apps[0]})
 assert state['sessions'][0]['state']=='active' and state['debits'][0]['state']=='confirmed'
 paid_until=state['sessions'][0]['paidUntil']
+assert not call('paidAllowed',{'userId':confirmed_user,'sessionId':confirmed_session})
+with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+    claims=list(pool.map(lambda token: (token,call('activationClaim',{'sessionId':confirmed_session,'token':token})),['activation-a','activation-b']))
+assert sorted(value for _,value in claims)==['claimed','wait']
+winning=next(token for token,value in claims if value=='claimed')
+assert call('activationComplete',{'sessionId':confirmed_session,'token':winning})
 assert call('paidAllowedAt',{'userId':confirmed_user,'sessionId':confirmed_session,'now':paid_until-1})
 assert not call('paidAllowedAt',{'userId':confirmed_user,'sessionId':confirmed_session,'now':paid_until})
 assert not call('paidAllowedAt',{'userId':confirmed_user,'sessionId':confirmed_session,'now':paid_until+1})
@@ -67,10 +73,41 @@ call('paidSend',second)
 state=call('paidInspect',{'userId':confirmed_user,'appId':confirmed_apps[1]})
 assert state['app']['agent']['computeSessionId']==confirmed_session and len(state['sessions'])==1 and len(state['debits'])==1
 assert call('paidClaim',{'sessionId':confirmed_session,'expectedDebit':confirmed_debit['_id']}) is None
-call('paidExpire',{'sessionId':confirmed_session})
+assert call('activationArchive',{'sessionId':confirmed_session})
 assert not call('paidAllowed',{'userId':confirmed_user,'sessionId':confirmed_session})
 rejected(lambda:call('paidSend',second),'sandbox is stopping')
 assert call('paidClaim',{'sessionId':confirmed_session,'expectedDebit':confirmed_debit['_id']}) is None
 expired=call('paidInspect',{'userId':confirmed_user,'appId':confirmed_apps[1]})
 assert expired['sessions'][0]['state']=='stopping' and len(expired['debits'])==1
-print('PASS: confirmed window, exact access boundary, same-window balance recheck, expiry fails closed')
+print('PASS: confirmed window, concurrent activation claim, same-window balance recheck, archived stop without new debit')
+
+# A separate real transaction sequence models a lost activation reply.
+fence_user=call('paidUser',{}); fence_app=str(uuid.uuid4())
+call('paidApp',{'userId':fence_user,'appId':fence_app})
+call('paidSend',{'userId':fence_user,'appId':fence_app,'prompt':'fence fixture','balance':20})
+fence_state=call('paidInspect',{'userId':fence_user,'appId':fence_app}); fence_session=fence_state['sessions'][0]['_id']
+fence_debit=call('paidClaim',{'sessionId':fence_session}); call('paidConfirm',{'debitId':fence_debit['_id']})
+assert call('activationClaim',{'sessionId':fence_session,'token':'lost'})=='claimed'
+assert call('activationArchive',{'sessionId':fence_session})
+assert not call('activationStop',{'sessionId':fence_session,'token':'stop'})
+assert not call('activationComplete',{'sessionId':fence_session,'token':'lost'})
+call('activationExpireLease',{'sessionId':fence_session})
+assert call('activationStop',{'sessionId':fence_session,'token':'stop'})
+print('PASS: lost activation blocks stop until simulated expiry; late completion rejected')
+
+# Normalize more than two batches; inject an unresolved legacy write between claims.
+legacy_user=call('paidUser',{}); legacy_app=str(uuid.uuid4())
+call('paidApp',{'userId':legacy_user,'appId':legacy_app})
+call('paidSend',{'userId':legacy_user,'appId':legacy_app,'prompt':'legacy fixture','balance':20})
+legacy_state=call('paidInspect',{'userId':legacy_user,'appId':legacy_app}); legacy_session=legacy_state['sessions'][0]['_id']
+legacy_debit=call('paidClaim',{'sessionId':legacy_session}); call('paidConfirm',{'debitId':legacy_debit['_id']})
+call('activationSeedLegacy',{'userId':legacy_user,'count':111})
+assert call('activationClaim',{'sessionId':legacy_session,'token':'legacy'})=='wait'
+call('activationLegacyDelivery',{'userId':legacy_user,'index':110})
+for _ in range(8):
+    state=call('activationClaim',{'sessionId':legacy_session,'token':'legacy'})
+    if state=='blocked': break
+    assert state=='wait'
+else: raise AssertionError('legacy work was not fenced')
+assert call('paidInspect',{'userId':legacy_user,'appId':legacy_app})['sessions'][0]['state']=='stopping'
+print('PASS: bounded legacy batches retain an intervening unresolved marker')

@@ -137,13 +137,18 @@ const paidScheduler = (ctx: any) => ({
         "agent/compute:uncertain",
         "agent/actions/compute:stop",
         "agent/actions/compute:notice",
+        "agent/activation:expired",
       ];
       if (!allowed.includes(getFunctionName(ref)))
         throw new Error("Unexpected paid fixture schedule");
       return ctx.scheduler.runAfter(0, anyApi.agentFixture.noop, {});
     },
     runAt: async (_time: number, ref: any) => {
-      if (getFunctionName(ref) !== "agent/compute:boundary")
+      if (
+        !["agent/compute:boundary", "agent/actions/compute:stop"].includes(
+          getFunctionName(ref),
+        )
+      )
         throw new Error("Unexpected paid fixture scheduled boundary");
       return ctx.scheduler.runAfter(0, anyApi.agentFixture.noop, {});
     },
@@ -291,6 +296,85 @@ export const paidExpire = internalMutationGeneric({
   returns: v.null(),
   handler: async (ctx, args) => {
     await ctx.db.patch(args.sessionId, { paidUntil: Date.now() - 1 });
+    return null;
+  },
+});
+
+import {
+  claimActivation,
+  completeActivation,
+  archiveStop,
+} from "../../../../backend/convex/agent/activation";
+import { stopping } from "../../../../backend/convex/agent/compute";
+export const activationClaim = internalMutationGeneric({
+  args: { sessionId: v.id("computeSessions"), token: v.string() },
+  returns: v.any(),
+  handler: (ctx, args) => claimActivation(paidScheduler(ctx) as any, args),
+});
+export const activationComplete = internalMutationGeneric({
+  args: { sessionId: v.id("computeSessions"), token: v.string() },
+  returns: v.boolean(),
+  handler: (ctx, args) => completeActivation(paidScheduler(ctx) as any, args),
+});
+export const activationArchive = internalMutationGeneric({
+  args: { sessionId: v.id("computeSessions") },
+  returns: v.boolean(),
+  handler: (ctx, args) => archiveStop(paidScheduler(ctx) as any, args),
+});
+export const activationStop = internalMutationGeneric({
+  args: { sessionId: v.id("computeSessions"), token: v.string() },
+  returns: v.boolean(),
+  handler: (ctx, args) => (stopping as any)._handler(paidScheduler(ctx), args),
+});
+export const activationExpireLease = internalMutationGeneric({
+  args: { sessionId: v.id("computeSessions") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const row = await ctx.db.get(args.sessionId);
+    if (!row?.activationLease) throw Error("missing fixture lease");
+    await ctx.db.patch(args.sessionId, {
+      activationLease: { ...row.activationLease, until: Date.now() - 1 },
+    });
+    return null;
+  },
+});
+
+export const activationSeedLegacy = internalMutationGeneric({
+  args: { userId: v.string(), count: v.number() },
+  returns: v.null(),
+  handler: async (ctx, { userId, count }) => {
+    for (let i = 0; i < count; i++)
+      await ctx.db.insert("apps", {
+        userId,
+        appId: `legacy-${userId}-${i}`,
+        name: "Synthetic legacy",
+        platforms: ["web"],
+      });
+    return null;
+  },
+});
+export const activationLegacyDelivery = internalMutationGeneric({
+  args: { userId: v.string(), index: v.number() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const app = await ctx.db
+      .query("apps")
+      .withIndex("by_appId", (q: any) =>
+        q.eq("appId", `legacy-${args.userId}-${args.index}`),
+      )
+      .unique();
+    if (!app) throw Error("missing synthetic app");
+    await ctx.db.patch(app._id, {
+      agent: {
+        threadId: `legacy-${args.index}`,
+        status: "failed",
+        pending: [],
+        updatedAt: Date.now(),
+        delivery: "synthetic-unknown",
+      },
+      agentRemoteUnresolved: undefined,
+      agentResumeBusy: undefined,
+    });
     return null;
   },
 });
