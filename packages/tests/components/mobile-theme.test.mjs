@@ -17,6 +17,9 @@ const appearance = {
   }),
 };
 const read = mock((key) => Promise.resolve(saved.get(key) ?? null));
+const write = mock(async (key, value) => {
+  saved.set(key, value);
+});
 mock.module("react-native", () => ({
   View: "View",
   Appearance: appearance,
@@ -37,9 +40,7 @@ mock.module("expo-router", () => ({
 mock.module("expo-status-bar", () => ({ StatusBar: "StatusBar" }));
 mock.module("expo-secure-store", () => ({
   getItemAsync: read,
-  setItemAsync: async (key, value) => {
-    saved.set(key, value);
-  },
+  setItemAsync: write,
 }));
 const {
   ThemeProvider,
@@ -65,6 +66,8 @@ beforeEach(() => {
   saved.clear();
   appearance.setColorScheme.mockClear();
   read.mockImplementation((key) => Promise.resolve(saved.get(key) ?? null));
+  write.mockImplementation(async (key, value) => saved.set(key, value));
+  write.mockClear();
 });
 afterEach(async () => {
   await act(async () => renderer?.unmount());
@@ -119,4 +122,54 @@ test("a delayed stored preference cannot replace a user's new choice", async () 
   await act(async () => selection.setPreference("dark"));
   await act(async () => finish("light"));
   expect(selection.preference).toBe("dark");
+});
+
+test("failed persistence leaves the visible choice but cannot survive remount", async () => {
+  write.mockImplementation(async () => {
+    throw new Error("storage unavailable");
+  });
+  await mount();
+  await act(async () => selection.setPreference("dark"));
+  expect(selection.preference).toBe("dark");
+  expect(saved.has("app-theme")).toBe(false);
+  await act(async () => renderer.unmount());
+  await mount();
+  expect(selection.preference).toBe("system");
+});
+
+test("queued choices save in selection order even when a write is delayed", async () => {
+  let finish;
+  write.mockImplementation((key, value) => {
+    if (value === "dark")
+      return new Promise((resolve) => {
+        finish = () => {
+          saved.set(key, value);
+          resolve();
+        };
+      });
+    saved.set(key, value);
+    return Promise.resolve();
+  });
+  await mount();
+  await act(async () => selection.setPreference("dark"));
+  await act(async () => selection.setPreference("light"));
+  expect(write).toHaveBeenCalledTimes(1);
+  await act(async () => finish());
+  expect(saved.get("app-theme")).toBe("light");
+  await act(async () => renderer.unmount());
+  await mount();
+  expect(selection.preference).toBe("light");
+});
+
+test("a read failure falls back to system without writing a replacement", async () => {
+  saved.set("app-theme", "dark");
+  read.mockImplementation((key) =>
+    key === "app-theme"
+      ? Promise.reject(new Error("storage unavailable"))
+      : Promise.resolve(null),
+  );
+  await mount();
+  expect(selection.preference).toBe("system");
+  expect(saved.get("app-theme")).toBe("dark");
+  expect(write).not.toHaveBeenCalled();
 });
