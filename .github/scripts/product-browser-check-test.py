@@ -16,6 +16,22 @@ spec.loader.exec_module(runner)
 
 
 class RunnerTests(unittest.TestCase):
+    def test_layout_summary_accepts_only_fixed_fields_and_bounded_numbers(self):
+        valid = [
+            'LANDING_LAYOUT kind=context page=/stack theme=dark width=320',
+            'LANDING_LAYOUT kind=overflow page=/ theme=system width=844 height=390 viewport=844 scrollwidth=850',
+            'LANDING_LAYOUT kind=clipped page=/ theme=system width=320 count=1 minleft=-2 maxright=321',
+            'LANDING_LAYOUT kind=font page=/pricing theme=light width=320 dialog=0 count=4 minfont=14.5',
+        ]
+        invalid = [valid[0] + ' private-secret',
+                   valid[0].replace('/stack', '/private-secret'),
+                   valid[0].replace('dark', 'private-secret'),
+                   valid[0].replace('320', '1234567890123456789')]
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            runner.report_layout('\n'.join(valid + invalid))
+        self.assertEqual(output.getvalue(), '\n'.join(valid) + '\n')
+
     def test_missing_explicit_inputs_fails_before_any_backend(self):
         with patch.dict(runner.os.environ, {}, clear=True), patch.object(runner.sys, 'argv', ['runner']):
             with self.assertRaisesRegex(RuntimeError, 'Supply an executable verified local backend'):

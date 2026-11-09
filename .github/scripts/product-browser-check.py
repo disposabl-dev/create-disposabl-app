@@ -54,6 +54,26 @@ def report_e2e(path):
 
 
 
+def report_layout(text):
+    """Allow only fixed public routes, themes and bounded numeric measurements."""
+    base = r' page=/(?:stack|build|why-disposabl|pricing)? theme=(?:system|dark|light) width=\d{1,4}'
+    number = r'-?\d{1,6}(?:\.\d{1,3})?'
+    patterns = [
+        r'kind=context' + base + r'(?: height=\d{1,4})?',
+        r'kind=overflow' + base + r'(?: height=\d{1,4})? viewport=\d{1,4} scrollwidth=\d{1,6}',
+        r'kind=clipped' + base + r' count=\d{1,6} minleft=' + number + r' maxright=' + number,
+        r'kind=font' + base + r' dialog=[01] count=\d{1,6} minfont=' + number,
+    ]
+    markers = []
+    for line in re.sub(r'\x1b\[[0-9;]*m', '', text).splitlines():
+        if any(re.fullmatch('LANDING_LAYOUT ' + pattern, line) for pattern in patterns):
+            markers.append(line)
+    contexts = [line for line in markers if 'kind=context ' in line][-6:]
+    failures = [line for line in markers if 'kind=context ' not in line][:20]
+    for line in contexts + failures:
+        print(line, flush=True)
+
+
 def report_failure(path, source):
     """Print fixed error categories and committed flow locations, never raw payloads."""
     text = path.read_text(errors='replace') if path.exists() else ''
@@ -69,6 +89,7 @@ def report_failure(path, source):
     }
     matched = [name for name, pattern in categories.items() if re.search(pattern, text)]
     print('Failure categories: ' + (', '.join(matched) or 'unclassified'), flush=True)
+    report_layout(text)
     report = source / 'packages/tests/.e2e/report.json'
     if not report.is_file():
         return
