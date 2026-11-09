@@ -119,6 +119,11 @@ test("packaged starter and generated profiles exclude product proof fixtures", a
       }
     }
     for (const root of roots) {
+      const backendApi = await readFile(
+        join(root, "packages/backend/convex/_generated/api.d.ts"),
+        "utf8",
+      );
+      assert.doesNotMatch(backendApi, /localDeletion/);
       const mobileConfigPath = join(root, "apps/mobile/app.json");
       if (existsSync(mobileConfigPath)) {
         const billing = await readFile(
