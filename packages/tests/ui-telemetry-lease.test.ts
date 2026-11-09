@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { createTelemetryLeaseController } from "../disposabl-kit/client/lib/telemetry-lease";
 
 const id = "00000000-0000-4000-8000-000000000001";
+const token = (session: string) =>
+  `x.${btoa(JSON.stringify({ sub: session }))}.x`;
 const reply = (extra = {}) =>
   new Response(
     JSON.stringify({
@@ -57,8 +59,8 @@ test("account change invalidates an unresolved response and never starts its ide
       stop: () => events.push("stop"),
     },
   });
-  control.update({ enabled: true, token: "old" });
-  control.update({ enabled: false, token: "new" });
+  control.update({ enabled: true, token: token("old") });
+  control.update({ enabled: false, token: token("new") });
   resolve(reply({ identified: true }));
   await tick();
   assert.deepEqual(events, []);
@@ -77,7 +79,7 @@ test("anonymous identity is forwarded for login but never reused across logout",
   });
   control.update({ enabled: true, token: null });
   await tick();
-  control.update({ enabled: true, token: "signed-in" });
+  control.update({ enabled: true, token: token("signed-in") });
   await tick();
   control.update({ enabled: true, token: null });
   await tick();
@@ -111,6 +113,27 @@ test("disabled, malformed and unapproved bootstrap replies never start SDK", asy
     assert.equal(started, false);
     control.stop();
   }
+});
+
+test("access token refresh for the same session retains anonymous linkage", async () => {
+  const bodies: string[] = [];
+  const control = createTelemetryLeaseController({
+    origin: "http://local",
+    transport: async (_url, init) => {
+      bodies.push(String(init?.body));
+      return reply({ identified: true });
+    },
+    adapter: { start() {}, stop() {} },
+  });
+  control.update({ enabled: true, token: token("same") + "a" });
+  await tick();
+  control.update({ enabled: true, token: token("same") + "b" });
+  await tick();
+  assert.deepEqual(
+    bodies.map((body) => JSON.parse(body)),
+    [{}, { anonymousId: id }],
+  );
+  control.stop();
 });
 
 test("failed refresh stops capture and cannot revive an expired lease", async () => {

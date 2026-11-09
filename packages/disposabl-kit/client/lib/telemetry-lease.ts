@@ -1,3 +1,5 @@
+import { sessionId } from "../../lib/auth-session";
+
 /** A short-lived server authorization for a client telemetry adapter. */
 export type TelemetryLease = {
   enabled: true;
@@ -121,10 +123,16 @@ export function createTelemetryLeaseController(options: {
     update(input: { enabled: boolean; token: string | null }) {
       const changed = token !== input.token;
       stop();
-      if (!input.enabled || (changed && token !== null))
+      if (
+        !input.enabled ||
+        (changed &&
+          token !== null &&
+          sessionId(token) !== sessionId(input.token))
+      )
         anonymousId = undefined;
       token = input.token;
-      if (input.enabled) void acquire(generation);
+      if (input.enabled && (!token || sessionId(token)))
+        void acquire(generation);
     },
     stop,
   };
