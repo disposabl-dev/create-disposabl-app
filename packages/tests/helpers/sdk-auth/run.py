@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Run the packed SDK flow against a fresh owned local Convex instance."""
 import json
+from contextlib import contextmanager
 import os
 from pathlib import Path
 import secrets
 import shutil
+import signal
 import socket
 import subprocess
 import sys
@@ -15,6 +17,45 @@ import urllib.request
 ROOT = Path(__file__).resolve().parents[4]
 BINARY = Path.home() / '.cache/convex/binaries/precompiled-2026-10-22-1447815/convex-local-backend'
 EXPECTED_AUTH = '2.0.0-beta.0-reboot.437831bd-disposabl.8'
+
+
+@contextmanager
+def owned_backend(command, *, stop_timeout=10, **options):
+    """Defer cancellation during spawn/cleanup so the owned child is always reaped."""
+    phase, pending, proc = 'starting', None, None
+    previous = {sig: signal.getsignal(sig) for sig in (signal.SIGTERM, signal.SIGINT)}
+
+    def cancel(signum, _frame):
+        nonlocal pending
+        pending = signum
+        if phase == 'running':
+            raise SystemExit(128 + signum)
+
+    for sig in previous:
+        signal.signal(sig, cancel)
+    try:
+        proc = subprocess.Popen(command, **options)
+        phase = 'running'
+        if pending is not None:
+            raise SystemExit(128 + pending)
+        yield proc
+    finally:
+        phase = 'stopping'
+        try:
+            if proc is not None:
+                if proc.poll() is None:
+                    proc.terminate()
+                try:
+                    proc.wait(timeout=stop_timeout)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    proc.wait()
+                print('owned backend stopped', flush=True)
+        finally:
+            for sig, handler in previous.items():
+                signal.signal(sig, handler)
+        if pending is not None:
+            raise SystemExit(128 + pending)
 
 
 def main():
@@ -60,11 +101,10 @@ def main():
     command = ['bun', 'run', 'e2e', 'run', 'sdk-auth.e2e.ts', '--target', 'backend', '--retries', '0']
     print(f'source {sha}; retained evidence {stage}', flush=True)
     with (stage / 'backend.log').open('w') as backend_log:
-        proc = subprocess.Popen([str(BINARY), '--interface', '127.0.0.1', '--port', '3530',
+        with owned_backend([str(BINARY), '--interface', '127.0.0.1', '--port', '3530',
                                  '--site-proxy-port', '3531', '--instance-name', name,
                                  '--instance-secret', secret, '--disable-beacon', '--local-storage',
-                                 str(stage / 'storage'), str(db)], env=env, stdout=backend_log, stderr=subprocess.STDOUT)
-        try:
+                                 str(stage / 'storage'), str(db)], env=env, stdout=backend_log, stderr=subprocess.STDOUT) as proc:
             for _ in range(100):
                 if proc.poll() is not None:
                     raise RuntimeError('Backend exited during startup')
@@ -107,14 +147,6 @@ def main():
             if api.returncode:
                 raise RuntimeError('API flow failed; inspect retained api.log')
             print('API flow passed', flush=True)
-        finally:
-            proc.terminate()
-            try:
-                proc.wait(timeout=10)
-            except subprocess.TimeoutExpired:
-                proc.kill()
-                proc.wait()
-            print('owned backend stopped', flush=True)
 
 
 if __name__ == '__main__':
