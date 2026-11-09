@@ -38,9 +38,9 @@ const env = {
 };
 function space() {
   const fs = statfsSync(work);
-  if (fs.bavail * fs.bsize < 2 * 1024 ** 3)
+  if (fs.bavail * fs.bsize < 2.5 * 1024 ** 3)
     throw new Error(
-      "Less than 2 GiB free; stopping before further large work.",
+      "Less than 2.5 GiB free; stopping before further large work.",
     );
 }
 function run(command: string, args: string[], cwd: string) {
@@ -138,6 +138,17 @@ async function verify(enabled: boolean) {
       { cwd: join(app, "apps/mobile"), env, encoding: "utf8" },
     ),
   );
+  const properties = config.plugins.filter(
+    (plugin: unknown) =>
+      Array.isArray(plugin) && plugin[0] === "expo-build-properties",
+  );
+  assert.equal(properties.length, 1);
+  assert.ok(
+    properties[0][1].ios.extraPods.some(
+      (pod: { name: string; version: string }) =>
+        pod.name === "ReachabilitySwift" && pod.version === "5.2.3",
+    ),
+  );
   const baseConfig = JSON.parse(await read("apps/mobile/app.json")).expo;
   for (const key of ["name", "slug", "version", "orientation", "icon"])
     assert.deepEqual(config[key], baseConfig[key], key);
@@ -178,7 +189,20 @@ async function qualify(stage: string) {
     app,
   );
   await verify(stage === "on");
-  for (const workspace of ["packages/backend", "apps/web", "apps/mobile"])
+  run(
+    "python3",
+    [
+      "-c",
+      `import sys;sys.path.insert(0,${JSON.stringify(join(root, "packages/tests/helpers/sdk-auth"))});from selected_auth import verify_selected_auth;print(verify_selected_auth(${JSON.stringify(app)}))`,
+    ],
+    app,
+  );
+  for (const workspace of [
+    "packages/backend",
+    "apps/web",
+    "apps/mobile",
+    "packages/tests",
+  ])
     run("bun", ["run", "--cwd", workspace, "typecheck"], app);
   for (const platform of ["android", "ios"])
     run(
@@ -197,6 +221,13 @@ async function qualify(stage: string) {
       app,
     );
 }
+run("bun", ["install", "--offline", "--ignore-scripts"], app);
+run(
+  "bun",
+  ["install", "--offline", "--frozen-lockfile", "--ignore-scripts"],
+  app,
+);
+await verify(false);
 await reconfigureApp(template, app, version, { features: "payments" });
 await qualify("on");
 await reconfigureApp(template, app, version, { features: "authentication" });
