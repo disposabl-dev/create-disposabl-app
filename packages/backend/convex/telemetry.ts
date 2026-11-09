@@ -1,6 +1,10 @@
 import { v } from "convex/values";
 import { platform } from "./validator";
-import { httpAction, internalAction } from "./_generated/server";
+import {
+  httpAction,
+  internalAction,
+  type ActionCtx,
+} from "./_generated/server";
 import {
   getActiveSessionUserId as getSessionUserId,
   requireNotDeleting,
@@ -87,44 +91,49 @@ export const bootstrap = httpAction((ctx, request) =>
 );
 const anonymousIdPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-export const page = httpAction(async (ctx, request) => {
-  try {
-    const body: unknown = await request.json();
-    if (
-      !body ||
-      typeof body !== "object" ||
-      !("platform" in body) ||
-      !("page" in body) ||
-      (body.platform !== "web" && body.platform !== "mobile") ||
-      typeof body.page !== "string" ||
-      !pageNames.includes(body.page as (typeof pageNames)[number]) ||
-      ("anonymousId" in body &&
-        (typeof body.anonymousId !== "string" ||
-          !anonymousIdPattern.test(body.anonymousId)))
-    )
+export function createTelemetryPageHandler(
+  enabled: () => boolean = telemetryEnabled,
+  capture: typeof captureTelemetry = captureTelemetry,
+) {
+  return async (ctx: ActionCtx, request: Request) => {
+    try {
+      const body: unknown = await request.json();
+      if (
+        !body ||
+        typeof body !== "object" ||
+        !("platform" in body) ||
+        !("page" in body) ||
+        (body.platform !== "web" && body.platform !== "mobile") ||
+        typeof body.page !== "string" ||
+        !pageNames.includes(body.page as (typeof pageNames)[number]) ||
+        ("anonymousId" in body &&
+          (typeof body.anonymousId !== "string" ||
+            !anonymousIdPattern.test(body.anonymousId)))
+      )
+        return new Response(null, { status: 400, headers });
+      if (!enabled()) return new Response(null, { status: 204, headers });
+      const userId = await getSessionUserId(ctx);
+      if (request.headers.has("Authorization") && !userId)
+        return new Response(null, { status: 401, headers });
+      const existingId =
+        "anonymousId" in body ? (body.anonymousId as string) : undefined;
+      const identity = await claimTelemetryClient(ctx, existingId, userId);
+      if (!identity) return new Response(null, { status: 429, headers });
+      const { anonymousId } = identity;
+      await capture(
+        body.platform === "web" ? "page_view" : "screen_view",
+        { page: body.page as (typeof pageNames)[number] },
+        userId ?? undefined,
+        undefined,
+        anonymousId,
+      );
+      return new Response(JSON.stringify({ anonymousId }), {
+        status: 200,
+        headers: { ...headers, "Content-Type": "application/json" },
+      });
+    } catch {
       return new Response(null, { status: 400, headers });
-    if (!telemetryEnabled())
-      return new Response(null, { status: 204, headers });
-    const userId = await getSessionUserId(ctx);
-    if (request.headers.has("Authorization") && !userId)
-      return new Response(null, { status: 401, headers });
-    const existingId =
-      "anonymousId" in body ? (body.anonymousId as string) : undefined;
-    const identity = await claimTelemetryClient(ctx, existingId, userId);
-    if (!identity) return new Response(null, { status: 429, headers });
-    const { anonymousId } = identity;
-    await captureTelemetry(
-      body.platform === "web" ? "page_view" : "screen_view",
-      { page: body.page as (typeof pageNames)[number] },
-      userId ?? undefined,
-      undefined,
-      anonymousId,
-    );
-    return new Response(JSON.stringify({ anonymousId }), {
-      status: 200,
-      headers: { ...headers, "Content-Type": "application/json" },
-    });
-  } catch {
-    return new Response(null, { status: 400, headers });
-  }
-});
+    }
+  };
+}
+export const page = httpAction(createTelemetryPageHandler());

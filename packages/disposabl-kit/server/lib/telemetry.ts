@@ -431,6 +431,7 @@ export async function bootstrapTelemetry(
   ctx: ActionCtx,
   request: Request,
   getUser: (ctx: ActionCtx) => Promise<string | null>,
+  enabled: () => boolean = telemetryEnabled,
 ) {
   let body: unknown;
   try {
@@ -448,7 +449,7 @@ export async function bootstrapTelemetry(
         !uuidPattern.test(body.anonymousId)))
   )
     return new Response(null, { status: 400, headers: bootstrapHeaders });
-  if (!telemetryEnabled())
+  if (!enabled())
     return new Response(null, { status: 204, headers: bootstrapHeaders });
   const projectToken =
     settings.analytics?.projectToken ?? process.env.POSTHOG_PROJECT_TOKEN!;
