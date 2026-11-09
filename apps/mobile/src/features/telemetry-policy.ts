@@ -5,6 +5,10 @@ export const mobileActions = [
   "open_settings",
   "agent_send_attempt",
   "agent_stop_attempt",
+  "billing_native_subscription_attempt",
+  "billing_native_topup_attempt",
+  "billing_website_monthly_attempt",
+  "billing_website_topup_attempt",
 ] as const;
 export type MobileAction = (typeof mobileActions)[number];
 export function isMobileAction(value: unknown): value is MobileAction {

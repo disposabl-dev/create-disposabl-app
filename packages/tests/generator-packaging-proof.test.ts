@@ -48,6 +48,10 @@ const excluded = [
   "packages/tests/cli-first-execution.test.ts",
   "packages/tests/cli-version-lifecycle.test.ts",
   "packages/tests/web-action-policy.test.ts",
+  "packages/tests/components/mobile-payment-attempts.test.mjs",
+  "packages/tests/mobile-payment-attempts.test.ts",
+  "packages/tests/components/web-key-actions.test.mjs",
+  "packages/tests/web-key-actions.test.ts",
   "packages/tests/mobile-product-actions.test.ts",
   "packages/tests/components/mobile-action-navigation.test.mjs",
   "packages/tests/components/mobile-agent-composer.test.mjs",
@@ -192,6 +196,19 @@ test("packaged starter and generated profiles exclude product proof fixtures", a
         webRoot,
         /ProductTelemetry|AnalyticsPreference|telemetry-policy/,
       );
+      const apiKeysPath = join(
+        root,
+        "apps/web/src/router/_authenticated/dashboard.api-keys.tsx",
+      );
+      if (existsSync(apiKeysPath)) {
+        const apiKeys = await readFile(apiKeysPath, "utf8");
+        assert.doesNotMatch(
+          apiKeys,
+          /captureProductAction|api_key_\w+_attempt|from ["'][^"']*telemetry/,
+        );
+        assert.match(apiKeys, /await create\(/);
+        assert.match(apiKeys, /await revoke\(/);
+      }
       const webPackage = JSON.parse(
         await readFile(join(root, "apps/web/package.json"), "utf8"),
       );
