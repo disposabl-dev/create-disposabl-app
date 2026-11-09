@@ -202,7 +202,10 @@ test(
         body: JSON.stringify({ path, args, format: "json" }),
       });
       const result = (await response.json()) as any;
-      if (result.status !== "success") throw new Error(`${path} rejected`);
+      if (result.status !== "success")
+        throw new Error(
+          result.errorMessage ?? `${path} rejected without an error message`,
+        );
       return result.value;
     }
     async function account() {
@@ -227,6 +230,8 @@ test(
     }
     const owner = await account();
     const other = await account();
+    const deletionDenied =
+      /Account deletion has been requested or this account no longer exists\. Contact support for assistance\./;
     assert.equal(
       await invoke("query", "auth:isAuthenticated", {}, owner.token),
       true,
@@ -263,6 +268,7 @@ test(
         { newHash: "real-owner-late" },
         owner.token,
       ),
+      deletionDenied,
     );
     await assert.rejects(
       invoke(
@@ -271,6 +277,7 @@ test(
         { hash: "real-anonymous", newHash: "real-owner-bind" },
         owner.token,
       ),
+      deletionDenied,
     );
     assert.equal(
       await invoke(
@@ -289,6 +296,10 @@ test(
     );
     assert.equal(result.state, "known_user_bound_cleared");
     assert.equal(result.telemetryIdentitiesDeleted, 1);
+    assert.equal(
+      await invoke("query", "auth:isAuthenticated", {}, owner.token),
+      true,
+    );
     await assert.rejects(
       invoke(
         "mutation",
@@ -296,6 +307,16 @@ test(
         { newHash: "real-owner-after" },
         owner.token,
       ),
+      deletionDenied,
+    );
+    await assert.rejects(
+      invoke(
+        "mutation",
+        "fixture:authenticatedClaim",
+        { newHash: "real-owner-before" },
+        owner.token,
+      ),
+      deletionDenied,
     );
     assert.equal(await q("identity", { hash: "real-owner-before" }), null);
     assert.equal(await q("identity", { hash: "real-owner-late" }), null);
