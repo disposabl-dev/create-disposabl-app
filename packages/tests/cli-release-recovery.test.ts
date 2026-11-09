@@ -143,14 +143,14 @@ function fixture() {
       version=1.1.0
       if [[ "$VERIFY_MODE" == persistent || ( "$VERIFY_MODE" == delayed && "$attempt" == 1 ) ]]; then version=1.0.0; fi
       integrity=sha512-test; [[ "$VERIFY_MODE" != integrity ]] || integrity=sha512-wrong
-      printf '{"name":"@disposabl/cli","version":"%s","dist":{"integrity":"%s"}}' "$version" "$integrity" > "$output"; printf 200; exit
+      printf '{"name":"%s","version":"%s","dist":{"integrity":"%s"}}' "\${PACKAGE_NAME:-@disposabl/cli}" "$version" "$integrity" > "$output"; printf 200; exit
     fi
     attempt=$(cat "$RUNNER_TEMP/verify-attempt" 2>/dev/null || echo 0)
     attempt=$((attempt + 1)); echo "$attempt" > "$RUNNER_TEMP/verify-attempt"
     if [[ "$VERIFY_MODE" == auth ]]; then printf 401; exit; fi
     if [[ "$VERIFY_MODE" == network && "$attempt" == 1 ]]; then exit 7; fi
     if [[ "$VERIFY_MODE" == persistent || ( "$VERIFY_MODE" == delayed && "$attempt" == 1 ) ]]; then printf 404; exit; fi
-    name=@disposabl/cli; [[ "$VERIFY_MODE" != contradictory ]] || name=wrong-package
+    name=\${PACKAGE_NAME:-@disposabl/cli}; [[ "$VERIFY_MODE" != contradictory ]] || name=wrong-package
     printf '{"name":"%s","version":"1.1.0","dist":{"integrity":"sha512-test"}}' "$name" > "$output"; printf 200`,
   );
   script("sleep", 'echo sleep >> "$RUNNER_TEMP/verify-sleeps"');
@@ -228,6 +228,35 @@ test("post-publish verification fails boundedly on 404 and immediately on contra
         ? readFileSync(sleepFile, "utf8").trim().split("\n").length
         : 0,
     ).toBe(sleeps);
+    expect(readFileSync(join(f.dir, "published"), "utf8")).toBe("publish\n");
+  }
+});
+
+test("generator post-publish verification fails closed and never republishes", () => {
+  for (const [mode, ok, attempts] of [
+    ["delayed", true, "2"],
+    ["network", true, "2"],
+    ["persistent", false, "10"],
+    ["contradictory", false, "1"],
+    ["integrity", false, "1"],
+    ["auth", false, "1"],
+  ] as const) {
+    const f = fixture();
+    f.git("tag", "v1.0.0");
+    f.git("tag", "v1.1.0");
+    writeFileSync(join(f.dir, "published"), "publish\n");
+    const result = f.run(
+      "Verify published generator release and tag",
+      {
+        VERIFY_MODE: mode,
+        PACKAGE_NAME: "create-disposabl-app",
+      },
+      "publish",
+    );
+    expect(result.status === 0).toBe(ok);
+    expect(readFileSync(join(f.dir, "verify-attempt"), "utf8").trim()).toBe(
+      attempts,
+    );
     expect(readFileSync(join(f.dir, "published"), "utf8")).toBe("publish\n");
   }
 });

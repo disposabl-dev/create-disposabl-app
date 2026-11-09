@@ -106,7 +106,7 @@ export const faqs = [
   ],
   [
     "What does Agent Mode do, and how do credits work?",
-    `Agent Mode runs tasks in one remote sandbox shared across your apps. Compute costs 10 credits per 10-minute window while the agent is active. AI is currently included. Agent Mode offers ${creditQuantity("monthly")} credits for ${formatPrice(pricing.monthly.price)} per month, or ${creditQuantity("topup")} credits for ${formatPrice(pricing.topup.price)} once. Monthly credits expire; one-time credits do not.`,
+    `Agent Mode runs tasks in one remote sandbox shared across your apps. Each 10-minute compute window is paid upfront with 10 credits while the agent is active. AI is currently included. If the next window cannot be funded, new work pauses. Add credits if needed, then send a new message to resume. Agent Mode offers ${creditQuantity("monthly")} credits for ${formatPrice(pricing.monthly.price)} per month, or ${creditQuantity("topup")} credits for ${formatPrice(pricing.topup.price)} once. Monthly credits expire; one-time credits do not.`,
   ],
   [
     "Can I build an app for my business?",
