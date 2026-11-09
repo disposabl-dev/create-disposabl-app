@@ -171,7 +171,8 @@ export function PaymentGate({
         Credits: {data?.balance ?? "unavailable"}
       </Text>
       <Text className="text-muted-foreground">
-        At least 10 credits are needed to start.
+        Each 10-minute sandbox window costs 10 credits, paid upfront. Your apps
+        share one sandbox. AI is currently included.
       </Text>
       {resume && (
         <Text className="text-muted-foreground">
