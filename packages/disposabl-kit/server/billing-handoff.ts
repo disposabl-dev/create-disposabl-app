@@ -102,7 +102,10 @@ export const createHandoff = (eligibility?: BillingEligibility) =>
     },
   });
 export const create = createHandoff();
-export const inspectHandoff = (eligibility?: BillingEligibility) =>
+export const inspectHandoff = (
+  eligibility?: BillingEligibility,
+  enabled = paymentsEnabled,
+) =>
   query({
     args: { code: v.string() },
     returns: v.union(
@@ -110,6 +113,7 @@ export const inspectHandoff = (eligibility?: BillingEligibility) =>
       v.object({ name: v.union(v.string(), v.null()) }),
     ),
     handler: async (ctx, { code }) => {
+      if (!enabled) return null;
       try {
         const row = await lookup(ctx, code);
         await eligibility?.(ctx, row.userId);
@@ -137,7 +141,10 @@ export const inspectHandoff = (eligibility?: BillingEligibility) =>
     },
   });
 export const inspect = inspectHandoff();
-export const redeemHandoff = (eligibility?: BillingEligibility) =>
+export const redeemHandoff = (
+  eligibility?: BillingEligibility,
+  enabled = paymentsEnabled,
+) =>
   mutation({
     args: { code: v.string() },
     returns: v.object({
@@ -150,6 +157,7 @@ export const redeemHandoff = (eligibility?: BillingEligibility) =>
       returnClaim: v.union(v.string(), v.null()),
     }),
     handler: async (ctx, { code }) => {
+      if (!enabled) throw new ConvexError("Website checkout is unavailable.");
       const row = await lookup(ctx, code);
       await eligibility?.(ctx, row.userId);
       const tokens = await exchangeBrowserSession(

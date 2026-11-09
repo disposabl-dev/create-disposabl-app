@@ -1,10 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  redeem,
+  redeemHandoff,
+  inspectHandoff,
   cleanup,
   returnTarget,
 } from "../disposabl-kit/server/billing-handoff";
+
+const redeem = redeemHandoff(undefined, true);
 
 test("billing handoff expires and a redeemed link cannot be replayed", async () => {
   let row: any = {
@@ -180,4 +183,51 @@ test("return target is bound to a redeemed browser session and an allowlisted ch
     if (previous === undefined) delete process.env.BILLING_IOS_RETURN_CHANNELS;
     else process.env.BILLING_IOS_RETURN_CHANNELS = previous;
   }
+});
+
+test("disabled payments preserve existing handoffs without identity reads or session exchange", async () => {
+  const row = {
+    _id: "retained",
+    userId: "alice",
+    sessionId: "source",
+    purchase: "topup",
+    expiresAt: Date.now() + 120_000,
+  };
+  const original = structuredClone(row);
+  let reads = 0;
+  let exchanges = 0;
+  let writes = 0;
+  const ctx = {
+    db: {
+      query: () => {
+        reads++;
+        return { withIndex: () => ({ unique: async () => row }) };
+      },
+      normalizeId: () => null,
+      delete: async () => {
+        writes++;
+      },
+    },
+    runQuery: async () => {
+      reads++;
+      return { userId: "alice" };
+    },
+    runMutation: async () => {
+      exchanges++;
+      return { userId: "alice" };
+    },
+  };
+  const code = "Q".repeat(43);
+  const inspectOff = inspectHandoff(undefined, false) as any;
+  const redeemOff = redeemHandoff(undefined, false) as any;
+  assert.equal(await inspectOff._handler(ctx, { code }), null);
+  await assert.rejects(redeemOff._handler(ctx, { code }), /unavailable/);
+  assert.deepEqual(
+    { reads, exchanges, writes },
+    { reads: 0, exchanges: 0, writes: 0 },
+  );
+  assert.deepEqual(row, original);
+  await (redeem as any)._handler(ctx, { code });
+  assert.equal(exchanges, 1);
+  assert.equal(writes, 1);
 });
