@@ -107,8 +107,10 @@ test(
 
     const expiredOwner = await account();
     const expiredCode = await create(expiredOwner);
-    await app.open("/");
-    await app.open(`/billing-login#${expiredCode}`);
+    await browser.evaluate((next) => {
+      window.location.hash = next;
+      return null;
+    }, expiredCode);
     await expect(
       screen.getByRole("button", `Continue as @${expiredOwner.username}`),
     ).toBeVisible();
@@ -120,8 +122,14 @@ test(
 
     const original = await account();
     const handoff = await create(original);
-    await app.open("/");
-    await app.open(`/billing-login#${handoff}`);
+    await browser.evaluate((next) => {
+      window.location.hash = next;
+      return null;
+    }, handoff);
+    await expect(
+      screen.getByRole("button", `Continue as @${original.username}`),
+    ).toBeVisible();
+    expect(await browser.evaluate(() => window.location.hash)).toBe("");
     await screen.getByRole("button", `Continue as @${original.username}`).tap();
     await expect(browser).toHaveURL("/pricing?source=ios");
     await expect(screen.getByRole("button", "Buy top-up")).toBeVisible();
