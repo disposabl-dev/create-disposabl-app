@@ -26,7 +26,7 @@ export function StoreDownloads() {
               height={40}
             />
           </button>
-          <span id={`${id}-${index}`} role="tooltip" className="store-tooltip">
+          <span id={`${id}-${index}`} className="store-tooltip">
             Coming soon.
           </span>
         </div>
