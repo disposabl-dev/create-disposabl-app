@@ -4,6 +4,13 @@ import {
   queryGeneric,
   internalMutationGeneric,
   internalQueryGeneric,
+  makeFunctionReference,
+  docValidator,
+  paginationOptsValidator,
+  paginationResultValidator,
+  type PaginationOptions,
+  type PaginationResult,
+  type DocumentByName,
   type DataModelFromSchemaDefinition,
   type MutationBuilder,
   type QueryBuilder,
@@ -33,6 +40,19 @@ const query: QueryBuilder<DataModel, "public"> = queryGeneric;
 const internalMutation: MutationBuilder<DataModel, "internal"> =
   internalMutationGeneric;
 const internalQuery: QueryBuilder<DataModel, "internal"> = internalQueryGeneric;
+
+const reviewRef = makeFunctionReference<
+  "query",
+  { paginationOpts: PaginationOptions },
+  PaginationResult<DocumentByName<DataModel, "revenueCatDeliveries">>
+>("revenuecat:inspectReviewDeliveries");
+export const inspectReviewDeliveries = query({
+  args: { paginationOpts: paginationOptsValidator },
+  returns: paginationResultValidator(
+    docValidator("revenueCatDeliveries", schema.tables.revenueCatDeliveries),
+  ),
+  handler: (ctx, args) => ctx.runQuery(reviewRef, args),
+});
 
 export const user = mutation({
   args: { label: v.string() },

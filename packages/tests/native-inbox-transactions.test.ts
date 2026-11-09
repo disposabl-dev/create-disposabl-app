@@ -87,6 +87,132 @@ async function webhook(payload: object) {
   return { status: response.status, body: await response.json() };
 }
 
+test(
+  "review archive paginates HTTP reversals without changing financial state or holds",
+  { skip: !url },
+  async () => {
+    const readPage = (cursor: string | null, numItems: number) =>
+      call(
+        "inspectReviewDeliveries",
+        { paginationOpts: { cursor, numItems } },
+        true,
+      );
+    async function allReviews() {
+      const rows: {
+        deliveryId: string;
+        type: string;
+        _creationTime: number;
+      }[] = [];
+      const cursors = new Set<string>();
+      let cursor: string | null = null;
+      for (;;) {
+        const result = await readPage(cursor, 2);
+        assert.ok(result.page.length <= 2);
+        rows.push(...result.page);
+        if (result.isDone) break;
+        assert.ok(result.continueCursor);
+        assert.ok(!cursors.has(result.continueCursor));
+        cursors.add(result.continueCursor);
+        cursor = result.continueCursor;
+      }
+      assert.equal(
+        new Set(rows.map((row) => row.deliveryId)).size,
+        rows.length,
+      );
+      assert.ok(rows.every((row) => row.type === "review"));
+      assert.ok(
+        rows.every(
+          (row, i) =>
+            i === 0 || rows[i - 1]!._creationTime >= row._creationTime,
+        ),
+      );
+      return rows;
+    }
+    const baseline = await allReviews();
+    const [alice, bob] = await Promise.all([user(), user()]);
+    const refunded = event(alice),
+      tombstone = event(alice);
+    const refundedId = await balanceId(refunded),
+      tombstoneId = await balanceId(tombstone);
+    await call("controlCreate", { balanceId: refundedId });
+    await call("controlCreate", { balanceId: tombstoneId });
+    await deliver(refunded);
+    await awaitControl(refundedId, (row) => row.finished === 1);
+    assert.equal(
+      (await call("take", scope(refunded, refundedId))).kind,
+      "grant",
+    );
+    await call("finish", { balanceId: refundedId, kind: "grant" });
+    await deliver({ ...refunded, deliveryId: randomUUID(), type: "cancel" });
+    assert.equal(
+      await call("approveRefund", { balanceId: refundedId, evidence }),
+      true,
+    );
+    assert.equal(
+      (await call("take", scope(refunded, refundedId))).kind,
+      "refund",
+    );
+    await call("finish", { balanceId: refundedId, kind: "refund" });
+    await deliver({ ...tombstone, type: "cancel" });
+    const transfer = {
+      project: refunded.project,
+      app: refunded.app,
+      environment: refunded.environment,
+      deliveryId: randomUUID(),
+      from: [alice],
+      to: [bob],
+    };
+    await call("transfer", transfer);
+    const holdLookup = {
+      project: transfer.project,
+      app: transfer.app,
+      environment: transfer.environment,
+      deliveryId: transfer.deliveryId,
+      customer: alice,
+    };
+    const beforeRefunded = (await state(refundedId)).purchase;
+    const beforeTombstone = (await state(tombstoneId)).purchase;
+    const beforeHolds = await call("transferState", holdLookup, true);
+    assert.equal(beforeRefunded.state, "refunded");
+    assert.equal(beforeRefunded.refundEvidence, evidence);
+    assert.equal(beforeTombstone.state, "tombstone");
+    assert.equal(beforeHolds.holds.length, 1);
+    const created: string[] = [];
+    for (const purchase of [refunded, tombstone, refunded, tombstone]) {
+      const payload = reversalPayload(purchase);
+      assert.equal((await webhook(payload)).status, 200);
+      created.push(payload.event.id);
+    }
+    const rows = await allReviews();
+    assert.deepEqual(
+      rows.map((row) => row.deliveryId),
+      [...created.reverse(), ...baseline.map((row) => row.deliveryId)],
+    );
+    for (const numItems of [0, -1, 101, 1.5]) {
+      await assert.rejects(
+        () => readPage(null, numItems),
+        /Page size must be between 1 and 100/,
+      );
+    }
+    assert.deepEqual((await state(refundedId)).purchase, beforeRefunded);
+    assert.deepEqual((await state(tombstoneId)).purchase, beforeTombstone);
+    assert.deepEqual(
+      await call("transferState", holdLookup, true),
+      beforeHolds,
+    );
+    assert.equal(
+      (await call("controlState", { balanceId: refundedId }, true))
+        .providerCalls,
+      0,
+    );
+    assert.equal(
+      (await call("controlState", { balanceId: tombstoneId }, true))
+        .providerCalls,
+      0,
+    );
+  },
+);
+
 for (const phase of [
   "new",
   "queued",
