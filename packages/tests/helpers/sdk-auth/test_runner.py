@@ -94,7 +94,7 @@ class RunnerCancellation(unittest.TestCase):
 
 
 GROUP_LAUNCHER = r"""
-import json, sys, signal, subprocess
+import json, os, sys, signal, subprocess
 sys.path.insert(0, sys.argv[1])
 import run as fixture
 mode = sys.argv[2]
@@ -106,7 +106,12 @@ with fixture.owned_backend([sys.executable, '-c', 'import time; time.sleep(60)']
         print(json.dumps([backend.pid, runner.pid, grand_pid, port]), flush=True)
         if mode == 'failure':
             raise RuntimeError('synthetic runner failure')
-        runner.wait()
+        result = runner.wait()
+        if mode == 'leader-exit':
+            assert result == 0
+            assert runner.wait() == 0
+            assert os.waitpid(runner.pid, os.WNOHANG) == (0, 0)
+            print('group leader remains pinned after command completion', flush=True)
 """
 
 
@@ -126,6 +131,8 @@ class RunnerGroupCancellation(unittest.TestCase):
             stdout, stderr = launcher.communicate(timeout=5)
             self.assertEqual(launcher.returncode, 128 + signum if signum else (1 if mode == 'failure' else 0), stderr)
             self.assertEqual(stdout.count('owned backend stopped'), 2)
+            if mode == 'leader-exit':
+                self.assertIn('group leader remains pinned after command completion', stdout)
             for pid in ids[:2]:
                 with self.assertRaises(ProcessLookupError):
                     os.kill(pid, 0)

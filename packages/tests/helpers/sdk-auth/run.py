@@ -19,11 +19,70 @@ BINARY = Path.home() / '.cache/convex/binaries/precompiled-2026-10-22-1447815/co
 EXPECTED_AUTH = '2.0.0-beta.0-reboot.437831bd-disposabl.8'
 
 
+# The supervisor stays alive after the command exits. Its PID pins the process
+# group until cleanup sends its final signal; only then may we reap it.
+_GROUP_SUPERVISOR = r"""
+import os, signal, subprocess, sys
+fd = int(sys.argv[1])
+signal.signal(signal.SIGTERM, signal.SIG_IGN)
+signal.signal(signal.SIGINT, signal.SIG_IGN)
+def reset_signals():
+    signal.signal(signal.SIGTERM, signal.SIG_DFL)
+    signal.signal(signal.SIGINT, signal.SIG_DFL)
+try:
+    result = subprocess.Popen(sys.argv[2:], preexec_fn=reset_signals).wait()
+except Exception:
+    result = 127
+os.write(fd, (str(result) + "\n").encode())
+os.close(fd)
+while True:
+    signal.pause()
+"""
+
+
+class OwnedGroup:
+    def __init__(self, command, **options):
+        reader, writer = os.pipe()
+        try:
+            self._anchor = subprocess.Popen(
+                [sys.executable, '-c', _GROUP_SUPERVISOR, str(writer), *command],
+                start_new_session=True, pass_fds=(writer,), **options,
+            )
+        except BaseException:
+            os.close(reader)
+            raise
+        finally:
+            os.close(writer)
+        self._status = os.fdopen(reader)
+        self.pid = self._anchor.pid
+        self.stdout = self._anchor.stdout
+        self.returncode = None
+
+    def wait(self):
+        # Read command completion without polling/reaping the group leader.
+        if self.returncode is None:
+            value = self._status.readline()
+            if not value:
+                raise RuntimeError('Owned process supervisor exited unexpectedly')
+            self.returncode = int(value)
+        return self.returncode
+
+    def stop(self, timeout):
+        try:
+            os.killpg(self.pid, signal.SIGTERM)
+            time.sleep(timeout)
+        finally:
+            try:
+                os.killpg(self.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            self._anchor.wait()
+            self._status.close()
+
+
 @contextmanager
 def owned_backend(command, *, stop_timeout=10, process_group=False, **options):
     """Defer cancellation during spawn/cleanup so the owned child is always reaped."""
-    if process_group:
-        options['start_new_session'] = True
     phase, pending, proc = 'starting', None, None
     previous = {sig: signal.getsignal(sig) for sig in (signal.SIGTERM, signal.SIGINT)}
 
@@ -36,7 +95,7 @@ def owned_backend(command, *, stop_timeout=10, process_group=False, **options):
     for sig in previous:
         signal.signal(sig, cancel)
     try:
-        proc = subprocess.Popen(command, **options)
+        proc = OwnedGroup(command, **options) if process_group else subprocess.Popen(command, **options)
         phase = 'running'
         if pending is not None:
             raise SystemExit(128 + pending)
@@ -46,24 +105,15 @@ def owned_backend(command, *, stop_timeout=10, process_group=False, **options):
         try:
             if proc is not None:
                 if process_group:
+                    proc.stop(stop_timeout)
+                else:
+                    if proc.poll() is None:
+                        proc.terminate()
                     try:
-                        os.killpg(proc.pid, signal.SIGTERM)
-                    except ProcessLookupError:
-                        pass
-                elif proc.poll() is None:
-                    proc.terminate()
-                try:
-                    proc.wait(timeout=stop_timeout)
-                except subprocess.TimeoutExpired:
-                    proc.kill()
-                finally:
-                    if process_group:
-                        # The leader may have exited while descendants remain.
-                        try:
-                            os.killpg(proc.pid, signal.SIGKILL)
-                        except ProcessLookupError:
-                            pass
-                    proc.wait()
+                        proc.wait(timeout=stop_timeout)
+                    except subprocess.TimeoutExpired:
+                        proc.kill()
+                        proc.wait()
                 print('owned backend stopped', flush=True)
         finally:
             for sig, handler in previous.items():
