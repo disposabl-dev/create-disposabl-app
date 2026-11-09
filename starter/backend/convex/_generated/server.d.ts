@@ -32,6 +32,7 @@ type Env = {
   readonly R2_BUCKET_NAME: string | undefined;
   readonly R2_ACCESS_KEY_ID: string | undefined;
   readonly R2_SECRET_ACCESS_KEY: string | undefined;
+  readonly REVENUECAT_MANAGED_MONTHLY_ROUTES: string | undefined;
   readonly CONVEX_CLOUD_URL: string;
   readonly CONVEX_SITE_URL: string;
   readonly AUTH_EMAIL_ORIGIN: string | undefined;

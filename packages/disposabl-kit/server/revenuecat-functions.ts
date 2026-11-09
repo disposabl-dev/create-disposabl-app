@@ -12,6 +12,7 @@ import {
   balanceRequest,
   parseRevenueCatEvent,
   parseTransfer,
+  isManagedMonthlyEvent,
   revenueCatConfigs,
   selectRevenueCatRoute,
   resolveRevenueCatRoute,
@@ -98,6 +99,8 @@ export const createWebhook = (
     } catch {
       return new Response("Invalid event", { status: 400 });
     }
+    if (isManagedMonthlyEvent(payload, configs))
+      return Response.json({ status: "ignored" }, { status: 200 });
     const config = selectRevenueCatRoute(payload, configs);
     if (!config) return new Response("Invalid event", { status: 400 });
     const transfer = parseTransfer(payload, config);

@@ -124,6 +124,137 @@ const scopedClaim = (balanceId: string) => ({
 });
 
 describe("RevenueCat consumable inbox", () => {
+  test("managed monthly events are acknowledged only for valid, disjoint configured routes", async () => {
+    const monthly = { app: "app", store: "APP_STORE", product: "monthly" };
+    const env = {
+      REVENUECAT_CONSUMABLE_OWNER: "custom",
+      REVENUECAT_WEBHOOK_AUTH: config.authorization,
+      REVENUECAT_PROJECT_ID: config.project,
+      REVENUECAT_ENVIRONMENT: config.environment,
+      AUTUMN_SECRET_KEY: "am_sk_test_synthetic",
+      REVENUECAT_ROUTES: JSON.stringify([
+        { app: "app", store: "APP_STORE", product: "topup" },
+      ]),
+      REVENUECAT_MANAGED_MONTHLY_ROUTES: JSON.stringify([monthly]),
+    };
+    const cancellation = {
+      id: "private-delivery",
+      type: "CANCELLATION",
+      app_id: "app",
+      environment: "SANDBOX",
+      store: "APP_STORE",
+      product_id: "monthly",
+      app_user_id: "private-user",
+      transaction_id: "private-transaction",
+    };
+    const request = (event: object, auth = config.authorization) =>
+      new Request("https://example.test", {
+        method: "POST",
+        headers: { authorization: auth },
+        body: JSON.stringify({ api_version: "1.0", event }),
+      });
+    const f = fixture();
+    let mutations = 0;
+    const ctx = {
+      runMutation: (_ref: unknown, args: unknown) => {
+        mutations++;
+        return call(receive, f.ctx, args);
+      },
+    };
+    const handler = createWebhook(true, env);
+    for (const type of ["CANCELLATION", "INITIAL_PURCHASE", "RENEWAL"]) {
+      const response = await call(
+        handler,
+        ctx,
+        request({ ...cancellation, type }),
+      );
+      assert.equal(response.status, 200);
+      assert.equal(await response.text(), '{"status":"ignored"}');
+    }
+    assert.equal(mutations, 0);
+    assert.equal(f.jobs.length, 0);
+    assert.ok(Object.values(f.tables).every((rows) => rows.length === 0));
+    for (const change of [
+      { product_id: "unknown" },
+      { app_id: "other" },
+      { store: "PLAY_STORE" },
+      { environment: "PRODUCTION" },
+      { project_id: "other" },
+      { id: "" },
+      { transaction_id: "" },
+      { app_user_id: "$RCAnonymousID:x" },
+      { original_app_user_id: "other" },
+      { type: "UNKNOWN" },
+      { type: "NON_RENEWING_PURCHASE" },
+    ]) {
+      const response = await call(
+        handler,
+        ctx,
+        request({ ...cancellation, ...change }),
+      );
+      assert.equal(response.status, 400);
+      assert.equal(await response.text(), "Invalid event");
+    }
+    assert.equal(
+      (await call(handler, ctx, request(cancellation, "Bearer wrong"))).status,
+      401,
+    );
+    assert.equal(
+      (await call(createWebhook(false, env), ctx, request(cancellation)))
+        .status,
+      503,
+    );
+    for (const routes of [
+      [{ ...monthly, product: "topup" }],
+      [monthly, monthly],
+      [{ ...monthly, store: "PLAY_STORE" }],
+      [{ ...monthly, app: "other" }],
+      [{ ...monthly, extra: true }],
+    ]) {
+      assert.equal(
+        revenueCatConfigs(true, {
+          ...env,
+          REVENUECAT_MANAGED_MONTHLY_ROUTES: JSON.stringify(routes),
+        }),
+        null,
+      );
+      assert.equal(
+        (
+          await call(
+            createWebhook(true, {
+              ...env,
+              REVENUECAT_MANAGED_MONTHLY_ROUTES: JSON.stringify(routes),
+            }),
+            ctx,
+            request(cancellation),
+          )
+        ).status,
+        503,
+      );
+    }
+    assert.equal(
+      revenueCatConfigs(true, {
+        ...env,
+        REVENUECAT_MANAGED_MONTHLY_ROUTES: "bad",
+      }),
+      null,
+    );
+    const response = await call(
+      handler,
+      ctx,
+      request({
+        ...cancellation,
+        product_id: "topup",
+        type: "NON_RENEWING_PURCHASE",
+        app_user_id: "user-1",
+      }),
+    );
+    assert.equal(response.status, 200);
+    assert.equal(mutations, 1);
+    assert.equal(f.tables.revenueCatPurchases!.length, 1);
+    assert.equal(f.tables.revenueCatDeliveries!.length, 1);
+    assert.equal(f.jobs.length, 1);
+  });
   test("validated routes select both stores and reject ambiguous or removed configuration", () => {
     const env = {
       REVENUECAT_CONSUMABLE_OWNER: "custom",
