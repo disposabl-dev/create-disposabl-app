@@ -34,7 +34,9 @@ let snapshotValue = {
   checkoutNeedsReview: false,
   customerId: "SECRET_CUSTOMER_91",
 };
-const token = `header.${Buffer.from(JSON.stringify({ sub: "user" })).toString("base64url")}.sig`;
+const makeToken = (sub) =>
+  `header.${Buffer.from(JSON.stringify({ sub })).toString("base64url")}.sig`;
+let token = makeToken("user");
 const snapshot = mock(async () => snapshotValue);
 const checkout = mock(async () => ({ url: null }));
 const portal = mock(async () => {
@@ -121,6 +123,7 @@ afterEach(async () => {
   await act(async () => renderer?.unmount());
   renderer = undefined;
   authenticated = true;
+  token = makeToken("user");
   window.location.search = "";
   values.clear();
   events.length = 0;
@@ -133,7 +136,108 @@ afterEach(async () => {
   snapshot.mockClear();
   checkout.mockClear();
   portal.mockClear();
+  window.location.assign.mockClear();
   bootstrap.mockClear();
+});
+
+test.each([
+  ["Choose monthly", "Choose monthly", "checkout"],
+  ["Manage website billing", "Manage website billing", "portal"],
+  ["Choose monthly", "Manage website billing", "checkout"],
+  ["Manage website billing", "Buy top-up", "portal"],
+])(
+  "same-render %s then %s starts one %s request",
+  async (first, second, kind) => {
+    let resolve;
+    const pending = new Promise((done) => {
+      resolve = done;
+    });
+    (kind === "checkout" ? checkout : portal).mockImplementationOnce(
+      () => pending,
+    );
+    const observer = mock(() => {});
+    await mount(observer);
+    const firstHandler = button(first).props.onClick;
+    const secondHandler = button(second).props.onClick;
+    await act(async () => {
+      firstHandler();
+      secondHandler();
+    });
+    expect(checkout).toHaveBeenCalledTimes(kind === "checkout" ? 1 : 0);
+    expect(portal).toHaveBeenCalledTimes(kind === "portal" ? 1 : 0);
+    expect(observer).toHaveBeenCalledTimes(1);
+    await act(async () =>
+      resolve(
+        kind === "checkout"
+          ? { url: null }
+          : { url: "https://fixture.invalid" },
+      ),
+    );
+  },
+);
+
+test("a failed request releases the guard for a later attempt", async () => {
+  let reject;
+  checkout.mockImplementationOnce(
+    () =>
+      new Promise((_resolve, fail) => {
+        reject = fail;
+      }),
+  );
+  const observer = mock(() => {});
+  await mount(observer);
+  await invoke("Choose monthly");
+  await act(async () => reject(new Error("synthetic failure")));
+  await invoke("Buy top-up");
+  expect(checkout).toHaveBeenCalledTimes(2);
+  expect(observer).toHaveBeenCalledTimes(2);
+});
+
+test("a failed portal releases the guard for checkout", async () => {
+  await mount(() => {});
+  await invoke("Manage website billing");
+  await invoke("Buy top-up");
+  expect(portal).toHaveBeenCalledTimes(1);
+  expect(checkout).toHaveBeenCalledTimes(1);
+});
+
+test("a replacement identity has its own guard and ignores an obsolete completion", async () => {
+  let resolveOld, resolveNew;
+  checkout.mockImplementationOnce(
+    () =>
+      new Promise((done) => {
+        resolveOld = done;
+      }),
+  );
+  checkout.mockImplementationOnce(
+    () =>
+      new Promise((done) => {
+        resolveNew = done;
+      }),
+  );
+  const observer = mock(() => {});
+  await mount(observer);
+  await invoke("Choose monthly");
+  token = makeToken("other-user");
+  await act(async () =>
+    renderer.update(
+      createElement(
+        "Root",
+        null,
+        createElement(Pricing, { onAttempt: observer }),
+      ),
+    ),
+  );
+  await invoke("Buy top-up");
+  await act(async () =>
+    resolveOld({ url: "https://fixture.invalid/obsolete" }),
+  );
+  expect(window.location.assign).not.toHaveBeenCalled();
+  await invoke("Manage website billing");
+  expect(portal).not.toHaveBeenCalled();
+  expect(checkout).toHaveBeenCalledTimes(2);
+  expect(observer).toHaveBeenCalledTimes(2);
+  await act(async () => resolveNew({ url: null }));
 });
 
 test("actual button handlers send only fixed attempts once", async () => {
