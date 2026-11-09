@@ -36,6 +36,47 @@ export const seedLease = internalMutationGeneric({
   },
 });
 
+// Synthetic apps are created only in the disposable fixture backend.
+export const createAccessApp = internalMutationGeneric({
+  args: { appId: v.string(), userId: v.string() },
+  returns: v.string(),
+  handler: async (ctx, { appId, userId }) => {
+    const thread = await ctx.runMutation(
+      componentsGeneric().agent.threads.createThread,
+      { userId, title: "Synthetic access fixture" },
+    );
+    await ctx.db.insert("apps", {
+      appId,
+      userId,
+      name: "Synthetic access fixture",
+      platforms: ["web"],
+      agent: {
+        threadId: thread._id,
+        status: "processing",
+        pending: [],
+        updatedAt: Date.now(),
+      },
+    });
+    return thread._id;
+  },
+});
+export const setUnconfirmed = internalMutationGeneric({
+  args: { appId: v.string(), userId: v.string(), value: v.boolean() },
+  returns: v.null(),
+  handler: async (ctx, { appId, userId, value }) => {
+    const app = await ctx.db
+      .query("apps")
+      .withIndex("by_appId", (q: any) => q.eq("appId", appId))
+      .unique();
+    if (!app?.agent || app.userId !== userId)
+      throw new Error("Fixture app unavailable");
+    await ctx.db.patch(app._id, {
+      agent: { ...app.agent, stopUnconfirmed: value },
+    });
+    return null;
+  },
+});
+
 import { getFunctionName } from "convex/server";
 import {
   enqueueMessageHandler,

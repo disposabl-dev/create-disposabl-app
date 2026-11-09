@@ -10,6 +10,10 @@ globalThis.fetch = async () => {
   state.calls.network++;
   throw new Error("unexpected network");
 };
+mock.module("@convex-dev/agent", () => ({
+  saveMessage: async () => ({ messageId: "new-message" }),
+  listMessages: async () => [],
+}));
 mock.module("@disposabl/disposabl-kit/features", () => ({
   paymentsEnabled: true,
 }));
@@ -90,10 +94,15 @@ mock.module(paths("events.ts"), () => ({
 }));
 mock.module(paths("attachments.ts"), () => ({
   attachmentPrompt: async () => "",
+  ownedAttachments: async () => [],
+  attachmentReferences: async () => [],
 }));
 const { tick } = await import(paths("actions/run.ts"));
+const { enqueueMessageHandler } = await import(paths("internal.ts"));
 const { finish } = await import(paths("state.ts"));
-const { settle, stopping, stopped } = await import(paths("compute.ts"));
+const { settle, stopping, stopped, workBlocked } = await import(
+  paths("compute.ts")
+);
 const { stop } = await import(paths("actions/compute.ts"));
 
 function make({
@@ -106,6 +115,8 @@ function make({
   changeKind,
   status = "processing",
   stopRequests = false,
+  agent = {},
+  queued = true,
 } = {}) {
   state = {
     session: {
@@ -123,6 +134,7 @@ function make({
       paidUntil: 0,
     },
     pending,
+    queued,
     sandbox,
     archived,
     changeAt,
@@ -139,6 +151,7 @@ function make({
         status,
         pending: [],
         ...(stopRequests ? { delivery: "uncertain-delivery" } : {}),
+        ...agent,
       },
     },
     calls: {
@@ -157,24 +170,38 @@ function make({
     checks: 0,
     change() {
       if (changeKind === "expiry") this.session.paidUntil = Date.now() - 1;
+      else if (changeKind === "remote-uncertain") this.otherUnconfirmed = true;
       else this.pending = true;
     },
   };
   const ctx = {
     db: {
+      normalizeId: (_table, id) => id,
       get: async (table, id) =>
-        table === "computeSessions" && id === "session"
-          ? state.session
-          : table === "computeDebits" && id === "debit"
-            ? state.debit
-            : null,
+        table === "users"
+          ? {}
+          : table === "computeSessions" && id === "session"
+            ? state.session
+            : table === "computeDebits" && id === "debit"
+              ? state.debit
+              : null,
       query: (table) => {
+        let index;
         const chain = {
-          withIndex: () => chain,
+          withIndex: (name) => {
+            index = name;
+            return chain;
+          },
           unique: async () => (table === "apps" ? state.app : null),
           order: () => chain,
           first: async () =>
-            table === "computeSessions" ? state.session : null,
+            table === "computeSessions"
+              ? state.session
+              : table === "apps" &&
+                  index === "by_userId_stopUnconfirmed" &&
+                  (state.otherUnconfirmed || state.app.agent.stopUnconfirmed)
+                ? { userId: "owner" }
+                : null,
           take: async () => [],
         };
         return chain;
@@ -212,12 +239,25 @@ function make({
         return state.pending;
       }
       if (name === "agent/compute:get") return state.session;
+      if (name === "agent/compute:workBlocked")
+        return workBlocked._handler(ctx, { userId: "owner" });
       if (name === "apps/internal:get")
         return { name: "fixture", platforms: ["web"] };
       throw new Error(`unexpected query ${name}`);
     },
     runMutation: async (ref, args) => {
-      const name = getFunctionName(ref);
+      let name;
+      try {
+        name = getFunctionName(ref);
+      } catch (error) {
+        if (
+          String(error).includes(
+            "_reference/childComponent/agent/messages/updateMessage",
+          )
+        )
+          return null;
+        throw error;
+      }
       if (name === "agent/state:claim") {
         state.app.agent.lease = {
           token: args.token,
@@ -231,7 +271,9 @@ function make({
         return null;
       }
       if (name === "agent/state:next")
-        return { prompt: "synthetic", messageId: "message", fileIds: [] };
+        return state.queued
+          ? { prompt: "synthetic", messageId: "message", fileIds: [] }
+          : null;
       if (name === "agent/state:delivered") return false;
       if (name === "agent/state:finish") {
         state.finishes.push(args);
@@ -248,6 +290,7 @@ function make({
     settle: (args) => settle._handler(ctx, args),
     stop: () => stop._handler(ctx, { sessionId: "session" }),
     state,
+    context: ctx,
   };
 }
 function verifyNoExternal(s) {
@@ -283,11 +326,11 @@ test("denied and uncertain renewal preserve sandbox stop without claiming it suc
     const f = make({
       sessionState: "renewing",
       paidUntil: Date.now() - 1,
-      status: "stopping",
-      stopRequests: true,
+      status: "processing",
+      agent: { delivery: "uncertain-delivery" },
     });
     await f.run();
-    expect(f.state.app.agent.status).toBe("stopping");
+    expect(f.state.app.agent.status).toBe("processing");
     expect(f.state.app.agent.delivery).toBe("uncertain-delivery");
     await f.settle({ debitId: "debit", outcome });
     expect(f.state.session.state).toBe(
@@ -377,34 +420,212 @@ test("active paid work reaches create, resume and prompt through real access che
   }
 });
 
-test("abort survives pending boundary funding and interrupts after confirmation", async () => {
-  for (const sessionState of ["active", "renewing"]) {
+test("suspension preserves evidence of unresolved remote work", async () => {
+  for (const agent of [
+    { promptId: "prompt", conversationId: "conversation" },
+    { delivery: "uncertain-delivery" },
+    { conversationId: "conversation" },
+  ]) {
+    const f = make({ sessionState: "hold", agent });
+    await f.run();
+    expect(f.state.finishes[0].suspended).toBe(true);
+    expect(f.state.app.agent.stopUnconfirmed).toBe(true);
+    for (const [key, value] of Object.entries(agent))
+      expect(f.state.app.agent[key]).toBe(value);
+    expect(f.state.calls.resume).toBe(0);
+    verifyNoExternal(f.state);
+  }
+});
+
+test("unsent pending work alone does not mark remote execution unconfirmed", async () => {
+  const f = make({ sessionState: "hold", agent: { pending: ["unsent"] } });
+  await f.run();
+  expect(f.state.finishes[0].suspended).toBe(true);
+  expect(f.state.app.agent.pending).toEqual([]);
+  expect(f.state.app.agent.stopUnconfirmed).not.toBe(true);
+  verifyNoExternal(f.state);
+});
+
+test("archived abort preserves remote identifiers and does not claim interruption", async () => {
+  const f = make({
+    status: "stopping",
+    archived: true,
+    stopRequests: true,
+    agent: {
+      promptId: "prompt",
+      conversationId: "conversation",
+      stopUnconfirmed: true,
+    },
+  });
+  await f.run();
+  expect(f.state.calls.resume).toBe(0);
+  expect(f.state.remotePaths).toEqual([]);
+  expect(f.state.finishes.some((x) => x.stopped)).toBe(false);
+  expect(f.state.app.agent.promptId).toBe("prompt");
+  expect(f.state.app.agent.conversationId).toBe("conversation");
+  expect(f.state.app.agent.delivery).toBe("uncertain-delivery");
+  expect(f.state.app.agent.stopUnconfirmed).toBe(true);
+  expect(f.state.calls.network).toBe(0);
+  expect(f.state.calls.debit).toBe(0);
+});
+
+test("conversation-only abort remains unconfirmed when sandbox is archived or missing", async () => {
+  for (const options of [{ archived: true }, { sandbox: false }]) {
+    const f = make({
+      ...options,
+      status: "stopping",
+      agent: { conversationId: "conversation" },
+    });
+    await f.run();
+    expect(f.state.calls.resume).toBe(0);
+    expect(f.state.remotePaths).toEqual([]);
+    expect(f.state.finishes.some((x) => x.stopped)).toBe(false);
+    expect(f.state.app.agent.conversationId).toBe("conversation");
+    expect(f.state.app.agent.stopUnconfirmed).toBe(true);
+    expect(f.state.calls.network).toBe(0);
+    expect(f.state.calls.debit).toBe(0);
+  }
+});
+
+test("abort interrupts running conversation despite unavailable funding", async () => {
+  for (const sessionState of ["renewing", "stopping", "hold"]) {
     const f = make({
       sessionState,
       paidUntil: Date.now() - 1,
       status: "stopping",
       stopRequests: true,
+      agent: {
+        promptId: "prompt",
+        conversationId: "conversation",
+        delivery: undefined,
+        stopUnconfirmed: true,
+      },
     });
     await f.run();
-    expect(f.state.app.agent.status).toBe("stopping");
-    expect(f.state.app.agent.delivery).toBe("uncertain-delivery");
-    expect(f.state.app.agent.lease).toBeUndefined();
-    expect(f.state.finishes[0].suspended).toBeUndefined();
-    expect(f.state.scheduled[0].delay).toBe(2000);
-    expect(f.state.calls.request).toBe(0);
-    f.state.session.state = "active";
-    f.state.session.paidUntil = Date.now() + 600_000;
-    await f.run();
     expect(f.state.remotePaths).toEqual([
-      "/conversations",
       "/interrupt?conversation=conversation",
       "/conversations",
     ]);
-    expect(f.state.app.agent.status).toBe("idle");
-    expect(f.state.app.agent.delivery).toBeUndefined();
     expect(f.state.finishes.at(-1).stopped).toBe(true);
+    expect(f.state.app.agent.stopUnconfirmed).toBeUndefined();
+    expect(f.state.app.agent.promptId).toBeUndefined();
+    expect(f.state.calls.resume).toBe(0);
     expect(f.state.calls.prompt).toBe(0);
-    expect(f.state.calls.network).toBe(0);
     expect(f.state.calls.debit).toBe(0);
+    expect(f.state.calls.network).toBe(0);
   }
+});
+
+test("uncertain delivery with a known conversation remains unconfirmed after idle observation", async () => {
+  const f = make({
+    status: "stopping",
+    stopRequests: true,
+    agent: { conversationId: "conversation", delivery: "uncertain-delivery" },
+  });
+  await f.run();
+  expect(f.state.finishes.some((x) => x.stopped)).toBe(false);
+  expect(f.state.app.agent.delivery).toBe("uncertain-delivery");
+  expect(f.state.app.agent.conversationId).toBe("conversation");
+  expect(f.state.app.agent.stopUnconfirmed).toBe(true);
+  expect(f.state.calls.resume).toBe(0);
+  expect(f.state.calls.debit).toBe(0);
+  expect(f.state.calls.network).toBe(0);
+});
+
+test("completed turn followed by unsent work and suspension is not remote uncertainty", async () => {
+  const f = make({
+    queued: false,
+    agent: { promptId: "prompt", conversationId: "conversation" },
+  });
+  await f.run();
+  expect(f.state.finishes.at(-1).done).toBe(true);
+  expect(f.state.app.agent.promptId).toBeUndefined();
+  expect(f.state.app.agent.conversationId).toBe("conversation");
+  f.state.app.agent.status = "processing";
+  f.state.app.agent.pending = ["unsent"];
+  f.state.session.state = "hold";
+  await f.run();
+  expect(f.state.finishes.at(-1).suspended).toBe(true);
+  expect(f.state.app.agent.stopUnconfirmed).not.toBe(true);
+  expect(f.state.app.agent.pending).toEqual([]);
+  expect(f.state.calls.debit).toBe(0);
+  expect(f.state.calls.network).toBe(0);
+});
+
+test("another app becoming unconfirmed at refresh fences an already-admitted resume", async () => {
+  const f = make({
+    sandbox: true,
+    archived: true,
+    changeAt: "refresh",
+    changeKind: "remote-uncertain",
+  });
+  await f.run();
+  expect(f.state.calls.refresh).toBe(1);
+  expect(f.state.otherUnconfirmed).toBe(true);
+  expect(f.state.calls.resume).toBe(0);
+  expect(f.state.calls.prompt).toBe(0);
+  expect(f.state.calls.authorize).toBe(0);
+  expect(f.state.calls.debit).toBe(0);
+  expect(f.state.calls.network).toBe(0);
+});
+
+test("legacy completed history is normalized only when completion is unambiguous", async () => {
+  const appId = "12345678-1234-4123-8123-123456789abc";
+  for (const [variant, patch, expected] of [
+    ["completed", {}, true],
+    ["failed", { status: "failed", error: "failed" }, false],
+    ["uncertain delivery", { delivery: "unknown" }, false],
+    ["unordered timestamps", { finishedAt: 9 }, false],
+    [
+      "active lease",
+      { lease: { token: "lease", expiresAt: 9999999999999 } },
+      false,
+    ],
+  ]) {
+    const f = make({
+      agent: {
+        status: "idle",
+        computeSessionId: undefined,
+        promptId: "old-prompt",
+        conversationId: "conversation",
+        startedAt: 10,
+        finishedAt: 20,
+        ...patch,
+      },
+    });
+    f.state.app.appId = appId;
+    const ctx = f.context;
+    await enqueueMessageHandler(
+      ctx,
+      { userId: "owner", appId, prompt: "next" },
+      () => true,
+      false,
+    );
+    expect(f.state.app.agent.promptId).toBe(
+      expected ? undefined : "old-prompt",
+    );
+    expect(f.state.app.agent.turnCompleted).toBe(expected ? true : undefined);
+    expect(f.state.app.agent.conversationId).toBe("conversation");
+  }
+  const blocked = make({
+    agent: {
+      status: "idle",
+      computeSessionId: undefined,
+      promptId: "old-prompt",
+      conversationId: "conversation",
+      startedAt: 10,
+      finishedAt: 20,
+      stopUnconfirmed: true,
+    },
+  });
+  blocked.state.app.appId = appId;
+  await expect(
+    enqueueMessageHandler(
+      blocked.context,
+      { userId: "owner", appId, prompt: "next" },
+      () => true,
+      false,
+    ),
+  ).rejects.toThrow(/could not be stopped/);
+  expect(blocked.state.app.agent.promptId).toBe("old-prompt");
 });

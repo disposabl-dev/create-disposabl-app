@@ -12,10 +12,12 @@ mock.module(path("boat.ts"), () => ({
   boat: {
     exec: async (_ctx, args) => {
       current.commands.push(args);
+      if (current.commands.length === 1) current.afterPrepare?.();
       return { exitCode: 0, timedOut: false };
     },
     writeFile: async (_ctx, args) => {
       current.writes.push(args);
+      current.afterWrite?.();
     },
   },
 }));
@@ -65,13 +67,24 @@ function setup() {
     query: (table) => ({
       withIndex: (index, fn) => {
         let value;
-        fn({
+        const conditions = {};
+        const selector = {
           eq: (_key, v) => {
             value = v;
-            return {};
+            conditions[_key] = v;
+            return selector;
           },
-        });
+        };
+        fn(selector);
         return {
+          first: async () =>
+            table === "apps" &&
+            index === "by_userId_stopUnconfirmed" &&
+            conditions.userId === "owner" &&
+            conditions["agent.stopUnconfirmed"] === true &&
+            current.otherUnconfirmed
+              ? { userId: "owner", agent: { stopUnconfirmed: true } }
+              : null,
           unique: async () =>
             table === "apps" &&
             ((index === "by_threadId" &&
@@ -91,6 +104,10 @@ function setup() {
   };
   const mutationCtx = { db };
   const actionCtx = {
+    runQuery: async (ref, args) => {
+      expect(getFunctionName(ref)).toBe("agent/access:authenticate");
+      return authenticate._handler(mutationCtx, args);
+    },
     runMutation: async (ref, args) => {
       expect(getFunctionName(ref)).toBe("agent/access:issue");
       return issue._handler(mutationCtx, args);
@@ -164,6 +181,41 @@ test("blocked session, stale lease and wrong session owner cannot mint", async (
     expect(denied, block).toBe(true);
     expect(f.state.patches).toBe(0);
     expect(f.state.commands).toHaveLength(0);
+    expect(f.state.writes).toHaveLength(0);
+  }
+});
+
+test("a shared stop raised during preparation prevents the credential write", async () => {
+  const f = setup();
+  f.state.afterPrepare = () => {
+    f.state.otherUnconfirmed = true;
+  };
+  await expect(f.authorize()).rejects.toThrow("authorization ended");
+  expect(f.state.commands).toHaveLength(1);
+  expect(f.state.writes).toHaveLength(0);
+  expect(await f.authenticate(f.state.app.agent.access.hash)).toBeNull();
+});
+
+test("a shared stop raised during writing prevents the final rename", async () => {
+  const f = setup();
+  f.state.afterWrite = () => {
+    f.state.otherUnconfirmed = true;
+  };
+  await expect(f.authorize()).rejects.toThrow("authorization ended");
+  expect(f.state.commands).toHaveLength(1);
+  expect(f.state.writes).toHaveLength(1);
+  expect(await f.authenticate(f.state.app.agent.access.hash)).toBeNull();
+});
+
+test("lease expiry or replacement during preparation prevents later dispatch", async () => {
+  for (const change of ["expiry", "replacement"]) {
+    const f = setup();
+    f.state.afterPrepare = () => {
+      if (change === "expiry") f.state.app.agent.lease.expiresAt = now;
+      else f.state.app.agent.lease.token = "replacement";
+    };
+    await expect(f.authorize()).rejects.toThrow("authorization ended");
+    expect(f.state.commands).toHaveLength(1);
     expect(f.state.writes).toHaveLength(0);
   }
 });

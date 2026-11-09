@@ -80,15 +80,28 @@ test("agent credential lookup rejects expired, stopped, failed, deleted and unco
     },
   };
   let row: any = app;
+  let otherUnconfirmed = false;
   const ctx = {
     db: {
       normalizeId: () => "user",
       get: async () => ({}),
-      query: () => ({ withIndex: () => ({ unique: async () => row }) }),
+      query: () => ({
+        withIndex: (index: string) => ({
+          unique: async () => row,
+          first: async () =>
+            index === "by_userId_stopUnconfirmed" &&
+            (otherUnconfirmed || row?.agent?.stopUnconfirmed)
+              ? (row ?? app)
+              : null,
+        }),
+      }),
     },
   };
   const lookup = () => (authenticate as any)._handler(ctx, { hash: "fixture" });
   assert.deepEqual(await lookup(), binding);
+  otherUnconfirmed = true;
+  assert.equal(await lookup(), null);
+  otherUnconfirmed = false;
   for (const status of ["idle", "stopping", "failed"]) {
     row = { ...app, agent: { ...app.agent, status } };
     assert.equal(await lookup(), null);
@@ -118,7 +131,15 @@ test("only the current unexpired worker can issue access; sandboxes belong to us
     db: {
       normalizeId: () => "user",
       get: async () => ({}),
-      query: () => ({ withIndex: () => ({ unique: async () => row }) }),
+      query: () => ({
+        withIndex: (index: string) => ({
+          unique: async () => row,
+          first: async () =>
+            index === "by_userId_stopUnconfirmed" && row?.agent?.stopUnconfirmed
+              ? row
+              : null,
+        }),
+      }),
       patch: async (_table: string, _id: string, value: unknown) => {
         patch = value;
       },

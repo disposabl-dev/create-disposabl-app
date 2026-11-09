@@ -57,7 +57,12 @@ test("unavailable attachments finish an empty run but preserve active steering",
         {
           runQuery: async (ref: any) => {
             try {
-              if (getFunctionName(ref) === "users/internal:deletionPending")
+              if (
+                [
+                  "users/internal:deletionPending",
+                  "agent/compute:workBlocked",
+                ].includes(getFunctionName(ref))
+              )
                 return false;
             } catch {
               // Component references are not local function references.

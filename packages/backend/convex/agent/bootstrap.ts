@@ -25,17 +25,33 @@ export async function authorizeSandbox(
     accessPrefix +
     crypto.randomUUID().replaceAll("-", "") +
     crypto.randomUUID().replaceAll("-", "");
+  const hash = await digest(token);
   const expiresAt = await ctx.runMutation(internal.agent.access.issue, {
     ...lease,
     userId: current.userId,
     appId: current.appId,
-    hash: await digest(token),
+    hash,
   });
+  const check = async () => {
+    const identity = await ctx.runQuery(internal.agent.access.authenticate, {
+      hash,
+      worker: lease,
+    });
+    if (
+      identity?.userId !== current.userId ||
+      identity.appId !== current.appId ||
+      identity.threadId !== lease.id
+    )
+      throw new Error(
+        "Agent authorization ended before credential setup completed.",
+      );
+  };
   const ref = sandboxRef(current.userId);
   const directory = appCredentialDirectory(current.appId);
   const { DISPOSABL_API_ORIGIN: origin } = agentEnvironment();
   const path = `${directory}/${await digest(origin)}.json`;
   const temporary = `${path}.${crypto.randomUUID()}`;
+  await check();
   const prepare = await boat.exec(ctx, {
     ...ref,
     command: `install -d -m 700 ${directory} /home/user/apps`,
@@ -43,6 +59,7 @@ export async function authorizeSandbox(
   });
   if (prepare.exitCode !== 0 || prepare.timedOut)
     throw new Error("Could not prepare agent credentials.");
+  await check();
   await boat.writeFile(ctx, {
     ...ref,
     path: temporary,
@@ -51,6 +68,7 @@ export async function authorizeSandbox(
       expiresAt,
     }),
   });
+  await check();
   const saved = await boat.exec(ctx, {
     ...ref,
     command: `chmod 600 ${temporary} && mv -f ${temporary} ${path}`,

@@ -36,6 +36,7 @@ export const execution = v.object({
   finishedAt: v.optional(v.number()),
   conversationId: v.optional(v.string()),
   promptId: v.optional(v.string()),
+  turnCompleted: v.optional(v.boolean()),
   cursor: v.optional(v.string()),
   error: v.optional(v.string()),
   stopFailures: v.optional(v.number()),

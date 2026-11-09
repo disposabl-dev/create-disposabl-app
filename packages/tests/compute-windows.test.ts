@@ -423,6 +423,8 @@ test("normal stop serializes calls, waits for workers and requires an explicit n
     archived: true,
   });
   assert.equal(f.rows.get(f.sessionId).state, "stopped");
+  await assert.rejects(admitSession(f.ctx, "owner", true), /still stopping/);
+  f.rows.get(f.appId).agent.status = "idle";
   const next = await admitSession(f.ctx, "owner", true);
   assert.notEqual(next, f.sessionId);
   assert.equal(await stop("stale"), false);

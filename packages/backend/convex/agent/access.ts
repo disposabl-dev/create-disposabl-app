@@ -52,12 +52,12 @@ export const issue = internalMutation({
 });
 
 export const authenticate = internalQuery({
-  args: { hash: v.string() },
+  args: { hash: v.string(), worker: v.optional(v.object(workerArgs)) },
   returns: v.union(
     v.null(),
     v.object({ userId: v.string(), appId: v.string(), threadId: v.string() }),
   ),
-  handler: async (ctx, { hash }) => {
+  handler: async (ctx, { hash, worker }) => {
     const app = await ctx.db
       .query("apps")
       .withIndex("by_agentAccessHash", (q) => q.eq("agent.access.hash", hash))
@@ -73,6 +73,10 @@ export const authenticate = internalQuery({
       )) ||
       app.agent.status !== "processing" ||
       app.agent.stopUnconfirmed ||
+      (worker &&
+        (app.agent.threadId !== worker.id ||
+          app.agent.lease?.token !== worker.token ||
+          app.agent.lease.expiresAt <= Date.now())) ||
       app.agent.access.expiresAt <= Date.now() ||
       app.operation?.kind === "delete"
     )
