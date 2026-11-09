@@ -28,6 +28,7 @@ const app = defineApp({
     REVENUECAT_PROJECT_ID: v.optional(v.string()),
     REVENUECAT_ENVIRONMENT: v.optional(v.string()),
     REVENUECAT_ROUTES: v.optional(v.string()),
+    REVENUECAT_MANAGED_MONTHLY_ROUTES: v.optional(v.string()),
     REVENUECAT_SYNC_ENABLED: v.optional(v.string()),
     AUTH_GOOGLE_ONLY: v.optional(v.string()),
     DISPOSABL_ENVIRONMENT: v.optional(v.string()),

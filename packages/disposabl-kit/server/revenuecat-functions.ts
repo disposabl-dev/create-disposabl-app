@@ -12,6 +12,7 @@ import {
   balanceRequest,
   parseRevenueCatEvent,
   parseTransfer,
+  isManagedMonthlyEvent,
   revenueCatConfigs,
   selectRevenueCatRoute,
   resolveRevenueCatRoute,
@@ -83,33 +84,41 @@ export async function webhookAuthorized(
   return !!supplied && (await sameSecret(supplied, authorization));
 }
 
-export const webhook = httpActionGeneric(async (ctx, request) => {
-  const configs = revenueCatConfigs(paymentsEnabled, process.env);
-  if (!configs) return new Response("Unavailable", { status: 503 });
-  if (!(await webhookAuthorized(request, configs[0]!.authorization)))
-    return new Response("Unauthorized", { status: 401 });
-  let payload: unknown;
-  try {
-    payload = await request.json();
-  } catch {
-    return new Response("Invalid event", { status: 400 });
-  }
-  const config = selectRevenueCatRoute(payload, configs);
-  if (!config) return new Response("Invalid event", { status: 400 });
-  const transfer = parseTransfer(payload, config);
-  if (transfer) {
-    await ctx.runMutation(transferRef, transfer);
-    return Response.json({ status: "operator_review" }, { status: 202 });
-  }
-  const event = parseRevenueCatEvent(payload, config);
-  if (!event) return new Response("Invalid event", { status: 400 });
-  const result = await ctx.runMutation(receiveRef, {
-    event,
-    balanceId: await balanceId(event),
+export const createWebhook = (
+  enabled = paymentsEnabled,
+  environment: Record<string, string | undefined> = process.env,
+) =>
+  httpActionGeneric(async (ctx, request) => {
+    const configs = revenueCatConfigs(enabled, environment);
+    if (!configs) return new Response("Unavailable", { status: 503 });
+    if (!(await webhookAuthorized(request, configs[0]!.authorization)))
+      return new Response("Unauthorized", { status: 401 });
+    let payload: unknown;
+    try {
+      payload = await request.json();
+    } catch {
+      return new Response("Invalid event", { status: 400 });
+    }
+    if (isManagedMonthlyEvent(payload, configs))
+      return Response.json({ status: "ignored" }, { status: 200 });
+    const config = selectRevenueCatRoute(payload, configs);
+    if (!config) return new Response("Invalid event", { status: 400 });
+    const transfer = parseTransfer(payload, config);
+    if (transfer) {
+      await ctx.runMutation(transferRef, transfer);
+      return Response.json({ status: "operator_review" }, { status: 200 });
+    }
+    const event = parseRevenueCatEvent(payload, config);
+    if (!event) return new Response("Invalid event", { status: 400 });
+    const result = await ctx.runMutation(receiveRef, {
+      event,
+      balanceId: await balanceId(event),
+    });
+    // Accepted means persisted, never a claim that the balance has changed.
+    return Response.json({ status: result }, { status: 200 });
   });
-  // Accepted means persisted, never a claim that the balance has changed.
-  return Response.json({ status: result }, { status: 202 });
-});
+
+export const webhook = createWebhook();
 
 export const receiveTransfer = internalMutation({
   args: {

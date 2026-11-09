@@ -8,6 +8,7 @@ export type RevenueCatConfig = {
   product: string;
   store: "APP_STORE" | "PLAY_STORE";
   autumnKey: string;
+  managedMonthlyProducts?: string[];
 };
 
 export type PurchaseEvent = {
@@ -116,7 +117,61 @@ export function revenueCatConfigs(
       return null;
     result.push({ authorization, project, environment, autumnKey, ...route });
   }
+  if (env.REVENUECAT_MANAGED_MONTHLY_ROUTES !== undefined) {
+    let monthly: unknown;
+    try {
+      monthly = JSON.parse(env.REVENUECAT_MANAGED_MONTHLY_ROUTES);
+    } catch {
+      return null;
+    }
+    if (!Array.isArray(monthly) || monthly.length > 20) return null;
+    for (const route of monthly) {
+      if (
+        !route ||
+        typeof route !== "object" ||
+        Array.isArray(route) ||
+        Object.keys(route).sort().join(",") !== "app,product,store" ||
+        typeof route.product !== "string" ||
+        !route.product ||
+        route.product.trim() !== route.product ||
+        route.product.length > 256
+      )
+        return null;
+      const config = result.find(
+        (item) => item.app === route.app && item.store === route.store,
+      );
+      if (
+        !config ||
+        config.product === route.product ||
+        config.managedMonthlyProducts?.includes(route.product)
+      )
+        return null;
+      (config.managedMonthlyProducts ??= []).push(route.product);
+    }
+  }
   return result;
+}
+
+/** Managed monthly lifecycle events are acknowledged without entering the top-up inbox. */
+export function isManagedMonthlyEvent(
+  payload: unknown,
+  configs: RevenueCatConfig[],
+) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload))
+    return false;
+  const event = (payload as Record<string, unknown>).event;
+  if (!event || typeof event !== "object" || Array.isArray(event)) return false;
+  const e = event as Record<string, unknown>;
+  if (
+    !["INITIAL_PURCHASE", "RENEWAL", "CANCELLATION"].includes(e.type as string)
+  )
+    return false;
+  return configs.some((config) =>
+    config.managedMonthlyProducts?.some(
+      (product) =>
+        parseRevenueCatEvent(payload, { ...config, product }) !== null,
+    ),
+  );
 }
 
 export function selectRevenueCatRoute(

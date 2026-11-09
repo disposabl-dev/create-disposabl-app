@@ -63,6 +63,7 @@ type Env = {
   readonly REVENUECAT_CONSUMABLE_INTEGRATION_VERIFIED: string | undefined;
   readonly REVENUECAT_CONSUMABLE_OWNER: string | undefined;
   readonly REVENUECAT_ENVIRONMENT: string | undefined;
+  readonly REVENUECAT_MANAGED_MONTHLY_ROUTES: string | undefined;
   readonly REVENUECAT_PROJECT_ID: string | undefined;
   readonly REVENUECAT_ROUTES: string | undefined;
   readonly REVENUECAT_SYNC_ENABLED: string | undefined;
