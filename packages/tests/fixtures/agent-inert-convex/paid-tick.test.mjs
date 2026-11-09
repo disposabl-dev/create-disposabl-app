@@ -302,6 +302,7 @@ function make({
       if (name === "agent/state:claim") {
         expect(args.activationProtocol).toBe(1);
         state.app.agent.lease = {
+          activationProtocol: args.activationProtocol,
           token: args.token,
           expiresAt: Date.now() + 60_000,
           watchdog: "watchdog",
@@ -768,4 +769,5 @@ test("pre-deployment paid action cannot acquire a new worker lease", async () =>
     activationProtocol: 1,
   });
   expect(current?.lease?.token).toBe("current-code");
+  expect(current?.lease?.activationProtocol).toBe(1);
 });

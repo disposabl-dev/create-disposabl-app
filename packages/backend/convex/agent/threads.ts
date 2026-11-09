@@ -49,9 +49,20 @@ export async function classifyResumeSafety(
   ctx: MutationCtx,
   userId: string,
   sessionId: Id<"computeSessions">,
-  worker?: { id: string; token: string },
 ) {
   const now = Date.now();
+  // Old actions may still create/resume without claiming activation, and their
+  // mutations may not maintain derived flags. Read their actual leases directly.
+  const legacy = await ctx.db
+    .query("apps")
+    .withIndex("by_userId_leaseProtocol_until", (q) =>
+      q
+        .eq("userId", userId)
+        .eq("agent.lease.activationProtocol", undefined)
+        .gt("agent.lease.expiresAt", now),
+    )
+    .first();
+  if (legacy) return "wait" as const;
   const missing = await ctx.db
     .query("apps")
     .withIndex("by_userId_resumeBusy_session", (q) =>
@@ -69,30 +80,28 @@ export async function classifyResumeSafety(
     )
     .first();
   if (pending) return "wait" as const;
-  const isOtherWorker = (app: Doc<"apps">) =>
-    !worker ||
-    app.agent?.threadId !== worker.id ||
-    app.agent?.lease?.token !== worker.token ||
-    app.agent?.computeSessionId !== sessionId;
-  // Read the actual lease too: an in-flight pre-deployment mutation may not
-  // maintain the derived classification introduced by this deployment.
-  const leased = await ctx.db
-    .query("apps")
-    .withIndex("by_userId_agentLeaseUntil", (q) =>
-      q.eq("userId", userId).gt("agent.lease.expiresAt", now),
-    )
-    .take(2);
-  if (leased.some(isOtherWorker)) return "wait" as const;
-  // Only this exact action lease is exempt. Another worker in the same paid
-  // session can still be running pre-deployment code without activation fencing.
-  // Two rows suffice: at most one can own the unique thread/token pair.
-  const busy = await ctx.db
+  // Same-session current-protocol workers all use the atomic activation claim.
+  // Excluding those peers avoids synchronized retries blocking each other.
+  const old = await ctx.db
     .query("apps")
     .withIndex("by_userId_resumeBusy_session", (q) =>
-      q.eq("userId", userId).eq("agentResumeBusy", true),
+      q
+        .eq("userId", userId)
+        .eq("agentResumeBusy", true)
+        .lt("agent.computeSessionId", sessionId),
     )
-    .take(2);
-  const other = busy.find(isOtherWorker);
+    .first();
+  const other =
+    old ??
+    (await ctx.db
+      .query("apps")
+      .withIndex("by_userId_resumeBusy_session", (q) =>
+        q
+          .eq("userId", userId)
+          .eq("agentResumeBusy", true)
+          .gt("agent.computeSessionId", sessionId),
+      )
+      .first());
   if (!other) return "ready" as const;
   if (remoteUnresolved(other.agent)) return "blocked" as const;
   if (!resumeBusy(other.agent, now)) {

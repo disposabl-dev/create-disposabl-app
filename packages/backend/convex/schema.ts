@@ -210,6 +210,11 @@ export default defineSchema({
     ])
     .index("by_userId_stopUnconfirmed", ["userId", "agent.stopUnconfirmed"])
     .index("by_userId_agentLeaseUntil", ["userId", "agent.lease.expiresAt"])
+    .index("by_userId_leaseProtocol_until", [
+      "userId",
+      "agent.lease.activationProtocol",
+      "agent.lease.expiresAt",
+    ])
     .index("by_userId_agentRemoteUnresolved", [
       "userId",
       "agentRemoteUnresolved",

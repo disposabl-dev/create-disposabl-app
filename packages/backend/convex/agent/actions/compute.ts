@@ -15,11 +15,10 @@ export async function fund(
   expectedDebit?: Id<"computeDebits">,
   performDebit = (userId: string) =>
     debitCompute(userId, paymentsEnabled, env.AUTUMN_SECRET_KEY),
-  worker?: { id: string; token: string },
 ) {
   const debit: Doc<"computeDebits"> | null = await ctx.runMutation(
     internal.agent.compute.claim,
-    { sessionId, expectedDebit, worker },
+    { sessionId, expectedDebit },
   );
   if (!debit) return;
   const session = await ctx.runQuery(internal.agent.compute.get, { sessionId });
@@ -49,7 +48,6 @@ export async function computeAccess(
   userId: string,
   sessionId?: Id<"computeSessions">,
   allowActivation = false,
-  worker?: { id: string; token: string },
 ): Promise<"ready" | "waiting" | "blocked"> {
   if (await ctx.runQuery(internal.users.internal.deletionPending, { userId }))
     return "blocked";
@@ -60,7 +58,7 @@ export async function computeAccess(
   let session = await ctx.runQuery(internal.agent.compute.get, { sessionId });
   if (!session || session.userId !== userId) return "blocked";
   if (session.state === "starting" && !session.debitId) {
-    await fund(ctx, sessionId, undefined, undefined, worker);
+    await fund(ctx, sessionId);
     session = await ctx.runQuery(internal.agent.compute.get, { sessionId });
   }
   if (!session || !["starting", "active", "renewing"].includes(session.state))

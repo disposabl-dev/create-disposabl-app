@@ -204,7 +204,6 @@ test("old worker lease blocks until expired without blocking current-session lea
   f.rows.push(old);
   assert.equal(await claimActivation(f.ctx, args), "wait");
   lease.expiresAt = Date.now() - 1;
-  assert.equal(await claimActivation(f.ctx, args), "wait");
   f.rows.push({
     _id: "own",
     table: "apps",
@@ -217,16 +216,10 @@ test("old worker lease blocks until expired without blocking current-session lea
       status: "processing",
       pending: [],
       updatedAt: 1,
-      lease: { ...lease, expiresAt: Date.now() + 60000 },
+      lease: { ...lease, expiresAt: Date.now() + 60000, activationProtocol: 1 },
     },
   });
-  assert.equal(
-    await claimActivation(f.ctx, {
-      ...args,
-      worker: { id: "own", token: "old" },
-    }),
-    "claimed",
-  );
+  assert.equal(await claimActivation(f.ctx, args), "claimed");
 });
 test("expired old lease with delivery remains a durable block", async () => {
   const f = fixture();
@@ -276,13 +269,49 @@ test("activation watchdog stops expired claim without issuing a second claim", a
   );
 });
 
-test("same-session old workers fence activation and stop; only the exact claimant is exempt", async () => {
+test("same-session legacy worker fences activation and stop even with stale flags", async () => {
   const f = fixture();
-  const own = { id: "own", token: "new-worker" };
-  for (const [id, token] of [
-    ["own", own.token],
-    ["old", "base-worker"],
+  for (const [id, activationProtocol] of [
+    ["own", 1],
+    ["old", undefined],
   ]) {
+    f.rows.push({
+      _id: id,
+      appId: id,
+      table: "apps",
+      userId: "u",
+      agentRemoteUnresolved: false,
+      agentResumeBusy: false,
+      agent: {
+        threadId: id,
+        computeSessionId: "s",
+        status: "processing",
+        pending: [],
+        updatedAt: 1,
+        lease: {
+          token: id,
+          activationProtocol,
+          expiresAt: Date.now() + 60000,
+          watchdog: "w",
+        },
+      },
+    });
+  }
+  assert.equal(await claimActivation(f.ctx, args), "wait");
+  assert.equal(f.session.activation, "fresh");
+  f.session.state = "stopping";
+  assert.equal(
+    await (stopping as any)._handler(f.ctx, { sessionId: "s", token: "stop" }),
+    false,
+  );
+  f.session.state = "active";
+  f.rows.find((x) => x._id === "old").agent.lease.expiresAt = Date.now() - 1;
+  assert.equal(await claimActivation(f.ctx, args), "claimed");
+});
+
+test("two current workers in the same session make progress through one activation claim", async () => {
+  const f = fixture();
+  for (const id of ["one", "two"]) {
     f.rows.push({
       _id: id,
       appId: id,
@@ -296,33 +325,26 @@ test("same-session old workers fence activation and stop; only the exact claiman
         status: "processing",
         pending: [],
         updatedAt: 1,
-        lease: { token, expiresAt: Date.now() + 60000, watchdog: "w" },
+        lease: {
+          token: id,
+          activationProtocol: 1,
+          expiresAt: Date.now() + 60000,
+          watchdog: "w",
+        },
       },
     });
   }
-  assert.equal(await claimActivation(f.ctx, { ...args, worker: own }), "wait");
-  assert.equal(f.session.activation, "fresh");
-  const old = f.rows.find((x) => x._id === "old");
-  old.agentResumeBusy = false;
-  assert.equal(await claimActivation(f.ctx, { ...args, worker: own }), "wait");
-  old.agentResumeBusy = true;
-  f.session.state = "stopping";
   assert.equal(
-    await (stopping as any)._handler(f.ctx, { sessionId: "s", token: "stop" }),
-    false,
-  );
-  f.session.state = "active";
-  f.rows.find((x) => x._id === "old").agent.lease.expiresAt = Date.now() - 1;
-  assert.equal(await claimActivation(f.ctx, { ...args, worker: own }), "wait");
-  assert.equal(
-    await claimActivation(f.ctx, {
-      ...args,
-      worker: { ...own, token: "wrong" },
-    }),
-    "wait",
-  );
-  assert.equal(
-    await claimActivation(f.ctx, { ...args, worker: own }),
+    await claimActivation(f.ctx, { ...args, token: "one" }),
     "claimed",
+  );
+  assert.equal(await claimActivation(f.ctx, { ...args, token: "two" }), "wait");
+  assert.equal(
+    await completeActivation(f.ctx, { ...args, token: "one" }),
+    true,
+  );
+  assert.equal(
+    await claimActivation(f.ctx, { ...args, token: "two" }),
+    "ready",
   );
 });

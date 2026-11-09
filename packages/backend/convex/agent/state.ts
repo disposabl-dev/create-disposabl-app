@@ -53,7 +53,12 @@ export const claim = internalMutation({
       { id },
     );
     const patch = {
-      lease: { token, expiresAt: Date.now() + 11 * 60_000, watchdog },
+      lease: {
+        token,
+        expiresAt: Date.now() + 11 * 60_000,
+        watchdog,
+        activationProtocol,
+      },
       ...(current.delivery
         ? {
             status: "stopping" as const,
