@@ -20,7 +20,7 @@ const workflow = JSON.parse(
   ),
 );
 
-test("Android uses its selected runner while retaining the twenty-minute limit", () => {
+test("Android uses its selected runner while allowing native build and cache finalization", () => {
   assert.equal(
     workflow.jobs.changes.outputs.android_runner,
     "${{ steps.platforms.outputs.android_runner }}",
@@ -29,7 +29,7 @@ test("Android uses its selected runner while retaining the twenty-minute limit",
     workflow.jobs.android["runs-on"],
     "${{ needs.changes.outputs.android_runner }}",
   );
-  assert.equal(workflow.jobs.android["timeout-minutes"], 20);
+  assert.equal(workflow.jobs.android["timeout-minutes"], 30);
   assert.equal(
     workflow.jobs.web["runs-on"],
     "${{ needs.changes.outputs.linux_runner }}",
@@ -38,10 +38,16 @@ test("Android uses its selected runner while retaining the twenty-minute limit",
 
 test("Android failure reporting handles failed and cancelled builds independently", () => {
   const job = workflow.jobs["android-failure"];
-  assert.equal(job.needs, "android");
+  const hasPlayJob = !!workflow.jobs["android-play"];
+  assert.deepEqual(
+    job.needs,
+    hasPlayJob ? ["android", "android-play"] : "android",
+  );
   assert.equal(
     job.if,
-    "always() && (needs.android.result == 'failure' || needs.android.result == 'cancelled')",
+    hasPlayJob
+      ? "always() && (needs.android.result == 'failure' || needs.android.result == 'cancelled' || needs.android-play.result == 'failure' || needs.android-play.result == 'cancelled')"
+      : "always() && (needs.android.result == 'failure' || needs.android.result == 'cancelled')",
   );
   assert.deepEqual(job.permissions, { contents: "read", "id-token": "write" });
   assert.equal(job["runs-on"], "ubuntu-24.04");
