@@ -117,8 +117,9 @@ def main():
         thread.start()
         try:
             with (stage / 'browser.log').open('w') as log:
-                result = subprocess.run(['bun', 'run', 'e2e', 'run', 'billing-checkout-auth.e2e.ts', '--target', 'web', '--retries', '0'], cwd=source, env=testenv, stdout=log, stderr=subprocess.STDOUT)
-            if result.returncode:
+                with module.owned_backend(['bun', 'run', 'e2e', 'run', 'billing-checkout-auth.e2e.ts', '--target', 'web', '--retries', '0'], process_group=True, cwd=source, env=testenv, stdout=log, stderr=subprocess.STDOUT) as runner:
+                    result = runner.wait()
+            if result:
                 raise RuntimeError('Browser test failed; inspect retained browser.log')
             print('Checkout browser flow passed', flush=True)
         finally:

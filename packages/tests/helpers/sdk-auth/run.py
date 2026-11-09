@@ -20,8 +20,10 @@ EXPECTED_AUTH = '2.0.0-beta.0-reboot.437831bd-disposabl.8'
 
 
 @contextmanager
-def owned_backend(command, *, stop_timeout=10, **options):
+def owned_backend(command, *, stop_timeout=10, process_group=False, **options):
     """Defer cancellation during spawn/cleanup so the owned child is always reaped."""
+    if process_group:
+        options['start_new_session'] = True
     phase, pending, proc = 'starting', None, None
     previous = {sig: signal.getsignal(sig) for sig in (signal.SIGTERM, signal.SIGINT)}
 
@@ -43,12 +45,24 @@ def owned_backend(command, *, stop_timeout=10, **options):
         phase = 'stopping'
         try:
             if proc is not None:
-                if proc.poll() is None:
+                if process_group:
+                    try:
+                        os.killpg(proc.pid, signal.SIGTERM)
+                    except ProcessLookupError:
+                        pass
+                elif proc.poll() is None:
                     proc.terminate()
                 try:
                     proc.wait(timeout=stop_timeout)
                 except subprocess.TimeoutExpired:
                     proc.kill()
+                finally:
+                    if process_group:
+                        # The leader may have exited while descendants remain.
+                        try:
+                            os.killpg(proc.pid, signal.SIGKILL)
+                        except ProcessLookupError:
+                            pass
                     proc.wait()
                 print('owned backend stopped', flush=True)
         finally:

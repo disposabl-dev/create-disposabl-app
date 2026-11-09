@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 import select
 import signal
+import socket
 import subprocess
 import sys
 import time
@@ -89,6 +90,72 @@ class RunnerCancellation(unittest.TestCase):
 
     def test_repeated_sigterm_during_cleanup(self):
         self.check_exit('running', signal.SIGTERM, repeated=True)
+
+
+
+GROUP_LAUNCHER = r"""
+import json, sys, signal, subprocess
+sys.path.insert(0, sys.argv[1])
+import run as fixture
+mode = sys.argv[2]
+grandchild = 'import signal,socket,time; signal.signal(signal.SIGTERM, signal.SIG_IGN); s=socket.socket(); s.bind(("127.0.0.1",0)); s.listen(); print(s.getsockname()[1], flush=True); time.sleep(60)'
+leader = 'import subprocess,sys,signal,time; signal.signal(signal.SIGTERM,signal.SIG_IGN); p=subprocess.Popen([sys.executable,"-u","-c",sys.argv[1]],stdout=subprocess.PIPE,text=True); print(p.pid,p.stdout.readline().strip(),flush=True); ' + ('sys.exit(0)' if mode == 'leader-exit' else 'time.sleep(60)')
+with fixture.owned_backend([sys.executable, '-c', 'import time; time.sleep(60)'], stop_timeout=.25) as backend:
+    with fixture.owned_backend([sys.executable, '-u', '-c', leader, grandchild], process_group=True, stop_timeout=.25, stdout=subprocess.PIPE, text=True) as runner:
+        grand_pid, port = map(int, runner.stdout.readline().split())
+        print(json.dumps([backend.pid, runner.pid, grand_pid, port]), flush=True)
+        if mode == 'failure':
+            raise RuntimeError('synthetic runner failure')
+        runner.wait()
+"""
+
+
+class RunnerGroupCancellation(unittest.TestCase):
+    def check_group(self, mode, signum=None):
+        import json
+        ids = None
+        launcher = subprocess.Popen(
+            [sys.executable, '-u', '-c', GROUP_LAUNCHER, str(Path(__file__).parent), mode],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        )
+        try:
+            self.assertTrue(select.select([launcher.stdout], [], [], 5)[0])
+            ids = json.loads(launcher.stdout.readline())
+            if signum:
+                launcher.send_signal(signum)
+            stdout, stderr = launcher.communicate(timeout=5)
+            self.assertEqual(launcher.returncode, 128 + signum if signum else (1 if mode == 'failure' else 0), stderr)
+            self.assertEqual(stdout.count('owned backend stopped'), 2)
+            for pid in ids[:2]:
+                with self.assertRaises(ProcessLookupError):
+                    os.kill(pid, 0)
+            # A TERM-ignoring descendant must release its listener too.
+            with socket.socket() as probe:
+                probe.bind(('127.0.0.1', ids[3]))
+        finally:
+            if launcher.poll() is None:
+                launcher.kill()
+                launcher.wait()
+            if ids:
+                for pid in ids[:3]:
+                    try:
+                        os.kill(pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+            launcher.stdout.close()
+            launcher.stderr.close()
+
+    def test_runner_sigterm(self):
+        self.check_group('running', signal.SIGTERM)
+
+    def test_runner_sigint(self):
+        self.check_group('running', signal.SIGINT)
+
+    def test_runner_exception(self):
+        self.check_group('failure')
+
+    def test_exited_leader_with_running_descendant(self):
+        self.check_group('leader-exit')
 
 
 if __name__ == '__main__':
