@@ -22,12 +22,14 @@ export function PaymentGate({
   refresh,
   proceed,
   cancel,
+  resume = false,
 }: {
   customerId: string;
   data: BillingSnapshot | null;
   refresh: () => Promise<number | null>;
   proceed: () => void;
   cancel: () => void;
+  resume?: boolean;
 }) {
   const snapshot = useAction(api.billing.snapshot);
   const version = useRef(0);
@@ -145,6 +147,13 @@ export function PaymentGate({
       <Text className="text-muted-foreground">
         At least 10 credits are needed to start.
       </Text>
+      {resume && (
+        <Text className="text-muted-foreground">
+          If your sandbox has stopped, add credits if needed, then return to
+          your message and tap Send to resume. Refreshing credits will not send
+          it.
+        </Text>
+      )}
       {data?.monthlyCheckoutPending && (
         <Text className={"text-muted-foreground"}>
           Finish or cancel your website checkout before subscribing here.
@@ -201,10 +210,14 @@ export function PaymentGate({
         onPress={() => void refresh()}
         disabled={busy}
       />
-      {data?.balance != null && data.balance >= 10 && (
+      {!resume && data?.balance != null && data.balance >= 10 && (
         <Action label="Continue" onPress={proceed} disabled={busy} />
       )}
-      <Action label="Back to idea" onPress={cancel} disabled={busy} />
+      <Action
+        label={resume ? "Back to message" : "Back to idea"}
+        onPress={cancel}
+        disabled={busy}
+      />
       {!!error && (
         <Text accessibilityRole="alert" className="text-destructive">
           {error}
