@@ -7,10 +7,21 @@ import {
 import { v } from "convex/values";
 import { fund as productFund } from "./agent/actions/productCompute";
 export const seed = mutation({
-  args: { outcome: v.union(v.literal("confirmed"), v.literal("unknown")) },
-  handler: async (ctx, { outcome }) => {
+  args: {
+    outcome: v.union(
+      v.literal("confirmed"),
+      v.literal("denied"),
+      v.literal("unknown"),
+    ),
+    responseBalance: v.optional(v.number()),
+  },
+  handler: async (ctx, { outcome, responseBalance }) => {
     const userId = await ctx.db.insert("users", {});
-    await ctx.db.insert("fixtureOwners", { userId, outcome });
+    await ctx.db.insert("fixtureOwners", {
+      userId,
+      outcome,
+      responseBalance: responseBalance ?? 90,
+    });
     const sessionId = await ctx.db.insert("computeSessions", {
       userId,
       state: "starting",
@@ -41,9 +52,13 @@ export const dispatch = mutation({
       .withIndex("by_userId", (q) => q.eq("userId", userId))
       .unique();
     if (!owner) throw new Error("Missing fixture owner");
-    return owner.outcome === "unknown"
-      ? { outcome: "unknown" as const }
-      : { outcome: "confirmed" as const, responseBalance: 90 };
+    if (owner.outcome === "deferred") return { outcome: "deferred" as const };
+    if (owner.outcome === "unknown") return { outcome: "unknown" as const };
+    if (owner.outcome === "denied") return { outcome: "denied" as const };
+    return {
+      outcome: "confirmed" as const,
+      responseBalance: owner.responseBalance,
+    };
   },
 });
 export const fund = action({
@@ -68,11 +83,64 @@ export const expire = mutation({
   handler: (ctx, { sessionId }) =>
     ctx.db.patch(sessionId, { paidUntil: Date.now() - 1 }),
 });
-// Test-only eligible branch: production active windows stop at expiry.
-export const prepareEligibleRenewal = mutation({
-  args: { sessionId: v.id("computeSessions") },
-  handler: (ctx, { sessionId }) =>
-    ctx.db.patch(sessionId, { state: "starting", paidUntil: 0 }),
+export const setOutcome = mutation({
+  args: {
+    userId: v.string(),
+    outcome: v.union(
+      v.literal("confirmed"),
+      v.literal("denied"),
+      v.literal("unknown"),
+      v.literal("deferred"),
+    ),
+    responseBalance: v.optional(v.number()),
+  },
+  handler: async (ctx, { userId, outcome, responseBalance }) => {
+    const owner = await ctx.db
+      .query("fixtureOwners")
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
+      .unique();
+    if (!owner) throw new Error("Missing fixture owner");
+    await ctx.db.patch(owner._id, {
+      outcome,
+      ...(responseBalance === undefined ? {} : { responseBalance }),
+    });
+  },
+});
+export const outcome = query({
+  args: { userId: v.string() },
+  handler: async (ctx, { userId }) => {
+    const owner = await ctx.db
+      .query("fixtureOwners")
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
+      .unique();
+    if (!owner) throw new Error("Missing fixture owner");
+    return owner.outcome === "confirmed"
+      ? {
+          outcome: "confirmed" as const,
+          responseBalance: owner.responseBalance,
+        }
+      : { outcome: owner.outcome };
+  },
+});
+export const timeout = mutation({
+  args: { debitId: v.id("computeDebits") },
+  handler: (ctx, args) => ctx.runMutation(anyApi.agent.compute.uncertain, args),
+});
+export const markNotice = mutation({
+  args: { debitId: v.id("computeDebits") },
+  handler: async (ctx, args) => {
+    await ctx.db.insert("fixtureNoticeCalls", args);
+  },
+});
+export const noticeCount = query({
+  args: { debitId: v.id("computeDebits") },
+  handler: async (ctx, { debitId }) =>
+    (
+      await ctx.db
+        .query("fixtureNoticeCalls")
+        .withIndex("by_debitId", (q) => q.eq("debitId", debitId))
+        .take(10)
+    ).length,
 });
 export const inspect = query({
   args: { sessionId: v.id("computeSessions"), userId: v.string() },
