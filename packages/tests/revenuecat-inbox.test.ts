@@ -16,6 +16,7 @@ import {
   complete,
   confirmFullRefund,
   receiveTransfer,
+  createWebhook,
   webhookAuthorized,
   webhook,
   dispatchBalance,
@@ -396,6 +397,108 @@ describe("RevenueCat consumable inbox", () => {
       assert.equal(response.status, 503);
     },
   );
+  test("webhook acknowledges durable purchases and transfer holds with HTTP 200", async () => {
+    const handler = createWebhook(true, {
+      REVENUECAT_CONSUMABLE_OWNER: "custom",
+      REVENUECAT_WEBHOOK_AUTH: config.authorization,
+      REVENUECAT_PROJECT_ID: config.project,
+      REVENUECAT_ENVIRONMENT: config.environment,
+      AUTUMN_SECRET_KEY: "am_sk_test_synthetic",
+      REVENUECAT_ROUTES: JSON.stringify([
+        { app: config.app, store: config.store, product: config.product },
+      ]),
+    });
+    const purchase = {
+      id: "delivery",
+      type: "NON_RENEWING_PURCHASE",
+      app_id: config.app,
+      environment: config.environment,
+      store: config.store,
+      product_id: config.product,
+      app_user_id: "user-1",
+      transaction_id: "transaction",
+    };
+    const request = (event: object) =>
+      new Request("https://example.test/revenuecat/webhook", {
+        method: "POST",
+        headers: { authorization: config.authorization },
+        body: JSON.stringify({ api_version: "1.0", event }),
+      });
+    for (const event of [
+      purchase,
+      {
+        ...purchase,
+        type: "TRANSFER",
+        transferred_from: ["user-1"],
+        transferred_to: ["user-2"],
+      },
+    ]) {
+      let enter!: () => void;
+      let persist!: (value: string) => void;
+      const entered = new Promise<void>((resolve) => {
+        enter = resolve;
+      });
+      const persisted = new Promise<string>((resolve) => {
+        persist = resolve;
+      });
+      let acknowledged = false;
+      const result = call(
+        handler,
+        {
+          runMutation: () => {
+            enter();
+            return persisted;
+          },
+        },
+        request(event),
+      ).then((response: Response) => {
+        acknowledged = true;
+        return response;
+      });
+      await entered;
+      assert.equal(acknowledged, false);
+      persist("pending");
+      const response = await result;
+      assert.equal(response.status, 200);
+      assert.deepEqual(await response.json(), {
+        status: event.type === "TRANSFER" ? "operator_review" : "pending",
+      });
+      await assert.rejects(
+        call(
+          handler,
+          {
+            runMutation: async () => {
+              throw new Error("persistence failed");
+            },
+          },
+          request(event),
+        ),
+        /persistence failed/,
+      );
+    }
+    const f = fixture();
+    const ctx = {
+      runMutation: (_ref: unknown, args: unknown) => call(receive, f.ctx, args),
+    };
+    assert.equal((await call(handler, ctx, request(purchase))).status, 200);
+    assert.equal((await call(handler, ctx, request(purchase))).status, 200);
+    assert.equal(f.tables.revenueCatPurchases!.length, 1);
+    assert.equal(f.tables.revenueCatDeliveries!.length, 1);
+    assert.equal(
+      (
+        await call(
+          handler,
+          ctx,
+          request({ ...purchase, environment: "PRODUCTION" }),
+        )
+      ).status,
+      400,
+    );
+    assert.equal(
+      (await call(handler, ctx, new Request("https://example.test"))).status,
+      401,
+    );
+  });
   test("webhook authorization requires the exact configured header", async () => {
     assert.equal(
       await webhookAuthorized(
