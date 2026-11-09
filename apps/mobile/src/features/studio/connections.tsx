@@ -1,4 +1,5 @@
 import { router } from "expo-router";
+import { captureProductAction } from "../product-telemetry";
 import {
   createContext,
   useContext,
@@ -101,6 +102,7 @@ function AuthenticatedConnectionGate({
   const [error, setError] = useState("");
   async function openConnections() {
     if (busy) return;
+    captureProductAction("open_connections");
     setBusy(true);
     setError("");
     try {

@@ -6,6 +6,7 @@ import { useTheme } from "../../../../../packages/disposabl-kit/mobile/design/us
 import { AppCollection } from "./catalogue";
 import { examples as apps } from "./data";
 import { Screen, Label, Touch, Icon } from "./ui";
+import { captureProductAction } from "../product-telemetry";
 export default function HomeScreen() {
   const router = useRouter();
   const c = useTheme();
@@ -46,7 +47,11 @@ export default function HomeScreen() {
           >
             <Touch
               label={item.action}
-              onPress={() => router.push(item.route)}
+              onPress={() => {
+                if (item.route === "/compose")
+                  captureProductAction("open_create");
+                router.push(item.route);
+              }}
               className="w-[var(--layout-width)] p-[28px] rounded-[28px] gap-[20px] bg-[var(--layout-background-color)]"
             >
               <Label variant="title">{item.title}</Label>

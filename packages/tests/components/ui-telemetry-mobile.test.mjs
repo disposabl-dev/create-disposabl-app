@@ -156,6 +156,38 @@ test("production waits for bootstrap, sanitizes screen and stops on local opt-ou
   });
   captureProductAction("open_create");
   expect(events[1].properties.action).toBe("open_create");
+  for (const action of ["open_connections", "open_app", "open_settings"])
+    captureProductAction(action);
+  expect(events.slice(1).map((event) => event.properties.action)).toEqual([
+    "open_create",
+    "open_connections",
+    "open_app",
+    "open_settings",
+  ]);
+  captureProductAction("private-app-id");
+  expect(events).toHaveLength(5);
+  expect(JSON.stringify(events)).not.toContain("private-id");
+  const now = Date.now;
+  Date.now = () => now() + 31_000;
+  captureProductAction("open_app");
+  Date.now = now;
+  expect(events).toHaveLength(5);
+  await act(async () => {
+    renderer.update(
+      createElement(
+        "Root",
+        null,
+        createElement(ProductTelemetry, {
+          pathname: "/",
+          token: "changed-session",
+          ready: false,
+        }),
+        createElement(AnalyticsPreference),
+      ),
+    );
+  });
+  captureProductAction("open_settings");
+  expect(events).toHaveLength(5);
   await act(async () => {
     renderer.root.findByType("PreferenceRow").props.onPress();
     await Promise.resolve();
@@ -163,5 +195,5 @@ test("production waits for bootstrap, sanitizes screen and stops on local opt-ou
   expect(saved).toBe("1");
   expect(stops).toHaveBeenCalled();
   captureProductAction("open_create");
-  expect(events).toHaveLength(2);
+  expect(events).toHaveLength(5);
 });

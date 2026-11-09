@@ -6,6 +6,7 @@ import { Pressable, Text, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api } from "../../../../../packages/backend/convex/_generated/api";
 import { Icon } from "../studio/ui";
+import { captureProductAction } from "../product-telemetry";
 
 export function ConversationHeader({ appId }: { appId: string }) {
   const router = useRouter();
@@ -72,7 +73,10 @@ export function ConversationHeader({ appId }: { appId: string }) {
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="New chat"
-              onPress={() => router.push("/compose")}
+              onPress={() => {
+                captureProductAction("open_create");
+                router.push("/compose");
+              }}
               className="w-[44px] h-[44px] items-center justify-center"
             >
               <Icon name="compose" size={23} />
@@ -80,11 +84,13 @@ export function ConversationHeader({ appId }: { appId: string }) {
             <MenuView
               actions={[{ id: "settings", title: "App settings" }]}
               onPressAction={({ nativeEvent }) => {
-                if (nativeEvent.event === "settings")
+                if (nativeEvent.event === "settings") {
+                  captureProductAction("open_settings");
                   router.push({
                     pathname: "/apps/[appId]/details",
                     params: { appId },
                   });
+                }
               }}
             >
               <View

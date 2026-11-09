@@ -15,6 +15,7 @@ import {
 } from "@disposabl/disposabl-kit/features";
 import { useTheme } from "../../../../../packages/disposabl-kit/mobile/design/use-theme";
 import { ConnectionPanel } from "../studio/connection-panel";
+import { captureProductAction } from "../product-telemetry";
 import { PaymentGate, type BillingSnapshot } from "./payment-gate";
 import { nextSubmissionStep } from "./submission-policy";
 import { openURL } from "expo-linking";
@@ -204,26 +205,22 @@ function Composer() {
       !!connections?.ready &&
       (!selected.some((p) => p === "android" || p === "ios") ||
         !!connections.expo);
+    const openConnections = () => {
+      captureProductAction("open_connections");
+      void handoff({
+        mobile: selected.some((p) => p === "android" || p === "ios"),
+      })
+        .then(openURL)
+        .catch(() => setError("Could not open connections."));
+    };
     return (
       <View className="gap-[20px]">
         <ConnectionPanel
           connections={connections ? { ...connections, ready } : undefined}
           expoRequired={selected.some((p) => p === "android" || p === "ios")}
           busy={busy}
-          onConnect={() =>
-            void handoff({
-              mobile: selected.some((p) => p === "android" || p === "ios"),
-            })
-              .then(openURL)
-              .catch(() => setError("Could not open connections."))
-          }
-          onProvider={() =>
-            void handoff({
-              mobile: selected.some((p) => p === "android" || p === "ios"),
-            })
-              .then(openURL)
-              .catch(() => setError("Could not open connections."))
-          }
+          onConnect={openConnections}
+          onProvider={openConnections}
           onContinue={() => void submit(prompt)}
         />
         <Action label="Back to idea" onPress={() => setPhase(null)} />

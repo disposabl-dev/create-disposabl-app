@@ -5,7 +5,11 @@ import {
   PreferenceRow,
   PreferenceSection,
 } from "../../../../packages/disposabl-kit/mobile/design/preferences";
-import { screenCategory } from "./telemetry-policy";
+import {
+  isMobileAction,
+  screenCategory,
+  type MobileAction,
+} from "./telemetry-policy";
 import { createTelemetryLeaseController } from "../../../../packages/disposabl-kit/client/lib/telemetry-lease";
 
 const key = "disposabl.product.analytics.optout.v1";
@@ -14,12 +18,9 @@ let preferencePending = false;
 let preferenceLoad: Promise<void> | undefined;
 const listeners = new Set<() => void>();
 let stopActive: (() => void) | undefined;
-let sendAction:
-  ((action: "open_create" | "open_connections") => void) | undefined;
-export function captureProductAction(
-  action: "open_create" | "open_connections",
-) {
-  sendAction?.(action);
+let sendAction: ((action: MobileAction) => void) | undefined;
+export function captureProductAction(action: MobileAction) {
+  if (isMobileAction(action)) sendAction?.(action);
 }
 function notify() {
   for (const listener of listeners) listener();
@@ -133,6 +134,7 @@ export function ProductTelemetry({
         },
         start(lease) {
           live = true;
+          const activeToken = identity.current.token;
           deadline = Math.min(lease.expiresAt, Date.now() + 30_000);
           sdk = new PostHog(lease.projectToken, {
             host: lease.host,
@@ -154,16 +156,15 @@ export function ProductTelemetry({
               if (
                 !live ||
                 allowed !== true ||
+                !identity.current.ready ||
+                identity.current.preference !== true ||
+                identity.current.token !== activeToken ||
                 Date.now() >= deadline ||
                 (event.event !== "$screen" && event.event !== "product_action")
               )
                 return null;
               const action = event.properties?.action;
-              if (
-                event.event === "product_action" &&
-                action !== "open_create" &&
-                action !== "open_connections"
-              )
+              if (event.event === "product_action" && !isMobileAction(action))
                 return null;
               return {
                 uuid: event.uuid,
@@ -187,7 +188,17 @@ export function ProductTelemetry({
             lastView = current;
           };
           send.current = capture;
-          sendAction = (action) => sdk?.capture("product_action", { action });
+          sendAction = (action) => {
+            if (
+              live &&
+              allowed === true &&
+              identity.current.ready &&
+              identity.current.preference === true &&
+              identity.current.token === activeToken &&
+              Date.now() < deadline
+            )
+              sdk?.capture("product_action", { action });
+          };
           capture();
         },
         stop() {
