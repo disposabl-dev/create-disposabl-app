@@ -30,6 +30,23 @@ function inspect(command: string, args: string[]) {
   }
 }
 
+function parentPid(pid: number) {
+  const fields = inspect("lsof", [
+    "-nP",
+    "-a",
+    "-p",
+    String(pid),
+    "-d",
+    "cwd",
+    "-FpR",
+  ]).split("\n");
+  const parents = fields.filter((line) => line.startsWith("R"));
+  if (!fields.includes(`p${pid}`) || parents.length !== 1) fail();
+  const parent = Number(parents[0].slice(1));
+  if (!Number.isSafeInteger(parent) || parent < 1) fail();
+  return parent;
+}
+
 /** Local process evidence only. The launcher creates the marker before the database. */
 export function assertOwnedSdkBackend({
   markerVariable = "E2E_SDK_OWNERSHIP_FILE",
@@ -75,17 +92,29 @@ export function assertOwnedSdkBackend({
   while (ancestor > 1 && ancestor !== lease.launcherPid) {
     if (seen.has(ancestor)) fail();
     seen.add(ancestor);
-    ancestor = Number(inspect("ps", ["-o", "ppid=", "-p", String(ancestor)]));
+    ancestor = parentPid(ancestor);
   }
   if (
     ancestor !== lease.launcherPid ||
-    Number(inspect("ps", ["-o", "ppid=", "-p", String(lease.backendPid)])) !==
-      lease.launcherPid
+    parentPid(lease.backendPid) !== lease.launcherPid
   )
     fail();
   if (
-    basename(inspect("ps", ["-o", "comm=", "-p", String(lease.backendPid)])) !==
-    "convex-local-backend"
+    !inspect("lsof", [
+      "-nP",
+      "-a",
+      "-p",
+      String(lease.backendPid),
+      "-d",
+      "txt",
+      "-Fn",
+    ])
+      .split("\n")
+      .some(
+        (line) =>
+          line.startsWith("n") &&
+          basename(line.slice(1)) === "convex-local-backend",
+      )
   )
     fail();
   const database = realpathSync(lease.database);
