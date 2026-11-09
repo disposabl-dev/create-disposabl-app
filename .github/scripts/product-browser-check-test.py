@@ -1,0 +1,123 @@
+"""Inert boundary checks; no backend or browser is launched."""
+import importlib.util
+import contextlib
+import io
+import json
+from pathlib import Path
+import socket
+import subprocess
+import tempfile
+import unittest
+from unittest.mock import patch
+
+spec = importlib.util.spec_from_file_location('product_browser', Path(__file__).with_name('product-browser-check.py'))
+runner = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(runner)
+
+
+class RunnerTests(unittest.TestCase):
+    def test_layout_summary_accepts_only_fixed_fields_and_bounded_numbers(self):
+        valid = [
+            'LANDING_LAYOUT kind=context page=/stack theme=dark width=320',
+            'LANDING_LAYOUT kind=overflow page=/ theme=system width=844 height=390 viewport=844 scrollwidth=850',
+            'LANDING_LAYOUT kind=clipped page=/ theme=system width=320 count=1 minleft=-2 maxright=321',
+            'LANDING_LAYOUT kind=font page=/pricing theme=light width=320 dialog=0 count=4 minfont=14.5',
+        ]
+        invalid = [valid[0] + ' private-secret',
+                   valid[0].replace('/stack', '/private-secret'),
+                   valid[0].replace('dark', 'private-secret'),
+                   valid[0].replace('320', '1234567890123456789')]
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            runner.report_layout('\n'.join(valid + invalid))
+        self.assertEqual(output.getvalue(), '\n'.join(valid) + '\n')
+
+    def test_missing_explicit_inputs_fails_before_any_backend(self):
+        with patch.dict(runner.os.environ, {}, clear=True), patch.object(runner.sys, 'argv', ['runner']):
+            with self.assertRaisesRegex(RuntimeError, 'Supply an executable verified local backend'):
+                runner.main()
+
+    def test_occupied_loopback_port_is_rejected(self):
+        with socket.socket() as listener:
+            listener.bind(('127.0.0.1', 0))
+            listener.listen()
+            with patch.object(runner, 'PORTS', (listener.getsockname()[1],)):
+                with self.assertRaises(OSError):
+                    runner.check_ports()
+
+    def test_listener_inspection_distinguishes_empty_from_error(self):
+        with patch.object(runner.subprocess, 'run', return_value=subprocess.CompletedProcess([], 1, '', '')):
+            self.assertEqual(runner.listeners(3520), [])
+        with patch.object(runner.subprocess, 'run', return_value=subprocess.CompletedProcess([], 2, '', 'error')):
+            with self.assertRaisesRegex(RuntimeError, 'Cannot inspect listeners'):
+                runner.listeners(3520)
+
+    def test_clean_source_required_before_launching_backend(self):
+        with patch.dict(runner.os.environ, {'CONVEX_LOCAL_BINARY': runner.sys.executable,
+                                          'PLAYWRIGHT_BROWSERS_PATH': '/tmp',
+                                          'PRODUCT_BROWSER_FROZEN_INSTALL': '1'}, clear=True), \
+             patch.object(runner.sys, 'argv', ['runner']), \
+             patch.object(runner.subprocess, 'check_output', return_value=' M source\n'), \
+             patch.object(runner, 'load') as load:
+            with self.assertRaisesRegex(RuntimeError, 'clean committed checkout'):
+                runner.main()
+            load.assert_not_called()
+
+    def test_report_prints_only_counts_not_private_log_content(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'e2e.log'
+            path.write_text('private-secret\n Tests  43 passed | 25 skipped (68)\n')
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                runner.report_e2e(path)
+            self.assertEqual(output.getvalue(), 'E2E counts: passed=43, skipped=25\n')
+
+    def test_failed_flow_summary_excludes_private_payloads_and_unknown_paths(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            flows = root / 'packages/tests/flows'
+            flows.mkdir(parents=True)
+            (flows / 'safe.e2e.ts').write_text('test declaration\n')
+            report = root / 'packages/tests/.e2e/report.json'
+            report.parent.mkdir()
+            report.write_text(json.dumps({'run': {'results': [
+                {'status': 'failed', 'source': {'file': 'flows/safe.e2e.ts', 'line': 1},
+                 'titlePath': ['private-secret'], 'error': 'private-secret'},
+                {'status': 'failed', 'source': {'file': 'private-secret', 'line': 1}},
+                {'status': 'failed', 'source': {'file': 'flows/safe.e2e.ts', 'line': 99999}},
+            ]}}))
+            log = root / 'failure.log'
+            log.write_text('TimeoutError private-secret https://private-secret\n')
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                runner.report_failure(log, root)
+            self.assertEqual(output.getvalue(), 'Failure categories: timeout\nFailed flow declaration: flows/safe.e2e.ts:1\n')
+
+    def test_failure_stack_locations_are_validated_without_exposing_messages(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            flows = root / 'packages/tests/flows'
+            flows.mkdir(parents=True)
+            (flows / 'safe.e2e.ts').write_text('declaration\nassertion\n')
+            report = root / 'packages/tests/.e2e/report.json'
+            report.parent.mkdir()
+            report.write_text(json.dumps({'run': {'results': []}}))
+            log = root / 'failure.log'
+            log.write_text('AssertionError private-secret\n'
+                           ' at fn (/private-secret/flows/safe.e2e.ts:2:14)\n'
+                           ' at fn (/private-secret/flows/safe.e2e.ts:2:14)\n'
+                           ' at fn (/private-secret/flows/safe.e2e.ts:99999:1)\n'
+                           ' at fn (/private-secret/flows/unknown.e2e.ts:1:1)\n')
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                runner.report_failure(log, root)
+            self.assertEqual(output.getvalue(), 'Failure categories: assertion\nFailure stack location: flows/safe.e2e.ts:2\n')
+
+    def test_isolation_rejects_root_on_linux(self):
+        with patch.object(runner.sys, 'platform', 'linux'), patch.object(runner.os, 'geteuid', return_value=0):
+            with self.assertRaisesRegex(RuntimeError, 'must not run as root'):
+                runner.verify_isolation()
+
+
+if __name__ == '__main__':
+    unittest.main()

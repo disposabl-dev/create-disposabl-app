@@ -33,34 +33,26 @@ const step = (name: string, job = "cli") =>
   workflow.jobs[job].steps.find((s: { name?: string }) => s.name === name)
     .run as string;
 
+test("verification budget leaves time for release work", () => {
+  const maximumVerificationSeconds = 25 * 2 * 10 + 24 * 20;
+  for (const job of ["cli", "publish"]) {
+    expect(workflow.jobs[job]["timeout-minutes"]).toBe(30);
+    expect(
+      workflow.jobs[job]["timeout-minutes"] * 60 - maximumVerificationSeconds,
+    ).toBe(820);
+  }
+});
+
 test("conflicting recovery inputs run validation and fail visibly", () => {
-  const shouldRun = new Function(
-    "github",
-    "inputs",
-    `return ${workflow.jobs.cli.if}`,
+  const f = fixture();
+  const result = f.run(
+    "Resolve release source",
+    {
+      CLI_RECOVERY: "1.1.0",
+      GENERATOR_RECOVERY: "0.15.0",
+    },
+    "resolve",
   );
-  const github = {
-    repository: "disposabl-dev/create-disposabl-app",
-    ref: "refs/heads/main",
-  };
-  expect(
-    shouldRun(github, { recovery_version: "", cli_recovery_version: "" }),
-  ).toBe(true);
-  expect(
-    shouldRun(github, { recovery_version: "0.15.0", cli_recovery_version: "" }),
-  ).toBe(false);
-  expect(
-    shouldRun(github, { recovery_version: "", cli_recovery_version: "1.1.0" }),
-  ).toBe(true);
-  expect(
-    shouldRun(github, {
-      recovery_version: "0.15.0",
-      cli_recovery_version: "1.1.0",
-    }),
-  ).toBe(true);
-  const result = fixture().run("Verify CLI recovery tag", {
-    GENERATOR_RECOVERY: "0.15.0",
-  });
   expect(result.status).not.toBe(0);
   expect(result.stdout).toContain("Select only one recovery.");
 });
@@ -72,6 +64,16 @@ function fixture() {
   const git = (...args: string[]) =>
     execFileSync("git", args, { cwd: dir, stdio: "pipe" });
   git("init", "-q");
+  for (const path of [
+    ".github/scripts/product-browser-check.py",
+    ".github/scripts/product-browser-check-test.py",
+    "packages/tests/helpers/sdk-auth/run.py",
+    "packages/tests/helpers/sdk-auth/selected_auth.py",
+  ]) {
+    mkdirSync(join(dir, path, ".."), { recursive: true });
+    writeFileSync(join(dir, path), "# inert harness fixture\n");
+    git("add", path);
+  }
   git(
     "-c",
     "user.name=test",
@@ -132,6 +134,7 @@ function fixture() {
     if [[ -z "\${VERIFY_MODE:-}" ]]; then
       printf '{"name":"%s","version":"%s","dist":{"integrity":"%s"}}' "\${PACKAGE_NAME:-@disposabl/cli}" "\${REGISTRY_VERSION:-$VERSION}" "\${INTEGRITY:-sha512-test}" > "$3"; printf '%s' "\${STATUS:-404}"; exit
     fi
+    [[ "$*" == *'Cache-Control: no-cache'* ]] || exit 22
     output=''; url=''; previous=''
     for arg in "$@"; do
       [[ "$previous" != -o ]] || output="$arg"
@@ -141,7 +144,7 @@ function fixture() {
     if [[ "$url" == */latest ]]; then
       attempt=$(cat "$RUNNER_TEMP/verify-attempt" 2>/dev/null || echo 0)
       version=1.1.0
-      if [[ "$VERIFY_MODE" == persistent || ( "$VERIFY_MODE" == delayed && "$attempt" == 1 ) ]]; then version=1.0.0; fi
+      if [[ "$VERIFY_MODE" == persistent || ( "$VERIFY_MODE" == delayed && "$attempt" == 1 ) || ( "$VERIFY_MODE" == late && "$attempt" -lt 23 ) ]]; then version=1.0.0; fi
       integrity=sha512-test; [[ "$VERIFY_MODE" != integrity ]] || integrity=sha512-wrong
       printf '{"name":"%s","version":"%s","dist":{"integrity":"%s"}}' "\${PACKAGE_NAME:-@disposabl/cli}" "$version" "$integrity" > "$output"; printf 200; exit
     fi
@@ -149,7 +152,8 @@ function fixture() {
     attempt=$((attempt + 1)); echo "$attempt" > "$RUNNER_TEMP/verify-attempt"
     if [[ "$VERIFY_MODE" == auth ]]; then printf 401; exit; fi
     if [[ "$VERIFY_MODE" == network && "$attempt" == 1 ]]; then exit 7; fi
-    if [[ "$VERIFY_MODE" == persistent || ( "$VERIFY_MODE" == delayed && "$attempt" == 1 ) ]]; then printf 404; exit; fi
+    if [[ "$VERIFY_MODE" == malformed ]]; then printf 'private-marker-not-json' > "$output"; printf 200; exit; fi
+    if [[ "$VERIFY_MODE" == persistent || ( "$VERIFY_MODE" == delayed && "$attempt" == 1 ) || ( "$VERIFY_MODE" == late && "$attempt" -lt 23 ) ]]; then printf 404; exit; fi
     name=\${PACKAGE_NAME:-@disposabl/cli}; [[ "$VERIFY_MODE" != contradictory ]] || name=wrong-package
     printf '{"name":"%s","version":"1.1.0","dist":{"integrity":"sha512-test"}}' "$name" > "$output"; printf 200`,
   );
@@ -173,12 +177,212 @@ function fixture() {
         npm_config_userconfig: join(dir, "empty-npmrc"),
         VERSION: "1.1.0",
         GENERATOR_RECOVERY: "",
+        CLI_RECOVERY: "",
+        EVENT_SHA: git("rev-parse", "HEAD").toString().trim(),
+        RESOLVED_SHA: git("rev-parse", "HEAD").toString().trim(),
+        GITHUB_OUTPUT: join(dir, "output"),
         ...env,
       },
     });
   expect(run("Preserve recovery metadata guard").status).toBe(0);
   return { dir, git, run };
 }
+
+test("shared checks use the resolved SHA and block every failed or skipped gate", () => {
+  expect(workflow.jobs.checks.uses).toBe(
+    "./.github/workflows/product-checks.yml",
+  );
+  expect(workflow.jobs.checks.with.source_sha).toBe(
+    "${{ needs.resolve.outputs.source_sha }}",
+  );
+  expect(workflow.jobs.checks.permissions).toEqual({ contents: "read" });
+  expect(workflow.jobs.checks.secrets).toBeUndefined();
+  const github = {
+    repository: "disposabl-dev/create-disposabl-app",
+    ref: "refs/heads/main",
+  };
+  const evaluate = (
+    job: string,
+    needs: unknown,
+    inputs: unknown,
+    cancelled = false,
+  ) =>
+    new Function(
+      "github",
+      "needs",
+      "inputs",
+      "always",
+      "cancelled",
+      `return ${workflow.jobs[job].if}`,
+    )(
+      github,
+      needs,
+      inputs,
+      () => true,
+      () => cancelled,
+    );
+  const normal = { recovery_version: "", cli_recovery_version: "" };
+  const generator = { recovery_version: "1.1.0", cli_recovery_version: "" };
+  const cliRecovery = { recovery_version: "", cli_recovery_version: "1.1.0" };
+  const needs = (resolve: string, checks: string, cli: string) => ({
+    resolve: { result: resolve },
+    checks: { result: checks },
+    cli: { result: cli },
+  });
+  expect(evaluate("cli", needs("success", "success", "skipped"), normal)).toBe(
+    true,
+  );
+  expect(
+    evaluate("cli", needs("success", "success", "skipped"), cliRecovery),
+  ).toBe(true);
+  expect(
+    evaluate("cli", needs("success", "success", "skipped"), generator),
+  ).toBe(false);
+  expect(
+    evaluate("publish", needs("success", "success", "success"), normal),
+  ).toBe(true);
+  expect(
+    evaluate("publish", needs("success", "success", "skipped"), generator),
+  ).toBe(true);
+  expect(
+    evaluate("publish", needs("success", "success", "success"), cliRecovery),
+  ).toBe(false);
+  for (const result of ["failure", "cancelled", "skipped"]) {
+    expect(
+      evaluate("cli", needs("success", result, "success"), cliRecovery),
+    ).toBe(false);
+    expect(
+      evaluate("publish", needs("success", "success", result), normal),
+    ).toBe(false);
+    expect(evaluate("cli", needs("success", result, "success"), normal)).toBe(
+      false,
+    );
+    expect(
+      evaluate("publish", needs("success", result, "success"), normal),
+    ).toBe(false);
+    expect(
+      evaluate("publish", needs("success", result, "skipped"), generator),
+    ).toBe(false);
+    expect(
+      evaluate("publish", needs(result, "success", "success"), normal),
+    ).toBe(false);
+  }
+  expect(
+    evaluate("publish", needs("success", "success", "failure"), normal),
+  ).toBe(false);
+  expect(
+    evaluate("publish", needs("success", "success", "success"), normal, true),
+  ).toBe(false);
+});
+
+test("release source resolves current push and fenced recovery tags", () => {
+  const f = fixture();
+  const head = f.git("rev-parse", "HEAD").toString().trim();
+  expect(f.run("Resolve release source", {}, "resolve").status).toBe(0);
+  expect(readFileSync(join(f.dir, "output"), "utf8")).toContain(`sha=${head}`);
+  f.git("tag", "@disposabl/cli@1.1.0");
+  f.git("tag", "v1.1.0");
+  for (const input of [
+    { CLI_RECOVERY: "1.1.0" },
+    { GENERATOR_RECOVERY: "1.1.0" },
+  ])
+    expect(f.run("Resolve release source", input, "resolve").status).toBe(0);
+  for (const input of [
+    { CLI_RECOVERY: "1.0.0" },
+    { CLI_RECOVERY: "bad" },
+    { GENERATOR_RECOVERY: "2.0.0" },
+    { EVENT_SHA: "0".repeat(40) },
+  ])
+    expect(f.run("Resolve release source", input, "resolve").status).not.toBe(
+      0,
+    );
+  expect(
+    f.run("Verify CLI recovery tag", { RESOLVED_SHA: "0".repeat(40) }).status,
+  ).not.toBe(0);
+  expect(
+    f.run("Verify recovery tag", { RESOLVED_SHA: "0".repeat(40) }, "publish")
+      .status,
+  ).not.toBe(0);
+  expect(
+    f.run("Verify workflow source", {
+      EVENT_SHA: head,
+      RESOLVED_SHA: "0".repeat(40),
+      RECOVERY: "",
+    }).status,
+  ).not.toBe(0);
+});
+
+test("recovery checks the actual historical tag commit and rejects detached or changed tags", () => {
+  const f = fixture();
+  const head = f.git("rev-parse", "HEAD").toString().trim();
+  const old = f
+    .git("rev-parse", "refs/tags/@disposabl/cli@1.0.0^{commit}")
+    .toString()
+    .trim();
+  expect(old).not.toBe(head);
+  f.git("tag", "v1.0.0", old);
+  for (const input of [
+    { CLI_RECOVERY: "1.0.0" },
+    { GENERATOR_RECOVERY: "1.0.0" },
+  ]) {
+    expect(f.run("Resolve release source", input, "resolve").status).toBe(0);
+    expect(
+      readFileSync(join(f.dir, "output"), "utf8").trim().split("\n").at(-1),
+    ).toBe(`sha=${old}`);
+  }
+  expect(
+    f.run("Verify workflow source", {
+      EVENT_SHA: head,
+      RESOLVED_SHA: old,
+      RECOVERY: "1.0.0",
+    }).status,
+  ).toBe(0);
+  expect(
+    f.run("Verify CLI recovery tag", { VERSION: "1.0.0", RESOLVED_SHA: old })
+      .status,
+  ).toBe(0);
+  expect(f.git("rev-parse", "HEAD").toString().trim()).toBe(old);
+  f.git("checkout", "--detach", head);
+  expect(
+    f.run(
+      "Verify recovery tag",
+      { VERSION: "1.0.0", RESOLVED_SHA: old },
+      "publish",
+    ).status,
+  ).toBe(0);
+  expect(f.git("rev-parse", "HEAD").toString().trim()).toBe(old);
+  f.git("checkout", "--detach", head);
+  f.git("tag", "-f", "v1.0.0", head);
+  f.git("tag", "-f", "@disposabl/cli@1.0.0", head);
+  expect(
+    f.run("Verify CLI recovery tag", { VERSION: "1.0.0", RESOLVED_SHA: old })
+      .status,
+  ).not.toBe(0);
+  expect(
+    f.run(
+      "Verify recovery tag",
+      { VERSION: "1.0.0", RESOLVED_SHA: old },
+      "publish",
+    ).status,
+  ).not.toBe(0);
+  f.git("checkout", "-qb", "unrelated");
+  f.git(
+    "-c",
+    "user.name=test",
+    "-c",
+    "user.email=test@example.test",
+    "commit",
+    "--allow-empty",
+    "-qm",
+    "unrelated",
+  );
+  f.git("tag", "v2.0.0");
+  f.git("checkout", "--detach", head);
+  expect(
+    f.run("Resolve release source", { GENERATOR_RECOVERY: "2.0.0" }, "resolve")
+      .status,
+  ).not.toBe(0);
+});
 
 test("missing newer tagged CLI blocks generator with exact recovery instruction", () => {
   const f = fixture();
@@ -197,6 +401,9 @@ test("post-publish verification retries only propagation and transient network e
       VERIFY_MODE: mode,
     });
     expect(result.status).toBe(0);
+    expect(result.stdout).toContain(
+      mode === "network" ? "exact curl exit 7" : "exact HTTP 404",
+    );
     expect(readFileSync(join(f.dir, "verify-attempt"), "utf8").trim()).toBe(
       "2",
     );
@@ -205,61 +412,121 @@ test("post-publish verification retries only propagation and transient network e
   }
 });
 
-test("post-publish verification fails boundedly on 404 and immediately on contradictions or auth", () => {
-  for (const [mode, attempts, sleeps] of [
-    ["persistent", "10", 9],
-    ["contradictory", "1", 0],
-    ["integrity", "1", 0],
-    ["auth", "1", 0],
-  ] as const) {
-    const f = fixture();
-    f.git("tag", "@disposabl/cli@1.1.0");
-    writeFileSync(join(f.dir, "published"), "publish\n");
-    const result = f.run("Verify published CLI release and tag", {
-      VERIFY_MODE: mode,
-    });
-    expect(result.status).not.toBe(0);
-    expect(readFileSync(join(f.dir, "verify-attempt"), "utf8").trim()).toBe(
-      attempts,
-    );
-    const sleepFile = join(f.dir, "verify-sleeps");
-    expect(
-      existsSync(sleepFile)
-        ? readFileSync(sleepFile, "utf8").trim().split("\n").length
-        : 0,
-    ).toBe(sleeps);
-    expect(readFileSync(join(f.dir, "published"), "utf8")).toBe("publish\n");
-  }
-});
-
-test("generator post-publish verification fails closed and never republishes", () => {
-  for (const [mode, ok, attempts] of [
-    ["delayed", true, "2"],
-    ["network", true, "2"],
-    ["persistent", false, "10"],
-    ["contradictory", false, "1"],
-    ["integrity", false, "1"],
-    ["auth", false, "1"],
-  ] as const) {
-    const f = fixture();
-    f.git("tag", "v1.0.0");
-    f.git("tag", "v1.1.0");
-    writeFileSync(join(f.dir, "published"), "publish\n");
-    const result = f.run(
-      "Verify published generator release and tag",
-      {
+test(
+  "post-publish verification fails boundedly on 404 and immediately on contradictions or auth",
+  { timeout: 30000 },
+  () => {
+    for (const [mode, attempts, sleeps] of [
+      ["persistent", "25", 24],
+      ["contradictory", "1", 0],
+      ["malformed", "1", 0],
+      ["integrity", "1", 0],
+      ["auth", "1", 0],
+    ] as const) {
+      const f = fixture();
+      f.git("tag", "@disposabl/cli@1.1.0");
+      writeFileSync(join(f.dir, "published"), "publish\n");
+      const result = f.run("Verify published CLI release and tag", {
         VERIFY_MODE: mode,
-        PACKAGE_NAME: "create-disposabl-app",
-      },
-      "publish",
-    );
-    expect(result.status === 0).toBe(ok);
-    expect(readFileSync(join(f.dir, "verify-attempt"), "utf8").trim()).toBe(
-      attempts,
-    );
-    expect(readFileSync(join(f.dir, "published"), "utf8")).toBe("publish\n");
-  }
-});
+      });
+      expect(result.status).not.toBe(0);
+      expect(result.stdout + result.stderr).not.toContain(
+        "private-marker-not-json",
+      );
+      expect(readFileSync(join(f.dir, "verify-attempt"), "utf8").trim()).toBe(
+        attempts,
+      );
+      const sleepFile = join(f.dir, "verify-sleeps");
+      expect(
+        existsSync(sleepFile)
+          ? readFileSync(sleepFile, "utf8").trim().split("\n").length
+          : 0,
+      ).toBe(sleeps);
+      expect(readFileSync(join(f.dir, "published"), "utf8")).toBe("publish\n");
+    }
+  },
+);
+
+test(
+  "generator post-publish verification fails closed and never republishes",
+  { timeout: 30000 },
+  () => {
+    for (const [mode, ok, attempts] of [
+      ["delayed", true, "2"],
+      ["network", true, "2"],
+      ["persistent", false, "25"],
+      ["contradictory", false, "1"],
+      ["malformed", false, "1"],
+      ["integrity", false, "1"],
+      ["auth", false, "1"],
+    ] as const) {
+      const f = fixture();
+      f.git("tag", "v1.0.0");
+      f.git("tag", "v1.1.0");
+      writeFileSync(join(f.dir, "published"), "publish\n");
+      const result = f.run(
+        "Verify published generator release and tag",
+        {
+          VERIFY_MODE: mode,
+          PACKAGE_NAME: "create-disposabl-app",
+        },
+        "publish",
+      );
+      expect(result.status === 0).toBe(ok);
+      expect(result.stdout + result.stderr).not.toContain(
+        "private-marker-not-json",
+      );
+      expect(readFileSync(join(f.dir, "verify-attempt"), "utf8").trim()).toBe(
+        attempts,
+      );
+      expect(readFileSync(join(f.dir, "published"), "utf8")).toBe("publish\n");
+    }
+  },
+);
+
+test(
+  "both verifiers observe delayed availability without publishing again",
+  { timeout: 30000 },
+  () => {
+    for (const [job, stepName, tag, packageName] of [
+      [
+        "cli",
+        "Verify published CLI release and tag",
+        "@disposabl/cli@",
+        "@disposabl/cli",
+      ],
+      [
+        "publish",
+        "Verify published generator release and tag",
+        "v",
+        "create-disposabl-app",
+      ],
+    ] as const) {
+      const f = fixture();
+      if (job === "publish") f.git("tag", `${tag}1.0.0`);
+      f.git("tag", `${tag}1.1.0`);
+      writeFileSync(join(f.dir, "published"), "publish\n");
+      const result = f.run(
+        stepName,
+        { VERIFY_MODE: "late", PACKAGE_NAME: packageName },
+        job,
+      );
+      expect(result.status).toBe(0);
+      expect(readFileSync(join(f.dir, "verify-attempt"), "utf8").trim()).toBe(
+        "23",
+      );
+      expect(
+        readFileSync(join(f.dir, "verify-sleeps"), "utf8").trim().split("\n")
+          .length,
+      ).toBe(22);
+      expect(result.stdout).toContain("attempt 1/25: exact HTTP 404");
+      expect(result.stdout).toContain("attempt 1/25: latest HTTP 200");
+      expect(result.stdout).toContain("latest version 1.0.0; expected 1.1.0");
+      expect(result.stdout).toContain("attempt 23/25: exact HTTP 200");
+      expect(readFileSync(join(f.dir, "published"), "utf8")).toBe("publish\n");
+    }
+  },
+);
 
 test("recovery publishes only a 404 and safely replays a matching version", () => {
   const f = fixture();
@@ -300,11 +567,12 @@ test(
         ),
       );
       f.git("tag", job === "cli" ? "@disposabl/cli@1.1.0" : "v1.1.0", "HEAD~1");
+      const resolved = f.git("rev-parse", "HEAD~1").toString().trim();
       expect(f.run("Preserve recovery metadata guard", {}, job).status).toBe(0);
       expect(
         f.run(
           job === "cli" ? "Verify CLI recovery tag" : "Verify recovery tag",
-          {},
+          { RESOLVED_SHA: resolved },
           job,
         ).status,
       ).toBe(0);
@@ -433,7 +701,7 @@ test("network, registry, and dist-tag failures do not publish", () => {
       REGISTRY_VERSION: "1.1.0",
     }).status,
   ).not.toBe(0);
-  expect(workflow.jobs.publish.needs).toBe("cli");
+  expect(workflow.jobs.publish.needs).toEqual(["resolve", "checks", "cli"]);
   expect(workflow.jobs.publish.if).toContain("needs.cli.result == 'success'");
   expect(workflow.jobs.publish.if).toContain(
     "inputs.cli_recovery_version == ''",
@@ -590,3 +858,42 @@ test(
     }
   },
 );
+
+test("recovery rejects absent or outdated browser harness before testing or publishing", () => {
+  for (const mode of ["missing", "changed"]) {
+    const f = fixture();
+    const path = ".github/scripts/product-browser-check.py";
+    if (mode === "missing") {
+      f.git("rm", path);
+      f.git(
+        "-c",
+        "user.name=test",
+        "-c",
+        "user.email=test@example.test",
+        "commit",
+        "-qm",
+        "historical missing harness",
+      );
+    }
+    f.git("tag", "v1.2.0");
+    writeFileSync(join(f.dir, path), "# current harness fixture\n");
+    f.git("add", path);
+    f.git(
+      "-c",
+      "user.name=test",
+      "-c",
+      "user.email=test@example.test",
+      "commit",
+      "-qm",
+      "current harness",
+    );
+    const result = f.run(
+      "Resolve release source",
+      { GENERATOR_RECOVERY: "1.2.0" },
+      "resolve",
+    );
+    expect(result.status).not.toBe(0);
+    expect(result.stdout).toContain("Recovery unsupported:");
+    expect(existsSync(join(f.dir, "published"))).toBe(false);
+  }
+});

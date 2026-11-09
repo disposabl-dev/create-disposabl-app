@@ -21,8 +21,11 @@ import {
 
 const excluded = [
   ".github/workflows/play-bundle.yml",
+  ".github/workflows/product-checks.yml",
   ".github/scripts/play-bundle.sh",
   ".github/scripts/play-bundle.test.py",
+  ".github/scripts/product-browser-check.py",
+  ".github/scripts/product-browser-check-test.py",
   "packages/tests/ui-telemetry-policy.test.ts",
   "packages/tests/components/ui-telemetry-mobile.test.mjs",
   "packages/tests/components/mobile-posthog-sdk.test.mjs",
@@ -126,6 +129,170 @@ const excluded = [
   "packages/tests/low-credit-elapsed.test.ts",
   "packages/tests/fixtures/low-credit-convex",
 ];
+
+test("product browser gate uses the reusable exact-source workflow", async () => {
+  const parseWorkflow = async (name: string) => {
+    const input = await readFile(
+      join(import.meta.dirname, "../../.github/workflows", name),
+      "utf8",
+    );
+    const result = spawnSync(
+      process.execPath,
+      [
+        "-e",
+        "console.log(JSON.stringify(Bun.YAML.parse(await Bun.stdin.text())))",
+      ],
+      { input, encoding: "utf8" },
+    );
+    assert.equal(result.status, 0, result.stderr);
+    return JSON.parse(result.stdout);
+  };
+  const pipeline = (await parseWorkflow("pipeline.yml")) as {
+    jobs: {
+      "product-checks": {
+        uses: string;
+        with: { source_sha: string };
+        secrets?: unknown;
+      };
+      web: { needs: string[]; if: string };
+      publish: { needs: string[] };
+      packages: { needs: string[] };
+      "android-play": { needs: string[] };
+    };
+  };
+  const reusable = (await parseWorkflow("product-checks.yml")) as {
+    on: { workflow_call: { inputs: { source_sha: unknown } } };
+    permissions: unknown;
+    jobs: {
+      check: {
+        env: Record<string, string>;
+        steps: Array<{
+          name?: string;
+          run?: string;
+          uses?: string;
+          with?: Record<string, unknown>;
+        }>;
+      };
+    };
+  };
+  const gate = pipeline.jobs["product-checks"];
+  assert.equal(gate.uses, "./.github/workflows/product-checks.yml");
+  assert.ok(pipeline.jobs.web.needs.includes("product-checks"));
+  const webAllowed = new Function(
+    "needs",
+    "github",
+    "always",
+    "cancelled",
+    `return ${pipeline.jobs.web.if.replaceAll("needs.product-checks", 'needs["product-checks"]')}`,
+  );
+  for (const status of ["success", "failure", "cancelled", "skipped"]) {
+    assert.equal(
+      webAllowed(
+        {
+          changes: { result: "success", outputs: { changed: "true" } },
+          "product-checks": { result: status },
+        },
+        {
+          repository: "disposabl-dev/create-disposabl-app",
+          event_name: "push",
+        },
+        () => true,
+        () => false,
+      ),
+      status === "success",
+    );
+  }
+  for (const name of ["publish", "packages", "android-play"] as const)
+    assert.ok(pipeline.jobs[name].needs.includes("web"));
+  const checkout = reusable.jobs.check.steps.find((step) =>
+    step.uses?.startsWith("actions/checkout@"),
+  );
+  assert.equal(checkout?.with?.ref, "${{ inputs.source_sha }}");
+  const runStep = (name: string) =>
+    reusable.jobs.check.steps.find((step) => step.name === name)?.run ?? "";
+  assert.equal(
+    runStep("Install frozen dependencies"),
+    "bun install --frozen-lockfile",
+  );
+  assert.match(runStep("Verify requested source"), /git rev-parse HEAD/);
+  assert.match(runStep("Verify requested source"), /EXPECTED_SOURCE/);
+  assert.match(
+    runStep("Run isolated product web and backend E2E"),
+    /sudo unshare --net --fork/,
+  );
+  assert.match(
+    runStep("Run isolated product web and backend E2E"),
+    /exec runuser -u/,
+  );
+  assert.match(runStep("Run isolated product web and backend E2E"), /env -i/);
+  assert.match(
+    gate.with.source_sha,
+    /github\.event\.pull_request\.head\.sha \|\| github\.sha/,
+  );
+  assert.equal(gate.secrets, undefined);
+  assert.deepEqual(reusable.on.workflow_call.inputs.source_sha, {
+    required: true,
+    type: "string",
+  });
+  assert.deepEqual(reusable.permissions, { contents: "read" });
+  assert.equal(reusable.jobs.check.env.PYTHONDONTWRITEBYTECODE, "1");
+  assert.match(
+    runStep("Run isolated product web and backend E2E"),
+    /PYTHONDONTWRITEBYTECODE=1/,
+  );
+  const cacheFixture = await mkdtemp(join(tmpdir(), "browser-bytecode-"));
+  try {
+    await cp(
+      join(
+        import.meta.dirname,
+        "../../.github/scripts/product-browser-check.py",
+      ),
+      join(cacheFixture, "runner.py"),
+    );
+    const imported = spawnSync(
+      "python3",
+      [
+        "-c",
+        `
+import importlib.util, sys
+sys.pycache_prefix = None
+spec = importlib.util.spec_from_file_location("runner", "runner.py")
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+`,
+      ],
+      {
+        cwd: cacheFixture,
+        env: {
+          ...process.env,
+          PYTHONDONTWRITEBYTECODE:
+            reusable.jobs.check.env.PYTHONDONTWRITEBYTECODE,
+        },
+        encoding: "utf8",
+      },
+    );
+    assert.equal(imported.status, 0, imported.stderr);
+    assert.equal(existsSync(join(cacheFixture, "__pycache__")), false);
+  } finally {
+    await rm(cacheFixture, { recursive: true, force: true });
+  }
+  const steps = reusable.jobs.check.steps as Array<{
+    name?: string;
+    run?: string;
+  }>;
+  assert.ok(
+    steps.findIndex((step) => step.name === "Install frozen dependencies") <
+      steps.findIndex(
+        (step) => step.name === "Run isolated product web and backend E2E",
+      ),
+  );
+  assert.match(
+    steps.find(
+      (step) => step.name === "Run isolated product web and backend E2E",
+    )?.run ?? "",
+    /PRODUCT_BROWSER_REQUIRE_ISOLATION=1/,
+  );
+});
 const template = resolve(
   import.meta.dirname,
   "../create-disposabl-app/dist/templates/default",
@@ -222,7 +389,10 @@ test("packaged starter and generated profiles exclude product proof fixtures", a
         join(root, ".github/workflows/pipeline.yml"),
         "utf8",
       );
-      assert.doesNotMatch(workflow, /android-play|play-bundle\.sh/);
+      assert.doesNotMatch(
+        workflow,
+        /android-play|play-bundle\.sh|product-checks/,
+      );
       const easPath = join(root, "apps/mobile/eas.json");
       if (existsSync(easPath)) {
         const eas = JSON.parse(await readFile(easPath, "utf8"));

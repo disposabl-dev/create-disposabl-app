@@ -25,8 +25,11 @@ if (
 // This release workflow targets Disposabl's package and signing identity.
 const productReleaseFiles = [
   ".github/workflows/play-bundle.yml",
+  ".github/workflows/product-checks.yml",
   ".github/scripts/play-bundle.sh",
   ".github/scripts/play-bundle.test.py",
+  ".github/scripts/product-browser-check.py",
+  ".github/scripts/product-browser-check-test.py",
 ];
 
 // Product-only proof harnesses must not enter generated apps. Keep the same
@@ -278,6 +281,8 @@ if (
 )
   throw new Error("Starter product release boundary changed.");
 delete pipeline.jobs["android-play"];
+delete pipeline.jobs["product-checks"];
+pipeline.jobs.web.needs = "changes";
 pipeline.jobs.web.if = "needs.changes.outputs.changed == 'true'";
 pipeline.jobs.web.steps = pipeline.jobs.web.steps?.filter(
   (step) => step.name !== "Check product release guards",

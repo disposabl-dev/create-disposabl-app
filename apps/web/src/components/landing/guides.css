@@ -328,4 +328,6 @@
 
 .stack-continue {
   margin-top: 32px;
+  max-width: 100%;
+  white-space: normal;
 }
