@@ -172,15 +172,13 @@ test("packaged starter and generated profiles exclude product proof fixtures", a
         mobile,
         `${name}: native module selection`,
       );
-      for (const path of mobile
-        ? [
-            "packages/tests/mobile-storefront-observer.test.ts",
-            "packages/tests/components/mobile-storefront-observer.test.mjs",
-          ]
-        : []) {
+      for (const path of [
+        "packages/tests/mobile-storefront-observer.test.ts",
+        "packages/tests/components/mobile-storefront-observer.test.mjs",
+      ]) {
         assert.equal(
           existsSync(join(destination, path)),
-          features.includes("payments"),
+          mobile && features.includes("payments"),
           `${name}: ${path} must match mobile payments selection`,
         );
       }
