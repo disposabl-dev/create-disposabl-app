@@ -1,41 +1,59 @@
 import ExpoModulesCore
 import StoreKit
 
-public final class StorefrontObserverModule: Module {
+// All mutable state is confined to the main dispatch queue, including teardown.
+// Registration is synchronous. RevenueCat remains the transaction owner.
+private final class StorefrontObservation: NSObject, SKPaymentTransactionObserver {
   private var observers = 0
-  private var task: Task<Void, Never>?
+  private var changed: (() -> Void)?
+
+  func start(changed: @escaping () -> Void) {
+    dispatchPrecondition(condition: .onQueue(.main))
+    self.changed = changed
+    observers += 1
+    if observers == 1 { SKPaymentQueue.default().add(self) }
+  }
+
+  func stop(all: Bool = false) {
+    dispatchPrecondition(condition: .onQueue(.main))
+    guard observers > 0 else { return }
+    observers = all ? 0 : observers - 1
+    if observers == 0 {
+      SKPaymentQueue.default().remove(self)
+      changed = nil
+    }
+  }
+
+  func paymentQueue(_ queue: SKPaymentQueue, updatedTransactions transactions: [SKPaymentTransaction]) {
+    // Required protocol callback. Never finish, acknowledge, or modify purchases.
+  }
+
+  func paymentQueueDidChangeStorefront(_ queue: SKPaymentQueue) {
+    DispatchQueue.main.async { [weak self] in self?.changed?() }
+  }
+}
+
+public final class StorefrontObserverModule: Module {
+  private let observation = StorefrontObservation()
 
   public func definition() -> ModuleDefinition {
     Name("StorefrontObserver")
     Events("onStorefrontChange")
 
     AsyncFunction("start") { () -> Bool in
-      guard #available(iOS 15.0, *) else { return false }
-      if self.observers == 0 {
-        let updates = Storefront.updates
-        self.task = Task { [weak self] in
-          for await _ in updates {
-            guard !Task.isCancelled else { break }
-            self?.sendEvent("onStorefrontChange", [:])
-          }
-        }
+      self.observation.start { [weak self] in
+        self?.sendEvent("onStorefrontChange", [:])
       }
-      self.observers += 1
       return true
     }.runOnQueue(.main)
 
     AsyncFunction("stop") {
-      self.observers = max(0, self.observers - 1)
-      if self.observers == 0 {
-        self.task?.cancel()
-        self.task = nil
-      }
+      self.observation.stop()
     }.runOnQueue(.main)
 
     OnDestroy {
-      self.task?.cancel()
-      self.task = nil
-      self.observers = 0
+      let observation = self.observation
+      DispatchQueue.main.async { observation.stop(all: true) }
     }
   }
 }

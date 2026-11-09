@@ -151,7 +151,13 @@ export function useWebCheckout(
     )
       return false;
     const generation = version.current;
-    const current = () => billingSession.current(customerId, generation);
+    const sequence = lifecycle.current.sequence;
+    const sameSession = () => billingSession.current(customerId, generation);
+    const current = () =>
+      sameSession() &&
+      lifecycle.current.observing &&
+      lifecycle.current.eligible &&
+      lifecycle.current.sequence === sequence;
     setBusy(true);
     setError("");
     try {
@@ -219,7 +225,7 @@ export function useWebCheckout(
       return false;
     } finally {
       billingSession.endTransaction();
-      if (current()) setBusy(false);
+      if (sameSession()) setBusy(false);
     }
   }
   return {

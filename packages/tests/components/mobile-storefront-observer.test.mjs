@@ -10,7 +10,14 @@ let starts = 0,
   failStart = false,
   missing = false,
   pending,
-  startPending;
+  startPending,
+  onStorefrontRead;
+const link = {
+  url: `https://fixture.invalid/billing-login#${"A".repeat(43)}`,
+  userId: "owner",
+};
+const handoff = mock(async () => link);
+const openURL = mock(async () => {});
 const observer = {
   addListener(_event, callback) {
     listeners.add(callback);
@@ -32,26 +39,32 @@ mock.module("expo-constants", () => ({ default: { expoConfig: {} } }));
 mock.module("convex/server", () => ({
   makeFunctionReference: () => "fixture",
 }));
-mock.module("convex/react", () => ({ useMutation: () => async () => ({}) }));
+mock.module("convex/react", () => ({ useMutation: () => handoff }));
 mock.module("react-native", () => ({
   Platform: { OS: "ios" },
-  Linking: {},
+  Linking: { openURL },
   AppState: { addEventListener: () => ({ remove() {} }) },
 }));
 mock.module("../../../packages/disposabl-kit/mobile/billing/session", () => ({
   billingSession: {
     current: () => current,
+    beginTransaction: () => true,
+    endTransaction: () => {},
     run: async (_id, _version, _key, fn) =>
       fn({
         canMakePayments: async () => true,
-        getStorefront: async () =>
-          pending
+        getStorefront: async () => {
+          const value = pending
             ? await pending
             : country === "error"
-              ? Promise.reject(Error("unknown"))
+              ? await Promise.reject(Error("unknown"))
               : country
                 ? { countryCode: country }
-                : null,
+                : null;
+          onStorefrontRead?.();
+          return value;
+        },
+        getCustomerInfo: async () => ({ activeSubscriptions: [] }),
         getOfferings: async () => ({}),
         getAppUserID: async () => "owner",
       }),
@@ -99,6 +112,9 @@ afterEach(async () => {
   missing = false;
   pending = undefined;
   startPending = undefined;
+  onStorefrontRead = undefined;
+  handoff.mockReset().mockImplementation(async () => link);
+  openURL.mockClear();
   listeners.clear();
 });
 test("active storefront changes and unknown/error fail closed", async () => {
@@ -178,4 +194,48 @@ test("missing module and unmount during native start remain closed", async () =>
   await act(async () => finish(true));
   expect(stops).toBe(1);
   expect(listeners.size).toBe(0);
+});
+
+test("an unchanged US storefront opens the validated handoff", async () => {
+  await mount();
+  let opened;
+  await act(async () => {
+    opened = await result.open();
+  });
+  expect(opened).toBe(true);
+  expect(openURL).toHaveBeenCalledWith(link.url);
+  expect(result.busy).toBe(false);
+});
+
+test("a change during the final storefront read cancels the handoff and clears busy", async () => {
+  await mount();
+  handoff.mockImplementationOnce(async () => {
+    onStorefrontRead = () => {
+      onStorefrontRead = undefined;
+      country = "CAN";
+      for (const listener of [...listeners]) listener();
+    };
+    return link;
+  });
+  let opened;
+  await act(async () => {
+    opened = await result.open();
+  });
+  expect(handoff).toHaveBeenCalledTimes(1);
+  expect(opened).toBe(false);
+  expect(openURL).not.toHaveBeenCalled();
+  expect(result.busy).toBe(false);
+  expect(result.available).toBe(false);
+});
+
+test("a queued callback from a removed subscription is ignored", async () => {
+  const { observeStorefront } =
+    await import("../../../packages/disposabl-kit/mobile/billing/storefront-observer");
+  const changed = mock(() => {});
+  const subscription = observeStorefront(changed);
+  await subscription.ready;
+  const queued = [...listeners][0];
+  subscription.remove();
+  queued();
+  expect(changed).not.toHaveBeenCalled();
 });

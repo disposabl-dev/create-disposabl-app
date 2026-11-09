@@ -13,7 +13,10 @@ export function observeStorefront(onChange: () => void) {
   let native: Observer | null = null;
   try {
     native = requireOptionalNativeModule<Observer>("StorefrontObserver");
-    if (native) listener = native.addListener("onStorefrontChange", onChange);
+    if (native)
+      listener = native.addListener("onStorefrontChange", () => {
+        if (!removed) onChange();
+      });
   } catch {
     native = null;
   }
