@@ -238,6 +238,10 @@ try {
   assert.ok(payload.some((x) => x.properties?.action === "open_setup"));
   assert.ok(payload.every((x) => x.properties?.platform === mode));
   assert.ok(
+    payload.every((x) => x.properties?.$geoip_disable === true),
+    "SDK event missing GeoIP opt-out",
+  );
+  assert.ok(
     payload.some(
       (x) =>
         x.event === "$pageview" &&

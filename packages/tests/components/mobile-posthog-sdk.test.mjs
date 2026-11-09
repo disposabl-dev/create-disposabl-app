@@ -1,6 +1,7 @@
 import { expect, mock, test } from "bun:test";
 import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
+import { gunzipSync } from "node:zlib";
 
 const require = createRequire(
   resolve(import.meta.dirname, "../../../apps/mobile/package.json"),
@@ -91,4 +92,47 @@ test("positive control: default push collectors initialize the native plugin", a
   expect(native.setup).toHaveBeenCalledTimes(1);
   await client.optOut();
   await client._nativeChain;
+});
+
+test("actual native SDK sends the GeoIP control through a reconstructing filter", async () => {
+  const payloads = [];
+  let sdkSetGeoip = false;
+  const deniedFetch = globalThis.fetch;
+  globalThis.fetch = async (_url, request) => {
+    const body = request.body;
+    const bytes = Buffer.from(
+      body instanceof Blob ? await body.arrayBuffer() : body,
+    );
+    payloads.push(
+      JSON.parse(
+        bytes[0] === 31 ? gunzipSync(bytes).toString() : bytes.toString(),
+      ),
+    );
+    return new Response("{}", { status: 200 });
+  };
+  const client = new PostHog("fixture", {
+    ...options("fixture-geoip"),
+    disableGeoip: true,
+    flushAt: 1,
+    before_send: (event) => {
+      sdkSetGeoip = event.properties.$geoip_disable === true;
+      return {
+        ...event,
+        properties: { $geoip_disable: true, action: event.properties.action },
+      };
+    },
+  });
+  try {
+    await client.ready();
+    client.capture("product_action", { action: "open_settings" });
+    await client.flush();
+    const events = payloads.flatMap((body) => body.batch ?? []);
+    expect(sdkSetGeoip).toBe(true);
+    expect(events).toHaveLength(1);
+    expect(events[0].properties.$geoip_disable).toBe(true);
+    expect(events[0].properties.action).toBe("open_settings");
+  } finally {
+    await client.optOut();
+    globalThis.fetch = deniedFetch;
+  }
 });
