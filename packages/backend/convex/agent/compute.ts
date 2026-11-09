@@ -10,6 +10,7 @@ import type { MutationCtx, QueryCtx } from "../_generated/server";
 import schema from "../schema";
 import { deletionPending } from "../users/deletion";
 import { computeSessionArgs } from "./computeValidator";
+import { assertNoUnconfirmedRuns, hasUnconfirmedRuns } from "./threads";
 
 export const WINDOW_MS = 600_000;
 
@@ -19,6 +20,7 @@ export async function admitSession(
   userId: string,
   enabled = paymentsEnabled,
 ) {
+  await assertNoUnconfirmedRuns(ctx, userId);
   if (!enabled) return undefined;
   const current = await ctx.db
     .query("computeSessions")
@@ -41,6 +43,22 @@ export async function admitSession(
             : "Your sandbox is stopping. Send a new message after it stops.",
     });
   }
+  if (current) {
+    for (const status of ["processing", "stopping"] as const) {
+      const unfinished = await ctx.db
+        .query("apps")
+        .withIndex("by_computeSessionId_status", (q) =>
+          q
+            .eq("agent.computeSessionId", current._id)
+            .eq("agent.status", status),
+        )
+        .first();
+      if (unfinished)
+        throw new ConvexError(
+          "Previous sandbox work is still stopping. Try again after it finishes.",
+        );
+    }
+  }
   return ctx.db.insert("computeSessions", {
     userId,
     state: "starting",
@@ -55,6 +73,7 @@ export async function sessionAllows(
   now: number,
   enabled = paymentsEnabled,
 ) {
+  if (await hasUnconfirmedRuns(ctx, userId)) return false;
   if (!enabled) return true;
   const session = sessionId
     ? await ctx.db.get("computeSessions", sessionId)
@@ -71,6 +90,12 @@ export const get = internalQuery({
   args: computeSessionArgs,
   returns: v.union(schema.doc("computeSessions"), v.null()),
   handler: (ctx, { sessionId }) => ctx.db.get("computeSessions", sessionId),
+});
+
+export const workBlocked = internalQuery({
+  args: { userId: v.string() },
+  returns: v.boolean(),
+  handler: (ctx, { userId }) => hasUnconfirmedRuns(ctx, userId),
 });
 
 /** The transaction persists the sole dispatch claim BEFORE contacting Autumn. */
@@ -122,7 +147,10 @@ export async function claimWindow(
     session.stopLease
   )
     return null;
-  if (await deletionPending(ctx, session.userId)) {
+  if (
+    (await deletionPending(ctx, session.userId)) ||
+    (await hasUnconfirmedRuns(ctx, session.userId))
+  ) {
     await ctx.db.patch("computeSessions", sessionId, { state: "stopping" });
     await ctx.scheduler.runAfter(0, internal.agent.actions.compute.stop, {
       sessionId,

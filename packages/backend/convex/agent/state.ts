@@ -86,7 +86,10 @@ export const next = internalMutation({
       { messageIds: [messageId] },
     );
     if (!message?.text) throw new Error("Saved user message is missing.");
-    await patchThread(ctx, current, { delivery: messageId });
+    await patchThread(ctx, current, {
+      delivery: messageId,
+      turnCompleted: false,
+    });
     const content = message.message?.content;
     const fileIds = Array.isArray(content)
       ? content.flatMap((part) => {
@@ -121,6 +124,7 @@ export const delivered = internalMutation({
     await patchThread(ctx, current, {
       promptId: args.promptId,
       conversationId: args.conversationId,
+      turnCompleted: false,
       delivery: undefined,
       pending: current.pending.filter((id) => id !== args.messageId),
       updatedAt: Date.now(),
@@ -136,7 +140,7 @@ export const attachConversation = internalMutation({
     const current = await locked(ctx, args);
     await patchThread(ctx, current, {
       conversationId: args.conversationId,
-      delivery: undefined,
+      turnCompleted: false,
     });
     return null;
   },
@@ -245,8 +249,17 @@ export const finish = internalMutation({
     await ctx.scheduler.cancel(current.lease!.watchdog);
     let status = current.status;
     let pending = current.pending;
+    const unresolved = Boolean(
+      args.suspended &&
+      (current.promptId ||
+        (current.conversationId && !current.turnCompleted) ||
+        current.delivery ||
+        current.stopUnconfirmed),
+    );
     const error = args.suspended
-      ? "Sandbox access ended. Add credits if needed, then send a new message after the sandbox stops."
+      ? unresolved
+        ? "Sandbox access ended before the remote run was confirmed stopped. Contact support to reconcile it before starting more work."
+        : "Sandbox access ended. Add credits if needed, then send a new message after the sandbox stops."
       : (args.error ?? current.error);
     if (args.suspended) {
       status = "failed";
@@ -321,12 +334,8 @@ export const finish = internalMutation({
         ? "Boat delivery could not be confirmed. Retry abortMessage to reconcile this app's conversation; other apps were not interrupted."
         : error,
       lease: undefined,
-      delivery:
-        args.stopped || args.suspended
-          ? undefined
-          : args.error || args.unconfirmed || status === "stopping"
-            ? current.delivery
-            : undefined,
+      // Only delivery acknowledgement or a confirmed stop can clear uncertainty.
+      delivery: args.stopped ? undefined : current.delivery,
       stopFailures: args.stopped
         ? undefined
         : args.error
@@ -334,10 +343,12 @@ export const finish = internalMutation({
           : current.stopFailures,
       stopUnconfirmed: args.stopped
         ? undefined
-        : args.unconfirmed || (status === "failed" && args.error)
+        : unresolved || args.unconfirmed || (status === "failed" && args.error)
           ? true
           : current.stopUnconfirmed,
-      ...(args.stopped ? { promptId: undefined } : {}),
+      ...(args.stopped || (args.done && !args.error && !current.delivery)
+        ? { promptId: undefined, turnCompleted: true }
+        : {}),
       updatedAt: Date.now(),
     });
     if (pending.length || status === "processing" || status === "stopping")
