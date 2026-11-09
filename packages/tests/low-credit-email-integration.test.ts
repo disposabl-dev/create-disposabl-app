@@ -264,3 +264,44 @@ test(
     assert.equal((await emails()).length, before + 1);
   },
 );
+
+test(
+  "exhausted failure finalizes once at the paid deadline without reading or queueing",
+  { skip },
+  async () => {
+    const before = (await emails()).length;
+    const paidUntil = Date.now() + 2000;
+    const record = await call("seed", {
+      paidUntil,
+      email: "verified@example.invalid",
+    });
+    await settle(record.debitId, 10);
+    await deliver(record.debitId, 0, "http-error", 5);
+    assert.equal((await debit(record.debitId)).noticeOutcome, undefined);
+    const finalizers = (jobs: any[]) =>
+      jobs.filter(
+        (job: any) =>
+          job.name === "agent/compute.js:notice" &&
+          job.args[0].debitId === record.debitId &&
+          job.args[0].failed === true,
+      );
+    const scheduled = finalizers(await call("scheduled", {}, true));
+    assert.equal(scheduled.length, 1);
+    assert.equal(scheduled[0].scheduledTime, paidUntil);
+    let row;
+    for (let i = 0; i < 100; i++) {
+      row = await debit(record.debitId);
+      if (row.noticeOutcome === "expired") break;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    assert.equal(row.noticeOutcome, "expired");
+    assert.equal(row.responseBalance, 10);
+    assert.equal(row.noticeBalance, undefined);
+    assert.equal((await reads(record.debitId)).length, 1);
+    assert.equal((await emails()).length, before);
+    await call("notify", { debitId: record.debitId, failed: true });
+    assert.equal(finalizers(await call("scheduled", {}, true)).length, 1);
+    assert.equal((await reads(record.debitId)).length, 1);
+    assert.equal((await emails()).length, before);
+  },
+);
