@@ -201,6 +201,110 @@ test("a failed portal releases the guard for checkout", async () => {
   expect(checkout).toHaveBeenCalledTimes(1);
 });
 
+test("a reentrant observer cannot start a second billing action", async () => {
+  let finish;
+  checkout.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  );
+  let portalHandler;
+  let nested = false;
+  const observer = mock(() => {
+    if (nested) return;
+    nested = true;
+    portalHandler();
+  });
+  await mount(observer);
+  portalHandler = button("Manage website billing").props.onClick;
+  await invoke("Choose monthly");
+  expect(checkout).toHaveBeenCalledTimes(1);
+  expect(portal).not.toHaveBeenCalled();
+  expect(observer).toHaveBeenCalledTimes(1);
+  await act(async () => finish({ url: null }));
+});
+
+test.each(["resolve", "reject"])(
+  "obsolete portal %s cannot navigate or release the replacement account's guard",
+  async (outcome) => {
+    let settleOld, rejectOld, finishNew;
+    portal.mockImplementationOnce(
+      () =>
+        new Promise((resolve, reject) => {
+          settleOld = resolve;
+          rejectOld = reject;
+        }),
+    );
+    checkout.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishNew = resolve;
+        }),
+    );
+    const observer = mock(() => {});
+    snapshotValue = { ...snapshotValue, customerId: "synthetic-owner-a" };
+    await mount(observer);
+    await invoke("Manage website billing");
+    token = makeToken("other-user");
+    snapshotValue = { ...snapshotValue, customerId: "synthetic-owner-b" };
+    await act(async () =>
+      renderer.update(
+        createElement(
+          "Root",
+          null,
+          createElement(Pricing, { onAttempt: observer }),
+        ),
+      ),
+    );
+    await invoke("Buy top-up");
+    expect([...values.keys()]).toContain(
+      "billing-attempt:synthetic-owner-b:topup",
+    );
+    expect([...values.keys()]).not.toContain(
+      "billing-attempt:synthetic-owner-a:topup",
+    );
+    await act(async () => {
+      if (outcome === "resolve")
+        settleOld({ url: "https://fixture.invalid/obsolete" });
+      else rejectOld(new Error("obsolete portal failure"));
+    });
+    expect(window.location.assign).not.toHaveBeenCalled();
+    expect(JSON.stringify(renderer.toJSON())).not.toContain(
+      "Unable to open billing settings",
+    );
+    expect(button("Manage website billing").props.disabled).toBe(true);
+    await invoke("Manage website billing");
+    expect(portal).toHaveBeenCalledTimes(1);
+    expect(checkout).toHaveBeenCalledTimes(1);
+    expect(observer).toHaveBeenCalledTimes(2);
+    await act(async () => finishNew({ url: null }));
+  },
+);
+
+test("checkout without a URL releases the guard for another action", async () => {
+  let finish;
+  checkout.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  );
+  const observer = mock(() => {});
+  await mount(observer);
+  await invoke("Choose monthly");
+  await act(async () => finish({ url: null }));
+  expect(button("Manage website billing").props.disabled).toBe(false);
+  await invoke("Manage website billing");
+  expect(checkout).toHaveBeenCalledTimes(1);
+  expect(portal).toHaveBeenCalledTimes(1);
+  expect(observer.mock.calls).toEqual([
+    ["billing_monthly_checkout_attempt"],
+    ["billing_portal_attempt"],
+  ]);
+  expect(window.location.assign).not.toHaveBeenCalled();
+});
+
 test("a replacement identity has its own guard and ignores an obsolete completion", async () => {
   let resolveOld, resolveNew;
   checkout.mockImplementationOnce(
