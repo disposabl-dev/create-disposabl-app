@@ -40,19 +40,19 @@ public final class StorefrontObserverModule: Module {
     Name("StorefrontObserver")
     Events("onStorefrontChange")
 
-    AsyncFunction("start") { () -> Bool in
+    AsyncFunction("start") { [weak self] () -> Bool in
+      guard let self else { return false }
       self.observation.start { [weak self] in
         self?.sendEvent("onStorefrontChange", [:])
       }
       return true
     }.runOnQueue(.main)
 
-    AsyncFunction("stop") {
-      self.observation.stop()
+    AsyncFunction("stop") { [observation] in
+      observation.stop()
     }.runOnQueue(.main)
 
-    OnDestroy {
-      let observation = self.observation
+    OnDestroy { [observation] in
       DispatchQueue.main.async { observation.stop(all: true) }
     }
   }
