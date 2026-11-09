@@ -18,7 +18,7 @@ SPEC.loader.exec_module(runner)
 
 class RunnerTests(unittest.TestCase):
     def test_inherited_sandbox_flag_cannot_skip_exec(self):
-        with patch.dict(os.environ, {'BILLING_FIXTURE_SANDBOXED': '1'}):
+        with patch.object(sys, 'argv', ['run.py']), patch.dict(os.environ, {'BILLING_FIXTURE_SANDBOXED': '1'}):
             with patch.object(runner.os, 'execve', side_effect=RuntimeError('exec intercepted')) as execute:
                 with self.assertRaisesRegex(RuntimeError, 'exec intercepted'):
                     runner.main()
@@ -26,11 +26,23 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual(path, '/usr/bin/sandbox-exec')
         self.assertIn(runner.PROFILE, argv)
         self.assertNotIn('BILLING_FIXTURE_SANDBOXED', env)
-        self.assertIn('guarded_fixture', argv[-2])
+        self.assertIn('guarded_fixture', argv[-3])
+        self.assertEqual(argv[-1], 'handoff')
+
+    def test_only_fixed_modes_are_accepted(self):
+        for mode in ('handoff', 'receipt'):
+            with patch.object(sys, 'argv', ['run.py', mode]), patch.object(runner.os, 'execve', side_effect=RuntimeError('exec intercepted')) as execute:
+                with self.assertRaisesRegex(RuntimeError, 'exec intercepted'):
+                    runner.main()
+                self.assertEqual(execute.call_args.args[1][-1], mode)
+        for args in (['run.py', 'other'], ['run.py', 'receipt', 'extra']):
+            with patch.object(sys, 'argv', args), patch.object(runner.os, 'execve') as execute:
+                with self.assertRaises(SystemExit): runner.main()
+                execute.assert_not_called()
 
     def test_guard_installed_before_preparation_and_restored(self):
         previous = signal.getsignal(signal.SIGTERM)
-        def preparation(_owner):
+        def preparation(_owner, _mode):
             self.assertNotEqual(signal.getsignal(signal.SIGTERM), previous)
             raise ValueError('preparation failed')
         with patch.object(runner, 'run_fixture', preparation):

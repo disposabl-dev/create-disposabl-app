@@ -29,12 +29,15 @@ def load(path, name):
 
 def main():
     # Always enter the OS sandbox. No inherited flag can skip this boundary.
+    if len(sys.argv) > 2 or (len(sys.argv) == 2 and sys.argv[1] not in ('handoff', 'receipt')):
+        raise SystemExit('Usage: run.py [handoff|receipt]')
+    mode = sys.argv[1] if len(sys.argv) == 2 else 'handoff'
     env = {'PATH': os.environ['PATH'], 'HOME': str(Path.home()),
            'CONVEX_LOCAL_BINARY': os.environ.get('CONVEX_LOCAL_BINARY', ''),
            'PLAYWRIGHT_BROWSERS_PATH': os.environ.get('PLAYWRIGHT_BROWSERS_PATH', '')}
-    entry = 'import runpy,sys; runpy.run_path(sys.argv[1])["guarded_fixture"]()'
+    entry = 'import runpy,sys; runpy.run_path(sys.argv[1])["guarded_fixture"](sys.argv[2])'
     os.execve('/usr/bin/sandbox-exec',
-              ['sandbox-exec', '-p', PROFILE, sys.executable, '-c', entry, __file__], env)
+              ['sandbox-exec', '-p', PROFILE, sys.executable, '-c', entry, __file__, mode], env)
 
 
 @contextmanager
@@ -76,13 +79,15 @@ def command(owner, argv, *, cwd=None, env=None, log=None):
         return out.read()
 
 
-def guarded_fixture():
+def guarded_fixture(mode="handoff"):
     owner = load(ROOT / 'packages/tests/helpers/sdk-auth/run.py', 'sdk_runner')
     with disk_guard():
-        run_fixture(owner)
+        run_fixture(owner, mode)
 
 
-def run_fixture(owner):
+def run_fixture(owner, mode):
+    if mode not in ("handoff", "receipt"):
+        raise ValueError("Unknown fixture mode")
     with socket.socket() as probe:
         probe.settimeout(1)
         if probe.connect_ex(('1.1.1.1', 443)) != 1:
@@ -126,7 +131,8 @@ def run_fixture(owner):
                 (scope / package.name).symlink_to(target, target_is_directory=target.is_dir())
         else:
             (modules / dep.name).symlink_to(dep.resolve(), target_is_directory=dep.is_dir())
-    (source / '.billing-handoff-local-fixture').touch()
+    if mode == 'handoff':
+        (source / '.billing-handoff-local-fixture').touch()
     (work / 'home').mkdir()
     shutil.copyfile(source / 'packages/tests/fixtures/account-deletion-convex/local/block-remote.cjs', work / 'block-remote.cjs')
     env = {'HOME': str(work / 'home'), 'PATH': os.environ['PATH'], 'TMPDIR': str(work),
@@ -143,7 +149,8 @@ def run_fixture(owner):
     with ExitStack() as stack:
         def group(argv, cwd, log_name, child_env=env):
             command(owner, argv, cwd=cwd, env=child_env, log=work / log_name)
-        group(['bun', str(source / 'packages/tests/fixtures/billing-handoff-local/prepare.ts'), str(source)], source, 'prepare.log')
+        if mode == 'handoff':
+            group(['bun', str(source / 'packages/tests/fixtures/billing-handoff-local/prepare.ts'), str(source)], source, 'prepare.log')
         log = stack.enter_context((work / 'backend.log').open('w'))
         proc = stack.enter_context(owner.owned_backend([str(binary), '--interface', '127.0.0.1', '--port', '3530',
             '--site-proxy-port', '3531', '--convex-origin', 'http://127.0.0.1:3530', '--convex-site',
@@ -169,11 +176,17 @@ def run_fixture(owner):
             if response.status != 200: raise RuntimeError('Fixture environment configuration failed')
         admin = env | {'CONVEX_SELF_HOSTED_URL': 'http://127.0.0.1:3530', 'CONVEX_SELF_HOSTED_ADMIN_KEY': key}
         group(['node', str(source / 'node_modules/convex/bin/main.js'), 'dev', '--once', '--typecheck', 'disable', '--codegen', 'disable'], source / 'packages/backend', 'sync.log', admin)
-        testenv = env | {'E2E_CONVEX_URL': 'http://127.0.0.1:3530', 'E2E_CONVEX_SITE_URL': 'http://127.0.0.1:3531',
-            'E2E_BILLING_HANDOFF_BROWSER': '1', 'E2E_BILLING_OWNERSHIP_FILE': str(marker)}
-        group(['bun', 'run', 'e2e', 'run', 'billing-handoff-auth.e2e.ts', '--target', 'web', '--retries', '0',
-               '--no-cache', '--output', '.e2e/billing-handoff-auth'], source, 'e2e.log', testenv)
-        print('Browser handoff fixture passed', flush=True)
+        testenv = env | {'E2E_CONVEX_URL': 'http://127.0.0.1:3530', 'E2E_CONVEX_SITE_URL': 'http://127.0.0.1:3531'}
+        if mode == 'handoff':
+            testenv.update({'E2E_BILLING_HANDOFF_BROWSER': '1', 'E2E_BILLING_OWNERSHIP_FILE': str(marker)})
+            flow, output = 'billing-handoff-auth.e2e.ts', '.e2e/billing-handoff-auth'
+        else:
+            testenv.update({'E2E_RECEIPT_CLEANUP': '1', 'E2E_RECEIPT_OWNERSHIP_FILE': str(marker),
+                            'E2E_CONVEX_ADMIN_KEY': key, 'E2E_RECEIPT_ARTIFACT_DIR': str(work / 'receipt')})
+            flow, output = 'account-deletion-receipt.e2e.ts', '.e2e/account-deletion-receipt'
+        group(['bun', 'run', 'e2e', 'run', flow, '--target', 'web', '--retries', '0',
+               '--no-cache', '--output', output], source, 'e2e.log', testenv)
+        print(f'{mode} browser fixture passed', flush=True)
 
 
 if __name__ == '__main__':

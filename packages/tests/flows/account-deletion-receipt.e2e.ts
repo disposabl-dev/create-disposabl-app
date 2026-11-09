@@ -1,9 +1,11 @@
 import { test } from "@e2e-dev/web";
 import { expect } from "e2e";
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { resolve, join } from "node:path";
+import { readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { backendUrl, siteUrl } from "../project";
+import { assertOwnedSdkBackend } from "../helpers/sdk-auth/ownership";
+import { reserveSdkArtifacts } from "../helpers/sdk-auth/artifacts";
 
 test(
   "saved request receipt survives synthetic authentication cleanup",
@@ -14,18 +16,23 @@ test(
       "Explicit isolated receipt qualification only",
     );
     const admin = process.env.E2E_CONVEX_ADMIN_KEY;
-    const artifactDir = process.env.E2E_RECEIPT_ARTIFACT_DIR;
+    const artifactPath = process.env.E2E_RECEIPT_ARTIFACT_DIR;
     if (
-      backendUrl() !== "http://127.0.0.1:3540" ||
-      siteUrl() !== "http://127.0.0.1:3541" ||
+      backendUrl() !== "http://127.0.0.1:3530" ||
+      siteUrl() !== "http://127.0.0.1:3531" ||
       process.env.E2E_TELEMETRY_DISABLED !== "1" ||
       !admin ||
-      !artifactDir ||
-      !resolve(artifactDir).startsWith("/tmp/disposabl-receipt-e2e-")
+      !artifactPath
     )
       throw new Error(
         "Receipt cleanup requires the dedicated loopback fixture and artifact directory.",
       );
+    assertOwnedSdkBackend({
+      markerVariable: "E2E_RECEIPT_OWNERSHIP_FILE",
+      ports: [3530, 3531],
+      claimDirectory: ".receipt-claimed",
+    });
+    const artifactDir = reserveSdkArtifacts(artifactPath);
     const call = async (
       path: string,
       args: object,
@@ -131,7 +138,6 @@ test(
     expect(text).toContain("Support: vivek@yast.ai");
     expect(text).toContain("Status: requested");
     expect(text).toContain("Deletion is not confirmed.");
-    await mkdir(artifactDir, { recursive: true });
     const saved = join(artifactDir, "request-receipt.txt");
     await writeFile(saved, text);
     await app.screenshot("receipt-before-auth-cleanup");
