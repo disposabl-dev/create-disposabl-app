@@ -526,3 +526,38 @@ export const deletionFinish = internalMutationGeneric({
       outcome: "archived_observed",
     }),
 });
+
+// Model an older lease write that did not update the derived busy flag.
+export const activationSeedWorker = internalMutationGeneric({
+  args: { appId: v.string(), userId: v.string(), sessionId: v.id("computeSessions"), token: v.string(), expire: v.boolean() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const app = await ctx.db.query("apps").withIndex("by_appId", (q: any) => q.eq("appId", args.appId)).unique();
+    if (!app?.agent || app.userId !== args.userId) throw Error("fixture ownership");
+    const watchdog = await ctx.scheduler.runAfter(3600000, anyApi.agentFixture.noop, {});
+    await ctx.db.patch(app._id, { agentResumeBusy: false, agentRemoteUnresolved: false, agent: { ...app.agent, computeSessionId: args.sessionId, lease: { token: args.token, watchdog, expiresAt: Date.now() + (args.expire ? -1 : 60000) } } });
+    return null;
+  },
+});
+
+import { claim as workerClaim } from "../../../../backend/convex/agent/state";
+export const paidWorkerClaim = internalMutationGeneric({
+  args: { id: v.string(), token: v.string(), activationProtocol: v.optional(v.literal(1)) },
+  returns: v.any(),
+  handler: async (ctx, args) => {
+    const scheduled: string[] = [];
+    const result = await (workerClaim as any)._handler({
+      ...ctx,
+      scheduler: {
+        ...ctx.scheduler,
+        runAfter: async (_delay: number, ref: any) => {
+          const name = getFunctionName(ref);
+          if (name !== "agent/actions/run:tick") throw Error("unexpected claim schedule");
+          scheduled.push(name);
+          return ctx.scheduler.runAfter(3600000, anyApi.agentFixture.noop, {});
+        },
+      },
+    }, args);
+    return { result, scheduled };
+  },
+});
