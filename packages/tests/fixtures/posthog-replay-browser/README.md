@@ -25,9 +25,10 @@ For the current product adapter and the SDK stop diagnostic, run each command be
 
 ```sh
 bun packages/tests/fixtures/posthog-replay-browser/adapter-lifecycle.mjs
+bun packages/tests/fixtures/posthog-replay-browser/adapter-lifecycle.mjs desktop
 bun packages/tests/fixtures/posthog-replay-browser/sdk-stop.mjs
 ```
 
-`adapter-lifecycle.mjs` bundles the actual product adapter and installed PostHog SDK. Bootstrap and ingestion are intercepted; it checks account changes, rapid routes, opt-out, re-enablement and expiry while replay remains disabled. Chromium's automation indicators are overridden inside this fixture because the SDK otherwise discards automation traffic. The real adapter makes no remote-configuration request in this mode, so this test does not claim a hostile remote configuration was applied.
+`adapter-lifecycle.mjs` bundles the actual product adapter and installed PostHog SDK. The desktop mode supplies the exact authenticated preload bridge shape; the default mode supplies no bridge. Bootstrap and ingestion are intercepted; it checks source, canonical views, duplicate view calls, account changes, rapid routes, opt-out, re-enablement and expiry while replay remains disabled. It does not run Electron or prove website-level mounting. Chromium's automation indicators are overridden inside this fixture because the SDK otherwise discards automation traffic. The real adapter makes no remote-configuration request in this mode, so this test does not claim a hostile remote configuration was applied.
 
 `sdk-stop.mjs` separately starts the installed recorder with intercepted hostile remote configuration. It checks the observable console and network suppression and tests the public stop call. The SDK can flush buffered events on stop; its internal discard method is not used. The structural mutation in this diagnostic is not guaranteed to reach the recorder before stop, and the result reports whether it was seen. The commands use the current installed dependencies and cached browser rather than a separately verified frozen dependency snapshot. Neither test enables replay in the product or proves its recording lifecycle safe.

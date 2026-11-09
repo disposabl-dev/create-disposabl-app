@@ -5,6 +5,8 @@ import { gunzipSync } from "node:zlib";
 
 const executablePath = process.env.REPLAY_CHROMIUM;
 if (!executablePath) throw new Error("Set REPLAY_CHROMIUM");
+const mode = process.argv[2] ?? "web";
+assert.ok(mode === "web" || mode === "desktop", "invalid fixture mode");
 const bundle = await Bun.build({
   entrypoints: [
     resolve("packages/tests/fixtures/posthog-replay-browser/adapter-entry.ts"),
@@ -110,6 +112,10 @@ try {
     return route.abort();
   });
   await page.goto("https://fixture.invalid/");
+  if (mode === "desktop")
+    await page.evaluate(() => {
+      window.disposablDesktop = { authentication: true };
+    });
   await page.addScriptTag({ content: await bundle.outputs[0].text() });
   await page.evaluate(() => {
     window.fixtureAllowed = true;
@@ -130,11 +136,26 @@ try {
       },
       page: () => location.pathname,
       allowed: () => window.fixtureAllowed,
-      source: "web",
+      source: window.productTelemetrySource(),
     });
     window.adapter.update({ enabled: true, token: null });
   });
   await page.waitForTimeout(500);
+  const firstView = requests.length;
+  assert.equal(firstView, 1, "initial view must capture once");
+  await page.evaluate(() => {
+    window.adapter.page();
+    window.adapter.page();
+  });
+  await page.waitForTimeout(200);
+  assert.equal(requests.length, firstView, "duplicate view captured");
+  await page.evaluate(() => {
+    history.pushState({}, "", "/dashboard/connections?SECRET_QUERY_91");
+    window.adapter.page();
+    window.adapter.page();
+  });
+  await page.waitForTimeout(200);
+  assert.equal(requests.length, firstView + 1, "navigation must capture once");
   async function state(id) {
     await page.evaluate((id) => {
       const token = id
@@ -215,6 +236,15 @@ try {
   assert.ok(payload.some((x) => x.properties?.distinct_id === "anonymous"));
   assert.ok(payload.some((x) => x.properties?.action === "copy_setup"));
   assert.ok(payload.some((x) => x.properties?.action === "open_setup"));
+  assert.ok(payload.every((x) => x.properties?.platform === mode));
+  assert.ok(
+    payload.some(
+      (x) =>
+        x.event === "$pageview" &&
+        x.properties?.$current_url ===
+          "https://www.disposabl.dev/dashboard/connections",
+    ),
+  );
   assert.ok(
     requests.every(
       (x) => !x.path.includes("/s/") && !x.path.includes("/config"),
@@ -238,6 +268,7 @@ try {
   console.log(
     JSON.stringify({
       bootstrapCount,
+      platform: mode,
       capturedEvents: payload.length,
       accounts: ["anonymous", "account-a", "account-b"],
       recordingRequests: 0,
