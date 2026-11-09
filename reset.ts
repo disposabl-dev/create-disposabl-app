@@ -27,6 +27,8 @@ if (
 const productProofTests = [
   "packages/tests/ui-telemetry-policy.test.ts",
   "packages/tests/components/ui-telemetry-mobile.test.mjs",
+  "packages/tests/components/mobile-posthog-sdk.test.mjs",
+  "packages/tests/mobile-posthog-sdk.test.ts",
   "packages/tests/components/ui-telemetry-web.test.mjs",
   "apps/web/src/telemetry.tsx",
   "apps/web/src/telemetry-policy.ts",
@@ -469,6 +471,9 @@ for (const name of [
 ])
   delete mobile.dependencies[name];
 const mobileConfig = await json("apps/mobile/app.json");
+delete mobileConfig.expo.ios.infoPlist?.[
+  "com.posthog.posthog.CAPTURE_PUSH_NOTIFICATION_OPENED"
+];
 // Store listing identities belong to Disposabl, not newly generated apps.
 delete mobileConfig.expo.ios.bundleIdentifier;
 delete mobileConfig.expo.android.package;
