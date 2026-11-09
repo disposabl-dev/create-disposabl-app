@@ -40,6 +40,10 @@ mock.module(paths("boat.ts"), () => ({
       if (state.changeAt === "resume") state.change();
       return { sandboxId: "synthetic", state: "ready" };
     },
+    stop: async () => {
+      state.calls.stop++;
+      return { sandboxId: "synthetic", state: "ready" };
+    },
     prompt: async () => {
       state.calls.prompt++;
       return { promptId: "prompt", conversationId: "conversation" };
@@ -89,6 +93,8 @@ mock.module(paths("attachments.ts"), () => ({
 }));
 const { tick } = await import(paths("actions/run.ts"));
 const { finish } = await import(paths("state.ts"));
+const { settle, stopping, stopped } = await import(paths("compute.ts"));
+const { stop } = await import(paths("actions/compute.ts"));
 
 function make({
   sessionState = "active",
@@ -102,7 +108,20 @@ function make({
   stopRequests = false,
 } = {}) {
   state = {
-    session: { userId: "owner", state: sessionState, paidUntil },
+    session: {
+      _id: "session",
+      userId: "owner",
+      state: sessionState,
+      paidUntil,
+      debitId: "debit",
+    },
+    debit: {
+      _id: "debit",
+      _creationTime: Date.now(),
+      sessionId: "session",
+      state: "dispatching",
+      paidUntil: 0,
+    },
     pending,
     sandbox,
     archived,
@@ -129,6 +148,7 @@ function make({
       prompt: 0,
       promptStatus: 0,
       request: 0,
+      stop: 0,
       authorize: 0,
       debit: 0,
       network: 0,
@@ -142,20 +162,39 @@ function make({
   };
   const ctx = {
     db: {
+      get: async (table, id) =>
+        table === "computeSessions" && id === "session"
+          ? state.session
+          : table === "computeDebits" && id === "debit"
+            ? state.debit
+            : null,
       query: (table) => {
         const chain = {
           withIndex: () => chain,
           unique: async () => (table === "apps" ? state.app : null),
+          order: () => chain,
+          first: async () =>
+            table === "computeSessions" ? state.session : null,
           take: async () => [],
         };
         return chain;
       },
-      patch: async (_table, _id, patch) => Object.assign(state.app, patch),
+      patch: async (table, _id, patch) =>
+        Object.assign(
+          table === "computeSessions"
+            ? state.session
+            : table === "computeDebits"
+              ? state.debit
+              : state.app,
+          patch,
+        ),
     },
     scheduler: {
       cancel: async () => {},
       runAfter: async (delay, ref, args) =>
         state.scheduled.push({ delay, name: getFunctionName(ref), args }),
+      runAt: async (when, ref, args) =>
+        state.scheduled.push({ when, name: getFunctionName(ref), args }),
     },
     runQuery: async (ref) => {
       let name;
@@ -198,10 +237,18 @@ function make({
         state.finishes.push(args);
         return finish._handler(ctx, args);
       }
+      if (name === "agent/compute:stopping")
+        return stopping._handler(ctx, args);
+      if (name === "agent/compute:stopped") return stopped._handler(ctx, args);
       throw new Error(`unexpected mutation ${name}`);
     },
   };
-  return { run: () => tick._handler(ctx, { id: "thread" }), state };
+  return {
+    run: () => tick._handler(ctx, { id: "thread" }),
+    settle: (args) => settle._handler(ctx, args),
+    stop: () => stop._handler(ctx, { sessionId: "session" }),
+    state,
+  };
 }
 function verifyNoExternal(s) {
   expect(s.calls.network).toBe(0);
@@ -228,6 +275,59 @@ test("blocked, expired, held and deletion-pending work cannot create, resume or 
       expect(f.state.finishes).toHaveLength(1);
       verifyNoExternal(f.state);
     }
+  }
+});
+
+test("denied and uncertain renewal preserve sandbox stop without claiming it succeeded", async () => {
+  for (const outcome of ["denied", "unknown"]) {
+    const f = make({
+      sessionState: "renewing",
+      paidUntil: Date.now() - 1,
+      status: "stopping",
+      stopRequests: true,
+    });
+    await f.run();
+    expect(f.state.app.agent.status).toBe("stopping");
+    expect(f.state.app.agent.delivery).toBe("uncertain-delivery");
+    await f.settle({ debitId: "debit", outcome });
+    expect(f.state.session.state).toBe(
+      outcome === "denied" ? "stopping" : "hold",
+    );
+    expect(
+      f.state.scheduled.some(
+        (job) =>
+          job.name === "agent/actions/compute:stop" &&
+          job.args.sessionId === "session",
+      ),
+    ).toBe(true);
+    await f.run();
+    expect(f.state.finishes.at(-1).suspended).toBe(true);
+    expect(f.state.finishes.some((args) => args.stopped)).toBe(false);
+    await f.stop();
+    expect(f.state.calls.stop).toBe(1);
+    expect(f.state.session.stopConfirmed).toBeUndefined();
+    expect(f.state.session.state).toBe(
+      outcome === "denied" ? "stopping" : "hold",
+    );
+    expect(
+      f.state.scheduled.filter(
+        (job) => job.name === "agent/actions/compute:stop",
+      ).length,
+    ).toBeGreaterThan(1);
+    if (outcome === "unknown") {
+      await f.settle({
+        debitId: "debit",
+        outcome: "confirmed",
+        responseBalance: 4,
+      });
+      expect(f.state.debit.lateConfirmation.responseBalance).toBe(4);
+      expect(f.state.session.state).toBe("hold");
+      expect(f.state.session.stopConfirmed).toBeUndefined();
+    }
+    expect(f.state.calls.prompt).toBe(0);
+    expect(f.state.calls.network).toBe(0);
+    expect(f.state.calls.debit).toBe(0);
+    expect(f.state.remotePaths).toEqual([]);
   }
 });
 
