@@ -1,6 +1,18 @@
 import { afterEach, expect, mock, test } from "bun:test";
 import { createElement } from "react";
 import { act, create } from "react-test-renderer";
+import { createRequire } from "node:module";
+
+const require = createRequire(import.meta.url);
+test("iOS disables the native push-open hook before JavaScript starts", () => {
+  const configure = require("../../../apps/mobile/app.config.js");
+  const { expo } = require("../../../apps/mobile/app.json");
+  expect(
+    configure({ config: expo }).ios.infoPlist[
+      "com.posthog.posthog.CAPTURE_PUSH_NOTIFICATION_OPENED"
+    ],
+  ).toBe(false);
+});
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 globalThis.__DEV__ = false;
@@ -8,6 +20,7 @@ process.env.EXPO_PUBLIC_CONVEX_SITE_URL = "http://127.0.0.1:9999";
 process.env.EXPO_PUBLIC_DISPOSABL_ANALYTICS_ENABLED = "true";
 process.env.EXPO_PUBLIC_E2E = "true";
 const events = [];
+const instances = [];
 let initialized = 0;
 let saved = null;
 let finishRead;
@@ -45,6 +58,7 @@ mock.module("posthog-react-native", () => ({
     constructor(_key, options) {
       initialized++;
       this.options = options;
+      instances.push(this);
     }
     screen() {
       const result = this.options.before_send({
@@ -58,10 +72,13 @@ mock.module("posthog-react-native", () => ({
       if (result) events.push(result);
     }
     optOut() {
+      this.optedOut = true;
       stops();
       return Promise.resolve();
     }
-    reset() {}
+    reset() {
+      this.optedOut = false;
+    }
   },
 }));
 mock.module(
@@ -150,6 +167,8 @@ test("production waits for bootstrap, sanitizes screen and stops on local opt-ou
     );
   });
   expect(initialized).toBe(1);
+  expect(instances[0].options.capturePushNotificationSubscriptions).toBe(false);
+  expect(instances[0].options.capturePushNotificationOpened).toBe(false);
   expect(requests).toHaveBeenCalledTimes(1);
   expect(events[0].properties).toEqual({
     token: "test",
@@ -206,6 +225,7 @@ test("production waits for bootstrap, sanitizes screen and stops on local opt-ou
   });
   expect(saved).toBe("1");
   expect(stops).toHaveBeenCalled();
+  expect(instances.every((instance) => instance.optedOut)).toBe(true);
   captureProductAction("agent_send_attempt");
   captureProductAction("agent_stop_attempt");
   expect(events).toHaveLength(7);
@@ -232,6 +252,10 @@ test("a validated same-session token refresh resumes actions without recreating 
     await Promise.resolve();
   });
   const count = initialized;
+  expect(instances.slice(0, -1).every((instance) => instance.optedOut)).toBe(
+    true,
+  );
+  expect(instances.at(-1).optedOut).not.toBe(true);
   const before = events.length;
   captureProductAction("open_app");
   expect(events).toHaveLength(before + 1);

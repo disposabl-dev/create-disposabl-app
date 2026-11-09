@@ -9,7 +9,10 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "bundleIdentifier": "dev.disposabl.mobile",
-      "icon": "./assets/images/icon.png"
+      "icon": "./assets/images/icon.png",
+      "infoPlist": {
+        "com.posthog.posthog.CAPTURE_PUSH_NOTIFICATION_OPENED": false
+      }
     },
     "android": {
       "package": "com.yastai.disposabl",

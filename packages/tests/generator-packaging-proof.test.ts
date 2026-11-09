@@ -21,6 +21,8 @@ import {
 const excluded = [
   "packages/tests/ui-telemetry-policy.test.ts",
   "packages/tests/components/ui-telemetry-mobile.test.mjs",
+  "packages/tests/components/mobile-posthog-sdk.test.mjs",
+  "packages/tests/mobile-posthog-sdk.test.ts",
   "packages/tests/components/ui-telemetry-web.test.mjs",
   "apps/web/src/telemetry.tsx",
   "apps/web/src/telemetry-policy.ts",
@@ -228,6 +230,12 @@ test("packaged starter and generated profiles exclude product proof fixtures", a
           assert.match(source, /EXPO_PUBLIC_REVENUECAT_OFFERING_ID/);
         const mobileConfig = JSON.parse(
           await readFile(mobileConfigPath, "utf8"),
+        );
+        assert.equal(
+          mobileConfig.expo.ios?.infoPlist?.[
+            "com.posthog.posthog.CAPTURE_PUSH_NOTIFICATION_OPENED"
+          ],
+          undefined,
         );
         assert.equal(mobileConfig.expo.ios.bundleIdentifier, undefined);
         assert.equal(mobileConfig.expo.android.package, undefined);
