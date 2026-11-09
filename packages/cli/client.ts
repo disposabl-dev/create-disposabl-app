@@ -82,6 +82,10 @@ export function createProgram(
   const program = new Command()
     .name(Object.keys(manifest.bin)[0])
     .version(manifest.version);
+  program.addHelpText(
+    "after",
+    "\nAPI commands are loaded from the configured service. Use <command> --help for their options.\n",
+  );
   if (centralAnalytics)
     program.addHelpText(
       "after",
@@ -362,7 +366,8 @@ export async function runApiCli(argv: string[], serviceOrigin: string) {
       }
     }
   }
-  await program.parseAsync(argv);
+  if (argv.length <= 2) program.outputHelp();
+  else await program.parseAsync(argv);
 }
 
 /** Offline auth/version help remains usable even when the API is unavailable. */
@@ -376,6 +381,7 @@ export function needsContract(
   const command = operands[0] === "help" ? operands[1] : operands[0];
   return (
     Boolean(origin) &&
+    command !== undefined &&
     !args.some((arg) => arg === "--version" || arg === "-V") &&
     command !== "login" &&
     command !== "logout"
