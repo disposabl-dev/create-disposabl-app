@@ -19,7 +19,7 @@ def authenticated(token):
 def google_user():
     sub, state, code = (uuid.uuid4().hex for _ in range(3))
     call("googleStart", {"state": state})
-    call("googleMint", {"state": state, "code": code, "sub": sub, "legacy": False})
+    call("googleMint", {"state": state, "code": code, "sub": sub})
     login = call("completeSignInWithGoogle", {"state": state, "code": code})
     assert login["status"] == "complete"
     return sub, call("googleLookup", {"sub": sub}), login["tokens"]["accessToken"]

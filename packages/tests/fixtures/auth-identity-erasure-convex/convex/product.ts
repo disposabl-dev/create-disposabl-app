@@ -175,7 +175,6 @@ export const googleMint = mutation({
     state: v.string(),
     code: v.string(),
     sub: v.string(),
-    legacy: v.boolean(),
   },
   handler: async (ctx, a) =>
     ctx.runMutation(c.authGoogle.provider.fixtureMint, {
@@ -185,7 +184,6 @@ export const googleMint = mutation({
         a.code,
         JSON.stringify({ claims: { sub: a.sub } }),
       ),
-      legacy: a.legacy,
     }),
 });
 export const cutoff = mutation({

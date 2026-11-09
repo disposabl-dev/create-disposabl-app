@@ -16,8 +16,8 @@ def start():
     state, code = uuid.uuid4().hex, uuid.uuid4().hex
     call("googleStart", {"state": state})
     return state, code
-def mint(ticket, sub, legacy=False):
-    call("googleMint", {"state": ticket[0], "code": ticket[1], "sub": sub, "legacy": legacy})
+def mint(ticket, sub):
+    call("googleMint", {"state": ticket[0], "code": ticket[1], "sub": sub})
 def redeem(ticket):
     return call("completeSignInWithGoogle", {"state": ticket[0], "code": ticket[1]})
 def denied(fn, message):
@@ -31,7 +31,7 @@ def denied(fn, message):
 sub = "synthetic-" + uuid.uuid4().hex
 initial = start(); mint(initial, sub); assert redeem(initial)["status"] == "complete"
 user = call("googleLookup", {"sub": sub}); assert user
-old = start(); legacy = start(); raced = start(); mint(raced, sub)
+old = start(); raced = start(); mint(raced, sub)
 with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
     fence = pool.submit(call, "beginBoth", {"userId": user})
     race = pool.submit(redeem, raced)
@@ -41,9 +41,10 @@ with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
         assert call("googleLookup", {"sub": sub}) == user
     except RuntimeError as error:
         assert "Authorization predates" in str(error), str(error)
-mint(old, sub); mint(legacy, sub, legacy=True)
+mint(old, sub)
 denied(lambda: redeem(old), "Authorization predates")
-denied(lambda: redeem(legacy), "Authorization predates")
+# A retry of the denied ticket must not create a session either.
+denied(lambda: redeem(old), "Authorization predates")
 time.sleep(0.03)
 fresh = start(); mint(fresh, sub)
 denied(lambda: redeem(fresh), "explicit re-registration")
@@ -59,4 +60,4 @@ denied(lambda: call("directGoogleSignup", {"userId": "new-" + uuid.uuid4().hex, 
 other = "synthetic-" + uuid.uuid4().hex
 other_ticket = start(); mint(other_ticket, other); assert redeem(other_ticket)["status"] == "complete"
 assert call("recordFutureReceipt", {"userId": "synthetic-" + uuid.uuid4().hex})["receiptRecorded"]
-print("Real Convex identity cutoff, redemption race, delayed and legacy tickets, fresh denial, isolation, and atomic cleanup receipt passed")
+print("Real Convex identity cutoff, redemption race, delayed tickets, fresh denial, isolation, and atomic cleanup receipt passed")

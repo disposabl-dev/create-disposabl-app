@@ -5,10 +5,37 @@ export const fixtureBridge = mutation({
   args: { stateHash: fixtureV.string(), ticketCodeHash: fixtureV.string() },
   returns: fixtureV.union(fixtureV.null(), fixtureV.number()),
   handler: async (ctx, args) => {
-    const claimed = await fixtureHelpers.claimAuthorizationRequest<Doc<"authorizationRequests">>(ctx, args.stateHash);
+    const claimed = await fixtureHelpers.claimAuthorizationRequest<
+      Doc<"authorizationRequests">
+    >(ctx, args.stateHash);
     if (!claimed || claimed.expired) return null;
-    await fixtureHelpers.insertTicket<Doc<"tickets">>(ctx, { stateHash: args.stateHash, ticketCodeHash: args.ticketCodeHash, encryptedPayload: "fixture", ...(claimed.doc.authorizationStartedAt === undefined ? {} : { authorizationStartedAt: claimed.doc.authorizationStartedAt }) });
-    return claimed.doc.authorizationStartedAt ?? null;
+    await fixtureHelpers.insertTicket<Doc<"tickets">>(ctx, {
+      stateHash: args.stateHash,
+      ticketCodeHash: args.ticketCodeHash,
+      encryptedPayload: "fixture",
+      authorizationStartedAt: claimed.doc.authorizationStartedAt,
+    });
+    return claimed.doc.authorizationStartedAt;
   },
 });
-export const fixtureMint = mutation({args:{stateHash:fixtureV.string(),ticketCodeHash:fixtureV.string(),encryptedPayload:fixtureV.string(),legacy:fixtureV.boolean()},returns:fixtureV.null(),handler:async(ctx,args)=>{const r=await fixtureHelpers.claimAuthorizationRequest<Doc<"authorizationRequests">>(ctx,args.stateHash);if(!r||r.expired)throw new Error("missing authorization"); await fixtureHelpers.insertTicket<Doc<"tickets">>(ctx,{stateHash:args.stateHash,ticketCodeHash:args.ticketCodeHash,encryptedPayload:args.encryptedPayload,...(!args.legacy && r.doc.authorizationStartedAt!==undefined?{authorizationStartedAt:r.doc.authorizationStartedAt}:{})});return null;}});
+export const fixtureMint = mutation({
+  args: {
+    stateHash: fixtureV.string(),
+    ticketCodeHash: fixtureV.string(),
+    encryptedPayload: fixtureV.string(),
+  },
+  returns: fixtureV.null(),
+  handler: async (ctx, args) => {
+    const r = await fixtureHelpers.claimAuthorizationRequest<
+      Doc<"authorizationRequests">
+    >(ctx, args.stateHash);
+    if (!r || r.expired) throw new Error("missing authorization");
+    await fixtureHelpers.insertTicket<Doc<"tickets">>(ctx, {
+      stateHash: args.stateHash,
+      ticketCodeHash: args.ticketCodeHash,
+      encryptedPayload: args.encryptedPayload,
+      authorizationStartedAt: r.doc.authorizationStartedAt,
+    });
+    return null;
+  },
+});

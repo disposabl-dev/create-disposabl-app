@@ -24,7 +24,7 @@ def authenticated(token):
 def google_user():
     sub, state, code = (uuid.uuid4().hex for _ in range(3))
     call("googleStart", {"state": state})
-    call("googleMint", {"state": state, "code": code, "sub": sub, "legacy": False})
+    call("googleMint", {"state": state, "code": code, "sub": sub})
     login = call("completeSignInWithGoogle", {"state": state, "code": code})
     assert login["status"] == "complete"
     return sub, call("googleLookup", {"sub": sub}), login["tokens"]["accessToken"]
@@ -79,7 +79,7 @@ assert call("productAuthCleanup", args) == result == call("productAuthProgress",
 assert call("cutoff", {"sub": sub}) is not None
 state, code = uuid.uuid4().hex, uuid.uuid4().hex
 call("googleStart", {"state": state})
-call("googleMint", {"state": state, "code": code, "sub": sub, "legacy": False})
+call("googleMint", {"state": state, "code": code, "sub": sub})
 denied(lambda: call("completeSignInWithGoogle", {"state": state, "code": code}), "re-registration")
 assert call("googleLookup", {"sub": other_sub}) == other
 print("PASS: product atomic auth fence, concurrent batches, stale request, cutoff and unaffected owner")

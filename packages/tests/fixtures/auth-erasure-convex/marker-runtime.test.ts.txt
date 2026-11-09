@@ -60,9 +60,7 @@ test("server-owned authorization start survives delayed callback and fresh flow"
         stateHash: state,
         ticketCodeHash: `ticket-${state}`,
         encryptedPayload: "fixture",
-        ...(r.doc.authorizationStartedAt === undefined
-          ? {}
-          : { authorizationStartedAt: r.doc.authorizationStartedAt }),
+        authorizationStartedAt: r.doc.authorizationStartedAt,
       } as any);
     }
     await begin("old");
@@ -87,24 +85,75 @@ test("server-owned authorization start survives delayed callback and fresh flow"
         })
       )?.authorizationStartedAt,
     ).toBe(2000);
-    await insertTicket(ctx, {
-      stateHash: "legacy",
-      ticketCodeHash: "legacy",
+    for (const marker of [undefined, "invalid", Number.NaN]) {
+      await expect(
+        insertTicket(ctx, {
+          stateHash: "malformed",
+          ticketCodeHash: "malformed",
+          encryptedPayload: "fixture",
+          authorizationStartedAt: marker,
+        } as any),
+      ).rejects.toThrow("OAuth authorization start is missing");
+    }
+    await ctx.db.insert("authorizationRequests", {
+      stateHash: "bad-request",
+      redirectTo: "https://fixture.test",
+      callbackUrl: "https://fixture.test/oauth/callback",
+      codeVerifier: "verifier",
+      expiresAt: now + 1000,
+    });
+    await expect(claimAuthorizationRequest(ctx, "bad-request")).rejects.toThrow(
+      "OAuth authorization start is missing",
+    );
+    await ctx.db.insert("tickets", {
+      stateHash: "bad-state",
+      ticketCodeHash: "bad-ticket",
       encryptedPayload: "fixture",
-    } as any);
-    expect(
-      (
-        await claimTicket(ctx, {
-          stateHash: "legacy",
-          ticketCodeHash: "legacy",
-        })
-      )?.authorizationStartedAt,
-    ).toBeUndefined();
+      expiresAt: now + 1000,
+    });
+    await expect(
+      claimTicket(ctx, {
+        stateHash: "bad-state",
+        ticketCodeHash: "bad-ticket",
+      }),
+    ).rejects.toThrow("OAuth authorization start is missing");
   } finally {
     Date.now = oldDate;
     if (oldSite === undefined) delete process.env.CONVEX_SITE_URL;
     else process.env.CONVEX_SITE_URL = oldSite;
   }
+});
+
+test("a malformed callback request cannot exchange or mint a ticket", async () => {
+  const { runCallback } = await import("./package/src/lib/oauth/callback.ts");
+  let minted = false;
+  const response = await runCallback({
+    path: "/oauth/google/callback",
+    params: {
+      state: "fixture-state",
+      code: "fixture-code",
+      error: null,
+      errorDescription: null,
+    },
+    claim: async () =>
+      ({
+        expired: false,
+        stateHash: "server-state-hash",
+        redirectTo: "https://fixture.test/return",
+        callbackUrl: "https://fixture.convex.site/oauth/google/callback",
+        codeVerifier: "server-verifier",
+      }) as any,
+    mintTicket: async () => {
+      minted = true;
+      return null;
+    },
+    exchangeConfig: () => {
+      throw new Error("must not exchange");
+    },
+    redirectStatus: 302,
+  });
+  expect(response.status).toBe(400);
+  expect(minted).toBe(false);
 });
 
 test("callback carries server request marker through inert exchange", async () => {
@@ -122,7 +171,7 @@ test("callback carries server request marker through inert exchange", async () =
     return Response.json({ id: "synthetic" });
   };
   try {
-    for (const startedAt of [1000, 2000, undefined]) {
+    for (const startedAt of [1000, 2000]) {
       let minted: any;
       const response = await runCallback({
         path: "/oauth/google/callback",
@@ -138,9 +187,7 @@ test("callback carries server request marker through inert exchange", async () =
           redirectTo: "https://fixture.test/return",
           callbackUrl: "https://fixture.convex.site/oauth/google/callback",
           codeVerifier: "server-verifier",
-          ...(startedAt === undefined
-            ? {}
-            : { authorizationStartedAt: startedAt }),
+          authorizationStartedAt: startedAt,
         }),
         mintTicket: async (_request, ticket) => {
           minted = ticket;
@@ -159,19 +206,20 @@ test("callback carries server request marker through inert exchange", async () =
       expect(minted.authorizationStartedAt).toBe(startedAt);
       expect(verifier).toBe("server-verifier");
     }
-    expect(calls).toBe(6);
+    expect(calls).toBe(4);
   } finally {
     globalThis.fetch = previous;
   }
 });
 
-test("Google authorization creation validator does not accept a client marker", async () => {
-  const { createAuthorizationRequest } =
-    await import("./package/src/components/google/provider.ts");
-  const args = JSON.parse((createAuthorizationRequest as any).exportArgs());
-  expect(Object.keys(args.value).sort()).toEqual([
-    "codeVerifier",
-    "redirectTo",
-    "stateHash",
-  ]);
+test("OAuth authorization creation validators do not accept a client marker", async () => {
+  for (const provider of ["google", "github", "apple", "oauth"]) {
+    const { createAuthorizationRequest } = await import(
+      `./package/src/components/${provider}/provider.ts`
+    );
+    const args = JSON.parse((createAuthorizationRequest as any).exportArgs());
+    expect(Object.keys(args.value)).not.toContain("authorizationStartedAt");
+    for (const field of ["codeVerifier", "redirectTo", "stateHash"])
+      expect(Object.keys(args.value)).toContain(field);
+  }
 });
