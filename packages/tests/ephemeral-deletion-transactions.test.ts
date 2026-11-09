@@ -181,3 +181,132 @@ test(
     assert.deepEqual(await q("bucket", {}), bucketBefore);
   },
 );
+
+test(
+  "real username sessions fence deletion cleanup and guarded identity claims",
+  { skip: !base },
+  async () => {
+    const { randomUUID } = await import("node:crypto");
+    async function invoke(
+      kind: "query" | "mutation",
+      path: string,
+      args: object,
+      token?: string,
+    ): Promise<any> {
+      const response = await fetch(`${base}/api/${kind}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ path, args, format: "json" }),
+      });
+      const result = (await response.json()) as any;
+      if (result.status !== "success") throw new Error(`${path} rejected`);
+      return result.value;
+    }
+    async function account() {
+      const username = `ephemeral${randomUUID().replaceAll("-", "")}`;
+      const password = `Fixture-${randomUUID()}!`;
+      const signup = await invoke(
+        "mutation",
+        "auth:signUpWithUsernamePassword",
+        { username, password },
+      );
+      assert.equal(signup.status, "complete");
+      const signed = await invoke(
+        "mutation",
+        "auth:signInWithUsernamePassword",
+        { username, password },
+      );
+      assert.equal(signed.status, "complete");
+      const token = signed.tokens.accessToken as string;
+      const user = await invoke("query", "users/index:current", {}, token);
+      assert.equal(user.username, username);
+      return { token, userId: user.id as string };
+    }
+    const owner = await account();
+    const other = await account();
+    assert.equal(
+      await invoke("query", "auth:isAuthenticated", {}, owner.token),
+      true,
+    );
+    assert.equal(
+      await invoke(
+        "mutation",
+        "fixture:authenticatedClaim",
+        { newHash: "real-owner-before" },
+        owner.token,
+      ),
+      false,
+    );
+    assert.equal(
+      (await q("identity", { hash: "real-owner-before" })).userId,
+      owner.userId,
+    );
+    assert.equal(await m("claim", { newHash: "real-anonymous" }), false);
+    const request = await invoke(
+      "mutation",
+      "users/index:requestDeletion",
+      { confirmation: "DELETE" },
+      owner.token,
+    );
+    assert.equal(request.status, "requested");
+    assert.equal(
+      await invoke("query", "auth:isAuthenticated", {}, owner.token),
+      true,
+    );
+    await assert.rejects(
+      invoke(
+        "mutation",
+        "fixture:authenticatedClaim",
+        { newHash: "real-owner-late" },
+        owner.token,
+      ),
+    );
+    await assert.rejects(
+      invoke(
+        "mutation",
+        "fixture:authenticatedClaim",
+        { hash: "real-anonymous", newHash: "real-owner-bind" },
+        owner.token,
+      ),
+    );
+    assert.equal(
+      await invoke(
+        "mutation",
+        "fixture:authenticatedClaim",
+        { newHash: "real-other" },
+        other.token,
+      ),
+      false,
+    );
+    const result = await invoke(
+      "mutation",
+      "fixture:authenticatedCleanup",
+      { expectedRequestedAt: request.requestedAt },
+      owner.token,
+    );
+    assert.equal(result.state, "known_user_bound_cleared");
+    assert.equal(result.telemetryIdentitiesDeleted, 1);
+    await assert.rejects(
+      invoke(
+        "mutation",
+        "fixture:authenticatedClaim",
+        { newHash: "real-owner-after" },
+        owner.token,
+      ),
+    );
+    assert.equal(await q("identity", { hash: "real-owner-before" }), null);
+    assert.equal(await q("identity", { hash: "real-owner-late" }), null);
+    assert.equal(await q("identity", { hash: "real-owner-after" }), null);
+    assert.equal(
+      (await q("identity", { hash: "real-anonymous" })).userId,
+      undefined,
+    );
+    assert.equal(
+      (await q("identity", { hash: "real-other" })).userId,
+      other.userId,
+    );
+  },
+);

@@ -28,8 +28,12 @@ try:
     else: raise RuntimeError('isolated backend did not start')
     cli=str(root / 'node_modules/.bin/convex')
     subprocess.run([cli,'env','set','E2E_TELEMETRY_DISABLED','1'],cwd=work,env=env,check=True)
-    subprocess.run([cli,'env','get','E2E_TELEMETRY_DISABLED'],cwd=work,env=env,check=True)
-    subprocess.run([cli,'dev','--once','--typecheck','disable'],cwd=work,env=env,check=True)
+    subprocess.run([cli,'env','set','BOAT_API_KEY',''],cwd=work,env=env,check=True)
+    output=subprocess.check_output([cli,'env','list'],cwd=work,env=env,text=True)
+    entries=dict(line.split('=',1) for line in output.splitlines() if '=' in line)
+    if entries != {'E2E_TELEMETRY_DISABLED':'1','BOAT_API_KEY':''}: raise RuntimeError('unexpected provider configuration')
+    print('Verified telemetry disabled, Boat empty, other provider values absent', flush=True)
+    subprocess.run([cli,'dev','--once','--typecheck','disable','--codegen','disable'],cwd=work,env=env,check=True)
     env['EPHEMERAL_DELETION_FIXTURE_URL']='http://127.0.0.1:3540'
     subprocess.run(['bun','test',str(root/'packages/tests/ephemeral-deletion-transactions.test.ts')],cwd=work,env=env,check=True)
 finally:

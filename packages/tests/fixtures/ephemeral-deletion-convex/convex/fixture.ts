@@ -177,3 +177,28 @@ export const bucket = query({
       .withIndex("by_key", (q) => q.eq("key", "global"))
       .unique(),
 });
+
+import { getAuthUserId } from "@convex-dev/auth/server";
+import { ConvexError } from "convex/values";
+// The bridge derives the owner from the real active auth session; never ship it.
+export const authenticatedClaim = mutation({
+  args: { hash: v.optional(v.string()), newHash: v.string() },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new ConvexError("Sign in required");
+    return ctx.runMutation(anyApi.telemetry.claimIdentity, { ...args, userId });
+  },
+});
+export const authenticatedCleanup = mutation({
+  args: { expectedRequestedAt: v.number() },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new ConvexError("Sign in required");
+    const id = ctx.db.normalizeId("users", userId);
+    if (!id) throw new ConvexError("Invalid owner");
+    return ctx.runMutation(anyApi.users.ephemeralDeletion.runBatch, {
+      userId: id,
+      ...args,
+    });
+  },
+});
