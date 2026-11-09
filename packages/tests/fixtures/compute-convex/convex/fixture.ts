@@ -49,8 +49,27 @@ import {
   sessionAllows,
 } from "../../../../backend/convex/agent/compute";
 export const admit = mutation({
+  args: { userId: v.string(), enabled: v.optional(v.boolean()) },
+  handler: (ctx, { userId, enabled }) =>
+    admitSession(ctx as any, userId, enabled ?? true),
+});
+export const sessions = query({
   args: { userId: v.string() },
-  handler: (ctx, { userId }) => admitSession(ctx as any, userId, true),
+  handler: (ctx, { userId }) =>
+    ctx.db
+      .query("computeSessions")
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
+      .take(10),
+});
+export const setStopUnconfirmed = mutation({
+  args: { appId: v.id("apps"), value: v.boolean() },
+  handler: async (ctx, { appId, value }) => {
+    const app = await ctx.db.get(appId);
+    if (!app?.agent) throw new Error("Missing fixture agent");
+    await ctx.db.patch(appId, {
+      agent: { ...app.agent, stopUnconfirmed: value },
+    });
+  },
 });
 export const seedUser = mutation({
   args: {},
@@ -261,7 +280,11 @@ export const auth = query({
 export const setStatus = mutation({
   args: {
     appId: v.id("apps"),
-    status: v.union(v.literal("processing"), v.literal("idle")),
+    status: v.union(
+      v.literal("processing"),
+      v.literal("stopping"),
+      v.literal("idle"),
+    ),
   },
   handler: async (ctx, a) => {
     const app = await ctx.db.get(a.appId);
