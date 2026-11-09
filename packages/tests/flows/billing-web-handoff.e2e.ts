@@ -1,8 +1,179 @@
 import { test } from "@e2e-dev/web";
 import { expect } from "e2e";
+import { randomUUID } from "node:crypto";
+import { assertOwnedSdkBackend } from "../helpers/sdk-auth/ownership";
 
 const api = "http://127.0.0.1:3451";
 const code = "Q".repeat(43);
+const realBackend = "http://127.0.0.1:3520";
+
+async function realCall(
+  kind: "query" | "mutation",
+  path: string,
+  args: object,
+  token?: string,
+) {
+  const response = await fetch(`${realBackend}/api/${kind}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ path, args, format: "json" }),
+    signal: AbortSignal.timeout(15_000),
+  });
+  const value = await response.json();
+  if (value.status !== "success") throw new Error(`${path} rejected`);
+  return value.value;
+}
+
+test(
+  "real handoff fences revoked and expired native sessions while redeemed browser keeps its own owner",
+  { platforms: ["web"] },
+  async ({ app, screen, browser }) => {
+    test.skip(
+      process.env.E2E_BILLING_WEB_REAL !== "1",
+      "Requires the isolated real handoff fixture",
+    );
+    if (
+      process.env.E2E_CONVEX_URL !== realBackend ||
+      process.env.E2E_CONVEX_SITE_URL !== "http://127.0.0.1:3521" ||
+      process.env.E2E_TELEMETRY_DISABLED !== "1"
+    )
+      throw new Error("Requires isolated 3520/3521 and disabled telemetry");
+    assertOwnedSdkBackend({
+      markerVariable: "E2E_BILLING_OWNERSHIP_FILE",
+      ports: [3520, 3521],
+      claimDirectory: ".billing-web-real-claimed",
+    });
+    expect(await realCall("query", "fixtureBillingHandoff:ready", {})).toBe(
+      true,
+    );
+    const account = async () => {
+      const username = `handoff${randomUUID().replaceAll("-", "")}`;
+      const signup = await realCall(
+        "mutation",
+        "auth:signUpWithUsernamePassword",
+        { username, password: `Fixture-${randomUUID()}!` },
+      );
+      expect(signup.status).toBe("complete");
+      const user = await realCall(
+        "query",
+        "users/index:current",
+        {},
+        signup.tokens.accessToken,
+      );
+      return { username, tokens: signup.tokens, userId: user.id };
+    };
+    const create = async (owner: Awaited<ReturnType<typeof account>>) => {
+      const value = await realCall(
+        "mutation",
+        "billingHandoff:create",
+        { purchase: "topup", returnChannel: "preview" },
+        owner.tokens.accessToken,
+      );
+      expect(value.userId).toBe(owner.userId);
+      return new URL(value.url).hash.slice(1);
+    };
+    const signOut = async (owner: Awaited<ReturnType<typeof account>>) => {
+      await realCall(
+        "mutation",
+        "auth:signOut",
+        { refreshToken: owner.tokens.refreshToken },
+        owner.tokens.accessToken,
+      );
+      expect(
+        await realCall(
+          "query",
+          "auth:isAuthenticated",
+          {},
+          owner.tokens.accessToken,
+        ),
+      ).toBe(false);
+    };
+    const revoked = await account();
+    const revokedCode = await create(revoked);
+    await app.open(`/billing-login#${revokedCode}`);
+    await expect(
+      screen.getByRole("button", `Continue as @${revoked.username}`),
+    ).toBeVisible();
+    await signOut(revoked);
+    const nativeReplacement = await account();
+    expect(nativeReplacement.userId).not.toBe(revoked.userId);
+    await expect(screen.getByRole("alert")).toContainText("expired");
+    expect(
+      await realCall("query", "billingHandoff:inspect", { code: revokedCode }),
+    ).toBe(null);
+
+    const expiredOwner = await account();
+    const expiredCode = await create(expiredOwner);
+    await app.open("/");
+    await app.open(`/billing-login#${expiredCode}`);
+    await expect(
+      screen.getByRole("button", `Continue as @${expiredOwner.username}`),
+    ).toBeVisible();
+    await realCall("mutation", "fixtureBillingHandoff:expire", {
+      code: expiredCode,
+      field: "handoff",
+    });
+    await expect(screen.getByRole("alert")).toContainText("expired");
+
+    const original = await account();
+    const handoff = await create(original);
+    await app.open("/");
+    await app.open(`/billing-login#${handoff}`);
+    await screen.getByRole("button", `Continue as @${original.username}`).tap();
+    await expect(browser).toHaveURL("/pricing?source=ios");
+    await expect(screen.getByRole("button", "Buy top-up")).toBeVisible();
+    expect(
+      await realCall("query", "billingHandoff:inspect", { code: handoff }),
+    ).toBe(null);
+    await signOut(original);
+    const replacement = await account();
+    expect(replacement.userId).not.toBe(original.userId);
+    const browserUser = await browser.evaluate(async () => {
+      const key = `__convexAuthJWT_${"http://127.0.0.1:3520".replace(/[^a-zA-Z0-9]/g, "")}`;
+      const token = localStorage.getItem(key);
+      if (!token) return null;
+      const response = await fetch("http://127.0.0.1:3520/api/query", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          path: "users/index:current",
+          args: {},
+          format: "json",
+        }),
+      });
+      const result = await response.json();
+      return result.status === "success" ? result.value?.id : null;
+    });
+    expect(browserUser).toBe(original.userId);
+    await screen.getByRole("button", "Buy top-up").tap();
+    await expect(screen.getByRole("status")).toContainText("being processed");
+    expect(
+      await browser.evaluate(
+        (owner) => !!localStorage.getItem(`billing-attempt:${owner}:topup`),
+        original.userId,
+      ),
+    ).toBe(true);
+    expect(
+      await browser.evaluate(
+        (owner) => !!localStorage.getItem(`billing-attempt:${owner}:topup`),
+        replacement.userId,
+      ),
+    ).toBe(false);
+    let replayRejected = false;
+    try {
+      await realCall("mutation", "billingHandoff:redeem", { code: handoff });
+    } catch {
+      replayRejected = true;
+    }
+    expect(replayRejected).toBe(true);
+  },
+);
 async function reset(purchase: "monthly" | "topup", overrides: object = {}) {
   const res = await fetch(`${api}/reset`, {
     method: "POST",
