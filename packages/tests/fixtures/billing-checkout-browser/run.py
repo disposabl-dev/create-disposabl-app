@@ -48,6 +48,7 @@ def main():
         raise RuntimeError('Need at least 2 GiB free')
     for port in (3540, 3541, 3549):
         with socket.socket() as probe:
+            probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             probe.bind(('127.0.0.1', port))
     if subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True).strip():
         raise RuntimeError('Commit the exact fixture candidate before running')
