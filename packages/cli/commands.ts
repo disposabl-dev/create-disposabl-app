@@ -1,4 +1,5 @@
 import { openExpoDeletion } from "./delete";
+import { CommanderError } from "commander";
 import { capture, telemetryStatePath } from "./telemetry";
 import { version } from "./package.json";
 import { apiError } from "./errors";
@@ -27,6 +28,7 @@ export async function runCli(
   serviceOrigin = process.env.DISPOSABL_API_ORIGIN || SERVICE_ORIGIN,
 ) {
   const program = createProgram(serviceOrigin, true);
+  program.exitOverride();
   const origin = () => apiUrl(serviceOrigin);
 
   async function main() {
@@ -221,7 +223,11 @@ export async function runCli(
     }
     await program.parseAsync(argv);
   }
-  const command = argv[2] ?? "help";
+  const command = ["--version", "-V"].includes(argv[2] ?? "")
+    ? "version"
+    : ["--help", "-h"].includes(argv[2] ?? "")
+      ? "help"
+      : (argv[2] ?? "help");
   const central = serviceOrigin === SERVICE_ORIGIN;
   const started = central
     ? capture(version, "cli", command, "started", telemetryStatePath())
@@ -233,8 +239,15 @@ export async function runCli(
       await capture(version, "cli", command, "success", telemetryStatePath());
   } catch (error) {
     await started;
+    const success = error instanceof CommanderError && error.exitCode === 0;
     if (central)
-      await capture(version, "cli", command, "failure", telemetryStatePath());
-    throw error;
+      await capture(
+        version,
+        "cli",
+        command,
+        success ? "success" : "failure",
+        telemetryStatePath(),
+      );
+    if (!success) throw error;
   }
 }

@@ -22,6 +22,9 @@ let uploadPending;
 let sendPending;
 const sent = mock(() => sendPending?.promise ?? Promise.resolve({}));
 const removed = [];
+mock.module("../../../../apps/mobile/src/features/product-telemetry", () => ({
+  captureProductAction: () => {},
+}));
 mock.module("@convex-dev/auth/react", () => ({
   useAuthToken: () => useContext(Session),
 }));

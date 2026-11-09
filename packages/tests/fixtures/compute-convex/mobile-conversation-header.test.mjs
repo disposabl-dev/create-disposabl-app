@@ -11,6 +11,9 @@ let preview = {
   },
 };
 const push = mock();
+mock.module("../../../../apps/mobile/src/features/product-telemetry", () => ({
+  captureProductAction: () => {},
+}));
 mock.module("convex/react", () => ({
   useQuery: (ref) =>
     getFunctionName(ref) === "apps/index:get"

@@ -5,6 +5,7 @@ import { api } from "../../../../../packages/backend/convex/_generated/api";
 import { useTheme } from "../../../../../packages/disposabl-kit/mobile/design/use-theme";
 import { authenticationEnabled } from "@disposabl/disposabl-kit/features";
 import { Action, Icon, Label, Screen, Touch } from "./ui";
+import { captureProductAction } from "../product-telemetry";
 
 export default function AppsScreen() {
   return authenticationEnabled ? (
@@ -58,7 +59,10 @@ function OwnedApps() {
               <Label variant="title">Create your first app.</Label>
               <Action
                 label="Create app"
-                onPress={() => router.push("/compose")}
+                onPress={() => {
+                  captureProductAction("open_create");
+                  router.push("/compose");
+                }}
               />
             </View>
           )
@@ -66,12 +70,13 @@ function OwnedApps() {
         renderItem={({ item }) => (
           <Touch
             label={`Open ${item.name}`}
-            onPress={() =>
+            onPress={() => {
+              captureProductAction("open_app");
               router.push({
                 pathname: "/(authenticated)/apps/[appId]",
                 params: { appId: item.appId },
-              })
-            }
+              });
+            }}
             className="flex-row items-center gap-[16px] py-[20px]"
           >
             <View className="h-14 w-14 items-center justify-center rounded-2xl bg-muted">

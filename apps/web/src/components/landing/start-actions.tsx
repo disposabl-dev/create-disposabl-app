@@ -27,6 +27,7 @@ export function StartActions({ onDetails }: { onDetails: () => void }) {
         <div className="agent-start-row">
           <button
             id="start"
+            data-telemetry-action="copy_setup"
             disabled={!hydrated}
             className="copy-start"
             onClick={() => void copy()}
@@ -51,6 +52,7 @@ export function StartActions({ onDetails }: { onDetails: () => void }) {
           </div>
           <button
             className="setup-help"
+            data-telemetry-action="open_setup"
             disabled={!hydrated}
             aria-label="View setup instructions"
             onClick={onDetails}

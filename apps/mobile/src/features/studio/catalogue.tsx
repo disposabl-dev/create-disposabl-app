@@ -1,6 +1,7 @@
 import { VariableContextProvider } from "nativewind";
 import { FlatList, View, useWindowDimensions } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
+import { captureProductAction } from "../product-telemetry";
 import { AppArtwork } from "./art";
 import { examples, type Example } from "./data";
 import { Action, Label, Screen, TargetBadges, Touch } from "./ui";
@@ -71,12 +72,13 @@ export function ExampleScreen() {
       </Label>
       <Action
         label="Make it yours"
-        onPress={() =>
+        onPress={() => {
+          captureProductAction("open_create");
           router.push({
             pathname: "/compose",
             params: { exampleSlug: app.slug },
-          })
-        }
+          });
+        }}
       />
     </Screen>
   );

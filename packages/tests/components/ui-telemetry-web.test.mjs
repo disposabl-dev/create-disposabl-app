@@ -3,7 +3,35 @@ import { createElement } from "react";
 import { act, create } from "react-test-renderer";
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
-globalThis.window = new EventTarget();
+class TestWindow extends EventTarget {
+  clickListener;
+  addEventListener(type, callback, options) {
+    if (type === "click") this.clickListener = callback;
+    return super.addEventListener(type, callback, options);
+  }
+  removeEventListener(type, callback, options) {
+    if (type === "click" && this.clickListener === callback)
+      this.clickListener = undefined;
+    return super.removeEventListener(type, callback, options);
+  }
+  clickTarget(target) {
+    this.clickListener?.({ target });
+  }
+}
+class TestElement {
+  constructor(action, parent = null) {
+    this.action = action;
+    this.parent = parent;
+  }
+  closest() {
+    return this.action === undefined ? this.parent?.closest() : this;
+  }
+  getAttribute() {
+    return this.action;
+  }
+}
+globalThis.Element = TestElement;
+globalThis.window = new TestWindow();
 window.location = { pathname: "/" };
 Object.defineProperty(globalThis, "navigator", {
   value: { doNotTrack: "0" },
@@ -83,6 +111,8 @@ test("web E2E never initializes or contacts bootstrap", async () => {
   });
   expect(initialized).toBe(0);
   expect(requests).toHaveBeenCalledTimes(0);
+  window.clickTarget(new TestElement(undefined, new TestElement("copy_setup")));
+  expect(events).toHaveLength(0);
 });
 
 test("Do Not Track prevents web bootstrap and SDK initialization", async () => {
@@ -126,6 +156,25 @@ test("web bootstraps, strips URL and stops immediately on opt-out", async () => 
     platform: "web",
     $current_url: "https://www.disposabl.dev/dashboard/connections",
   });
+  window.clickTarget(new TestElement(undefined, new TestElement("copy_setup")));
+  window.clickTarget(new TestElement(undefined, new TestElement("open_setup")));
+  window.clickTarget(
+    new TestElement(undefined, new TestElement("SECRET_PROMPT_91")),
+  );
+  window.clickTarget(new TestElement(undefined));
+  expect(
+    events
+      .filter((event) => event.event === "product_action")
+      .map((event) => event.properties.action),
+  ).toEqual(["copy_setup", "open_setup"]);
+  expect(JSON.stringify(events)).not.toContain("SECRET_PROMPT_91");
+  const clock = Date.now;
+  Date.now = () => clock() + 31_000;
+  window.clickTarget(new TestElement(undefined, new TestElement("copy_setup")));
+  Date.now = clock;
+  expect(
+    events.filter((event) => event.event === "product_action"),
+  ).toHaveLength(2);
   const id = "01890abc-1234-7123-8123-123456789abc";
   const snapshot = {
     uuid: "test",
@@ -146,6 +195,10 @@ test("web bootstraps, strips URL and stops immediately on opt-out", async () => 
     renderer.root.findByType("button").props.onClick();
   });
   expect(stops).toHaveBeenCalled();
+  window.clickTarget(new TestElement(undefined, new TestElement("copy_setup")));
+  expect(
+    events.filter((event) => event.event === "product_action"),
+  ).toHaveLength(2);
   expect(values.get("disposabl.product.analytics.optout.v1")).toBe("1");
   expect(sdkOptions.before_send(snapshot)).toBeNull();
 });
