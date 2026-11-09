@@ -54,6 +54,7 @@ mock.module(agent("noticeBalance.ts"), () => ({
   observeNoticeBalance: forbidden("other"),
 }));
 const { tick } = await import(agent("actions/run.ts"));
+const { computeAccess } = await import(agent("actions/compute.ts"));
 async function call(name, args) {
   const response = await fetch("http://127.0.0.1:3540/api/function", {
     method: "POST",
@@ -140,7 +141,14 @@ function heldTick(f) {
     },
   };
   const action = tick._handler(ctx, { id: f.id });
-  return { action, held, release, token: () => token, sessionReads };
+  return {
+    action,
+    held,
+    release,
+    token: () => token,
+    sessionReads,
+    access: (sessionId) => computeAccess(ctx, f.userId, sessionId),
+  };
 }
 async function denyRenewal(f) {
   await call("manualRemote", { userId: f.userId, appId: f.appId });
@@ -246,6 +254,9 @@ test("confirmed synthetic stops and a new admission do not let the retained tick
   ).toBe(true);
   const oldBefore = await call("manualSession", { sessionId: f.sessionId });
   const newBefore = await call("manualSession", { sessionId: newSession });
+  expect(await worker.access(f.sessionId)).toBe("blocked");
+  expect(await worker.access(newSession)).toBe("ready");
+  worker.sessionReads.length = 0;
   worker.release();
   await finishStale(worker.action);
   const oldAfter = await call("manualSession", { sessionId: f.sessionId });

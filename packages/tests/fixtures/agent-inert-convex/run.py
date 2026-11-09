@@ -41,15 +41,12 @@ def run(runner, owner):
     sha = runner.command(owner,['git','rev-parse','HEAD'],cwd=ROOT).strip()
     if len(os.environ['AGENT_SOURCE_REVISION']) != 40 or sha != os.environ['AGENT_SOURCE_REVISION']: raise RuntimeError('Set AGENT_SOURCE_REVISION to the exact checked-out commit')
     changed=runner.command(owner,['git','status','--porcelain'],cwd=ROOT).splitlines()
-    allowed={'packages/tests/fixtures/agent-inert-convex/'+name for name in ('agentFixture.ts','paid-test.py','run.py','README.md','legacy-action.test.mjs','manual-action.test.mjs')}
-    if any(line[3:] not in allowed for line in changed): raise RuntimeError('Unexpected checkout changes')
+    if changed: raise RuntimeError('Commit checkout changes before exact-revision qualification')
     work = pathlib.Path(tempfile.mkdtemp(prefix='disposabl-agent-owned-',dir='/tmp')).resolve(); work.chmod(0o700)
     source = work/'source'; source.mkdir()
     print(f'source {sha}; auth {auth["sha256"]} ({auth["files"]} files); artifacts {work}',flush=True)
     runner.command(owner,['git','archive','--format=tar','--output',str(work/'source.tar'),sha],cwd=ROOT)
     runner.command(owner,['tar','-xf',str(work/'source.tar'),'-C',str(source)])
-    for name in ('agentFixture.ts','paid-test.py','run.py','README.md','legacy-action.test.mjs','manual-action.test.mjs'):
-        shutil.copyfile(HERE/name,source/'packages/tests/fixtures/agent-inert-convex'/name)
     modules=source/'node_modules'; modules.mkdir()
     for dep in deps.iterdir():
         if dep.name == '@disposabl' and dep.is_dir():
