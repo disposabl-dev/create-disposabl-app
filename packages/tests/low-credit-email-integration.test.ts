@@ -204,6 +204,24 @@ test(
           false,
           true,
         );
+        const retried = await call("session", { sessionId }, true);
+        assert.equal(retried.state, "hold");
+        assert.equal(retried.debitId, session.debitId);
+        assert.equal(retried.paidUntil, session.paidUntil);
+        assert.equal(await call("allowed", { sessionId, userId }, true), false);
+        const retriedDebit = await debit(session.debitId);
+        assert.equal(retriedDebit.state, "unknown");
+        assert.equal(retriedDebit.paidUntil, 0);
+        assert.equal(retriedDebit.responseBalance, undefined);
+        assert.equal(retriedDebit.noticeOutcome, undefined);
+        assert.equal(
+          (await call("scheduled", {}, true)).some(
+            (job: any) =>
+              job.name === "agent/actions/compute.js:notice" &&
+              job.args[0].debitId === session.debitId,
+          ),
+          false,
+        );
         assert.equal(
           (await call("debitRequests", { sessionId }, true)).length,
           requests.length,

@@ -100,8 +100,15 @@ export const queueDirect = mutation({
 
 export const scheduled = query({
   args: {},
-  handler: (ctx) =>
-    ctx.db.system.query("_scheduled_functions").order("desc").take(100),
+  handler: async (ctx) => {
+    const jobs = await ctx.db.system
+      .query("_scheduled_functions")
+      .order("desc")
+      .take(101);
+    if (jobs.length > 100)
+      throw new Error("Fixture scheduled-job limit exceeded");
+    return jobs;
+  },
 });
 
 export const expire = mutation({
