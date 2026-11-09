@@ -21,6 +21,14 @@ function allowed() {
 }
 
 let stopActive: (() => void) | undefined;
+let sendAction: ((action: unknown) => void) | undefined;
+export function captureProductAction(action: unknown) {
+  try {
+    sendAction?.(action);
+  } catch {
+    // Analytics must never interrupt the user's action.
+  }
+}
 export function productTelemetrySource(): "web" | "desktop" {
   return (
     window as Window & { disposablDesktop?: { authentication?: boolean } }
@@ -197,7 +205,7 @@ export function ProductTelemetry({
       return;
     const adapter = createWebTelemetryAdapter({
       origin,
-      transport: fetch.bind(window) as typeof fetch,
+      transport: fetch.bind<typeof fetch>(window),
       page: () => page.current,
       allowed,
       source: productTelemetrySource(),
@@ -208,6 +216,7 @@ export function ProductTelemetry({
         token: identity.current.token,
       });
     stopActive = adapter.stop;
+    sendAction = adapter.action;
     capture.current = adapter.page;
     const reportError = () => adapter.error();
     const reportAction = (event: MouseEvent) => {
@@ -230,6 +239,7 @@ export function ProductTelemetry({
       window.removeEventListener("unhandledrejection", reportError);
       window.removeEventListener("click", reportAction);
       if (stopActive === adapter.stop) stopActive = undefined;
+      if (sendAction === adapter.action) sendAction = undefined;
       capture.current = undefined;
       adapter.stop();
     };

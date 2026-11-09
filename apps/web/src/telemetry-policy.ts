@@ -5,6 +5,9 @@ const productActions = [
   "open_api_keys",
   "copy_setup",
   "open_setup",
+  "api_key_create_attempt",
+  "api_key_revoke_attempt",
+  "api_key_copy_attempt",
 ] as const;
 export function isProductAction(
   value: unknown,
