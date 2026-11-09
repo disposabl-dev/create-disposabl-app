@@ -145,3 +145,104 @@ test("local operator advances one existing stage, resumes legacy auth, and repor
     "users/fileDeletion:runBatch",
   ]);
 });
+
+const localUrl = process.env.LOCAL_DELETION_FIXTURE_URL;
+if (localUrl && localUrl !== "http://127.0.0.1:3480")
+  throw new Error("Local deletion fixture requires 127.0.0.1:3480");
+test(
+  "local coordinator advances real component and database transactions",
+  { skip: !localUrl, timeout: 120000 },
+  async () => {
+    async function rpc(
+      kind: "query" | "mutation",
+      name: string,
+      args: object,
+    ): Promise<any> {
+      const response = await fetch(`${localUrl}/api/${kind}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: `fixture:${name}`, args, format: "json" }),
+      });
+      const result = (await response.json()) as any;
+      if (result.status !== "success")
+        throw new Error(result.errorMessage ?? "Fixture request failed");
+      return result.value;
+    }
+    const m = (name: string, args: object) => rpc("mutation", name, args);
+    const q = (name: string, args: object) => rpc("query", name, args);
+    const requestedAt = 1700000000000;
+    const owner = await m("create", { requestedAt });
+    const other = await m("create", {});
+    const args = { userId: owner, expectedRequestedAt: requestedAt };
+    await m("key", { userId: owner, hash: "synthetic-owner-key-1" });
+    await m("key", { userId: owner, hash: "synthetic-owner-key-2" });
+    await m("username", { userId: owner, username: "synthetic-owner" });
+    await m("legacy", { userId: owner });
+    await m("seed", { userId: owner, count: 205 });
+    const file = await m("r2", { userId: owner });
+    await assert.rejects(
+      m("advance", { ...args, expectedRequestedAt: requestedAt + 1 }),
+      /Matching deletion request/,
+    );
+    await assert.rejects(
+      m("advance", { ...args, userId: other }),
+      /Matching deletion request/,
+    );
+    let previous = await q("inspect", { userId: owner });
+    assert.equal(previous.mcpDeletion, undefined);
+    for (let i = 0; i < 6; i++) {
+      const result = await m("advance", args);
+      assert.equal(result.status, "requested");
+      assert.equal(result.stage, "mcp");
+      const current = await q("inspect", { userId: owner });
+      assert.equal(
+        current.mcpDeletion.batches,
+        (previous.mcpDeletion?.batches ?? 0) + 1,
+      );
+      assert.deepEqual(current.authDeletion, previous.authDeletion);
+      previous = current;
+      if (current.mcpDeletion.state === "attributed_complete") break;
+    }
+    assert.equal(previous.mcpDeletion.state, "attributed_complete");
+    assert.ok(previous.mcpDeletion.batches > 1);
+    assert.equal((await m("advance", args)).stage, "auth");
+    let current = await q("inspect", { userId: owner });
+    assert.equal(current.authDeletion.usernameCleared, true);
+    assert.equal(current.authDeletion.attributedEmailsCleared, true);
+    assert.equal(
+      current.authDeletion.unattributedEmailChallengesUnverified,
+      true,
+    );
+    assert.ok(current.authDeletion.batches > 1);
+    await assert.rejects(
+      m("username", { userId: owner, username: "synthetic-another" }),
+    );
+    for (let i = 0; i < 4; i++) {
+      assert.equal((await m("advance", args)).stage, "ephemeral");
+      current = await q("inspect", { userId: owner });
+      if (current.ephemeralDeletion.state === "known_user_bound_cleared") break;
+    }
+    assert.equal(current.ephemeralDeletion.batches, 3);
+    assert.equal(current.ephemeralDeletion.billingHandoffsDeleted, 205);
+    assert.equal(current.ephemeralDeletion.telemetryIdentitiesDeleted, 205);
+    let result = await m("advance", args);
+    assert.equal(result.stage, "files");
+    assert.equal(result.outcome, "blocked");
+    assert.match(result.blockers[0], /R2/);
+    assert.equal((await m("advance", args)).outcome, "blocked");
+    await m("removeFixtureFile", { userId: owner, fileId: file });
+    assert.equal((await m("advance", args)).stage, "files");
+    result = await m("advance", args);
+    assert.equal(result.status, "requested");
+    assert.equal(result.outcome, "local_stages_cleared");
+    assert.ok(result.blockers.some((s: string) => /provider cleanup/.test(s)));
+    assert.ok(result.blockers.some((s: string) => /retention/.test(s)));
+    assert.deepEqual(await m("advance", args), result);
+    current = await q("inspect", { userId: owner });
+    assert.equal(current.deletionRequestedAt, requestedAt);
+    assert.equal(
+      (await q("inspect", { userId: other })).deletionRequestedAt,
+      undefined,
+    );
+  },
+);
