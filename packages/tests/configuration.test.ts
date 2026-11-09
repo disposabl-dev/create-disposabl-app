@@ -8,7 +8,6 @@ import {
   applyConfiguration,
   get,
   requestConfiguration,
-  requestConfigurationLegacy,
 } from "../backend/convex/apps/internal";
 import { registerPageRoutes } from "../disposabl-kit/server/lib/static";
 import config from "../../disposabl.json";
@@ -207,11 +206,13 @@ test("configuration requests persist in the conversation before account setup", 
 
 test("settings action authenticates and forwards selected architectures", async () => {
   let forwarded: any;
+  let actionName: string | undefined;
   const ctx = {
     auth: { getUserIdentity: async () => ({ subject: "session" }) },
     runQuery: async (_ref: unknown, args: any) =>
       "sessionId" in args ? { userId: "owner" } : false,
-    runAction: async (_ref: unknown, args: unknown) => {
+    runAction: async (ref: any, args: unknown) => {
+      actionName = getFunctionName(ref);
       forwarded = args;
       return { queued: true };
     },
@@ -223,6 +224,7 @@ test("settings action authenticates and forwards selected architectures", async 
     androidArchitectures: ["x86_64"],
   };
   await (requestConfigurationChecked as any)._handler(ctx, payload);
+  assert.equal(actionName, "apps/internal:requestConfiguration");
   assert.deepEqual(forwarded, { ...payload, userId: "owner" });
   await assert.rejects(
     (requestConfigurationChecked as any)._handler(
@@ -231,24 +233,6 @@ test("settings action authenticates and forwards selected architectures", async 
     ),
     /Sign in/,
   );
-});
-
-test("legacy configuration mutation queues the same request when payments are disabled", async () => {
-  let queued: any;
-  await (requestConfigurationLegacy as any)._handler(
-    {
-      db: db(app, () => {
-        throw new Error("unexpected patch");
-      }),
-      runMutation: async (_ref: unknown, args: unknown) => {
-        queued = args;
-        return { appId, threadId: "thread", status: "processing" };
-      },
-    },
-    { userId: "owner", appId, platforms: ["web", "android"], features: [] },
-  );
-  assert.equal(queued.userId, "owner");
-  assert.match(queued.prompt, /Requested platforms: web,android/);
 });
 
 test("disabled docs cannot be served from retained static assets", async () => {

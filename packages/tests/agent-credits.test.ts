@@ -174,7 +174,7 @@ test("ownership and credits precede enqueue, with no public unchecked endpoint",
   );
 });
 
-test("legacy mutations remain callable only before payments are enabled", () => {
+test("agent guard and checked configuration contracts are retained", () => {
   assert.doesNotThrow(() => requireCurrentClient(false));
   assert.throws(
     () => requireCurrentClient(true),
@@ -182,8 +182,9 @@ test("legacy mutations remain callable only before payments are enabled", () => 
   );
   assert.equal((agentNative.sendMessage as any).isMutation, true);
   assert.equal((agentNative.sendMessageChecked as any).isAction, true);
-  assert.equal((appsNative.requestConfiguration as any).isMutation, true);
+  assert.equal("requestConfiguration" in appsNative, false);
   assert.equal((appsNative.requestConfigurationChecked as any).isAction, true);
+  assert.equal("requestConfigurationLegacy" in appsInternal, false);
   const platform = createPlatforms({ "apps/internal": appsInternal });
   assert.ok(
     platform.spec.some(
