@@ -193,7 +193,7 @@ async function qualify(stage: string) {
     "python3",
     [
       "-c",
-      `import sys;sys.path.insert(0,${JSON.stringify(join(root, "packages/tests/helpers/sdk-auth"))});from selected_auth import verify_selected_auth;print(verify_selected_auth(${JSON.stringify(app)}))`,
+      `import sys;sys.path.insert(0,${JSON.stringify(join(source, "packages/tests/helpers/sdk-auth"))});from selected_auth import verify_selected_auth;print(verify_selected_auth(${JSON.stringify(app)}))`,
     ],
     app,
   );
