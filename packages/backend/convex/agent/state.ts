@@ -330,15 +330,8 @@ export const finish = internalMutation({
         ? "Boat delivery could not be confirmed. Retry abortMessage to reconcile this app's conversation; other apps were not interrupted."
         : error,
       lease: undefined,
-      delivery:
-        args.stopped || (args.suspended && !unresolved)
-          ? undefined
-          : unresolved ||
-              args.error ||
-              args.unconfirmed ||
-              status === "stopping"
-            ? current.delivery
-            : undefined,
+      // Only delivery acknowledgement or a confirmed stop can clear uncertainty.
+      delivery: args.stopped ? undefined : current.delivery,
       stopFailures: args.stopped
         ? undefined
         : args.error
