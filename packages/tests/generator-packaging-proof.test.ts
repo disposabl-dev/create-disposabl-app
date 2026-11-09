@@ -217,6 +217,10 @@ test("packaged starter and generated profiles exclude product proof fixtures", a
       for (const path of excluded)
         assert.equal(existsSync(join(root, path)), false, `${root}: ${path}`);
       for (const path of [
+        "packages/tests/pricing-identity.test.ts",
+        "packages/tests/components/pricing-identity.test.mjs",
+        "packages/disposabl-kit/client/routes/pricing.tsx",
+        "packages/disposabl-kit/client/components/consent-identity.tsx",
         "packages/tests/billing.test.ts",
         "packages/tests/billing-setup.test.ts",
         "packages/tests/flows/mobile.e2e.ts",
