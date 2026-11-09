@@ -11,10 +11,12 @@ if (
     "http://localhost:3420",
     "http://127.0.0.1:3520",
     "http://localhost:3520",
+    "http://127.0.0.1:3540",
+    "http://localhost:3540",
   ].includes(url)
 )
   throw new Error(
-    "Compute fixture requires the isolated loopback deployment on port 3420 or 3520",
+    "Compute fixture requires the isolated loopback deployment on port 3420, 3520 or 3540",
   );
 async function call(name: string, args: object, query = false) {
   const response = await fetch(`${url}/api/${query ? "query" : "mutation"}`, {
@@ -206,32 +208,70 @@ test(
   "expired worker cannot mutate or issue credentials",
   { skip: !url },
   async () => {
-    const userId = randomUUID(),
+    const userId = await call("seedUser", {}),
       threadId = randomUUID(),
       sessionId = await call("admit", { userId });
-    const appId = await call("app", { userId, sessionId, threadId });
+    const appRowId = await call("app", { userId, sessionId, threadId });
+    const otherUserId = await call("seedUser", {});
+    const otherSessionId = await call("admit", { userId: otherUserId });
+    const otherAppId = randomUUID();
+    await call("app", {
+      userId: otherUserId,
+      sessionId: otherSessionId,
+      threadId: otherAppId,
+    });
     const hash =
       randomUUID().replaceAll("-", "") + randomUUID().replaceAll("-", "");
-    await call("worker", { appId, token: "old", expiresAt: Date.now() - 1 });
+    const replacementHash =
+      randomUUID().replaceAll("-", "") + randomUUID().replaceAll("-", "");
+    const identity = { id: threadId, userId, appId: threadId };
+    await call("worker", {
+      appId: appRowId,
+      token: "old",
+      expiresAt: Date.now() - 1,
+    });
     await assert.rejects(
       call("appendEvents", { id: threadId, token: "old" }),
       /lease expired/,
     );
     await assert.rejects(
-      call("issueAccess", { id: threadId, token: "old", hash }),
+      call("issueAccess", { ...identity, token: "old", hash }),
       /active worker lease/,
     );
     await call("worker", {
-      appId,
+      appId: appRowId,
       token: "new",
       expiresAt: Date.now() + 60000,
     });
-    await call("issueAccess", { id: threadId, token: "new", hash });
-    assert.ok(await call("auth", { hash }, true));
-    await call("expireAccess", { appId });
+    await call("issueAccess", { ...identity, token: "new", hash });
+    const expected = { userId, appId: threadId, threadId };
+    assert.deepEqual(await call("auth", { hash }, true), expected);
+    for (const mismatch of [{ userId: otherUserId }, { appId: otherAppId }]) {
+      await assert.rejects(
+        call("issueAccess", {
+          ...identity,
+          ...mismatch,
+          token: "new",
+          hash: replacementHash,
+        }),
+      );
+      assert.deepEqual(await call("auth", { hash }, true), expected);
+      assert.equal(await call("auth", { hash: replacementHash }, true), null);
+    }
+    await call("issueAccess", {
+      ...identity,
+      token: "new",
+      hash: replacementHash,
+    });
     assert.equal(await call("auth", { hash }, true), null);
-    await call("issueAccess", { id: threadId, token: "new", hash });
-    await call("setStatus", { appId, status: "idle" });
+    assert.deepEqual(
+      await call("auth", { hash: replacementHash }, true),
+      expected,
+    );
+    await call("expireAccess", { appId: appRowId });
+    assert.equal(await call("auth", { hash: replacementHash }, true), null);
+    await call("issueAccess", { ...identity, token: "new", hash });
+    await call("setStatus", { appId: appRowId, status: "idle" });
     assert.equal(await call("auth", { hash }, true), null);
   },
 );

@@ -52,6 +52,11 @@ export const admit = mutation({
   args: { userId: v.string() },
   handler: (ctx, { userId }) => admitSession(ctx as any, userId, true),
 });
+export const seedUser = mutation({
+  args: {},
+  returns: v.id("users"),
+  handler: (ctx) => ctx.db.insert("users", {}),
+});
 export const app = mutation({
   args: {
     userId: v.string(),
@@ -215,7 +220,13 @@ export const appendEvents = mutation({
   handler: (ctx, a) => (append as any)._handler(ctx, { ...a, events: [] }),
 });
 export const issueAccess = mutation({
-  args: { id: v.string(), token: v.string(), hash: v.string() },
+  args: {
+    id: v.string(),
+    token: v.string(),
+    userId: v.string(),
+    appId: v.string(),
+    hash: v.string(),
+  },
   handler: (ctx, a) => (issue as any)._handler(ctx, a),
 });
 export const auth = query({
