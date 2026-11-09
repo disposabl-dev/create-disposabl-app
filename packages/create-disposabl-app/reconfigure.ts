@@ -20,7 +20,7 @@ import { authStarterPaths, createApp } from "./scaffold";
 import {
   mergePurchasesManifest,
   nativeBillingPath,
-  nativeBillingTest,
+  nativeBillingTests,
   omitMobilePayments,
 } from "./mobile-payments";
 
@@ -238,7 +238,7 @@ export async function reconfigureApp(
         nextFiles.has(path) ||
         !(
           path.startsWith(nativeBillingPath) ||
-          path === nativeBillingTest ||
+          nativeBillingTests.includes(path) ||
           (disableAuth &&
             authStarterPaths.some(
               (authPath) =>
