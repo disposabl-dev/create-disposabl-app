@@ -33,6 +33,16 @@ const step = (name: string, job = "cli") =>
   workflow.jobs[job].steps.find((s: { name?: string }) => s.name === name)
     .run as string;
 
+test("verification budget leaves time for release work", () => {
+  const maximumVerificationSeconds = 25 * 2 * 10 + 24 * 20;
+  for (const job of ["cli", "publish"]) {
+    expect(workflow.jobs[job]["timeout-minutes"]).toBe(30);
+    expect(
+      workflow.jobs[job]["timeout-minutes"] * 60 - maximumVerificationSeconds,
+    ).toBe(820);
+  }
+});
+
 test("conflicting recovery inputs run validation and fail visibly", () => {
   const shouldRun = new Function(
     "github",
@@ -132,6 +142,7 @@ function fixture() {
     if [[ -z "\${VERIFY_MODE:-}" ]]; then
       printf '{"name":"%s","version":"%s","dist":{"integrity":"%s"}}' "\${PACKAGE_NAME:-@disposabl/cli}" "\${REGISTRY_VERSION:-$VERSION}" "\${INTEGRITY:-sha512-test}" > "$3"; printf '%s' "\${STATUS:-404}"; exit
     fi
+    [[ "$*" == *'Cache-Control: no-cache'* ]] || exit 22
     output=''; url=''; previous=''
     for arg in "$@"; do
       [[ "$previous" != -o ]] || output="$arg"
@@ -141,7 +152,7 @@ function fixture() {
     if [[ "$url" == */latest ]]; then
       attempt=$(cat "$RUNNER_TEMP/verify-attempt" 2>/dev/null || echo 0)
       version=1.1.0
-      if [[ "$VERIFY_MODE" == persistent || ( "$VERIFY_MODE" == delayed && "$attempt" == 1 ) ]]; then version=1.0.0; fi
+      if [[ "$VERIFY_MODE" == persistent || ( "$VERIFY_MODE" == delayed && "$attempt" == 1 ) || ( "$VERIFY_MODE" == late && "$attempt" -lt 23 ) ]]; then version=1.0.0; fi
       integrity=sha512-test; [[ "$VERIFY_MODE" != integrity ]] || integrity=sha512-wrong
       printf '{"name":"%s","version":"%s","dist":{"integrity":"%s"}}' "\${PACKAGE_NAME:-@disposabl/cli}" "$version" "$integrity" > "$output"; printf 200; exit
     fi
@@ -149,7 +160,8 @@ function fixture() {
     attempt=$((attempt + 1)); echo "$attempt" > "$RUNNER_TEMP/verify-attempt"
     if [[ "$VERIFY_MODE" == auth ]]; then printf 401; exit; fi
     if [[ "$VERIFY_MODE" == network && "$attempt" == 1 ]]; then exit 7; fi
-    if [[ "$VERIFY_MODE" == persistent || ( "$VERIFY_MODE" == delayed && "$attempt" == 1 ) ]]; then printf 404; exit; fi
+    if [[ "$VERIFY_MODE" == malformed ]]; then printf 'private-marker-not-json' > "$output"; printf 200; exit; fi
+    if [[ "$VERIFY_MODE" == persistent || ( "$VERIFY_MODE" == delayed && "$attempt" == 1 ) || ( "$VERIFY_MODE" == late && "$attempt" -lt 23 ) ]]; then printf 404; exit; fi
     name=\${PACKAGE_NAME:-@disposabl/cli}; [[ "$VERIFY_MODE" != contradictory ]] || name=wrong-package
     printf '{"name":"%s","version":"1.1.0","dist":{"integrity":"sha512-test"}}' "$name" > "$output"; printf 200`,
   );
@@ -197,6 +209,9 @@ test("post-publish verification retries only propagation and transient network e
       VERIFY_MODE: mode,
     });
     expect(result.status).toBe(0);
+    expect(result.stdout).toContain(
+      mode === "network" ? "exact curl exit 7" : "exact HTTP 404",
+    );
     expect(readFileSync(join(f.dir, "verify-attempt"), "utf8").trim()).toBe(
       "2",
     );
@@ -205,61 +220,121 @@ test("post-publish verification retries only propagation and transient network e
   }
 });
 
-test("post-publish verification fails boundedly on 404 and immediately on contradictions or auth", () => {
-  for (const [mode, attempts, sleeps] of [
-    ["persistent", "10", 9],
-    ["contradictory", "1", 0],
-    ["integrity", "1", 0],
-    ["auth", "1", 0],
-  ] as const) {
-    const f = fixture();
-    f.git("tag", "@disposabl/cli@1.1.0");
-    writeFileSync(join(f.dir, "published"), "publish\n");
-    const result = f.run("Verify published CLI release and tag", {
-      VERIFY_MODE: mode,
-    });
-    expect(result.status).not.toBe(0);
-    expect(readFileSync(join(f.dir, "verify-attempt"), "utf8").trim()).toBe(
-      attempts,
-    );
-    const sleepFile = join(f.dir, "verify-sleeps");
-    expect(
-      existsSync(sleepFile)
-        ? readFileSync(sleepFile, "utf8").trim().split("\n").length
-        : 0,
-    ).toBe(sleeps);
-    expect(readFileSync(join(f.dir, "published"), "utf8")).toBe("publish\n");
-  }
-});
-
-test("generator post-publish verification fails closed and never republishes", () => {
-  for (const [mode, ok, attempts] of [
-    ["delayed", true, "2"],
-    ["network", true, "2"],
-    ["persistent", false, "10"],
-    ["contradictory", false, "1"],
-    ["integrity", false, "1"],
-    ["auth", false, "1"],
-  ] as const) {
-    const f = fixture();
-    f.git("tag", "v1.0.0");
-    f.git("tag", "v1.1.0");
-    writeFileSync(join(f.dir, "published"), "publish\n");
-    const result = f.run(
-      "Verify published generator release and tag",
-      {
+test(
+  "post-publish verification fails boundedly on 404 and immediately on contradictions or auth",
+  { timeout: 30000 },
+  () => {
+    for (const [mode, attempts, sleeps] of [
+      ["persistent", "25", 24],
+      ["contradictory", "1", 0],
+      ["malformed", "1", 0],
+      ["integrity", "1", 0],
+      ["auth", "1", 0],
+    ] as const) {
+      const f = fixture();
+      f.git("tag", "@disposabl/cli@1.1.0");
+      writeFileSync(join(f.dir, "published"), "publish\n");
+      const result = f.run("Verify published CLI release and tag", {
         VERIFY_MODE: mode,
-        PACKAGE_NAME: "create-disposabl-app",
-      },
-      "publish",
-    );
-    expect(result.status === 0).toBe(ok);
-    expect(readFileSync(join(f.dir, "verify-attempt"), "utf8").trim()).toBe(
-      attempts,
-    );
-    expect(readFileSync(join(f.dir, "published"), "utf8")).toBe("publish\n");
-  }
-});
+      });
+      expect(result.status).not.toBe(0);
+      expect(result.stdout + result.stderr).not.toContain(
+        "private-marker-not-json",
+      );
+      expect(readFileSync(join(f.dir, "verify-attempt"), "utf8").trim()).toBe(
+        attempts,
+      );
+      const sleepFile = join(f.dir, "verify-sleeps");
+      expect(
+        existsSync(sleepFile)
+          ? readFileSync(sleepFile, "utf8").trim().split("\n").length
+          : 0,
+      ).toBe(sleeps);
+      expect(readFileSync(join(f.dir, "published"), "utf8")).toBe("publish\n");
+    }
+  },
+);
+
+test(
+  "generator post-publish verification fails closed and never republishes",
+  { timeout: 30000 },
+  () => {
+    for (const [mode, ok, attempts] of [
+      ["delayed", true, "2"],
+      ["network", true, "2"],
+      ["persistent", false, "25"],
+      ["contradictory", false, "1"],
+      ["malformed", false, "1"],
+      ["integrity", false, "1"],
+      ["auth", false, "1"],
+    ] as const) {
+      const f = fixture();
+      f.git("tag", "v1.0.0");
+      f.git("tag", "v1.1.0");
+      writeFileSync(join(f.dir, "published"), "publish\n");
+      const result = f.run(
+        "Verify published generator release and tag",
+        {
+          VERIFY_MODE: mode,
+          PACKAGE_NAME: "create-disposabl-app",
+        },
+        "publish",
+      );
+      expect(result.status === 0).toBe(ok);
+      expect(result.stdout + result.stderr).not.toContain(
+        "private-marker-not-json",
+      );
+      expect(readFileSync(join(f.dir, "verify-attempt"), "utf8").trim()).toBe(
+        attempts,
+      );
+      expect(readFileSync(join(f.dir, "published"), "utf8")).toBe("publish\n");
+    }
+  },
+);
+
+test(
+  "both verifiers observe delayed availability without publishing again",
+  { timeout: 30000 },
+  () => {
+    for (const [job, stepName, tag, packageName] of [
+      [
+        "cli",
+        "Verify published CLI release and tag",
+        "@disposabl/cli@",
+        "@disposabl/cli",
+      ],
+      [
+        "publish",
+        "Verify published generator release and tag",
+        "v",
+        "create-disposabl-app",
+      ],
+    ] as const) {
+      const f = fixture();
+      if (job === "publish") f.git("tag", `${tag}1.0.0`);
+      f.git("tag", `${tag}1.1.0`);
+      writeFileSync(join(f.dir, "published"), "publish\n");
+      const result = f.run(
+        stepName,
+        { VERIFY_MODE: "late", PACKAGE_NAME: packageName },
+        job,
+      );
+      expect(result.status).toBe(0);
+      expect(readFileSync(join(f.dir, "verify-attempt"), "utf8").trim()).toBe(
+        "23",
+      );
+      expect(
+        readFileSync(join(f.dir, "verify-sleeps"), "utf8").trim().split("\n")
+          .length,
+      ).toBe(22);
+      expect(result.stdout).toContain("attempt 1/25: exact HTTP 404");
+      expect(result.stdout).toContain("attempt 1/25: latest HTTP 200");
+      expect(result.stdout).toContain("latest version 1.0.0; expected 1.1.0");
+      expect(result.stdout).toContain("attempt 23/25: exact HTTP 200");
+      expect(readFileSync(join(f.dir, "published"), "utf8")).toBe("publish\n");
+    }
+  },
+);
 
 test("recovery publishes only a 404 and safely replays a matching version", () => {
   const f = fixture();
