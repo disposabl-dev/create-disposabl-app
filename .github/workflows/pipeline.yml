@@ -180,32 +180,14 @@ jobs:
           compression-level: 0
           if-no-files-found: error
   product-checks:
-    name: Product unit tests
+    name: Product checks
     needs: changes
     if: github.repository == 'disposabl-dev/create-disposabl-app'
     permissions:
       contents: read
-    runs-on: *linux-runner
-    timeout-minutes: 20
-    env:
-      GH_TOKEN: ""
-      DO_NOT_TRACK: "1"
-      E2E_TELEMETRY_DISABLED: "1"
-      EXPO_NO_TELEMETRY: "1"
-      DISPOSABL_ANALYTICS_ENABLED: "false"
-      EXPO_PUBLIC_DISPOSABL_ANALYTICS_ENABLED: "false"
-      VITE_DISPOSABL_ANALYTICS_ENABLED: "false"
-    steps:
-      - *checkout
-      - *node
-      - *bun
-      - *cache
-      - *install
-      - name: Build current generator template
-        run: bun run --cwd packages/create-disposabl-app build
-      - name: Run standard unit suite
-        working-directory: packages/tests
-        run: bun test *.test.ts
+    uses: ./.github/workflows/product-checks.yml
+    with:
+      source_sha: ${{ github.event.pull_request.head.sha || github.sha }}
   android:
     name: Android
     needs: [changes, web]

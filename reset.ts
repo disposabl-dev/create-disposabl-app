@@ -25,8 +25,11 @@ if (
 // This release workflow targets Disposabl's package and signing identity.
 const productReleaseFiles = [
   ".github/workflows/play-bundle.yml",
+  ".github/workflows/product-checks.yml",
   ".github/scripts/play-bundle.sh",
   ".github/scripts/play-bundle.test.py",
+  ".github/scripts/product-browser-check.py",
+  ".github/scripts/product-browser-check-test.py",
 ];
 
 // Product-only proof harnesses must not enter generated apps. Keep the same

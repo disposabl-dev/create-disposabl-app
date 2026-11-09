@@ -21,8 +21,11 @@ import {
 
 const excluded = [
   ".github/workflows/play-bundle.yml",
+  ".github/workflows/product-checks.yml",
   ".github/scripts/play-bundle.sh",
   ".github/scripts/play-bundle.test.py",
+  ".github/scripts/product-browser-check.py",
+  ".github/scripts/product-browser-check-test.py",
   "packages/tests/ui-telemetry-policy.test.ts",
   "packages/tests/components/ui-telemetry-mobile.test.mjs",
   "packages/tests/components/mobile-posthog-sdk.test.mjs",
@@ -126,6 +129,69 @@ const excluded = [
   "packages/tests/low-credit-elapsed.test.ts",
   "packages/tests/fixtures/low-credit-convex",
 ];
+
+test("product browser gate uses the reusable exact-source workflow", async () => {
+  const parseWorkflow = async (name: string) => {
+    const input = await readFile(
+      join(import.meta.dirname, "../../.github/workflows", name),
+      "utf8",
+    );
+    const result = spawnSync(
+      process.execPath,
+      [
+        "-e",
+        "console.log(JSON.stringify(Bun.YAML.parse(await Bun.stdin.text())))",
+      ],
+      { input, encoding: "utf8" },
+    );
+    assert.equal(result.status, 0, result.stderr);
+    return JSON.parse(result.stdout);
+  };
+  const pipeline = (await parseWorkflow("pipeline.yml")) as {
+    jobs: {
+      "product-checks": {
+        uses: string;
+        with: { source_sha: string };
+        secrets?: unknown;
+      };
+      web: { needs: string[] };
+    };
+  };
+  const reusable = (await parseWorkflow("product-checks.yml")) as {
+    on: { workflow_call: { inputs: { source_sha: unknown } } };
+    permissions: unknown;
+    jobs: { check: { steps: Array<{ name?: string; run?: string }> } };
+  };
+  const gate = pipeline.jobs["product-checks"];
+  assert.equal(gate.uses, "./.github/workflows/product-checks.yml");
+  assert.ok(pipeline.jobs.web.needs.includes("product-checks"));
+  assert.match(
+    gate.with.source_sha,
+    /github\.event\.pull_request\.head\.sha \|\| github\.sha/,
+  );
+  assert.equal(gate.secrets, undefined);
+  assert.deepEqual(reusable.on.workflow_call.inputs.source_sha, {
+    required: true,
+    type: "string",
+  });
+  assert.deepEqual(reusable.permissions, { contents: "read" });
+  const steps = reusable.jobs.check.steps as Array<{
+    name?: string;
+    run?: string;
+  }>;
+  assert.ok(
+    steps.findIndex((step) => step.name === "Install frozen dependencies") <
+      steps.findIndex(
+        (step) => step.name === "Run isolated product web and backend E2E",
+      ),
+  );
+  assert.match(
+    steps.find(
+      (step) => step.name === "Run isolated product web and backend E2E",
+    )?.run ?? "",
+    /PRODUCT_BROWSER_REQUIRE_ISOLATION=1/,
+  );
+});
 const template = resolve(
   import.meta.dirname,
   "../create-disposabl-app/dist/templates/default",

@@ -1,0 +1,77 @@
+name: Product checks
+on:
+  workflow_call:
+    inputs:
+      source_sha:
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  check:
+    name: Product unit and browser tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      GH_TOKEN: ""
+      DO_NOT_TRACK: "1"
+      E2E_TELEMETRY_DISABLED: "1"
+      EXPO_NO_TELEMETRY: "1"
+      DISPOSABL_ANALYTICS_ENABLED: "false"
+      EXPO_PUBLIC_DISPOSABL_ANALYTICS_ENABLED: "false"
+      VITE_DISPOSABL_ANALYTICS_ENABLED: "false"
+    steps:
+      - name: Validate immutable source
+        env:
+          EXPECTED_SOURCE: ${{ inputs.source_sha }}
+        run: '[[ "$EXPECTED_SOURCE" =~ ^[0-9a-f]{40}$ ]]'
+      - uses: actions/checkout@v6
+        with: { ref: "${{ inputs.source_sha }}", persist-credentials: false }
+      - uses: actions/setup-node@v6
+        with: { node-version: "24", package-manager-cache: false }
+      - uses: oven-sh/setup-bun@v2
+        with: { bun-version: "1.4.4" }
+      - uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ runner.arch }}-1.4.4-${{ hashFiles('bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-${{ runner.arch }}-1.4.4-
+      - name: Install frozen dependencies
+        run: bun install --frozen-lockfile
+      - name: Verify requested source
+        env:
+          EXPECTED_SOURCE: ${{ inputs.source_sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE"
+      - name: Build current generator template
+        run: bun run --cwd packages/create-disposabl-app build
+      - name: Run standard unit suite
+        working-directory: packages/tests
+        run: bun test *.test.ts
+      - name: Prepare isolated browser test dependencies
+        shell: bash
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/product-browser-cache
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/product-convex"
+          curl --fail --location --retry 3 --output "$RUNNER_TEMP/product-convex/backend.zip" https://github.com/convex/convex-backend/releases/download/precompiled-2026-10-22-1447815/convex-local-backend-x86_64-unknown-linux-gnu.zip
+          echo '7be627d8a8c9175b66a55cf6c4ab63c5f6bde1c412f59fbbe93f64a24a11bd13  '"$RUNNER_TEMP/product-convex/backend.zip" | sha256sum --check --status
+          unzip -q "$RUNNER_TEMP/product-convex/backend.zip" -d "$RUNNER_TEMP/product-convex"
+          chmod +x "$RUNNER_TEMP/product-convex/convex-local-backend"
+          bun run --cwd packages/tests setup:browser
+          python3 .github/scripts/product-browser-check-test.py
+      - name: Run isolated product web and backend E2E
+        shell: bash
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/product-browser-cache
+        run: |
+          set -euo pipefail
+          # Create only a private network namespace; drop root before the test.
+          sudo unshare --net --fork /bin/bash -euc '
+            ip link set lo up
+            test "$(ip -o link show | wc -l)" -eq 1
+            ip -o link show | grep -Eq "^[0-9]+: lo:"
+            exec runuser -u "$1" -- env -i HOME="$2" PATH="$3" \
+              CONVEX_LOCAL_BINARY="$4" PLAYWRIGHT_BROWSERS_PATH="$5" \
+              PRODUCT_BROWSER_REQUIRE_ISOLATION=1 PRODUCT_BROWSER_FROZEN_INSTALL=1 python3 "$6"
+          ' _ "$(id -un)" "$HOME" "$PATH" "$RUNNER_TEMP/product-convex/convex-local-backend" "$PLAYWRIGHT_BROWSERS_PATH" "$GITHUB_WORKSPACE/.github/scripts/product-browser-check.py"

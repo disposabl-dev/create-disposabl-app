@@ -6,8 +6,10 @@ never downloads a binary or configures a cloud deployment. Retained evidence is
 private; apply an OS network sandbox externally if outbound denial is required.
 """
 import importlib.util
+import errno
 import json
 import os
+import re
 from pathlib import Path
 import secrets
 import shutil
@@ -22,6 +24,33 @@ from contextlib import ExitStack
 ROOT = Path(__file__).resolve().parents[2]
 PORTS = (3520, 3521)
 MIN_FREE = int(2.5 * 1024**3)
+
+
+def verify_isolation():
+    if sys.platform.startswith('linux') and os.geteuid() == 0:
+        raise RuntimeError('The isolated test process must not run as root')
+    with socket.socket() as listener:
+        listener.bind(('127.0.0.1', 0))
+        listener.listen(1)
+        with socket.create_connection(listener.getsockname(), timeout=1):
+            pass
+    for family, target in ((socket.AF_INET, ('1.1.1.1', 443)),
+                           (socket.AF_INET6, ('2606:4700:4700::1111', 443))):
+        try:
+            with socket.socket(family) as probe:
+                probe.settimeout(1)
+                result = probe.connect_ex(target)
+        except OSError as exc:
+            result = exc.errno
+        if result not in (errno.ENETUNREACH, errno.EACCES, errno.EPERM, errno.EAFNOSUPPORT):
+            raise RuntimeError('External network denial was not verified')
+
+
+def report_e2e(path):
+    text = re.sub(r'\x1b\[[0-9;]*m', '', path.read_text(errors='replace'))
+    line = next((line for line in text.splitlines() if re.match(r'\s*Tests\s+', line)), '')
+    counts = {name: int(value) for value, name in re.findall(r'(\d+)\s+(passed|failed|skipped)', line)}
+    print('E2E counts: ' + (', '.join(f'{name}={counts[name]}' for name in ('passed', 'failed', 'skipped') if name in counts) or 'unavailable'), flush=True)
 
 
 def load(path, name):
@@ -53,8 +82,14 @@ def main():
     browsers = Path(os.environ.get('PLAYWRIGHT_BROWSERS_PATH', '')).resolve()
     if not os.environ.get('CONVEX_LOCAL_BINARY') or not os.environ.get('PLAYWRIGHT_BROWSERS_PATH') or not binary.is_file() or not os.access(binary, os.X_OK) or not browsers.is_dir():
         raise RuntimeError('Supply an executable verified local backend and cached browser directory')
+    if os.environ.get('PRODUCT_BROWSER_FROZEN_INSTALL') != '1':
+        raise RuntimeError('Caller must complete bun install --frozen-lockfile before running')
+    if os.environ.get('PRODUCT_BROWSER_REQUIRE_ISOLATION') == '1':
+        verify_isolation()
     if shutil.disk_usage('/tmp').free < MIN_FREE:
         raise RuntimeError('Insufficient free space (<2.5 GiB)')
+    if subprocess.check_output(['git', 'status', '--porcelain', '--untracked-files=all'], cwd=ROOT, text=True).strip():
+        raise RuntimeError('A clean committed checkout is required')
     check_ports()
     owner = load(ROOT / 'packages/tests/helpers/sdk-auth/run.py', 'owned_runner')
     selected = load(ROOT / 'packages/tests/helpers/sdk-auth/selected_auth.py', 'selected_auth')
@@ -70,14 +105,22 @@ def main():
            'LANG': 'en_US.UTF-8', 'CI': '1', 'DO_NOT_TRACK': '1', 'DISPOSABL_TELEMETRY_DISABLED': '1',
            'E2E_TELEMETRY_DISABLED': '1', 'DISABLE_BEACON': '1', 'EXPO_NO_TELEMETRY': '1',
            'EXPO_NO_DOTENV': '1', 'PLAYWRIGHT_BROWSERS_PATH': str(browsers)}
-    print(f"source {sha}; auth {auth['version']} sha256 {auth['sha256']} ({auth['files']} files); private evidence {work}", flush=True)
+    print(f"source {sha}; auth {auth['version']} sha256 {auth['sha256']} ({auth['files']} files); non-Auth dependencies linked from caller frozen install; private evidence {work}", flush=True)
 
-    def command(argv, *, cwd, environment=env, log=None):
-        with tempfile.TemporaryFile(mode='w+') if log is None else (work / log).open('w+') as out:
+    sequence = 0
+    def command(argv, *, cwd, environment=env, log=None, sensitive=False):
+        nonlocal sequence
+        sequence += 1
+        name = log or f'preparation-{sequence}.log'
+        with tempfile.TemporaryFile(mode='w+') if sensitive else (work / name).open('w+') as out:
             with owner.owned_backend(argv, process_group=True, stop_timeout=.1, cwd=cwd, env=environment,
                                      stdout=out, stderr=subprocess.STDOUT) as proc:
-                if proc.wait():
-                    raise RuntimeError(f'Fixture command failed; inspect {log or "private evidence"}')
+                code = proc.wait()
+                out.flush()
+                if log == 'e2e.log':
+                    report_e2e(work / log)
+                if code:
+                    raise RuntimeError(f'Fixture command failed (exit {code}); inspect {name if not sensitive else "private key generation"}')
             out.seek(0)
             return out.read()
 
@@ -103,7 +146,7 @@ def main():
         raise RuntimeError('Insufficient free space after snapshot')
     command(['bun', 'run', 'build'], cwd=source / 'packages/create-disposabl-app', log='generator.log')
     name, secret = 'product-browser-fixture', secrets.token_hex(32)
-    key = command([str(binary), 'keygen', 'admin-key', '--instance-name', name, '--instance-secret', secret], cwd=source).strip()
+    key = command([str(binary), 'keygen', 'admin-key', '--instance-name', name, '--instance-secret', secret], cwd=source, sensitive=True).strip()
     if not key:
         raise RuntimeError('Local admin key generation failed')
     backend = source / 'packages/backend'
