@@ -22,6 +22,7 @@ test("setup interaction categories cannot carry clipboard content or bypass a le
       {
         token: "public",
         distinct_id: "opaque",
+        $geoip_disable: true,
         platform: "web",
         action,
       },

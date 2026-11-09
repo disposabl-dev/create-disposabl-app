@@ -14,7 +14,19 @@ test("mobile product action handlers and lease gates", () => {
       ["test", join(import.meta.dirname, "components", file)],
       {
         encoding: "utf8",
-        env: { ...process.env, E2E_TELEMETRY_DISABLED: "1", DO_NOT_TRACK: "1" },
+        env: {
+          ...process.env,
+          E2E_TELEMETRY_DISABLED: "1",
+          DO_NOT_TRACK: "1",
+          ...(file === "ui-telemetry-mobile.test.mjs"
+            ? {
+                CONVEX_URL: "http://127.0.0.1:3540",
+                CONVEX_SITE_URL: "http://127.0.0.1:3541",
+                EXPO_PUBLIC_CONVEX_URL: "http://127.0.0.1:9998",
+                EXPO_PUBLIC_CONVEX_SITE_URL: "http://127.0.0.1:9999",
+              }
+            : {}),
+        },
       },
     );
     assert.equal(result.status, 0, result.stdout + result.stderr);

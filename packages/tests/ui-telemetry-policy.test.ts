@@ -1,6 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { safeTelemetryEvent } from "../../apps/web/src/telemetry-policy";
+import {
+  productPageCategory,
+  safeTelemetryEvent,
+} from "../../apps/web/src/telemetry-policy";
 import { screenCategory } from "../../apps/mobile/src/features/telemetry-policy";
 import {
   publicReplayPath,
@@ -59,6 +62,36 @@ test("mobile categories never expose app identifiers or unknown routes", () => {
   assert.equal(screenCategory("/apps/private-app-id"), "app_detail");
   assert.equal(screenCategory("/settings"), "settings");
   assert.equal(screenCategory("/unknown/private"), "other");
+});
+
+test("web public categories are exact and private paths remain coarse", () => {
+  for (const route of ["pricing", "build", "stack", "why-disposabl"]) {
+    assert.equal(productPageCategory(`/${route}`), route);
+    assert.equal(productPageCategory(`/${route}/`), route);
+    assert.equal(productPageCategory(`/${route}-secret`), "other");
+    const event = safeTelemetryEvent("$pageview", {
+      active: true,
+      now: 1,
+      deadline: 2,
+      page: `/${route}`,
+      source: "web",
+      projectToken: "public",
+      distinctId: "opaque",
+    });
+    assert.ok(event && "page" in event);
+    assert.equal(event.page, route);
+    assert.equal(event.$current_url, `https://www.disposabl.dev/${route}`);
+  }
+  assert.equal(productPageCategory("/dashboard-secret"), "other");
+  assert.equal(
+    productPageCategory("/dashboard/connections-secret"),
+    "dashboard",
+  );
+  assert.equal(productPageCategory("/dashboard/private-secret"), "dashboard");
+  assert.equal(
+    productPageCategory("/unknown/private-secret?token=secret"),
+    "other",
+  );
 });
 
 test("web events emit only fixed fields and stop at the lease deadline", () => {
