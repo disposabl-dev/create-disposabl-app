@@ -329,61 +329,6 @@ test(
       await grant();
       expect((await rest("apps/get", { appId })).status).toBe(200);
 
-      // A different app's unresolved remote stop must fence this already-issued
-      // credential, without changing a different owner's credential.
-      const uncertainApp = randomUUID();
-      const otherApp = randomUUID();
-      const otherLease = randomUUID();
-      const otherBearer =
-        "disposabl_agent_" +
-        randomUUID().replaceAll("-", "") +
-        randomUUID().replaceAll("-", "");
-      await value(
-        "agentFixture:createAccessApp",
-        { appId: uncertainApp, userId: owner.id },
-        { admin: true },
-      );
-      const otherThread = await value(
-        "agentFixture:createAccessApp",
-        { appId: otherApp, userId: other.id },
-        { admin: true },
-      );
-      await value(
-        "agentFixture:seedLease",
-        { appId: otherApp, userId: other.id, token: otherLease },
-        { admin: true },
-      );
-      await value(
-        "agent/access:issue",
-        {
-          id: otherThread,
-          userId: other.id,
-          appId: otherApp,
-          token: otherLease,
-          hash: createHash("sha256").update(otherBearer).digest("hex"),
-        },
-        { admin: true },
-      );
-      expect(
-        (await rest("apps/get", { appId: otherApp }, "GET", otherBearer))
-          .status,
-      ).toBe(200);
-      await value(
-        "agentFixture:setUnconfirmed",
-        { appId: uncertainApp, userId: owner.id, value: true },
-        { admin: true },
-      );
-      expect((await rest("apps/get", { appId })).status).toBe(401);
-      expect(
-        (await rest("apps/get", { appId: otherApp }, "GET", otherBearer))
-          .status,
-      ).toBe(200);
-      await value(
-        "agentFixture:setUnconfirmed",
-        { appId: uncertainApp, userId: owner.id, value: false },
-        { admin: true },
-      );
-      expect((await rest("apps/get", { appId })).status).toBe(200);
       function cliStatus(bearer: string, expiresAt = Date.now() + 14_400_000) {
         const sessionDirectory = mkdtempSync(
           join(tmpdir(), "disposabl-agent-session-"),
@@ -520,6 +465,61 @@ test(
           )
         ).status,
       ).toBe("error");
+      // A different app's unresolved remote stop must fence this already-issued
+      // credential, without changing a different owner's credential.
+      const uncertainApp = randomUUID();
+      const otherApp = randomUUID();
+      const otherLease = randomUUID();
+      const otherBearer =
+        "disposabl_agent_" +
+        randomUUID().replaceAll("-", "") +
+        randomUUID().replaceAll("-", "");
+      await value(
+        "agentFixture:createAccessApp",
+        { appId: uncertainApp, userId: owner.id },
+        { admin: true },
+      );
+      const otherThread = await value(
+        "agentFixture:createAccessApp",
+        { appId: otherApp, userId: other.id },
+        { admin: true },
+      );
+      await value(
+        "agentFixture:seedLease",
+        { appId: otherApp, userId: other.id, token: otherLease },
+        { admin: true },
+      );
+      await value(
+        "agent/access:issue",
+        {
+          id: otherThread,
+          userId: other.id,
+          appId: otherApp,
+          token: otherLease,
+          hash: createHash("sha256").update(otherBearer).digest("hex"),
+        },
+        { admin: true },
+      );
+      expect(
+        (await rest("apps/get", { appId: otherApp }, "GET", otherBearer))
+          .status,
+      ).toBe(200);
+      await value(
+        "agentFixture:setUnconfirmed",
+        { appId: uncertainApp, userId: owner.id, value: true },
+        { admin: true },
+      );
+      expect((await rest("apps/get", { appId })).status).toBe(401);
+      expect(
+        (await rest("apps/get", { appId: otherApp }, "GET", otherBearer))
+          .status,
+      ).toBe(200);
+      await value(
+        "agentFixture:setUnconfirmed",
+        { appId: uncertainApp, userId: owner.id, value: false },
+        { admin: true },
+      );
+      expect((await rest("apps/get", { appId })).status).toBe(200);
       const first = await value(
         "agent/index:getMessages",
         { appId, paginationOpts: { numItems: 1, cursor: null } },
