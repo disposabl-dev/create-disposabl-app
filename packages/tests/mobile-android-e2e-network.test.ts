@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import project from "../../disposabl.json";
 
+const selectedFeatures: readonly string[] = project.features;
 const require = createRequire(import.meta.url);
 const configure = require("../../apps/mobile/app.config.js");
 const network = require("../../apps/mobile/plugins/with-e2e-network.js");
@@ -80,7 +81,7 @@ test("E2E loopback configuration has isolated identity, scheme, updates and netw
         "app.disposabl.androidround10.preview",
       );
       assert.equal(config.scheme[0], "disposabl-androidround10-preview");
-      if (project.features.includes("payments")) {
+      if (selectedFeatures.includes("payments")) {
         assert.equal(config.scheme.length, 2);
         assert.match(
           config.scheme[1],
