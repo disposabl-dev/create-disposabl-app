@@ -26,8 +26,7 @@ test(
   "registered renew dispatches through its default adapter when the claim is eligible",
   { skip: !base },
   async () => {
-    const userId = "synthetic-renew-control";
-    const sessionId = await m("seed", { userId });
+    const { userId, sessionId } = await m("seed", { outcome: "confirmed" });
     await a("fund", { sessionId });
     const before = await q("inspect", { sessionId, userId });
     assert.equal(before.calls, 1);
@@ -51,8 +50,7 @@ test(
   "registered renew callbacks never dispatch for active, stale or expired windows",
   { skip: !base },
   async () => {
-    const userId = "synthetic-confirmed";
-    const sessionId = await m("seed", { userId });
+    const { userId, sessionId } = await m("seed", { outcome: "confirmed" });
     await Promise.all(
       Array.from({ length: 5 }, () => a("fund", { sessionId })),
     );
@@ -65,8 +63,9 @@ test(
     await Promise.all(
       Array.from({ length: 5 }, () => a("renew", { sessionId, expectedDebit })),
     );
-    const otherId = "synthetic-stale";
-    const otherSession = await m("seed", { userId: otherId });
+    const { userId: otherId, sessionId: otherSession } = await m("seed", {
+      outcome: "confirmed",
+    });
     await a("fund", { sessionId: otherSession });
     const other = await q("inspect", {
       sessionId: otherSession,
@@ -92,8 +91,7 @@ test(
   "unknown initial debit cannot be dispatched twice",
   { skip: !base },
   async () => {
-    const userId = "synthetic-unknown";
-    const sessionId = await m("seed", { userId });
+    const { userId, sessionId } = await m("seed", { outcome: "unknown" });
     await Promise.all(
       Array.from({ length: 5 }, () => a("fund", { sessionId })),
     );

@@ -7,8 +7,10 @@ import {
 import { v } from "convex/values";
 import { fund as productFund } from "./agent/actions/productCompute";
 export const seed = mutation({
-  args: { userId: v.string() },
-  handler: async (ctx, { userId }) => {
+  args: { outcome: v.union(v.literal("confirmed"), v.literal("unknown")) },
+  handler: async (ctx, { outcome }) => {
+    const userId = await ctx.db.insert("users", {});
+    await ctx.db.insert("fixtureOwners", { userId, outcome });
     const sessionId = await ctx.db.insert("computeSessions", {
       userId,
       state: "starting",
@@ -27,14 +29,19 @@ export const seed = mutation({
         updatedAt: Date.now(),
       },
     });
-    return sessionId;
+    return { sessionId, userId };
   },
 });
 export const dispatch = mutation({
   args: { userId: v.string() },
   handler: async (ctx, { userId }) => {
     await ctx.db.insert("fixtureProviderCalls", { userId });
-    return userId.endsWith("unknown")
+    const owner = await ctx.db
+      .query("fixtureOwners")
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
+      .unique();
+    if (!owner) throw new Error("Missing fixture owner");
+    return owner.outcome === "unknown"
       ? { outcome: "unknown" as const }
       : { outcome: "confirmed" as const, responseBalance: 90 };
   },
@@ -65,7 +72,7 @@ export const expire = mutation({
 export const prepareEligibleRenewal = mutation({
   args: { sessionId: v.id("computeSessions") },
   handler: (ctx, { sessionId }) =>
-    ctx.db.patch(sessionId, { state: "starting" }),
+    ctx.db.patch(sessionId, { state: "starting", paidUntil: 0 }),
 });
 export const inspect = query({
   args: { sessionId: v.id("computeSessions"), userId: v.string() },
