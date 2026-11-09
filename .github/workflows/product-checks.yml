@@ -14,6 +14,7 @@ jobs:
     timeout-minutes: 25
     env:
       GH_TOKEN: ""
+      PYTHONDONTWRITEBYTECODE: "1"
       DO_NOT_TRACK: "1"
       E2E_TELEMETRY_DISABLED: "1"
       EXPO_NO_TELEMETRY: "1"
@@ -73,5 +74,5 @@ jobs:
             ip -o link show | grep -Eq "^[0-9]+: lo:"
             exec runuser -u "$1" -- env -i HOME="$2" PATH="$3" \
               CONVEX_LOCAL_BINARY="$4" PLAYWRIGHT_BROWSERS_PATH="$5" \
-              PRODUCT_BROWSER_REQUIRE_ISOLATION=1 PRODUCT_BROWSER_FROZEN_INSTALL=1 python3 "$6"
+              PYTHONDONTWRITEBYTECODE=1 PRODUCT_BROWSER_REQUIRE_ISOLATION=1 PRODUCT_BROWSER_FROZEN_INSTALL=1 python3 "$6"
           ' _ "$(id -un)" "$HOME" "$PATH" "$RUNNER_TEMP/product-convex/convex-local-backend" "$PLAYWRIGHT_BROWSERS_PATH" "$GITHUB_WORKSPACE/.github/scripts/product-browser-check.py"

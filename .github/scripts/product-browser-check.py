@@ -125,8 +125,10 @@ def main():
         verify_isolation()
     if shutil.disk_usage('/tmp').free < MIN_FREE:
         raise RuntimeError('Insufficient free space (<2.5 GiB)')
-    if subprocess.check_output(['git', 'status', '--porcelain', '--untracked-files=all'], cwd=ROOT, text=True).strip():
-        raise RuntimeError('A clean committed checkout is required')
+    changes = subprocess.check_output(['git', 'status', '--porcelain', '--untracked-files=all'], cwd=ROOT, text=True).splitlines()
+    if changes:
+        bytecode = sum('__pycache__/' in change and change.endswith('.pyc') for change in changes)
+        raise RuntimeError(f'A clean committed checkout is required ({len(changes)} changed entries; {bytecode} Python cache files)')
     check_ports()
     owner = load(ROOT / 'packages/tests/helpers/sdk-auth/run.py', 'owned_runner')
     selected = load(ROOT / 'packages/tests/helpers/sdk-auth/selected_auth.py', 'selected_auth')

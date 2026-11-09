@@ -165,6 +165,7 @@ test("product browser gate uses the reusable exact-source workflow", async () =>
     permissions: unknown;
     jobs: {
       check: {
+        env: Record<string, string>;
         steps: Array<{
           name?: string;
           run?: string;
@@ -234,6 +235,47 @@ test("product browser gate uses the reusable exact-source workflow", async () =>
     type: "string",
   });
   assert.deepEqual(reusable.permissions, { contents: "read" });
+  assert.equal(reusable.jobs.check.env.PYTHONDONTWRITEBYTECODE, "1");
+  assert.match(
+    runStep("Run isolated product web and backend E2E"),
+    /PYTHONDONTWRITEBYTECODE=1/,
+  );
+  const cacheFixture = await mkdtemp(join(tmpdir(), "browser-bytecode-"));
+  try {
+    await cp(
+      join(
+        import.meta.dirname,
+        "../../.github/scripts/product-browser-check.py",
+      ),
+      join(cacheFixture, "runner.py"),
+    );
+    const imported = spawnSync(
+      "python3",
+      [
+        "-c",
+        `
+import importlib.util, sys
+sys.pycache_prefix = None
+spec = importlib.util.spec_from_file_location("runner", "runner.py")
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+`,
+      ],
+      {
+        cwd: cacheFixture,
+        env: {
+          ...process.env,
+          PYTHONDONTWRITEBYTECODE:
+            reusable.jobs.check.env.PYTHONDONTWRITEBYTECODE,
+        },
+        encoding: "utf8",
+      },
+    );
+    assert.equal(imported.status, 0, imported.stderr);
+    assert.equal(existsSync(join(cacheFixture, "__pycache__")), false);
+  } finally {
+    await rm(cacheFixture, { recursive: true, force: true });
+  }
   const steps = reusable.jobs.check.steps as Array<{
     name?: string;
     run?: string;
