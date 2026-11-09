@@ -7,11 +7,26 @@ const require = createRequire(import.meta.url);
 test("iOS disables the native push-open hook before JavaScript starts", () => {
   const configure = require("../../../apps/mobile/app.config.js");
   const { expo } = require("../../../apps/mobile/app.json");
-  expect(
-    configure({ config: expo }).ios.infoPlist[
-      "com.posthog.posthog.CAPTURE_PUSH_NOTIFICATION_OPENED"
-    ],
-  ).toBe(false);
+  const keys = [
+    "CONVEX_URL",
+    "CONVEX_SITE_URL",
+    "EXPO_PUBLIC_CONVEX_URL",
+    "EXPO_PUBLIC_CONVEX_SITE_URL",
+  ];
+  const saved = keys.map((key) => process.env[key]);
+  try {
+    for (const key of keys) delete process.env[key];
+    expect(
+      configure({ config: expo }).ios.infoPlist[
+        "com.posthog.posthog.CAPTURE_PUSH_NOTIFICATION_OPENED"
+      ],
+    ).toBe(false);
+  } finally {
+    keys.forEach((key, index) => {
+      if (saved[index] === undefined) delete process.env[key];
+      else process.env[key] = saved[index];
+    });
+  }
 });
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
