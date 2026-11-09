@@ -138,5 +138,5 @@ test("paid credential lifecycle uses the real issuance and access handlers", asy
     },
   );
   assert.equal(result.status, 0, result.stdout + result.stderr);
-  assert.match(result.stdout + result.stderr, /2 pass/);
+  assert.match(result.stdout + result.stderr, /4 pass/);
 });

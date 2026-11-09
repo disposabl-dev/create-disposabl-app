@@ -171,16 +171,13 @@ for (const identity of [
   { userId: "other", appId: "app-a" },
   { userId: "owner", appId: "other-app" },
 ]) {
-  test.skipIf(process.env.PAID_IDENTITY_REPRO !== "1")(
-    `bootstrap rejects mismatched ${identity.userId === "other" ? "owner" : "app"}`,
-    async () => {
-      const f = setup();
-      await expect(f.authorize(identity)).rejects.toThrow();
-      expect(f.state.patches).toBe(0);
-      expect(f.state.commands).toHaveLength(0);
-      expect(f.state.writes).toHaveLength(0);
-    },
-  );
+  test(`bootstrap rejects mismatched ${identity.userId === "other" ? "owner" : "app"}`, async () => {
+    const f = setup();
+    await expect(f.authorize(identity)).rejects.toThrow();
+    expect(f.state.patches).toBe(0);
+    expect(f.state.commands).toHaveLength(0);
+    expect(f.state.writes).toHaveLength(0);
+  });
 }
 process.on("exit", () => {
   Date.now = realNow;

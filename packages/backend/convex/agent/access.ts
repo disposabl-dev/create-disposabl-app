@@ -18,12 +18,19 @@ export async function digest(value: string) {
 
 /** Only the leased worker can authorize its next remote turn. Store no bearer. */
 export const issue = internalMutation({
-  args: { ...workerArgs, hash: v.string() },
+  args: {
+    ...workerArgs,
+    userId: v.string(),
+    appId: v.string(),
+    hash: v.string(),
+  },
   returns: v.number(),
-  handler: async (ctx, { id, token, hash }) => {
+  handler: async (ctx, { id, token, userId, appId, hash }) => {
     const current = await getThread(ctx, id);
     if (
       !current ||
+      current.userId !== userId ||
+      current.appId !== appId ||
       (await deletionPending(ctx, current.userId)) ||
       !(await sessionAllows(
         ctx,
