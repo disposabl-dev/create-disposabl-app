@@ -51,7 +51,7 @@ def main():
     name = 'sdk-auth-owned'
     secret = secrets.token_hex(32)
     key = subprocess.check_output([str(BINARY), 'keygen', 'admin-key', '--instance-name', name,
-                                   '--instance-secret', secret], env=env, text=True).strip()
+                                   '--instance-secret', secret], env=env, text=True, stderr=subprocess.PIPE).strip()
     admin = env | {'CONVEX_SELF_HOSTED_URL': 'http://127.0.0.1:3530', 'CONVEX_SELF_HOSTED_ADMIN_KEY': key}
     testenv = env | {'E2E_CONVEX_ADMIN_KEY': key, 'E2E_CONVEX_URL': 'http://127.0.0.1:3530',
                      'E2E_CONVEX_SITE_URL': 'http://127.0.0.1:3531', 'CONVEX_URL': 'http://127.0.0.1:3530',
@@ -120,6 +120,10 @@ def main():
 if __name__ == '__main__':
     try:
         main()
+    except subprocess.SubprocessError:
+        # CalledProcessError includes argv; key generation argv contains the local secret.
+        print('Fixture subprocess failed; inspect the retained redacted logs', file=sys.stderr)
+        sys.exit(1)
     except Exception as exc:
         print(f'Fixture failed: {exc}', file=sys.stderr)
         sys.exit(1)
