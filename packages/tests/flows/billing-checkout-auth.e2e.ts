@@ -2,7 +2,7 @@ import { test } from "@e2e-dev/web";
 import { expect } from "e2e";
 import { randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { lstatSync, readFileSync, realpathSync } from "node:fs";
+import { lstatSync, mkdirSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 function assertOwnedBackend() {
@@ -90,7 +90,7 @@ function assertOwnedBackend() {
   if (!opened.split("\n").includes(`n${db}`))
     throw new Error("Database not owned by backend");
   // A runner must not repeat account creation on a previously used database.
-  require("node:fs").mkdirSync(join(dirname(marker), ".claimed"));
+  mkdirSync(join(dirname(marker), ".claimed"));
 }
 
 test(
