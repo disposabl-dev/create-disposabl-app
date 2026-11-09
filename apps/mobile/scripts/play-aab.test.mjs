@@ -229,8 +229,8 @@ test("candidate build derives signer while optional Play checks fail closed", ()
       },
     });
     const commands = {
-      keytool: `if [ "$1" = -printcert ] && [ "\${BAD_BUNDLE_CERT:-}" = 1 ]; then printf 'SHA256: ${Array(32).fill("BB").join(":")}\\n'; else printf 'SHA256: ${Array(32).fill("AA").join(":")}\\n'; fi`,
-      bun: `if [ "$4" = config ]; then printf '%s' '${config}'; else mkdir -p android/app; printf "applicationId 'app.test'\\nversionCode 5\\n" > android/app/build.gradle; printf '#!/bin/sh\\nmkdir -p app/build/outputs/bundle/release\\nprintf fixture > app/build/outputs/bundle/release/app-release.aab\\n' > android/gradlew; chmod +x android/gradlew; fi`,
+      keytool: `if [ "$1" = -printcert ] && [ "\${BAD_BUNDLE_CERT:-}" = 1 ]; then printf 'SHA256: ${Array(32).fill("BB").join(":")}\\n'; else if [ "\${NO_SHA1:-}" != 1 ]; then printf 'SHA1: ${Array(20).fill("CC").join(":")}\\n'; fi; if [ "\${DUP_SHA1:-}" = 1 ]; then printf 'SHA1: ${Array(20).fill("CC").join(":")}\\n'; fi; printf 'SHA256: ${Array(32).fill("AA").join(":")}\\n'; fi`,
+      bun: `printf x >> "$CALL_LOG"; if [ "$4" = config ]; then printf '%s' '${config}'; else mkdir -p android/app; printf "applicationId 'app.test'\\nversionCode 5\\n" > android/app/build.gradle; printf '#!/bin/sh\\nmkdir -p app/build/outputs/bundle/release\\nprintf fixture > app/build/outputs/bundle/release/app-release.aab\\n' > android/gradlew; chmod +x android/gradlew; fi`,
       unzip: `if [ "$1" = -p ]; then printf '%s' '${config}'; else printf 'base/lib/arm64-v8a/liba.so\\nbase/lib/x86_64/liba.so\\n'; fi`,
       java: `if [ "$3" = dump ]; then printf '<manifest package="app.test" android:versionCode="5"><uses-sdk android:targetSdkVersion="36"/></manifest>'; fi`,
       jarsigner: "printf 'jar verified.'",
@@ -253,12 +253,17 @@ test("candidate build derives signer while optional Play checks fail closed", ()
       ANDROID_KEY_ALIAS: "fixture",
       ANDROID_KEY_PASSWORD: "fixture",
       BUNDLETOOL_JAR: input,
+      CALL_LOG: join(mobile, "bun-calls"),
     };
     const run = (extra) =>
       spawnSync(process.execPath, [join(mobile, "scripts/play-aab.mjs")], {
         env: { ...env, ...extra },
         encoding: "utf8",
       });
+    const rejected = run({ PLAY_UPLOAD_CERT_SHA1: "DD".repeat(20) });
+    expect(rejected.status).not.toBe(0);
+    expect(rejected.stderr).toContain("SHA1 does not match supplied Play");
+    expect(existsSync(env.CALL_LOG)).toBe(false);
     const unchecked = run({});
     expect(unchecked.status).toBe(0);
     const result = JSON.parse(
@@ -268,19 +273,47 @@ test("candidate build derives signer while optional Play checks fail closed", ()
     expect(result.signingCertificateSource).toBe("selected keystore");
     expect(result.playUploadCertificate).toBe("unchecked");
     expect(result.playPreviousVersion).toBe("unchecked");
+    expect(result.playUploadCertificateSha1).toBe("unchecked");
     expect(result.uploadCertificateSha256).toBeUndefined();
     const matched = run({
       PLAY_UPLOAD_CERT_SHA256: "AA".repeat(32),
+      PLAY_UPLOAD_CERT_SHA1: Array(20).fill("cc").join(":"),
       PLAY_PREVIOUS_VERSION_CODE: "4",
     });
     expect(matched.status).toBe(0);
     expect(matched.stdout).toContain("matched supplied fingerprint");
+    const sha1Only = run({ PLAY_UPLOAD_CERT_SHA1: "CC".repeat(20) });
+    expect(sha1Only.status).toBe(0);
+    const sha1Result = JSON.parse(
+      sha1Only.stdout.slice(sha1Only.stdout.indexOf("{")),
+    );
+    expect(sha1Result.playUploadCertificate).toBe("unchecked");
+    expect(sha1Result.playUploadCertificateSha1).toBe(
+      "matched supplied fingerprint",
+    );
     for (const [extra, message] of [
       [
         { BAD_BUNDLE_CERT: "1" },
         "Bundle signer does not match expected signing certificate",
       ],
       [{ PLAY_UPLOAD_CERT_SHA256: ":" }, "Invalid upload certificate"],
+      [
+        { PLAY_UPLOAD_CERT_SHA1: "CC".repeat(20), NO_SHA1: "1" },
+        "Expected exactly one SHA1",
+      ],
+      [
+        { PLAY_UPLOAD_CERT_SHA1: "CC".repeat(20), DUP_SHA1: "1" },
+        "Expected exactly one SHA1",
+      ],
+      [{ PLAY_UPLOAD_CERT_SHA1: ":" }, "Invalid upload certificate SHA1"],
+      [
+        { PLAY_UPLOAD_CERT_SHA1: "GG".repeat(20) },
+        "Invalid upload certificate SHA1",
+      ],
+      [
+        { PLAY_UPLOAD_CERT_SHA1: "CC".repeat(19) },
+        "Invalid upload certificate SHA1",
+      ],
       [
         { PLAY_UPLOAD_CERT_SHA256: "BB".repeat(32) },
         "does not match verified Play",

@@ -257,6 +257,7 @@ jobs:
     env:
       EXPECTED_SOURCE_SHA: ${{ github.sha }}
       PLAY_PACKAGE_ID: com.yastai.disposabl
+      PLAY_UPLOAD_CERT_SHA1: "B5:8D:03:56:8C:BC:03:62:D4:A8:7A:0E:63:EC:83:C9:55:B0:29:A7"
       EXPO_PUBLIC_CONVEX_URL: ${{ needs.web.outputs.convex_url }}
       EXPO_PUBLIC_CONVEX_SITE_URL: ${{ needs.web.outputs.convex_site_url }}
       EXPO_PUBLIC_DISPOSABL_ANALYTICS_ENABLED: "true"
