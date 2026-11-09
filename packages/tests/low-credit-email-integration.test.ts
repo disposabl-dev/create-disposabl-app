@@ -142,6 +142,86 @@ test(
 );
 
 test(
+  "unknown funding holds initial and renewal windows without retrying the debit or notifying",
+  { skip },
+  async () => {
+    for (const mode of ["malformed", "lost"]) {
+      for (const renewal of [false, true]) {
+        const before = (await emails()).length;
+        const { userId, sessionId } = await call("seedUnclaimed");
+        let expectedDebit: string | undefined;
+        if (renewal) {
+          await call(
+            "fundFixture",
+            { sessionId, responseBalance: 20 },
+            false,
+            true,
+          );
+          const initial = await call("session", { sessionId }, true);
+          assert.equal((await debit(initial.debitId)).state, "confirmed");
+          await call("activateFixture", { sessionId });
+          expectedDebit = initial.debitId;
+          await call("shortenWindow", {
+            debitId: expectedDebit,
+            paidUntil: Date.now() - 1,
+          });
+        }
+        const request = { sessionId, expectedDebit, responseBalance: 0, mode };
+        await call("fundFixture", request, false, true);
+        const session = await call("session", { sessionId }, true);
+        const unknown = await debit(session.debitId);
+        assert.equal(unknown.state, "unknown");
+        assert.equal(unknown.paidUntil, 0);
+        assert.equal(unknown.responseBalance, undefined);
+        assert.equal(unknown.noticeOutcome, undefined);
+        assert.equal(session.state, "hold");
+        assert.ok(session.paidUntil <= Date.now());
+        assert.equal(await call("allowed", { sessionId, userId }, true), false);
+        const requests = await call("debitRequests", { sessionId }, true);
+        assert.equal(requests.length, renewal ? 2 : 1);
+        assert.ok(
+          requests.every(
+            (entry: any) =>
+              entry.method === "balances.check" && entry.sendEvent,
+          ),
+        );
+        assert.equal(
+          (await call("sessionDebits", { sessionId }, true)).length,
+          renewal ? 2 : 1,
+        );
+        assert.equal(
+          (await call("scheduled", {}, true)).some(
+            (job: any) =>
+              job.name === "agent/actions/compute.js:notice" &&
+              job.args[0].debitId === session.debitId,
+          ),
+          false,
+        );
+        await call("fundFixture", request, false, true);
+        await call(
+          "fundFixture",
+          { ...request, expectedDebit: session.debitId },
+          false,
+          true,
+        );
+        assert.equal(
+          (await call("debitRequests", { sessionId }, true)).length,
+          requests.length,
+        );
+        assert.equal(
+          (await call("sessionDebits", { sessionId }, true)).length,
+          renewal ? 2 : 1,
+        );
+        await deliver(session.debitId, 0);
+        assert.equal((await reads(session.debitId)).length, 0);
+        assert.equal((await debit(session.debitId)).noticeOutcome, undefined);
+        assert.equal((await emails()).length, before);
+      }
+    }
+  },
+);
+
+test(
   "fresh observation controls inert decisions and duplicates never add a second marker",
   { skip },
   async () => {

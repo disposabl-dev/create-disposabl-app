@@ -324,12 +324,37 @@ export const allowed = query({
       true,
     ),
 });
+export const recordDebitRequest = mutation({
+  args: {
+    sessionId: v.id("computeSessions"),
+    method: v.string(),
+    sendEvent: v.boolean(),
+  },
+  handler: (ctx, args) => ctx.db.insert("fixtureDebits", args),
+});
+export const debitRequests = query({
+  args: { sessionId: v.id("computeSessions") },
+  handler: (ctx, args) =>
+    ctx.db
+      .query("fixtureDebits")
+      .withIndex("by_session", (q) => q.eq("sessionId", args.sessionId))
+      .take(20),
+});
+export const sessionDebits = query({
+  args: { sessionId: v.id("computeSessions") },
+  handler: (ctx, args) =>
+    ctx.db
+      .query("computeDebits")
+      .withIndex("by_sessionId", (q) => q.eq("sessionId", args.sessionId))
+      .take(20),
+});
 export const fundFixture = action({
   args: {
     sessionId: v.id("computeSessions"),
     responseBalance: v.number(),
     expectedDebit: v.optional(v.id("computeDebits")),
     allowed: v.optional(v.boolean()),
+    mode: v.optional(v.union(v.literal("malformed"), v.literal("lost"))),
   },
   handler: (ctx, args) =>
     fund(
@@ -338,26 +363,36 @@ export const fundFixture = action({
       args.expectedDebit as any,
       async (userId) =>
         debitCompute(userId, true, "fixture", (key, method, body) =>
-          billingRequest(
-            key,
-            method,
-            body,
-            async () =>
-              new Response(
-                JSON.stringify({
-                  customer_id: userId,
-                  required_balance: 10,
-                  allowed: args.allowed ?? true,
-                  balance: {
-                    feature_id: "credits",
-                    unlimited: false,
-                    overage_allowed: false,
-                    remaining: args.responseBalance,
-                  },
-                }),
-                { status: 200 },
-              ),
-          ),
+          billingRequest(key, method, body, async (_url, init) => {
+            const request = JSON.parse(String(init?.body));
+            await ctx.runMutation(
+              makeFunctionReference("fixture:recordDebitRequest") as any,
+              {
+                sessionId: args.sessionId,
+                method,
+                sendEvent: request.send_event === true,
+              },
+            );
+            if (args.mode === "lost")
+              throw new Error("synthetic lost response");
+            return new Response(
+              JSON.stringify({
+                customer_id: userId,
+                required_balance: 10,
+                allowed: args.allowed ?? true,
+                balance:
+                  args.mode === "malformed"
+                    ? {}
+                    : {
+                        feature_id: "credits",
+                        unlimited: false,
+                        overage_allowed: false,
+                        remaining: args.responseBalance,
+                      },
+              }),
+              { status: 200 },
+            );
+          }),
         ),
     ),
 });
