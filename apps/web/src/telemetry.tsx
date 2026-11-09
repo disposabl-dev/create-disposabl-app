@@ -21,6 +21,13 @@ function allowed() {
 }
 
 let stopActive: (() => void) | undefined;
+export function productTelemetrySource(): "web" | "desktop" {
+  return (
+    window as Window & { disposablDesktop?: { authentication?: boolean } }
+  ).disposablDesktop?.authentication === true
+    ? "desktop"
+    : "web";
+}
 export function AnalyticsPreference() {
   const [enabled, setEnabled] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -188,17 +195,12 @@ export function ProductTelemetry({
       !origin
     )
       return;
-    const source =
-      (window as Window & { disposablDesktop?: { authentication?: boolean } })
-        .disposablDesktop?.authentication === true
-        ? "desktop"
-        : "web";
     const adapter = createWebTelemetryAdapter({
       origin,
-      transport: fetch,
+      transport: fetch.bind(window) as typeof fetch,
       page: () => page.current,
       allowed,
-      source,
+      source: productTelemetrySource(),
     });
     const update = () =>
       adapter.update({
