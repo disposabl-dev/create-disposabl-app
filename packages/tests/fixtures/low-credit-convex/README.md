@@ -10,7 +10,6 @@ Start a fresh local Convex backend on `127.0.0.1:3480` and `127.0.0.1:3481` with
 
 Sync this fixture to that loopback backend, then from the repository root run `LOW_CREDIT_FIXTURE_URL=http://127.0.0.1:3480 LOW_CREDIT_BACKEND_E2E=1 E2E_TELEMETRY_DISABLED=1 bun test packages/tests/low-credit-email-integration.test.ts`. The test refuses other ports and skips without the fixture URL or explicit E2E flag. Stop only the backend you started. These checks do not prove Autumn traffic, email delivery, or production configuration.
 
-
 ## Public admission regression
 
 Run from a clean checkout committed at the explicitly selected revision, with cached dependencies and local backend supplied (macOS sandbox-exec required):
