@@ -155,6 +155,7 @@ const touched = [
   "apps/mobile/src/app/index.tsx",
   "apps/mobile/package.json",
   "apps/mobile/app.json",
+  "apps/mobile/eas.json",
   "packages/disposabl-kit/package.json",
   "packages/disposabl-kit/legal/publisher.ts",
   "packages/disposabl-kit/client/components/account-deletion.tsx",
@@ -258,6 +259,35 @@ const lock = Bun.JSONC.parse(
   packages: Record<string, unknown>;
 };
 const turbo = await json("turbo.json");
+const eas = await json("apps/mobile/eas.json");
+const pipeline = Bun.YAML.parse(
+  await readFile(join(root, ".github/workflows/pipeline.yml"), "utf8"),
+) as {
+  jobs: Record<
+    string,
+    {
+      if?: string;
+      needs?: string | string[];
+      steps?: { name?: string; if?: string }[];
+    }
+  >;
+};
+if (
+  !pipeline.jobs["android-play"] ||
+  eas.submit?.production?.android?.applicationId !== "com.yastai.disposabl"
+)
+  throw new Error("Starter product release boundary changed.");
+delete pipeline.jobs["android-play"];
+pipeline.jobs.web.if = "needs.changes.outputs.changed == 'true'";
+for (const step of pipeline.jobs.web.steps ?? [])
+  if (["Expo", "Channel", "Fingerprint"].includes(step.name ?? ""))
+    step.if = "needs.changes.outputs.android == 'true'";
+pipeline.jobs.android.if = "needs.web.outputs.android_build == 'true'";
+pipeline.jobs["android-failure"].needs = "android";
+pipeline.jobs["android-failure"].if =
+  "always() && (needs.android.result == 'failure' || needs.android.result == 'cancelled')";
+delete eas.submit.production;
+if (!Object.keys(eas.submit).length) delete eas.submit;
 if (
   !backend ||
   !lock ||
@@ -383,6 +413,10 @@ await Bun.write(
   ) + "\n",
 );
 await Bun.write(join(root, apiKeysPath), starterApiKeys);
+await Bun.write(
+  join(root, ".github/workflows/pipeline.yml"),
+  Bun.YAML.stringify(pipeline),
+);
 await rm(join(root, "apps/web/public/og"), { recursive: true, force: true });
 
 for (const entry of await readdir(convex)) {
@@ -529,6 +563,7 @@ for (const [path, value] of [
   ["apps/mobile/package.json", mobile],
   ["apps/web/package.json", web],
   ["apps/mobile/app.json", mobileConfig],
+  ["apps/mobile/eas.json", eas],
   ["packages/disposabl-kit/package.json", kit],
   [backendPath, backend],
   ["bun.lock", lock],
