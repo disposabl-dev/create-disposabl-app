@@ -34,6 +34,69 @@ export function remoteUnresolved(agent: Infer<typeof execution> | undefined) {
   );
 }
 
+export function resumeBusy(
+  agent: Infer<typeof execution> | undefined,
+  now: number,
+) {
+  return (
+    remoteUnresolved(agent) ||
+    Boolean(agent?.lease && agent.lease.expiresAt > now)
+  );
+}
+
+/** Normalize old rows in committed batches; expire lease-only classifications lazily. */
+export async function classifyResumeSafety(
+  ctx: MutationCtx,
+  userId: string,
+  sessionId: Id<"computeSessions">,
+) {
+  const now = Date.now();
+  const missing = await ctx.db
+    .query("apps")
+    .withIndex("by_userId_resumeBusy_session", (q) =>
+      q.eq("userId", userId).eq("agentResumeBusy", undefined),
+    )
+    .take(50);
+  for (const app of missing)
+    await ctx.db.patch("apps", app._id, {
+      agentResumeBusy: resumeBusy(app.agent, now),
+    });
+  const pending = await ctx.db
+    .query("apps")
+    .withIndex("by_userId_resumeBusy_session", (q) =>
+      q.eq("userId", userId).eq("agentResumeBusy", undefined),
+    )
+    .first();
+  if (pending) return "wait" as const;
+  const old = await ctx.db
+    .query("apps")
+    .withIndex("by_userId_resumeBusy_session", (q) =>
+      q
+        .eq("userId", userId)
+        .eq("agentResumeBusy", true)
+        .lt("agent.computeSessionId", sessionId),
+    )
+    .first();
+  const other =
+    old ??
+    (await ctx.db
+      .query("apps")
+      .withIndex("by_userId_resumeBusy_session", (q) =>
+        q
+          .eq("userId", userId)
+          .eq("agentResumeBusy", true)
+          .gt("agent.computeSessionId", sessionId),
+      )
+      .first());
+  if (!other) return "ready" as const;
+  if (remoteUnresolved(other.agent)) return "blocked" as const;
+  if (!resumeBusy(other.agent, now)) {
+    await ctx.db.patch("apps", other._id, { agentResumeBusy: false });
+    return "wait" as const;
+  }
+  return "wait" as const;
+}
+
 /** Call again when pending is true; never throw after writing a batch. */
 export async function normalizeRemoteWork(ctx: MutationCtx, userId: string) {
   const missing = await ctx.db
@@ -110,6 +173,7 @@ export async function patchThread(
   await ctx.db.patch("apps", app._id, {
     agent,
     agentRemoteUnresolved: remoteUnresolved(agent),
+    agentResumeBusy: resumeBusy(agent, Date.now()),
   });
 }
 

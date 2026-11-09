@@ -183,6 +183,7 @@ export default defineSchema({
     features: v.optional(v.array(feature)),
     agent: v.optional(execution),
     agentRemoteUnresolved: v.optional(v.boolean()),
+    agentResumeBusy: v.optional(v.boolean()),
     posthogProject: v.optional(posthogProject),
     githubOwner: v.optional(v.string()),
     githubRepo: v.optional(v.string()),
@@ -211,6 +212,11 @@ export default defineSchema({
     .index("by_userId_agentRemoteUnresolved", [
       "userId",
       "agentRemoteUnresolved",
+    ])
+    .index("by_userId_resumeBusy_session", [
+      "userId",
+      "agentResumeBusy",
+      "agent.computeSessionId",
     ])
     .index("by_threadId", ["agent.threadId"])
     .index("by_agentAccessHash", ["agent.access.hash"])

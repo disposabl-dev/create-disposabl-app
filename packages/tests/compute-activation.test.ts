@@ -32,17 +32,35 @@ function fixture() {
           patch,
         ),
       query: (table: string) => {
-        const conditions: [string, unknown][] = [];
+        const conditions: [string, unknown, string][] = [];
         const q: any = {
           eq(k: string, v: unknown) {
-            conditions.push([k, v]);
+            conditions.push([k, v, "eq"]);
+            return q;
+          },
+          lt(k: string, v: unknown) {
+            conditions.push([k, v, "lt"]);
+            return q;
+          },
+          gt(k: string, v: unknown) {
+            conditions.push([k, v, "gt"]);
             return q;
           },
         };
         const matches = () =>
           rows.filter(
             (x) =>
-              x.table === table && conditions.every(([k, v]) => x[k] === v),
+              x.table === table &&
+              conditions.every(([k, v, op]) => {
+                const value = k
+                  .split(".")
+                  .reduce((r: any, part: string) => r?.[part], x);
+                return op === "eq"
+                  ? value === v
+                  : op === "lt"
+                    ? value === undefined || value < (v as string)
+                    : value !== undefined && value > (v as string);
+              }),
           );
         const chain: any = {
           withIndex(_: string, f: (q: any) => void) {
@@ -117,7 +135,7 @@ test("legacy rows normalize in bounded batches and late uncertainty blocks", asy
     });
   assert.equal(await claimActivation(f.ctx, args), "wait");
   assert.equal(await claimActivation(f.ctx, args), "wait");
-  assert.equal(await claimActivation(f.ctx, args), "wait");
+  assert.equal(await claimActivation(f.ctx, args), "blocked");
   assert.equal(f.session.activation, "fresh");
 });
 test("expired, deleted or replaced completion cannot reactivate", async () => {
@@ -158,4 +176,72 @@ test("archive during activation fences a delayed provider completion", async () 
     await (stopping as any)._handler(f.ctx, { sessionId: "s", token: "stop" }),
     false,
   );
+});
+
+test("old worker lease blocks until expired without blocking current-session lease", async () => {
+  const f = fixture();
+  const lease = { token: "old", expiresAt: Date.now() + 60000, watchdog: "w" };
+  const old = {
+    _id: "old",
+    table: "apps",
+    userId: "u",
+    agent: {
+      threadId: "old",
+      status: "processing",
+      pending: [],
+      updatedAt: 1,
+      lease,
+    },
+  };
+  f.rows.push(old);
+  assert.equal(await claimActivation(f.ctx, args), "wait");
+  lease.expiresAt = Date.now() - 1;
+  assert.equal(await claimActivation(f.ctx, args), "wait");
+  f.rows.push({
+    _id: "own",
+    table: "apps",
+    userId: "u",
+    agentRemoteUnresolved: false,
+    agentResumeBusy: true,
+    agent: {
+      threadId: "own",
+      computeSessionId: "s",
+      status: "processing",
+      pending: [],
+      updatedAt: 1,
+      lease: { ...lease, expiresAt: Date.now() + 60000 },
+    },
+  });
+  assert.equal(await claimActivation(f.ctx, args), "claimed");
+});
+test("expired old lease with delivery remains a durable block", async () => {
+  const f = fixture();
+  f.rows.push({
+    _id: "old",
+    table: "apps",
+    userId: "u",
+    agent: {
+      threadId: "t",
+      status: "failed",
+      pending: [],
+      updatedAt: 1,
+      delivery: "remote",
+      lease: { token: "old", expiresAt: 1, watchdog: "w" },
+    },
+  });
+  assert.equal(await claimActivation(f.ctx, args), "blocked");
+});
+
+test("legacy busy classification advances across multiple committed batches", async () => {
+  const f = fixture();
+  for (let i = 0; i < 111; i++)
+    f.rows.push({
+      _id: `legacy${i}`,
+      table: "apps",
+      userId: "u",
+      agentRemoteUnresolved: false,
+    });
+  assert.equal(await claimActivation(f.ctx, args), "wait");
+  assert.equal(await claimActivation(f.ctx, args), "wait");
+  assert.equal(await claimActivation(f.ctx, args), "claimed");
 });

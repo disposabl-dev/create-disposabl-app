@@ -4,7 +4,7 @@ import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { deletionPending } from "../users/deletion";
-import { normalizeRemoteWork } from "./threads";
+import { classifyResumeSafety, normalizeRemoteWork } from "./threads";
 import { computeSessionArgs } from "./computeValidator";
 
 // The claiming action itself must make the provider call; handing the token to
@@ -43,7 +43,14 @@ export async function claimActivation(
     return "blocked" as const;
   if (session.activation !== "fresh") return "blocked" as const;
   const work = await normalizeRemoteWork(ctx, session.userId);
-  if (work.pending || work.unresolved) return "wait" as const;
+  if (work.pending) return "wait" as const;
+  if (work.unresolved) return "blocked" as const;
+  const safety = await classifyResumeSafety(
+    ctx,
+    session.userId,
+    args.sessionId,
+  );
+  if (safety !== "ready") return safety;
   await ctx.db.patch("computeSessions", args.sessionId, {
     activation: "claimed",
     activationLease: { token: args.token, until: Date.now() + ACTION_FENCE_MS },

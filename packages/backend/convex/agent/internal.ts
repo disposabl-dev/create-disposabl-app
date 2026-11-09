@@ -73,6 +73,7 @@ export async function enqueueMessageHandler(
       appId,
       userId,
       agentRemoteUnresolved: false,
+      agentResumeBusy: false,
       name: prompt.slice(0, 80),
       platforms: selectedPlatforms,
       features: selectedFeatures,
