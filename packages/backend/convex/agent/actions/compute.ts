@@ -6,6 +6,7 @@ import { env, type ActionCtx } from "../../_generated/server";
 import type { Doc, Id } from "../../_generated/dataModel";
 import { boat, sandboxRef } from "../boat";
 import { debitCompute } from "../computeDebit";
+import { observeNoticeBalance } from "../noticeBalance";
 import { computeSessionArgs } from "../computeValidator";
 
 export async function fund(
@@ -105,11 +106,25 @@ export const stop = internalAction({
   },
 });
 
-/** Retries only queue failures, at most five times and only within the paid window. */
+/** Retry only the non-consuming observation and queue, never the debit. */
 export async function deliverNotice(
   ctx: ActionCtx,
   debitId: Id<"computeDebits">,
   attempt: number,
+  options: {
+    enabled: boolean;
+    environment?: string;
+    e2e?: string;
+    key?: string;
+    observe: (userId: string, key?: string) => Promise<number>;
+  } = {
+    enabled: paymentsEnabled,
+    environment: env.DISPOSABL_ENVIRONMENT,
+    // eslint-disable-next-line @convex-dev/no-process-env
+    e2e: process.env.E2E_TELEMETRY_DISABLED,
+    key: env.AUTUMN_SECRET_KEY,
+    observe: observeNoticeBalance,
+  },
 ) {
   const debit = await ctx.runQuery(internal.agent.compute.getDebit, {
     debitId,
@@ -122,7 +137,30 @@ export async function deliverNotice(
   )
     return null;
   try {
-    await ctx.runMutation(internal.agent.compute.notice, { debitId });
+    if (
+      !options.enabled ||
+      options.environment !== "production" ||
+      options.e2e === "1"
+    ) {
+      await ctx.runMutation(internal.agent.compute.notice, {
+        debitId,
+        disabled: true,
+      });
+      return null;
+    }
+    const candidate = await ctx.runQuery(
+      internal.agent.compute.noticeCandidate,
+      { debitId, now: Date.now() },
+    );
+    if (!candidate) {
+      await ctx.runMutation(internal.agent.compute.notice, { debitId });
+      return null;
+    }
+    const balance = await options.observe(candidate.userId, options.key);
+    await ctx.runMutation(internal.agent.compute.notice, {
+      debitId,
+      observation: { ...candidate, balance, observedAt: Date.now() },
+    });
   } catch {
     if (attempt < 5 && debit.paidUntil > Date.now())
       await ctx.scheduler.runAfter(

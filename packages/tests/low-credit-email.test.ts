@@ -107,3 +107,195 @@ test("reports missing verified email and rejects invalid data or configuration",
   );
   assert.equal(f.messages.length, 0);
 });
+
+test("non-consuming balance observation validates the response", async () => {
+  const { observeNoticeBalance } =
+    await import("../backend/convex/agent/noticeBalance");
+  let calls = 0;
+  const valid = {
+    customer_id: "owner",
+    required_balance: 10,
+    allowed: false,
+    balance: {
+      feature_id: "credits",
+      unlimited: false,
+      overage_allowed: false,
+      remaining: 0,
+    },
+  };
+  const reader =
+    (value: unknown) => async (_key: string, method: string, body: object) => {
+      calls++;
+      assert.equal(method, "balances.check");
+      assert.deepEqual(body, {
+        customer_id: "owner",
+        feature_id: "credits",
+        required_balance: 10,
+        send_event: false,
+      });
+      return value as Record<string, unknown>;
+    };
+  assert.equal(
+    await observeNoticeBalance("owner", "fixture", reader(valid)),
+    0,
+  );
+  for (const bad of [
+    { ...valid, customer_id: "other" },
+    { ...valid, required_balance: 1 },
+    { ...valid, allowed: "false" },
+    { ...valid, balance: null },
+    { ...valid, balance: { ...valid.balance, feature_id: "other" } },
+    { ...valid, balance: { ...valid.balance, unlimited: true } },
+    { ...valid, balance: { ...valid.balance, overage_allowed: true } },
+    { ...valid, balance: { ...valid.balance, remaining: Infinity } },
+  ])
+    await assert.rejects(
+      observeNoticeBalance("owner", "fixture", reader(bad)),
+      /Balance observation unavailable/,
+    );
+  const before = calls;
+  await assert.rejects(observeNoticeBalance("owner", "", reader(valid)));
+  assert.equal(calls, before);
+});
+
+test("notice uses a fresh observation and fences stale or ineligible work", async () => {
+  const { getFunctionName } = await import("convex/server");
+  const { deliverNotice } =
+    await import("../backend/convex/agent/actions/compute");
+  const { notice: mutate, noticeCandidate } =
+    await import("../backend/convex/agent/compute");
+  const make = (raw: number, observed: number) => {
+    const until = Date.now() + 60000;
+    const debit: any = {
+      _id: "debit",
+      sessionId: "session",
+      state: "confirmed",
+      paidUntil: until,
+      responseBalance: raw,
+    };
+    const session: any = {
+      _id: "session",
+      userId: "owner",
+      state: "active",
+      debitId: "debit",
+      paidUntil: until,
+    };
+    let owner: any = {};
+    let reads = 0;
+    const queues: number[] = [];
+    const retries: any[] = [];
+    const db: any = {
+      get: async (table: string) =>
+        table === "computeDebits"
+          ? debit
+          : table === "computeSessions"
+            ? session
+            : owner,
+      normalizeId: (_table: string, id: string) => id,
+      patch: async (_table: string, _id: string, value: object) =>
+        Object.assign(debit, value),
+    };
+    const mutation: any = {
+      db,
+      runMutation: async (_ref: unknown, args: any) => {
+        queues.push(args.balance);
+        return args.balance < 10 ? "queued" : "not_low";
+      },
+    };
+    const ctx: any = {
+      scheduler: {
+        runAfter: async (_delay: number, _ref: unknown, args: any) =>
+          retries.push(args),
+      },
+      runQuery: async (ref: any, args: any) =>
+        getFunctionName(ref) === "agent/compute:getDebit"
+          ? debit
+          : (noticeCandidate as any)._handler({ db }, args),
+      runMutation: async (ref: any, args: any) => {
+        assert.equal(getFunctionName(ref), "agent/compute:notice");
+        return (mutate as any)._handler(mutation, args);
+      },
+    };
+    const options = {
+      enabled: true,
+      environment: "production",
+      e2e: "0",
+      key: "fixture",
+      observe: async () => {
+        reads++;
+        return observed;
+      },
+    };
+    return {
+      debit,
+      session,
+      ctx,
+      options,
+      queues,
+      retries,
+      reads: () => reads,
+      setOwner: (value: any) => {
+        owner = value;
+      },
+    };
+  };
+  for (const [raw, fresh, outcome] of [
+    [10, 0, "queued"],
+    [0, 20, "not_low"],
+  ] as const) {
+    const f = make(raw, fresh);
+    await deliverNotice(f.ctx, "debit" as any, 0, f.options);
+    assert.equal(f.debit.responseBalance, raw);
+    assert.equal(f.debit.noticeBalance, fresh);
+    assert.equal(f.debit.noticeOutcome, outcome);
+    assert.deepEqual(f.queues, [fresh]);
+    await deliverNotice(f.ctx, "debit" as any, 0, f.options);
+    assert.equal(f.reads(), 1);
+  }
+  for (const changes of [
+    { enabled: false },
+    { environment: "development" },
+    { e2e: "1" },
+  ]) {
+    const f = make(0, 0);
+    await deliverNotice(f.ctx, "debit" as any, 0, { ...f.options, ...changes });
+    assert.equal(f.reads(), 0);
+    assert.equal(f.debit.noticeOutcome, "disabled");
+  }
+  for (const owner of [null, { deletionRequestedAt: 1 }]) {
+    const f = make(0, 0);
+    f.setOwner(owner);
+    await deliverNotice(f.ctx, "debit" as any, 0, f.options);
+    assert.equal(f.reads(), 0);
+    assert.equal(f.debit.noticeOutcome, "account_ineligible");
+    assert.deepEqual(f.queues, []);
+  }
+  const retry = make(0, 0);
+  retry.options.observe = async () => {
+    throw new Error("lookup failed");
+  };
+  await deliverNotice(retry.ctx, "debit" as any, 0, retry.options);
+  assert.deepEqual(retry.retries, [{ debitId: "debit", attempt: 1 }]);
+  assert.equal(retry.debit.state, "confirmed");
+  assert.equal(retry.debit.responseBalance, 0);
+  assert.equal(retry.debit.noticeOutcome, undefined);
+  await deliverNotice(retry.ctx, "debit" as any, 5, retry.options);
+  assert.equal(retry.debit.noticeOutcome, "failed");
+  assert.deepEqual(retry.queues, []);
+  const racing = make(10, 0);
+  racing.options.observe = async () => {
+    racing.setOwner({ deletionRequestedAt: 1 });
+    return 0;
+  };
+  await deliverNotice(racing.ctx, "debit" as any, 0, racing.options);
+  assert.equal(racing.debit.noticeOutcome, "account_ineligible");
+  assert.deepEqual(racing.queues, []);
+  const expired = make(10, 0);
+  expired.options.observe = async () => {
+    expired.debit.paidUntil = Date.now() - 1;
+    return 0;
+  };
+  await deliverNotice(expired.ctx, "debit" as any, 0, expired.options);
+  assert.equal(expired.debit.noticeOutcome, "expired");
+  assert.deepEqual(expired.queues, []);
+});

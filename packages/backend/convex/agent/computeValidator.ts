@@ -28,6 +28,8 @@ export const computeDebitFields = {
   paidUntil: v.number(),
   noticeComplete: v.optional(v.boolean()),
   responseBalance: v.optional(v.number()),
+  noticeBalance: v.optional(v.number()),
+  noticeObservedAt: v.optional(v.number()),
   lateConfirmation: v.optional(
     v.object({
       observedAt: v.number(),
@@ -51,6 +53,7 @@ export const computeDebitFields = {
       v.literal("not_low"),
       v.literal("expired"),
       v.literal("invalid_user"),
+      v.literal("superseded"),
       v.literal("missing_balance"),
       v.literal("failed"),
     ),

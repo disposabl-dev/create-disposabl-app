@@ -245,8 +245,15 @@ test("boundary recovery is armed before renewal; notices cannot replay after com
     ),
   );
   assert.ok(f.scheduled.some((r) => r.name === "agent/actions/compute:renew"));
-  await (notice as any)._handler(f.ctx, { debitId: f.debit._id });
-  await (notice as any)._handler(f.ctx, { debitId: f.debit._id });
+  f.rows.set("owner", { _id: "owner" });
+  const observation = {
+    userId: "owner",
+    paidUntil: f.debit.paidUntil,
+    balance: 9,
+    observedAt: Date.now(),
+  };
+  await (notice as any)._handler(f.ctx, { debitId: f.debit._id, observation });
+  await (notice as any)._handler(f.ctx, { debitId: f.debit._id, observation });
   assert.equal(f.notices(), 1);
   const empty = fixture();
   assert.equal(await admitSession(empty.ctx, "owner", false), undefined);

@@ -20,7 +20,7 @@ type Message = {
   idempotencyKey: string;
 };
 
-/** The caller supplies the confirmed debit window and its response balance. */
+/** The caller supplies the confirmed debit window and a later balance observation. */
 export async function queueLowCreditNotice(
   notice: Notice,
   options: {
@@ -74,7 +74,7 @@ export async function queueLowCreditNotice(
     from: options.sender.trim(),
     to: email,
     subject: "Your Disposabl credits are running low",
-    text: `Your balance is below 10 credits. Your current access window ends at ${new Date(notice.paidUntil).toISOString()}. To resume after it ends, add credits and send a new message.\n\nAdd credits: ${paymentUrl}`,
+    text: `Your balance was below 10 credits when checked after the confirmed debit. Your current access window ends at ${new Date(notice.paidUntil).toISOString()}. To resume after it ends, add credits and send a new message.\n\nAdd credits: ${paymentUrl}`,
     idempotencyKey: `low-credit:${key}`,
   });
   return "queued" as const;
@@ -93,8 +93,8 @@ export async function queueForEligibleOwner<T>(
 }
 
 /**
- * Call only after a confirmed debit, with its recorded response balance.
- * Autumn has not established whether that response is before or after consumption.
+ * Call only after a confirmed debit with a separate, non-consuming observation.
+ * That later observation is not an atomic snapshot of the debit.
  * Use the same windowId and paidUntil for retries, unique per user and paid window.
  * Enqueue deduplication lasts while the Resend component retains its email record.
  * Schedule or retry from durable compute state without undoing the debit; never

@@ -5,7 +5,7 @@ import {
 } from "@disposabl/disposabl-kit/server/lib/functions";
 import { ConvexError, v } from "convex/values";
 import { internal } from "../_generated/api";
-import type { Id } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import schema from "../schema";
 import { computeSessionArgs } from "./computeValidator";
@@ -364,37 +364,103 @@ export const getDebit = internalQuery({
   handler: (ctx, { debitId }) => ctx.db.get("computeDebits", debitId),
 });
 
-// Terminal outcomes are recorded atomically with enqueue; failed enqueues roll back.
+// The observation is separate from the raw debit response; queueing rechecks the window.
+const noticeObservation = v.object({
+  userId: v.id("users"),
+  paidUntil: v.number(),
+  balance: v.number(),
+  observedAt: v.number(),
+});
+
+async function noticeEligibility(
+  ctx: Pick<QueryCtx, "db">,
+  debitId: Id<"computeDebits">,
+  now: number,
+) {
+  const debit = await ctx.db.get("computeDebits", debitId);
+  if (
+    !debit ||
+    debit.state !== "confirmed" ||
+    debit.noticeComplete ||
+    debit.noticeOutcome
+  )
+    return { debit, terminal: null } as const;
+  if (debit.paidUntil <= now) return { debit, terminal: "expired" } as const;
+  const session = await ctx.db.get("computeSessions", debit.sessionId);
+  if (
+    !session ||
+    session.state !== "active" ||
+    session.debitId !== debitId ||
+    session.paidUntil !== debit.paidUntil
+  )
+    return { debit, terminal: "superseded" } as const;
+  const userId = ctx.db.normalizeId("users", session.userId);
+  if (!userId) return { debit, terminal: "invalid_user" } as const;
+  const user = await ctx.db.get("users", userId);
+  if (!user || user.deletionRequestedAt !== undefined)
+    return { debit, terminal: "account_ineligible" } as const;
+  return { debit, terminal: null, userId } as const;
+}
+
+export const noticeCandidate = internalQuery({
+  args: { debitId: v.id("computeDebits"), now: v.number() },
+  returns: v.union(
+    v.null(),
+    v.object({ userId: v.id("users"), paidUntil: v.number() }),
+  ),
+  handler: async (ctx, { debitId, now }) => {
+    const result = await noticeEligibility(ctx, debitId, now);
+    return result.debit && "userId" in result && result.userId
+      ? { userId: result.userId, paidUntil: result.debit.paidUntil }
+      : null;
+  },
+});
+
+// Terminal outcomes and any queue insertion commit in the same transaction.
 export const notice = internalMutation({
-  args: { debitId: v.id("computeDebits"), failed: v.optional(v.boolean()) },
+  args: {
+    debitId: v.id("computeDebits"),
+    observation: v.optional(noticeObservation),
+    disabled: v.optional(v.boolean()),
+    failed: v.optional(v.boolean()),
+  },
   returns: v.null(),
-  handler: async (ctx, { debitId, failed }) => {
-    const debit = await ctx.db.get("computeDebits", debitId);
-    if (
-      !debit ||
-      debit.state !== "confirmed" ||
-      debit.noticeComplete ||
-      debit.noticeOutcome
-    )
+  handler: async (ctx, { debitId, observation, disabled, failed }) => {
+    const now = Date.now();
+    const result = await noticeEligibility(ctx, debitId, now);
+    if (!result.debit || (result.terminal === null && !("userId" in result)))
       return null;
-    const session = await ctx.db.get("computeSessions", debit.sessionId);
-    const userId = session && ctx.db.normalizeId("users", session.userId);
-    const outcome =
-      debit.paidUntil <= Date.now()
-        ? "expired"
-        : failed
-          ? "failed"
-          : !userId
-            ? "invalid_user"
-            : debit.responseBalance === undefined
-              ? "missing_balance"
-              : await ctx.runMutation(internal.product.lowCreditEmail.queue, {
-                  userId,
-                  windowId: debitId,
-                  paidUntil: debit.paidUntil,
-                  balance: debit.responseBalance,
-                });
-    await ctx.db.patch("computeDebits", debitId, { noticeOutcome: outcome });
+    let outcome: NonNullable<Doc<"computeDebits">["noticeOutcome"]>;
+    if (result.terminal) outcome = result.terminal;
+    else if (disabled) outcome = "disabled";
+    else if (failed) outcome = "failed";
+    else {
+      if (!observation) return null;
+      if (
+        observation.userId !== result.userId ||
+        observation.paidUntil !== result.debit.paidUntil ||
+        !Number.isFinite(observation.balance) ||
+        !Number.isSafeInteger(observation.observedAt) ||
+        observation.observedAt <= 0 ||
+        observation.observedAt > now
+      )
+        throw new Error("Invalid notice observation.");
+      outcome = await ctx.runMutation(internal.product.lowCreditEmail.queue, {
+        userId: observation.userId,
+        windowId: debitId,
+        paidUntil: observation.paidUntil,
+        balance: observation.balance,
+      });
+    }
+    await ctx.db.patch("computeDebits", debitId, {
+      noticeOutcome: outcome,
+      ...(observation && !result.terminal && !disabled && !failed
+        ? {
+            noticeBalance: observation.balance,
+            noticeObservedAt: observation.observedAt,
+          }
+        : {}),
+    });
     return null;
   },
 });
