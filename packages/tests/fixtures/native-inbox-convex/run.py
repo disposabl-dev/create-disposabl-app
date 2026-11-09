@@ -1,5 +1,6 @@
 import importlib.util, json, os, pathlib, secrets, shutil, socket, subprocess, tempfile, time, urllib.request
 root=pathlib.Path(__file__).resolve().parents[4]; fixture=root/'packages/tests/fixtures/native-inbox-convex'
+if shutil.disk_usage('/tmp').free < 5 * 1024**3 // 2: raise RuntimeError('Less than 2.5 GiB free')
 with socket.socket() as s:
     s.settimeout(1)
     if s.connect_ex(('1.1.1.1',443)) != 1: raise RuntimeError('Outbound sandbox not enforced')

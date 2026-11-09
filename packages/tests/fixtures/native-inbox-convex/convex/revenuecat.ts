@@ -6,6 +6,8 @@ export {
   routing,
   claim,
   complete,
+  receive,
+  receiveTransfer,
 } from "../../../../disposabl-kit/server/revenuecat-functions";
 
 const control = makeFunctionReference<"query", { balanceId: string }, any>(
