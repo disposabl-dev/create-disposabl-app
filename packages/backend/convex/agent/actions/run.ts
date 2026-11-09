@@ -121,6 +121,15 @@ export const tick = internalAction({
                 });
                 return null;
               }
+              // An idle observation cannot exclude acceptance of an earlier
+              // timed-out request. Keep that delivery for provider reconciliation.
+              if (current.delivery) {
+                await ctx.runMutation(internal.agent.state.finish, {
+                  ...lease,
+                  unconfirmed: true,
+                });
+                return null;
+              }
             } else if (current.promptId || current.stopUnconfirmed) {
               await ctx.runMutation(internal.agent.state.finish, {
                 ...lease,
@@ -132,7 +141,7 @@ export const tick = internalAction({
             // An archived machine may retain its running programs for warm resume.
             if (
               current.promptId ||
-              current.conversationId ||
+              (current.conversationId && !current.turnCompleted) ||
               current.delivery ||
               current.stopUnconfirmed
             ) {
@@ -146,7 +155,7 @@ export const tick = internalAction({
             throw new Error("Boat sandbox status is unavailable.");
         } else if (
           current.promptId ||
-          current.conversationId ||
+          (current.conversationId && !current.turnCompleted) ||
           current.delivery ||
           current.stopUnconfirmed
         ) {

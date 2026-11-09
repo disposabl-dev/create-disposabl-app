@@ -86,7 +86,10 @@ export const next = internalMutation({
       { messageIds: [messageId] },
     );
     if (!message?.text) throw new Error("Saved user message is missing.");
-    await patchThread(ctx, current, { delivery: messageId });
+    await patchThread(ctx, current, {
+      delivery: messageId,
+      turnCompleted: false,
+    });
     const content = message.message?.content;
     const fileIds = Array.isArray(content)
       ? content.flatMap((part) => {
@@ -121,6 +124,7 @@ export const delivered = internalMutation({
     await patchThread(ctx, current, {
       promptId: args.promptId,
       conversationId: args.conversationId,
+      turnCompleted: false,
       delivery: undefined,
       pending: current.pending.filter((id) => id !== args.messageId),
       updatedAt: Date.now(),
@@ -136,7 +140,7 @@ export const attachConversation = internalMutation({
     const current = await locked(ctx, args);
     await patchThread(ctx, current, {
       conversationId: args.conversationId,
-      delivery: undefined,
+      turnCompleted: false,
     });
     return null;
   },
@@ -248,7 +252,7 @@ export const finish = internalMutation({
     const unresolved = Boolean(
       args.suspended &&
       (current.promptId ||
-        current.conversationId ||
+        (current.conversationId && !current.turnCompleted) ||
         current.delivery ||
         current.stopUnconfirmed),
     );
@@ -342,7 +346,9 @@ export const finish = internalMutation({
         : unresolved || args.unconfirmed || (status === "failed" && args.error)
           ? true
           : current.stopUnconfirmed,
-      ...(args.stopped ? { promptId: undefined } : {}),
+      ...(args.stopped || (args.done && !args.error && !current.delivery)
+        ? { promptId: undefined, turnCompleted: true }
+        : {}),
       updatedAt: Date.now(),
     });
     if (pending.length || status === "processing" || status === "stopping")

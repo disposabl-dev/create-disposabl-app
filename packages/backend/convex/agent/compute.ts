@@ -10,7 +10,7 @@ import type { MutationCtx, QueryCtx } from "../_generated/server";
 import schema from "../schema";
 import { deletionPending } from "../users/deletion";
 import { computeSessionArgs } from "./computeValidator";
-import { assertNoUnconfirmedRuns } from "./threads";
+import { assertNoUnconfirmedRuns, hasUnconfirmedRuns } from "./threads";
 
 export const WINDOW_MS = 600_000;
 
@@ -73,6 +73,7 @@ export async function sessionAllows(
   now: number,
   enabled = paymentsEnabled,
 ) {
+  if (await hasUnconfirmedRuns(ctx, userId)) return false;
   if (!enabled) return true;
   const session = sessionId
     ? await ctx.db.get("computeSessions", sessionId)
@@ -89,6 +90,12 @@ export const get = internalQuery({
   args: computeSessionArgs,
   returns: v.union(schema.doc("computeSessions"), v.null()),
   handler: (ctx, { sessionId }) => ctx.db.get("computeSessions", sessionId),
+});
+
+export const workBlocked = internalQuery({
+  args: { userId: v.string() },
+  returns: v.boolean(),
+  handler: (ctx, { userId }) => hasUnconfirmedRuns(ctx, userId),
 });
 
 /** The transaction persists the sole dispatch claim BEFORE contacting Autumn. */
@@ -140,7 +147,10 @@ export async function claimWindow(
     session.stopLease
   )
     return null;
-  if (await deletionPending(ctx, session.userId)) {
+  if (
+    (await deletionPending(ctx, session.userId)) ||
+    (await hasUnconfirmedRuns(ctx, session.userId))
+  ) {
     await ctx.db.patch("computeSessions", sessionId, { state: "stopping" });
     await ctx.scheduler.runAfter(0, internal.agent.actions.compute.stop, {
       sessionId,

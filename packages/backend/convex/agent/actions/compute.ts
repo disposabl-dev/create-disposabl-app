@@ -50,6 +50,8 @@ export async function computeAccess(
 ): Promise<"ready" | "waiting" | "blocked"> {
   if (await ctx.runQuery(internal.users.internal.deletionPending, { userId }))
     return "blocked";
+  if (await ctx.runQuery(internal.agent.compute.workBlocked, { userId }))
+    return "blocked";
   if (!paymentsEnabled) return "ready";
   if (!sessionId) return "blocked";
   let session = await ctx.runQuery(internal.agent.compute.get, { sessionId });

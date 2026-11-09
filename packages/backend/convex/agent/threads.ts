@@ -8,14 +8,18 @@ import type { execution, thread } from "./validator";
 type Thread = Infer<typeof thread>;
 
 /** Every app shares this user's machine, including any suspended remote work. */
-export async function assertNoUnconfirmedRuns(ctx: QueryCtx, userId: string) {
+export async function hasUnconfirmedRuns(ctx: QueryCtx, userId: string) {
   const unresolved = await ctx.db
     .query("apps")
     .withIndex("by_userId_stopUnconfirmed", (q) =>
       q.eq("userId", userId).eq("agent.stopUnconfirmed", true),
     )
     .first();
-  if (unresolved)
+  return Boolean(unresolved);
+}
+
+export async function assertNoUnconfirmedRuns(ctx: QueryCtx, userId: string) {
+  if (await hasUnconfirmedRuns(ctx, userId))
     throw new ConvexError(
       "A previous remote run has not been confirmed stopped. Reconcile it before starting more sandbox work.",
     );
