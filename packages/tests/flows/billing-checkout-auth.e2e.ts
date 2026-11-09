@@ -22,18 +22,38 @@ function assertOwnedBackend() {
   )
     throw new Error("Invalid fixture marker");
   const lease = JSON.parse(readFileSync(marker, "utf8"));
+  const parent = (pid: number) => {
+    const output = execFileSync(
+      "lsof",
+      ["-nP", "-a", "-p", String(pid), "-FpR"],
+      { encoding: "utf8" },
+    );
+    const line = output.split("\n").find((item) => /^R\d+$/.test(item));
+    if (!line) throw new Error("Missing process ancestry");
+    return Number(line.slice(1));
+  };
   let pid = process.pid;
-  const ps = (p: number, field: string) =>
-    execFileSync("ps", ["-o", `${field}=`, "-p", String(p)], {
-      encoding: "utf8",
-    }).trim();
-  while (pid > 1 && pid !== lease.launcherPid) pid = Number(ps(pid, "ppid"));
+  const seen = new Set<number>();
+  while (pid > 1 && pid !== lease.launcherPid) {
+    if (seen.has(pid)) throw new Error("Invalid process ancestry");
+    seen.add(pid);
+    pid = parent(pid);
+  }
   if (
     pid !== lease.launcherPid ||
-    Number(ps(lease.backendPid, "ppid")) !== lease.launcherPid ||
-    !ps(lease.backendPid, "comm").endsWith("/convex-local-backend")
+    parent(lease.backendPid) !== lease.launcherPid
   )
     throw new Error("Unowned backend");
+  const executable = realpathSync(lease.executable);
+  if (!executable.endsWith("/convex-local-backend"))
+    throw new Error("Unexpected backend binary");
+  const binary = execFileSync(
+    "lsof",
+    ["-a", "-p", String(lease.backendPid), "-Fn", "--", executable],
+    { encoding: "utf8" },
+  );
+  if (!binary.split("\n").includes(`n${executable}`))
+    throw new Error("Unexpected backend process");
   const db = realpathSync(lease.database);
   if (
     !db.startsWith(`${dirname(marker)}/`) ||

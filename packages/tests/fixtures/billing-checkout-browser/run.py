@@ -101,7 +101,7 @@ def main():
                 time.sleep(.1)
         else:
             raise RuntimeError('Backend did not start')
-        marker.write_text(json.dumps({'launcherPid': os.getpid(), 'backendPid': proc.pid, 'database': str(db)}))
+        marker.write_text(json.dumps({'launcherPid': os.getpid(), 'backendPid': proc.pid, 'database': str(db), 'executable': str(BINARY.resolve())}))
         cli = str(ROOT / 'node_modules/.bin/convex')
         backend = source / 'packages/backend'
         for name, value in [('E2E_TELEMETRY_DISABLED', '1'), ('BOAT_API_KEY', '')]:
