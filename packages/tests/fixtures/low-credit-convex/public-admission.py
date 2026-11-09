@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Exercise registered public admission on a fresh, owned local backend."""
-import importlib.util, json, os, pathlib, secrets, shutil, socket, subprocess, sys, tempfile, time, urllib.request, uuid
+import hashlib, importlib.util, json, os, pathlib, secrets, shutil, socket, subprocess, sys, tempfile, time, urllib.request, uuid
 from contextlib import ExitStack
 ROOT = pathlib.Path(__file__).resolve().parents[4]
 DEPS = pathlib.Path(os.environ.get("PUBLIC_ADMISSION_DEPS", ""))
@@ -35,6 +35,18 @@ def run(runner):
     auth=load(ROOT/"packages/tests/helpers/sdk-auth/selected_auth.py").verify_selected_auth(ROOT, DEPS/"@convex-dev/auth")
     if auth["files"] != 1333 or auth["sha256"] != AUTH_SHA: raise RuntimeError("auth mismatch")
     work=pathlib.Path(tempfile.mkdtemp(prefix="public-admission-",dir="/tmp")); work.chmod(0o700)
+    provenance = {"source": SHA, "backend": str(BINARY.resolve()),
+                  "backend_sha256": hashlib.sha256(BINARY.read_bytes()).hexdigest(),
+                  "lockfile_sha256": hashlib.sha256((ROOT / "bun.lock").read_bytes()).hexdigest(),
+                  "limitation": "Cached dependencies are linked, not a verified frozen installation. Only Auth has archive byte parity. Package metadata hashes do not verify package contents or publisher origin.",
+                  "packages": {}}
+    for name in ("convex", "@convex-dev/agent", "@convex-dev/auth"):
+        package = DEPS / name / "package.json"
+        provenance["packages"][name] = {"path": str(package.resolve()),
+            "version": json.loads(package.read_text())["version"],
+            "package_json_sha256": hashlib.sha256(package.read_bytes()).hexdigest()}
+    (work / "provenance.json").write_text(json.dumps(provenance, indent=2) + "\n")
+    print("LIMITATION", provenance["limitation"], flush=True)
     source=work/"source"; source.mkdir()
     owner=load(ROOT/"packages/tests/helpers/sdk-auth/run.py")
     runner.command(owner, ["git","archive","--format=tar","--output",str(work/"source.tar"),SHA], cwd=ROOT)
@@ -149,6 +161,14 @@ def main():
            "PUBLIC_ADMISSION_SOURCE_REVISION": os.environ.get("PUBLIC_ADMISSION_SOURCE_REVISION", ""),
            "E2E_TELEMETRY_DISABLED": "1", "DO_NOT_TRACK": "1"}
     entry = 'import runpy,sys; runpy.run_path(sys.argv[1])["guarded"]()'
+    evidence = pathlib.Path(tempfile.mkdtemp(prefix="public-admission-output-", dir="/tmp"))
+    evidence.chmod(0o700)
+    log = evidence / "runner.log"
+    print("Private runner output:", log, flush=True)
+    fd = os.open(log, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    os.dup2(fd, 1)
+    os.dup2(fd, 2)
+    os.close(fd)
     os.execve("/usr/bin/sandbox-exec", ["sandbox-exec", "-p", PROFILE, sys.executable, "-c", entry, __file__], env)
 
 if __name__=="__main__":
