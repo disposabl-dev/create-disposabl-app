@@ -13,4 +13,9 @@ export default defineSchema({
     method: v.string(),
     nonConsuming: v.boolean(),
   }).index("by_debit", ["debitId"]),
+  fixtureDebits: defineTable({
+    sessionId: v.id("computeSessions"),
+    method: v.string(),
+    sendEvent: v.boolean(),
+  }).index("by_session", ["sessionId"]),
 });

@@ -79,6 +79,12 @@ test(
     const { userId, sessionId } = await call("seedUnclaimed");
     await call("fundFixture", { sessionId, responseBalance: 20 }, false, true);
     const first = await call("session", { sessionId }, true);
+    assert.equal((await debit(first.debitId)).state, "confirmed");
+    await call("activateFixture", { sessionId });
+    assert.equal(
+      (await call("session", { sessionId }, true)).activation,
+      "active",
+    );
     await call("shortenWindow", {
       debitId: first.debitId,
       paidUntil: Date.now() - 1,
@@ -132,6 +138,104 @@ test(
     assert.ok(["stopping", "stopped"].includes(stopped.state));
     assert.equal(await call("allowed", { sessionId, userId }, true), false);
     assert.equal((await emails()).length, initialMarkers + 1);
+  },
+);
+
+test(
+  "unknown funding holds initial and renewal windows without retrying the debit or notifying",
+  { skip },
+  async () => {
+    for (const mode of ["malformed", "lost"]) {
+      for (const renewal of [false, true]) {
+        const before = (await emails()).length;
+        const { userId, sessionId } = await call("seedUnclaimed");
+        let expectedDebit: string | undefined;
+        if (renewal) {
+          await call(
+            "fundFixture",
+            { sessionId, responseBalance: 20 },
+            false,
+            true,
+          );
+          const initial = await call("session", { sessionId }, true);
+          assert.equal((await debit(initial.debitId)).state, "confirmed");
+          await call("activateFixture", { sessionId });
+          expectedDebit = initial.debitId;
+          await call("shortenWindow", {
+            debitId: expectedDebit,
+            paidUntil: Date.now() - 1,
+          });
+        }
+        const request = { sessionId, expectedDebit, responseBalance: 0, mode };
+        await call("fundFixture", request, false, true);
+        const session = await call("session", { sessionId }, true);
+        const unknown = await debit(session.debitId);
+        assert.equal(unknown.state, "unknown");
+        assert.equal(unknown.paidUntil, 0);
+        assert.equal(unknown.responseBalance, undefined);
+        assert.equal(unknown.noticeOutcome, undefined);
+        assert.equal(session.state, "hold");
+        assert.ok(session.paidUntil <= Date.now());
+        assert.equal(await call("allowed", { sessionId, userId }, true), false);
+        const requests = await call("debitRequests", { sessionId }, true);
+        assert.equal(requests.length, renewal ? 2 : 1);
+        assert.ok(
+          requests.every(
+            (entry: any) =>
+              entry.method === "balances.check" && entry.sendEvent,
+          ),
+        );
+        assert.equal(
+          (await call("sessionDebits", { sessionId }, true)).length,
+          renewal ? 2 : 1,
+        );
+        assert.equal(
+          (await call("scheduled", {}, true)).some(
+            (job: any) =>
+              job.name === "agent/actions/compute.js:notice" &&
+              job.args[0].debitId === session.debitId,
+          ),
+          false,
+        );
+        await call("fundFixture", request, false, true);
+        await call(
+          "fundFixture",
+          { ...request, expectedDebit: session.debitId },
+          false,
+          true,
+        );
+        const retried = await call("session", { sessionId }, true);
+        assert.equal(retried.state, "hold");
+        assert.equal(retried.debitId, session.debitId);
+        assert.equal(retried.paidUntil, session.paidUntil);
+        assert.equal(await call("allowed", { sessionId, userId }, true), false);
+        const retriedDebit = await debit(session.debitId);
+        assert.equal(retriedDebit.state, "unknown");
+        assert.equal(retriedDebit.paidUntil, 0);
+        assert.equal(retriedDebit.responseBalance, undefined);
+        assert.equal(retriedDebit.noticeOutcome, undefined);
+        assert.equal(
+          (await call("scheduled", {}, true)).some(
+            (job: any) =>
+              job.name === "agent/actions/compute.js:notice" &&
+              job.args[0].debitId === session.debitId,
+          ),
+          false,
+        );
+        assert.equal(
+          (await call("debitRequests", { sessionId }, true)).length,
+          requests.length,
+        );
+        assert.equal(
+          (await call("sessionDebits", { sessionId }, true)).length,
+          renewal ? 2 : 1,
+        );
+        await deliver(session.debitId, 0);
+        assert.equal((await reads(session.debitId)).length, 0);
+        assert.equal((await debit(session.debitId)).noticeOutcome, undefined);
+        assert.equal((await emails()).length, before);
+      }
+    }
   },
 );
 

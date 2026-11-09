@@ -7,6 +7,10 @@ import {
 } from "convex/server";
 import { v } from "convex/values";
 import {
+  claimActivation,
+  completeActivation,
+} from "../../../../backend/convex/agent/activation";
+import {
   deliverNotice,
   fund,
 } from "../../../../backend/convex/agent/actions/compute";
@@ -96,8 +100,15 @@ export const queueDirect = mutation({
 
 export const scheduled = query({
   args: {},
-  handler: (ctx) =>
-    ctx.db.system.query("_scheduled_functions").order("desc").take(100),
+  handler: async (ctx) => {
+    const jobs = await ctx.db.system
+      .query("_scheduled_functions")
+      .order("desc")
+      .take(101);
+    if (jobs.length > 100)
+      throw new Error("Fixture scheduled-job limit exceeded");
+    return jobs;
+  },
 });
 
 export const expire = mutation({
@@ -276,6 +287,7 @@ export const seedUnclaimed = mutation({
       userId,
       state: "starting",
       paidUntil: 0,
+      activation: "fresh",
     });
     await ctx.db.insert("apps", {
       appId: sessionId,
@@ -293,6 +305,17 @@ export const seedUnclaimed = mutation({
     return { userId, sessionId };
   },
 });
+// Model a successful inert sandbox activation before testing renewal.
+export const activateFixture = mutation({
+  args: { sessionId: v.id("computeSessions") },
+  handler: async (ctx, { sessionId }) => {
+    const args = { sessionId, token: "synthetic-activation" };
+    if ((await claimActivation(ctx as any, args as any)) !== "claimed")
+      throw new Error("Fixture activation was not claimed");
+    if (!(await completeActivation(ctx as any, args as any)))
+      throw new Error("Fixture activation did not complete");
+  },
+});
 export const session = query({
   args: { sessionId: v.id("computeSessions") },
   handler: (ctx, args) => ctx.db.get(args.sessionId),
@@ -308,12 +331,37 @@ export const allowed = query({
       true,
     ),
 });
+export const recordDebitRequest = mutation({
+  args: {
+    sessionId: v.id("computeSessions"),
+    method: v.string(),
+    sendEvent: v.boolean(),
+  },
+  handler: (ctx, args) => ctx.db.insert("fixtureDebits", args),
+});
+export const debitRequests = query({
+  args: { sessionId: v.id("computeSessions") },
+  handler: (ctx, args) =>
+    ctx.db
+      .query("fixtureDebits")
+      .withIndex("by_session", (q) => q.eq("sessionId", args.sessionId))
+      .take(20),
+});
+export const sessionDebits = query({
+  args: { sessionId: v.id("computeSessions") },
+  handler: (ctx, args) =>
+    ctx.db
+      .query("computeDebits")
+      .withIndex("by_sessionId", (q) => q.eq("sessionId", args.sessionId))
+      .take(20),
+});
 export const fundFixture = action({
   args: {
     sessionId: v.id("computeSessions"),
     responseBalance: v.number(),
     expectedDebit: v.optional(v.id("computeDebits")),
     allowed: v.optional(v.boolean()),
+    mode: v.optional(v.union(v.literal("malformed"), v.literal("lost"))),
   },
   handler: (ctx, args) =>
     fund(
@@ -322,26 +370,36 @@ export const fundFixture = action({
       args.expectedDebit as any,
       async (userId) =>
         debitCompute(userId, true, "fixture", (key, method, body) =>
-          billingRequest(
-            key,
-            method,
-            body,
-            async () =>
-              new Response(
-                JSON.stringify({
-                  customer_id: userId,
-                  required_balance: 10,
-                  allowed: args.allowed ?? true,
-                  balance: {
-                    feature_id: "credits",
-                    unlimited: false,
-                    overage_allowed: false,
-                    remaining: args.responseBalance,
-                  },
-                }),
-                { status: 200 },
-              ),
-          ),
+          billingRequest(key, method, body, async (_url, init) => {
+            const request = JSON.parse(String(init?.body));
+            await ctx.runMutation(
+              makeFunctionReference("fixture:recordDebitRequest") as any,
+              {
+                sessionId: args.sessionId,
+                method,
+                sendEvent: request.send_event === true,
+              },
+            );
+            if (args.mode === "lost")
+              throw new Error("synthetic lost response");
+            return new Response(
+              JSON.stringify({
+                customer_id: userId,
+                required_balance: 10,
+                allowed: args.allowed ?? true,
+                balance:
+                  args.mode === "malformed"
+                    ? {}
+                    : {
+                        feature_id: "credits",
+                        unlimited: false,
+                        overage_allowed: false,
+                        remaining: args.responseBalance,
+                      },
+              }),
+              { status: 200 },
+            );
+          }),
         ),
     ),
 });
