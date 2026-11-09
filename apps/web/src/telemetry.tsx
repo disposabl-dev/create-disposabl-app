@@ -1,8 +1,11 @@
 import { PostHog } from "posthog-js";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { pageCategory } from "../../../packages/disposabl-kit/lib/telemetry";
 import { createTelemetryLeaseController } from "../../../packages/disposabl-kit/client/lib/telemetry-lease";
-import { isProductAction, safeTelemetryEvent } from "./telemetry-policy";
+import {
+  isProductAction,
+  productPageCategory,
+  safeTelemetryEvent,
+} from "./telemetry-policy";
 
 const preferenceKey = "disposabl.product.analytics.optout.v1";
 const preferenceEvent = "disposabl-product-analytics-preference";
@@ -148,7 +151,7 @@ export function createWebTelemetryAdapter(options: {
           },
         });
         const sendPage = () => {
-          const key = `${lease.distinctId}:${pageCategory(options.page())}`;
+          const key = `${lease.distinctId}:${productPageCategory(options.page())}`;
           if (key === lastView) return;
           sdk?.capture("$pageview");
           lastView = key;

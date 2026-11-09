@@ -1,4 +1,20 @@
-import { pageCategory } from "../../../packages/disposabl-kit/lib/telemetry";
+export function productPageCategory(path: string) {
+  const publicPages = ["pricing", "build", "stack", "why-disposabl"] as const;
+  for (const page of publicPages)
+    if (path === `/${page}` || path === `/${page}/`) return page;
+  if (
+    path === "/dashboard/connections" ||
+    path.startsWith("/dashboard/connections/")
+  )
+    return "connections";
+  if (path === "/dashboard" || path.startsWith("/dashboard/"))
+    return "dashboard";
+  if (path === "/") return "home";
+  if (path === "/login") return "login";
+  if (path === "/signup") return "signup";
+  if (path === "/account") return "account";
+  return "other";
+}
 
 const productActions = [
   "open_connections",
@@ -50,7 +66,7 @@ export function safeTelemetryEvent(
       : {}),
   };
   if (event === "$pageview") {
-    const page = pageCategory(input.page);
+    const page = productPageCategory(input.page);
     const paths: Record<string, string> = {
       home: "/",
       dashboard: "/dashboard",
@@ -58,6 +74,10 @@ export function safeTelemetryEvent(
       login: "/login",
       signup: "/signup",
       account: "/account",
+      pricing: "/pricing",
+      build: "/build",
+      stack: "/stack",
+      "why-disposabl": "/why-disposabl",
     };
     return {
       ...common,
