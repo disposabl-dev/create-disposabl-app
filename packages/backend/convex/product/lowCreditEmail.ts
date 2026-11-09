@@ -74,7 +74,7 @@ export async function queueLowCreditNotice(
     from: options.sender.trim(),
     to: email,
     subject: "Your Disposabl credits are running low",
-    text: `At our latest check, your balance was below 10 credits. Your current access window ends at ${new Date(notice.paidUntil).toISOString()}. To resume after it ends, add credits and send a new message.\n\nAdd credits: ${paymentUrl}`,
+    text: `At our latest check, your balance was below 10 credits. Your current paid window continues until ${new Date(notice.paidUntil).toISOString()}. At the next ten-minute renewal check, 10 credits are required to keep the sandbox running. Add credits before then if needed. If the sandbox stops for insufficient credits, add credits and send a new message to resume.\n\nAdd credits: ${paymentUrl}`,
     idempotencyKey: `low-credit:${key}`,
   });
   return "queued" as const;

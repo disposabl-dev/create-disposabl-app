@@ -263,5 +263,5 @@ test("paid worker tick fences provider dispatch in an isolated subprocess", asyn
     },
   );
   assert.equal(result.status, 0, result.stdout + result.stderr);
-  assert.match(result.stdout + result.stderr, /4 pass/);
+  assert.match(result.stdout + result.stderr, /5 pass/);
 });

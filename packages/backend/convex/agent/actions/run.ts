@@ -56,6 +56,18 @@ export const tick = internalAction({
             (await ctx.runQuery(internal.agent.compute.get, {
               sessionId: current.computeSessionId,
             }));
+          // Keep an abort pending while boundary funding is unresolved. A later
+          // confirmed renewal must not abandon the remote conversation's stop.
+          if (
+            session?.state === "renewing" ||
+            (session?.state === "active" && session.paidUntil <= Date.now())
+          ) {
+            await ctx.runMutation(internal.agent.state.finish, {
+              ...lease,
+              delay: 2000,
+            });
+            return null;
+          }
           if (
             !session ||
             session.state !== "active" ||

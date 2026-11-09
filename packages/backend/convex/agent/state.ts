@@ -324,7 +324,7 @@ export const finish = internalMutation({
       delivery:
         args.stopped || args.suspended
           ? undefined
-          : args.error || args.unconfirmed
+          : args.error || args.unconfirmed || status === "stopping"
             ? current.delivery
             : undefined,
       stopFailures: args.stopped

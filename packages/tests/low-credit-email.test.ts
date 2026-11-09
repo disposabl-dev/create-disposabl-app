@@ -35,7 +35,15 @@ test("queues the paid-window warning with a stable per-user window key", async (
   assert.equal(await queueLowCreditNotice(notice, f.options), "queued");
   assert.equal(f.messages[0].idempotencyKey, f.messages[1].idempotencyKey);
   assert.match(f.messages[0].text, /2027-01-01T00:00:00.000Z/);
-  assert.match(f.messages[0].text, /add credits and send a new message/i);
+  assert.match(f.messages[0].text, /current paid window continues until/i);
+  assert.match(
+    f.messages[0].text,
+    /next ten-minute renewal check, 10 credits/i,
+  );
+  assert.match(
+    f.messages[0].text,
+    /If the sandbox stops for insufficient credits, add credits and send a new message/i,
+  );
   assert.doesNotMatch(
     f.messages[0].text,
     /unless you add credits|files will be saved/i,

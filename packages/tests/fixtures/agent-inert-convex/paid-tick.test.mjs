@@ -52,9 +52,23 @@ mock.module(paths("boat.ts"), () => ({
   BoatError: class BoatError extends Error {},
   sandboxRef: (userId) => ({ ownerId: userId, key: "workspace" }),
   object: (value) => value ?? {},
-  request: async () => {
+  request: async (_sandbox, path) => {
     state.calls.request++;
-    throw new Error("unexpected provider request");
+    if (!state.stopRequests) throw new Error("unexpected provider request");
+    state.remotePaths.push(path);
+    if (path.startsWith("/interrupt?")) return {};
+    if (path === "/conversations")
+      return {
+        conversations: [
+          {
+            id: "conversation",
+            running: false,
+            lastPromptPreview:
+              "Disposabl delivery uncertain-delivery\nsynthetic",
+          },
+        ],
+      };
+    throw new Error("unexpected stop request");
   },
   instructions: () => "",
 }));
@@ -74,6 +88,7 @@ mock.module(paths("attachments.ts"), () => ({
   attachmentPrompt: async () => "",
 }));
 const { tick } = await import(paths("actions/run.ts"));
+const { finish } = await import(paths("state.ts"));
 
 function make({
   sessionState = "active",
@@ -83,6 +98,8 @@ function make({
   archived = false,
   changeAt,
   changeKind,
+  status = "processing",
+  stopRequests = false,
 } = {}) {
   state = {
     session: { userId: "owner", state: sessionState, paidUntil },
@@ -90,6 +107,21 @@ function make({
     sandbox,
     archived,
     changeAt,
+    stopRequests,
+    remotePaths: [],
+    scheduled: [],
+    app: {
+      _id: "app-row",
+      appId: "app",
+      userId: "owner",
+      agent: {
+        threadId: "thread",
+        computeSessionId: "session",
+        status,
+        pending: [],
+        ...(stopRequests ? { delivery: "uncertain-delivery" } : {}),
+      },
+    },
     calls: {
       create: 0,
       refresh: 0,
@@ -109,6 +141,22 @@ function make({
     },
   };
   const ctx = {
+    db: {
+      query: (table) => {
+        const chain = {
+          withIndex: () => chain,
+          unique: async () => (table === "apps" ? state.app : null),
+          take: async () => [],
+        };
+        return chain;
+      },
+      patch: async (_table, _id, patch) => Object.assign(state.app, patch),
+    },
+    scheduler: {
+      cancel: async () => {},
+      runAfter: async (delay, ref, args) =>
+        state.scheduled.push({ delay, name: getFunctionName(ref), args }),
+    },
     runQuery: async (ref) => {
       let name;
       try {
@@ -131,20 +179,24 @@ function make({
     },
     runMutation: async (ref, args) => {
       const name = getFunctionName(ref);
-      if (name === "agent/state:claim")
-        return {
-          id: "thread",
-          userId: "owner",
-          appId: "app",
-          computeSessionId: "session",
-          status: "processing",
+      if (name === "agent/state:claim") {
+        state.app.agent.lease = {
+          token: args.token,
+          expiresAt: Date.now() + 60_000,
+          watchdog: "watchdog",
         };
+        return { ...state.app.agent, userId: "owner", appId: "app" };
+      }
+      if (name === "agent/state:attachConversation") {
+        state.app.agent.conversationId = args.conversationId;
+        return null;
+      }
       if (name === "agent/state:next")
         return { prompt: "synthetic", messageId: "message", fileIds: [] };
       if (name === "agent/state:delivered") return false;
       if (name === "agent/state:finish") {
         state.finishes.push(args);
-        return null;
+        return finish._handler(ctx, args);
       }
       throw new Error(`unexpected mutation ${name}`);
     },
@@ -222,5 +274,37 @@ test("active paid work reaches create, resume and prompt through real access che
     expect(f.state.calls.authorize).toBe(1);
     expect(f.state.checks).toBeGreaterThanOrEqual(4);
     verifyNoExternal(f.state);
+  }
+});
+
+test("abort survives pending boundary funding and interrupts after confirmation", async () => {
+  for (const sessionState of ["active", "renewing"]) {
+    const f = make({
+      sessionState,
+      paidUntil: Date.now() - 1,
+      status: "stopping",
+      stopRequests: true,
+    });
+    await f.run();
+    expect(f.state.app.agent.status).toBe("stopping");
+    expect(f.state.app.agent.delivery).toBe("uncertain-delivery");
+    expect(f.state.app.agent.lease).toBeUndefined();
+    expect(f.state.finishes[0].suspended).toBeUndefined();
+    expect(f.state.scheduled[0].delay).toBe(2000);
+    expect(f.state.calls.request).toBe(0);
+    f.state.session.state = "active";
+    f.state.session.paidUntil = Date.now() + 600_000;
+    await f.run();
+    expect(f.state.remotePaths).toEqual([
+      "/conversations",
+      "/interrupt?conversation=conversation",
+      "/conversations",
+    ]);
+    expect(f.state.app.agent.status).toBe("idle");
+    expect(f.state.app.agent.delivery).toBeUndefined();
+    expect(f.state.finishes.at(-1).stopped).toBe(true);
+    expect(f.state.calls.prompt).toBe(0);
+    expect(f.state.calls.network).toBe(0);
+    expect(f.state.calls.debit).toBe(0);
   }
 });

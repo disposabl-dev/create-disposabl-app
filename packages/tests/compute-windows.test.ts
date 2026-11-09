@@ -501,7 +501,7 @@ test("boundary recovery is armed before renewal; notices cannot replay after com
   assert.equal(empty.rows.size, 0);
 });
 
-test("an in-flight confirmed renewal after expiry is held without granting a window", async () => {
+test("a confirmed debit without a claimed renewal state cannot grant a window", async () => {
   const f = await running();
   await (settle as any)._handler(f.ctx, {
     debitId: f.debit._id,
