@@ -311,3 +311,36 @@ test("a failed renewal stops the SDK and recovers only after fresh authorization
   assert.deepEqual(events, ["start", "stop", "start"]);
   control.stop();
 });
+
+test("a successful response with a failed network body retries but malformed JSON does not", async () => {
+  for (const failure of [
+    new TypeError("connection lost"),
+    new SyntaxError("invalid JSON"),
+  ]) {
+    let calls = 0;
+    let starts = 0;
+    const control = createTelemetryLeaseController({
+      origin: "http://local",
+      transport: async () => {
+        if (++calls !== 1) return reply();
+        const response = new Response("", { status: 200 });
+        response.json = async () => {
+          throw failure;
+        };
+        return response;
+      },
+      adapter: {
+        start: () => {
+          starts++;
+        },
+        stop() {},
+      },
+    });
+    control.update({ enabled: true, token: null });
+    await new Promise<void>((resolve) => setTimeout(resolve, 1_100));
+    const recoverable = failure instanceof TypeError;
+    assert.equal(calls, recoverable ? 2 : 1);
+    assert.equal(starts, recoverable ? 1 : 0);
+    control.stop();
+  }
+});

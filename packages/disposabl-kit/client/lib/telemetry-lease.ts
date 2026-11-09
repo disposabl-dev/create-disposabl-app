@@ -116,7 +116,14 @@ export function createTelemetryLeaseController(options: {
       retryable = response.status === 429 || response.status >= 500;
       if (!response.ok || response.status !== 200)
         throw new Error("bootstrap unavailable");
-      const lease: unknown = await response.json();
+      let lease: unknown;
+      try {
+        lease = await response.json();
+      } catch (error) {
+        // A truncated transport is recoverable; malformed JSON is not a lease.
+        retryable = !(error instanceof SyntaxError);
+        throw error;
+      }
       if (epoch !== generation) return;
       const time = now();
       if (

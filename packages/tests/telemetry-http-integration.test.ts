@@ -1,3 +1,4 @@
+import { assertOwnedSdkBackend } from "./helpers/sdk-auth/ownership";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createHash, randomUUID } from "node:crypto";
@@ -65,6 +66,11 @@ test(
   "real HTTP page and bootstrap share one link with real auth and disabled production transport",
   { skip: !base },
   async () => {
+    assertOwnedSdkBackend({
+      markerVariable: "TELEMETRY_HTTP_OWNERSHIP_FILE",
+      ports: [3540, 3541],
+      claimDirectory: ".telemetry-http-claimed",
+    });
     const firstToken = await account();
     const secondToken = await account();
     const page = { platform: "web", page: "home" };
