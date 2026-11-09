@@ -12,7 +12,7 @@ const stage = v.union(
 const blockers = [
   "Remote work drain and provider cleanup remain unverified.",
   "User-owned records, external resources, financial records, receipts and retention require reconciliation.",
-  "Historical orphan MCP and auth records, unattributed challenges and untracked storage remain unverified.",
+  "Unattributed MCP and auth records, challenges and untracked storage remain unverified.",
   "Permanent component fences and identity cutoffs require a retention decision.",
 ];
 
@@ -53,13 +53,7 @@ export const advanceLocalBatch = internalMutation({
         blockers: [],
       };
     }
-    const auth = user.authDeletion;
-    if (
-      auth?.state !== "linked_auth_cleared" ||
-      !auth.usernameCleared ||
-      !auth.attributedEmailsCleared ||
-      !auth.unattributedEmailChallengesUnverified
-    ) {
+    if (user.authDeletion?.state !== "linked_auth_cleared") {
       await ctx.runMutation(internal.users.authDeletion.runBatch, args);
       return {
         status: "requested",
