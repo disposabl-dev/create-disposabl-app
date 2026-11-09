@@ -1,7 +1,13 @@
 import { ConvexAuthProvider, useAuthToken } from "@convex-dev/auth/react";
 import { ConvexProvider, ConvexReactClient, useConvexAuth } from "convex/react";
 import { Redirect, Stack, router, usePathname } from "expo-router";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ComponentType,
+  type ReactNode,
+} from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { analyticsEnabled, authenticationEnabled } from "../features";
 import { authClasses } from "./components/auth-ui";
@@ -14,15 +20,33 @@ import { UpdatePrompt } from "./updates/update-prompt";
 import { ThemeProvider, useResolvedColorScheme } from "./design/theme-provider";
 import { useTheme } from "./design/use-theme";
 
-export function MobileLayout({ children }: { children?: ReactNode }) {
+type TelemetryOverride = ComponentType<{
+  pathname: string;
+  token: string | null;
+  ready: boolean;
+}>;
+
+export function MobileLayout({
+  children,
+  telemetry,
+}: {
+  children?: ReactNode;
+  telemetry?: TelemetryOverride;
+}) {
   return (
     <ThemeProvider>
-      <BackendLayout>{children}</BackendLayout>
+      <BackendLayout telemetry={telemetry}>{children}</BackendLayout>
     </ThemeProvider>
   );
 }
 
-function BackendLayout({ children }: { children?: ReactNode }) {
+function BackendLayout({
+  children,
+  telemetry,
+}: {
+  children?: ReactNode;
+  telemetry?: TelemetryOverride;
+}) {
   const [client] = useState(() => {
     const url = process.env.EXPO_PUBLIC_CONVEX_URL;
     return url ? new ConvexReactClient(url) : null;
@@ -43,7 +67,7 @@ function BackendLayout({ children }: { children?: ReactNode }) {
   if (!authenticationEnabled) {
     return (
       <ConvexProvider client={client}>
-        <ScreenTelemetry token={null} />
+        <ScreenTelemetry token={null} override={telemetry} />
         <UpdatePrompt>{children ?? <PublicLayout />}</UpdatePrompt>
       </ConvexProvider>
     );
@@ -51,7 +75,7 @@ function BackendLayout({ children }: { children?: ReactNode }) {
 
   return (
     <ConvexAuthProvider client={client} api={api.auth} storage={authStorage}>
-      <AuthenticatedScreenTelemetry />
+      <AuthenticatedScreenTelemetry override={telemetry} />
       <UpdatePrompt>{children ?? <SessionRoutes />}</UpdatePrompt>
     </ConvexAuthProvider>
   );
@@ -207,25 +231,48 @@ const screenTelemetry = createPageTelemetry({
   setItem: SecureStore.setItemAsync,
 });
 
-function AuthenticatedScreenTelemetry() {
+function AuthenticatedScreenTelemetry({
+  override,
+}: {
+  override?: TelemetryOverride;
+}) {
   const token = useAuthToken();
   const { isLoading, isAuthenticated } = useConvexAuth();
   return (
     <ScreenTelemetry
       token={token}
       ready={!isLoading && (!isAuthenticated || !!token)}
+      override={override}
     />
   );
 }
 function ScreenTelemetry({
   token,
   ready = true,
+  override: Override,
 }: {
   token: string | null;
   ready?: boolean;
+  override?: TelemetryOverride;
+}) {
+  const pathname = usePathname();
+  return Override ? (
+    <Override pathname={pathname} token={token} ready={ready} />
+  ) : (
+    <DefaultScreenTelemetry pathname={pathname} token={token} ready={ready} />
+  );
+}
+
+function DefaultScreenTelemetry({
+  pathname,
+  token,
+  ready,
+}: {
+  pathname: string;
+  token: string | null;
+  ready: boolean;
 }) {
   const lastView = useRef<string | null>(null);
-  const pathname = usePathname();
   useEffect(() => {
     const origin = process.env.EXPO_PUBLIC_CONVEX_SITE_URL;
     if (
