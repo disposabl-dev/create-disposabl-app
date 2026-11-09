@@ -13,6 +13,8 @@ import {
   notice,
 } from "../backend/convex/agent/compute";
 
+import { resolveConflicts } from "../backend/convex/agent/computeRecovery";
+
 // Transaction fixtures exercise real handlers in serial commit order, not Convex OCC.
 function fixture() {
   const rows = new Map<string, any>();
@@ -428,4 +430,84 @@ test("an in-flight confirmed renewal after expiry is held without granting a win
     false,
   );
   await assert.rejects(admitSession(f.ctx, "owner", true), /reconciliation/);
+});
+
+test("an old confirmation fences the latest session and ungranted charges require final evidence", async () => {
+  const f = await running();
+  const original = f.rows.get(f.sessionId);
+  original.state = "stopped";
+  original.stopConfirmed = true;
+  f.rows.get(f.appId).agent = {
+    computeSessionId: f.sessionId,
+    status: "idle",
+    pending: [],
+  };
+  const currentId = (await admitSession(f.ctx, "owner", true))!;
+  const currentApp = await f.ctx.db.insert("apps", {
+    userId: "owner",
+    agent: { computeSessionId: currentId, status: "processing", pending: [] },
+  });
+  const currentDebit = (await claimWindow(
+    f.ctx,
+    { sessionId: currentId },
+    true,
+  ))!;
+  const before = f.scheduled.length;
+  await (settle as any)._handler(f.ctx, {
+    debitId: f.debit._id,
+    outcome: "confirmed",
+    responseBalance: 20,
+  });
+  const current = f.rows.get(currentId);
+  assert.equal(original.state, "stopped");
+  assert.equal(current.state, "hold");
+  assert.deepEqual(current.conflictDebits, [f.debit._id]);
+  assert.equal(f.rows.get(f.debit._id).lateConfirmation.responseBalance, 20);
+  const stops = f.scheduled
+    .slice(before)
+    .filter((job) => job.name === "agent/actions/compute:stop");
+  assert.deepEqual(
+    stops.map((job) => job.args.sessionId),
+    [currentId],
+  );
+  await assert.rejects(admitSession(f.ctx, "owner", true), /reconciliation/);
+  await (settle as any)._handler(f.ctx, {
+    debitId: currentDebit._id,
+    outcome: "confirmed",
+    responseBalance: 10,
+  });
+  assert.equal(current.state, "hold");
+  assert.equal(current.paidUntil, 0);
+  assert.equal(f.rows.get(currentDebit._id).paidUntil, 0);
+  assert.equal(f.rows.get(currentDebit._id).state, "confirmed");
+  current.stopConfirmed = true;
+  f.rows.get(currentApp).agent.status = "idle";
+  const args = {
+    currentSessionId: currentId,
+    conflicts: [
+      {
+        sessionId: f.sessionId,
+        debitId: f.debit._id,
+        evidence: "synthetic original charge reconciled",
+      },
+    ],
+    operator: "fixture",
+  };
+  await assert.rejects(
+    (resolveConflicts as any)._handler(f.ctx, args),
+    /Current debit needs matching final evidence/,
+  );
+  assert.equal(current.state, "hold");
+  assert.equal(f.rows.get(f.debit._id).conflictResolution, undefined);
+  await (resolveConflicts as any)._handler(f.ctx, {
+    ...args,
+    currentDebit: {
+      debitId: currentDebit._id,
+      outcome: "confirmed",
+      evidence: "synthetic ungranted charge reconciled",
+    },
+  });
+  assert.equal(current.state, "stopped");
+  assert.equal(f.rows.get(currentDebit._id).resolution.outcome, "confirmed");
+  assert.equal(current.paidUntil, 0);
 });

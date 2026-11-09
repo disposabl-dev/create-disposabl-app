@@ -216,7 +216,8 @@ export const resolveConflicts = internalMutation({
       !currentDebit.resolution &&
       (currentDebit.state === "unknown" ||
         (currentDebit.state === "confirmed" &&
-          currentDebit.paidUntil !== current.paidUntil));
+          (currentDebit.paidUntil === 0 ||
+            currentDebit.paidUntil !== current.paidUntil)));
     if (needsResolution) {
       const proof = args.currentDebit;
       if (

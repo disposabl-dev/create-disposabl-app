@@ -153,23 +153,26 @@ export const settle = internalMutation({
     )
       throw new Error("Invalid debit response balance.");
     const session = await ctx.db.get("computeSessions", debit.sessionId);
+    const current =
+      session &&
+      (await ctx.db
+        .query("computeSessions")
+        .withIndex("by_userId", (q) => q.eq("userId", session.userId))
+        .order("desc")
+        .first());
     const superseded = !session || session.debitId !== debitId;
-    if (debit.state !== "dispatching" || superseded) {
+    const displacedDispatch =
+      debit.state === "dispatching" && current?._id !== session?._id;
+    if (debit.state !== "dispatching" || superseded || displacedDispatch) {
       if (
         outcome !== "confirmed" ||
         debit.state === "confirmed" ||
         debit.lateConfirmation
       )
         return null;
-      const current =
-        session &&
-        (await ctx.db
-          .query("computeSessions")
-          .withIndex("by_userId", (q) => q.eq("userId", session.userId))
-          .order("desc")
-          .first());
       const conflict =
         superseded ||
+        displacedDispatch ||
         debit.state === "denied" ||
         debit.resolution?.outcome === "denied" ||
         Boolean(
@@ -218,13 +221,6 @@ export const settle = internalMutation({
     if (!session || session.debitId !== debitId) return null;
     const now = Date.now();
     const initial = session.state === "starting";
-    const current = initial
-      ? await ctx.db
-          .query("computeSessions")
-          .withIndex("by_userId", (q) => q.eq("userId", session.userId))
-          .order("desc")
-          .first()
-      : null;
     const activateInitial =
       outcome === "confirmed" &&
       initial &&
