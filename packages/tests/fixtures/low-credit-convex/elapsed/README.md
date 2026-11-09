@@ -1,0 +1,5 @@
+# Opt-in elapsed renewal fixture
+
+From a clean committed checkout with cached dependencies and exclusively free ports 3480/3481, set `CONVEX_LOCAL_BINARY` to the cached Convex backend and run `python3 packages/tests/fixtures/low-credit-convex/elapsed/run.py`. It retains a private fixture directory and takes two real 600-second windows. The launcher enforces loopback-only networking, telemetry/beacon off, an empty Boat key, selected Auth archive verification, a 2.5 GiB disk guard, and supervised teardown.
+
+The fixture uses real product claim, settlement, scheduled boundary and registered renewal action; only debit and notice balance are synthetic. A fixture-only notice handler invokes the real notice logic and an inert queue marker. The product queue remains disabled by E2E, and stop is inert. No provider, email or Boat call occurs. This is elapsed local scheduling evidence, not provider finality, remote stop, production behavior or receipt delivery. The test and fixture are product-only and must be excluded from generated starters.
