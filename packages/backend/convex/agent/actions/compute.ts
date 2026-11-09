@@ -126,17 +126,16 @@ export async function deliverNotice(
     observe: observeNoticeBalance,
   },
 ) {
-  const debit = await ctx.runQuery(internal.agent.compute.getDebit, {
-    debitId,
-  });
-  if (
-    !debit ||
-    debit.state !== "confirmed" ||
-    debit.noticeComplete ||
-    debit.noticeOutcome
-  )
-    return null;
+  let debit: Doc<"computeDebits"> | null | undefined;
   try {
+    debit = await ctx.runQuery(internal.agent.compute.getDebit, { debitId });
+    if (
+      !debit ||
+      debit.state !== "confirmed" ||
+      debit.noticeComplete ||
+      debit.noticeOutcome
+    )
+      return null;
     if (
       !options.enabled ||
       options.environment !== "production" ||
@@ -162,7 +161,7 @@ export async function deliverNotice(
       observation: { ...candidate, balance, observedAt: Date.now() },
     });
   } catch {
-    if (attempt < 5 && debit.paidUntil > Date.now())
+    if (attempt < 5 && (!debit || debit.paidUntil > Date.now()))
       await ctx.scheduler.runAfter(
         30_000,
         internal.agent.actions.compute.notice,

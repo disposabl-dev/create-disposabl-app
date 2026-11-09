@@ -433,8 +433,16 @@ export const notice = internalMutation({
     let outcome: NonNullable<Doc<"computeDebits">["noticeOutcome"]>;
     if (result.terminal) outcome = result.terminal;
     else if (disabled) outcome = "disabled";
-    else if (failed) outcome = "failed";
-    else {
+    else if (failed) {
+      // An exhausted observer must not suppress another observation in flight.
+      // At the deadline this mutation records expiry, unless a notice won first.
+      await ctx.scheduler.runAt(
+        result.debit.paidUntil,
+        internal.agent.compute.notice,
+        { debitId, failed: true },
+      );
+      return null;
+    } else {
       if (!observation) return null;
       if (
         observation.userId !== result.userId ||

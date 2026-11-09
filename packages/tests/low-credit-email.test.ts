@@ -184,6 +184,7 @@ test("notice uses a fresh observation and fences stale or ineligible work", asyn
     let reads = 0;
     const queues: number[] = [];
     const retries: any[] = [];
+    const finalizers: any[] = [];
     const db: any = {
       get: async (table: string) =>
         table === "computeDebits"
@@ -197,6 +198,12 @@ test("notice uses a fresh observation and fences stale or ineligible work", asyn
     };
     const mutation: any = {
       db,
+      scheduler: {
+        runAt: async (when: number, ref: any, args: any) => {
+          assert.equal(getFunctionName(ref), "agent/compute:notice");
+          finalizers.push({ when, args });
+        },
+      },
       runMutation: async (_ref: unknown, args: any) => {
         queues.push(args.balance);
         return args.balance < 10 ? "queued" : "not_low";
@@ -233,6 +240,8 @@ test("notice uses a fresh observation and fences stale or ineligible work", asyn
       options,
       queues,
       retries,
+      finalizers,
+      finalize: (args: any) => (mutate as any)._handler(mutation, args),
       reads: () => reads,
       setOwner: (value: any) => {
         owner = value;
@@ -280,8 +289,44 @@ test("notice uses a fresh observation and fences stale or ineligible work", asyn
   assert.equal(retry.debit.responseBalance, 0);
   assert.equal(retry.debit.noticeOutcome, undefined);
   await deliverNotice(retry.ctx, "debit" as any, 5, retry.options);
-  assert.equal(retry.debit.noticeOutcome, "failed");
+  assert.equal(retry.debit.noticeOutcome, undefined);
+  assert.deepEqual(retry.finalizers, [
+    {
+      when: retry.debit.paidUntil,
+      args: { debitId: "debit", failed: true },
+    },
+  ]);
   assert.deepEqual(retry.queues, []);
+  // A successful in-flight observation can still win before the deadline.
+  retry.options.observe = async () => 0;
+  await deliverNotice(retry.ctx, "debit" as any, 0, retry.options);
+  assert.equal(retry.debit.noticeOutcome, "queued");
+  await retry.finalize(retry.finalizers[0].args);
+  assert.deepEqual(retry.queues, [0]);
+  assert.equal(retry.debit.noticeOutcome, "queued");
+
+  const exhausted = make(10, 0);
+  exhausted.options.observe = async () => {
+    throw new Error("lookup failed");
+  };
+  await deliverNotice(exhausted.ctx, "debit" as any, 5, exhausted.options);
+  exhausted.debit.paidUntil = Date.now() - 1;
+  await exhausted.finalize(exhausted.finalizers[0].args);
+  assert.equal(exhausted.debit.noticeOutcome, "expired");
+  assert.deepEqual(exhausted.queues, []);
+  assert.equal(exhausted.finalizers.length, 1);
+
+  const initial = make(10, 0);
+  initial.ctx.runQuery = async () => {
+    throw new Error("initial read failed");
+  };
+  await deliverNotice(initial.ctx, "debit" as any, 0, initial.options);
+  assert.deepEqual(initial.retries, [{ debitId: "debit", attempt: 1 }]);
+  assert.equal(initial.reads(), 0);
+  await deliverNotice(initial.ctx, "debit" as any, 5, initial.options);
+  assert.equal(initial.retries.length, 1);
+  assert.equal(initial.finalizers.length, 1);
+  assert.equal(initial.debit.noticeOutcome, undefined);
   const racing = make(10, 0);
   racing.options.observe = async () => {
     racing.setOwner({ deletionRequestedAt: 1 });
