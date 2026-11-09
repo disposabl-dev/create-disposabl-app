@@ -131,6 +131,19 @@ test("packaged starter and generated profiles exclude product proof fixtures", a
       });
       roots.push(destination);
       for (const path of [
+        "packages/tests/helpers/mobile-simulator/preflight.py",
+        "packages/tests/helpers/mobile-simulator/test_preflight.py",
+        "packages/tests/mobile-simulator-preflight.test.ts",
+      ]) {
+        assert.equal(
+          existsSync(join(destination, path)),
+          platforms.includes("ios") || platforms.includes("android"),
+          `${name}: ${path} must match mobile selection`,
+        );
+      }
+      const readme = await readFile(join(destination, "packages/tests/README.md"), "utf8");
+      assert.equal(readme.includes("### Isolated iOS simulator acceptance preflight"), platforms.includes("ios") || platforms.includes("android"));
+      for (const path of [
         "packages/tests/consent-identity.test.ts",
         "packages/tests/components/consent-identity.test.mjs",
       ]) {
