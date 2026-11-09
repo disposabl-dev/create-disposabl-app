@@ -186,7 +186,7 @@ jobs:
     if: needs.web.outputs.android_build == 'true' && !(github.event_name == 'push' && github.repository == 'disposabl-dev/create-disposabl-app')
     permissions: *release-permissions
     runs-on: ${{ needs.changes.outputs.android_runner }}
-    timeout-minutes: 20
+    timeout-minutes: 30
     env:
       PLATFORM: android
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
