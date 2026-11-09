@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
+import { readFileSync, writeFileSync } from "node:fs";
 import {
   balanceId,
   type PurchaseEvent,
@@ -195,6 +196,10 @@ test(
     assert.equal(claims.filter(Boolean).length, 1);
     assert.deepEqual(claims.find(Boolean), { customer: alice, kind: "grant" });
     assert.equal((await state(id)).purchase.state, "grant_unknown");
+    assert.equal(
+      await call("retryQueued", { ...scope(e, id), customer: alice }),
+      false,
+    );
     assert.equal(await deliver({ ...e, deliveryId: randomUUID() }), "pending");
     assert.equal(await call("take", scope(e, id)), null);
     assert.equal(
@@ -370,5 +375,52 @@ test(
     assert.equal(await call("take", scope(google, appleId)), null);
     assert.equal((await call("take", scope(apple, appleId))).kind, "grant");
     assert.equal((await call("take", scope(google, googleId))).kind, "grant");
+  },
+);
+
+test(
+  "payments toggle recovery preserves and targets one queued grant",
+  {
+    skip: !url || !process.env.NATIVE_INBOX_RECOVERY_PHASE,
+  },
+  async () => {
+    const path = process.env.NATIVE_INBOX_RECOVERY_FILE!;
+    if (process.env.NATIVE_INBOX_RECOVERY_PHASE === "off") {
+      const customer = await user();
+      const purchase = event(customer),
+        id = await balanceId(purchase);
+      await call("controlCreate", { balanceId: id });
+      await call("controlSet", {
+        balanceId: id,
+        enabled: true,
+        released: true,
+      });
+      await deliver(purchase);
+      const done = await awaitControl(id, (row) => row.finished === 1);
+      assert.equal(done.claimAttempts, 0);
+      assert.equal(done.providerCalls, 0);
+      assert.equal((await state(id)).purchase.state, "queued");
+      writeFileSync(path, JSON.stringify({ purchase, id }));
+      return;
+    }
+    const { purchase, id } = JSON.parse(readFileSync(path, "utf8"));
+    assert.equal((await state(id)).purchase.state, "queued");
+    const target = { ...scope(purchase, id), customer: purchase.customer };
+    await call("controlSet", { balanceId: id, enabled: true, released: false });
+    assert.equal(await call("retryQueued", target), true);
+    assert.equal(await call("retryQueued", target), true);
+    await awaitControl(id, (row) => row.arrived === 3);
+    await call("controlSet", { balanceId: id, enabled: true, released: true });
+    const done = await awaitControl(id, (row) => row.finished === 3);
+    assert.equal(done.claimAttempts, 2);
+    assert.equal(done.providerCalls, 1);
+    assert.equal(done.providerCustomer, purchase.customer);
+    assert.equal((await state(id)).purchase.state, "granted");
+    assert.equal(await call("retryQueued", target), false);
+    assert.equal(await call("take", scope(purchase, id)), null);
+    assert.equal(
+      (await call("controlState", { balanceId: id }, true)).providerCalls,
+      1,
+    );
   },
 );

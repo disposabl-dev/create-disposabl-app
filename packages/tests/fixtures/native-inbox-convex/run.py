@@ -42,6 +42,18 @@ try:
     subprocess.run([cli,'dev','--once','--typecheck','disable','--codegen','disable'],cwd=workfixture,env=env,check=True)
     env['NATIVE_INBOX_FIXTURE_URL']='http://127.0.0.1:3490'
     subprocess.run(['bun','test','packages/tests/native-inbox-transactions.test.ts'],cwd=source,env=env,check=True)
+    # Retain the same database while deploying payments off, then back on.
+    env['NATIVE_INBOX_RECOVERY_FILE']=str(work/'recovery.json')
+    config['features']=[feature for feature in config['features'] if feature != 'payments']
+    (source/'disposabl.json').write_text(json.dumps(config))
+    subprocess.run([cli,'dev','--once','--typecheck','disable','--codegen','disable'],cwd=workfixture,env=env,check=True)
+    env['NATIVE_INBOX_RECOVERY_PHASE']='off'
+    subprocess.run(['bun','test','packages/tests/native-inbox-transactions.test.ts','-t','payments toggle recovery'],cwd=source,env=env,check=True)
+    config['features'].append('payments')
+    (source/'disposabl.json').write_text(json.dumps(config))
+    subprocess.run([cli,'dev','--once','--typecheck','disable','--codegen','disable'],cwd=workfixture,env=env,check=True)
+    env['NATIVE_INBOX_RECOVERY_PHASE']='on'
+    subprocess.run(['bun','test','packages/tests/native-inbox-transactions.test.ts','-t','payments toggle recovery'],cwd=source,env=env,check=True)
 finally:
     p.terminate()
     try: p.wait(timeout=10)

@@ -1,6 +1,6 @@
 # Native inbox transaction fixture
 
-This disposable local Convex fixture exercises production inbox handlers. For the worker tests it enables payments in a temporary copy of `disposabl.json`, supplies synthetic route settings on the disposable backend, and invokes the production dispatch handler through a test-only barrier. Its fetch adapter records the synthetic request and returns success without calling a provider. Other scheduled dispatches remain inert. These tests do not prove provider behavior or exactly-once writes.
+This disposable local Convex fixture exercises production inbox handlers. For the worker tests it enables payments in a temporary copy of `disposabl.json`, supplies synthetic route settings on the disposable backend, and invokes the production dispatch handler through a test-only barrier. Its fetch adapter records the synthetic request and returns success without calling a provider. Other scheduled dispatches remain inert. A separate phase deploys the copied configuration with payments off and then on against the same local database, exercising the production dispatch gate and targeted recovery. These tests do not prove provider behavior or exactly-once writes.
 
 Run from the repository root on macOS:
 
