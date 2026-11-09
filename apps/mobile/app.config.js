@@ -91,6 +91,14 @@ module.exports = ({ config }) => {
     plugins: [
       ...(config.plugins || []),
       "./plugins/with-android-signing.js",
+      // 5.2.4 omits the collected-data array used by Xcode's privacy report.
+      // Revisit when https://github.com/ashleymills/Reachability.swift/issues/423 is fixed.
+      [
+        "expo-build-properties",
+        {
+          ios: { extraPods: [{ name: "ReachabilitySwift", version: "5.2.3" }] },
+        },
+      ],
       ...(process.env.EXPO_PUBLIC_E2E === "true"
         ? [
             ...(process.env.E2E_ANDROID_LOOPBACK === "true"
