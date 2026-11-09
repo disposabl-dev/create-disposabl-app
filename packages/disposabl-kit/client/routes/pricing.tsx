@@ -153,6 +153,7 @@ function PurchasePage({
   const [message, setMessage] = useState("");
   const [refreshError, setRefreshError] = useState("");
   const [busy, setBusy] = useState(false);
+  const inFlight = useRef(false);
   const generation = useRef(0);
   const refreshSequence = useRef(0);
   useLayoutEffect(() => {
@@ -195,11 +196,13 @@ function PurchasePage({
       !session ||
       !customerId ||
       busy ||
+      inFlight.current ||
       (kind === "monthly" && hasMonthlyPlan !== false) ||
       !handoffAllows(fromIos, handoff, customerId, kind)
     )
       return;
     const version = generation.current;
+    inFlight.current = true;
     setBusy(true);
     setMessage("");
     try {
@@ -238,12 +241,16 @@ function PurchasePage({
         );
       await refresh();
     } finally {
-      if (version === generation.current) setBusy(false);
+      if (version === generation.current) {
+        inFlight.current = false;
+        setBusy(false);
+      }
     }
   }
   async function manage() {
-    if (!session || busy) return;
+    if (!session || busy || inFlight.current) return;
     const version = generation.current;
+    inFlight.current = true;
     setBusy(true);
     try {
       onAttempt?.("billing_portal_attempt");
@@ -256,6 +263,7 @@ function PurchasePage({
     } catch {
       if (version !== generation.current) return;
       setMessage("Unable to open billing settings. Please try again.");
+      inFlight.current = false;
       setBusy(false);
     }
   }
