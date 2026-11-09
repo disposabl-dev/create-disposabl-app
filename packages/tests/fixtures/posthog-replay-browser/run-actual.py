@@ -27,8 +27,13 @@ def command(args, *, cwd, env, log, timeout=180):
 
 
 def main():
+    electron_mount = os.environ.get('REPLAY_ELECTRON_MOUNT') == '1'
+    if electron_mount and not Path(os.environ.get('REPLAY_ELECTRON_BINARY', '')).is_file():
+        raise RuntimeError('REPLAY_ELECTRON_BINARY must name cached Electron')
+    if electron_mount and os.environ.get('REPLAY_ELECTRON_NO_SANDBOX') != '1':
+        raise RuntimeError('Electron fixture requires explicit REPLAY_ELECTRON_NO_SANDBOX=1')
     billing_mount = os.environ.get('REPLAY_BILLING_MOUNT') == '1'
-    telemetry_mount = billing_mount or os.environ.get('REPLAY_TELEMETRY_MOUNT') == '1'
+    telemetry_mount = electron_mount or billing_mount or os.environ.get('REPLAY_TELEMETRY_MOUNT') == '1'
     executable = Path(os.environ['REPLAY_CHROMIUM'])
     if not executable.is_file():
         raise RuntimeError('REPLAY_CHROMIUM must name cached Chromium')
@@ -105,8 +110,18 @@ def main():
     env['REPLAY_APP_DIST'] = str(dist)
     if billing_mount:
         env['REPLAY_BILLING_MOUNT'] = '1'
+    if electron_mount:
+        desktop = source/'apps/desktop'
+        compiled = work/'electron-build'
+        compiled.mkdir()
+        for name in ('main', 'preload'):
+            command(['bun', 'build', str(desktop/f'src/{name}.ts'), '--target=node', '--format=cjs', '--external=electron', '--outfile', str(compiled/f'{name}.cjs'), '--define', '__dirname='+json.dumps(str(compiled)), '--define', 'DISPOSABL_DESKTOP_ID="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"', '--define', 'DISPOSABL_WEB_URL="https://fixture.invalid"', '--define', 'DISPOSABL_UPDATE_URL=""', '--define', 'DISPOSABL_UPDATE_CHANNEL="production"'], cwd=source, env=env, log=work/f'electron-{name}-build.log')
+        env['REPLAY_ELECTRON_BINARY'] = os.environ['REPLAY_ELECTRON_BINARY']
+        entry = work/'electron-entry.cjs'
+        entry.write_text("const {app}=require('electron');app.setPath('appData'," + json.dumps(str(work)) + " );app.setPath('userData'," + json.dumps(str(work/'electron-user-data')) + " );globalThis.startTestProduct=()=>require(" + json.dumps(str(compiled/'main.cjs')) + " );")
+        env['REPLAY_ELECTRON_ENTRY'] = str(entry)
     script = 'mount-telemetry.mjs' if telemetry_mount else 'actual-app.mjs'
-    modes = ['web', 'desktop'] if telemetry_mount else [None]
+    modes = ['electron'] if electron_mount else ['web', 'desktop'] if telemetry_mount else [None]
     for mode in modes:
         args = ['bun', f'packages/tests/fixtures/posthog-replay-browser/{script}']
         if mode: args.append(mode)
@@ -117,6 +132,6 @@ def main():
 
 
 if __name__ == '__main__':
-    allowed = {'PATH': os.environ.get('PATH', '/usr/bin:/bin'), 'REPLAY_CHROMIUM': os.environ.get('REPLAY_CHROMIUM', ''), 'REPLAY_TELEMETRY_MOUNT': os.environ.get('REPLAY_TELEMETRY_MOUNT', ''), 'REPLAY_BILLING_MOUNT': os.environ.get('REPLAY_BILLING_MOUNT', '')}
+    allowed = {'PATH': os.environ.get('PATH', '/usr/bin:/bin'), 'REPLAY_CHROMIUM': os.environ.get('REPLAY_CHROMIUM', ''), 'REPLAY_TELEMETRY_MOUNT': os.environ.get('REPLAY_TELEMETRY_MOUNT', ''), 'REPLAY_BILLING_MOUNT': os.environ.get('REPLAY_BILLING_MOUNT', ''), 'REPLAY_ELECTRON_MOUNT': os.environ.get('REPLAY_ELECTRON_MOUNT', ''), 'REPLAY_ELECTRON_NO_SANDBOX': os.environ.get('REPLAY_ELECTRON_NO_SANDBOX', ''), 'REPLAY_ELECTRON_BINARY': os.environ.get('REPLAY_ELECTRON_BINARY', '')}
     entry = 'import runpy,sys; runpy.run_path(sys.argv[1])["main"]()'
     os.execve('/usr/bin/sandbox-exec', ['sandbox-exec', '-p', PROFILE, sys.executable, '-c', entry, __file__], allowed)

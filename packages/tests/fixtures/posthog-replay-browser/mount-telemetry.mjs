@@ -1,4 +1,4 @@
-import { chromium } from "playwright-core";
+import { chromium, _electron as electron } from "playwright-core";
 import { readFile } from "node:fs/promises";
 import { resolve, sep } from "node:path";
 import { gunzipSync } from "node:zlib";
@@ -7,31 +7,56 @@ import { exerciseBilling } from "./billing-mount.mjs";
 
 const dist = resolve(process.env.REPLAY_APP_DIST || "");
 const mode = process.argv[2];
-assert.ok(mode === "web" || mode === "desktop", "invalid mount mode");
+assert.ok(["web", "desktop", "electron"].includes(mode), "invalid mount mode");
 assert.ok(process.env.REPLAY_APP_DIST && process.env.REPLAY_CHROMIUM);
-const browser = await chromium.launch({
-  executablePath: process.env.REPLAY_CHROMIUM,
-  headless: true,
-  args: ["--disable-background-networking"],
-});
-const context = await browser.newContext({
-  serviceWorkers: "block",
-  userAgent:
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
-});
-const page = await context.newPage();
+const electronApp =
+  mode === "electron"
+    ? await electron.launch({
+        executablePath: process.env.REPLAY_ELECTRON_BINARY,
+        args: [process.env.REPLAY_ELECTRON_ENTRY, "--no-sandbox"],
+        timeout: 20000,
+      })
+    : null;
+const browser = electronApp
+  ? null
+  : await chromium.launch({
+      executablePath: process.env.REPLAY_CHROMIUM,
+      headless: true,
+      args: ["--disable-background-networking"],
+    });
+const context = electronApp
+  ? electronApp.context()
+  : await browser.newContext({
+      serviceWorkers: "block",
+      userAgent:
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+    });
+let page;
 const paths = [],
   captures = [],
+  bootstraps = [],
   generic = [],
   failures = [],
   outbound = [];
-page.on("pageerror", (e) => failures.push(e.message));
 try {
-  await page.addInitScript((mode) => {
-    Object.defineProperty(navigator, "webdriver", { get: () => false });
-    Object.defineProperty(navigator, "userAgentData", {
-      get: () => ({ brands: [{ brand: "Chromium", version: "130" }] }),
-    });
+  await context.addInitScript((mode) => {
+    if (location.origin !== "https://fixture.invalid") return;
+    if (
+      Object.getOwnPropertyDescriptor(navigator, "webdriver")?.configurable !==
+      false
+    )
+      Object.defineProperty(navigator, "webdriver", {
+        get: () => false,
+        configurable: true,
+      });
+    if (
+      Object.getOwnPropertyDescriptor(navigator, "userAgentData")
+        ?.configurable !== false
+    )
+      Object.defineProperty(navigator, "userAgentData", {
+        get: () => ({ brands: [{ brand: "Chromium", version: "130" }] }),
+        configurable: true,
+      });
     if (mode === "desktop") window.disposablDesktop = { authentication: true };
     localStorage.setItem("fixture-session", "A");
     window.fixtureBillingCalls = [];
@@ -68,7 +93,8 @@ try {
       });
     }
     if (url.host !== "fixture.invalid") return route.abort();
-    if (url.pathname === "/telemetry/bootstrap")
+    if (url.pathname === "/telemetry/bootstrap") {
+      bootstraps.push(!!req.headers().authorization);
       return route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -77,11 +103,16 @@ try {
           projectToken: "phc_fixture",
           host: "https://us.i.posthog.com",
           anonymousId: "00000000-0000-4000-8000-000000000001",
-          distinctId: "account-a",
+          distinctId: !req.headers().authorization
+            ? "anonymous-a"
+            : req.headers().authorization.includes("eyJzdWIiOiJCIn0")
+              ? "account-b"
+              : "account-a",
           identified: !!req.headers().authorization,
           expiresAt: Date.now() + 30000,
         }),
       });
+    }
     if (url.pathname === "/telemetry/page") {
       generic.push(url.pathname);
       return route.fulfill({ status: 200, body: "{}" });
@@ -100,6 +131,12 @@ try {
     }
     return route.fulfill({ status: 200, path: file, body });
   });
+  if (electronApp) {
+    await electronApp.evaluate(() => globalThis.startTestProduct());
+    page = await electronApp.firstWindow({ timeout: 20000 });
+  } else page = await context.newPage();
+  page.on("pageerror", (e) => failures.push(e.message));
+  const expectedPlatform = mode === "electron" ? "desktop" : mode;
   if (process.env.REPLAY_BILLING_MOUNT === "1") {
     await exerciseBilling({
       page,
@@ -114,6 +151,16 @@ try {
     await page.goto("https://fixture.invalid/dashboard", {
       waitUntil: "domcontentloaded",
     });
+    if (electronApp) {
+      assert.equal(
+        await page.evaluate(() => window.disposablDesktop?.authentication),
+        true,
+      );
+      assert.equal(
+        await page.evaluate(() => typeof window.require),
+        "undefined",
+      );
+    }
     const link = page.locator('a[href="/dashboard/connections"]').first();
     try {
       await link.waitFor({ state: "visible", timeout: 15000 });
@@ -159,7 +206,7 @@ try {
     assert.ok(
       views().every(
         (v) =>
-          v.properties.platform === mode &&
+          v.properties.platform === expectedPlatform &&
           v.properties.distinct_id === "account-a",
       ),
     );
@@ -203,6 +250,16 @@ try {
         "api_key_revoke_attempt",
       ],
     );
+    if (electronApp) {
+      await page.evaluate(() => {
+        localStorage.setItem("fixture-session", "B");
+        window.dispatchEvent(new Event("fixture-auth-change"));
+      });
+      await page.waitForTimeout(1000);
+      await page.getByRole("button", { name: "Revoke" }).click();
+      await page.waitForTimeout(1000);
+      assert.equal(keyActions().at(-1)?.properties.distinct_id, "account-b");
+    }
     const before = keyActions().length;
     await page.evaluate(() => {
       window.fixtureClock = Date.now;
@@ -222,7 +279,30 @@ try {
     await page.getByRole("button", { name: "Revoke" }).click();
     await page.waitForTimeout(300);
     assert.equal(keyActions().length, before, "opt-out emitted an action");
-    assert.ok(captures.every((event) => event.properties?.platform === mode));
+    if (electronApp) {
+      const prior = bootstraps.length;
+      await page.evaluate(() => {
+        localStorage.removeItem("fixture-session");
+        window.dispatchEvent(new Event("fixture-auth-change"));
+      });
+      await page.waitForTimeout(500);
+      assert.equal(
+        bootstraps.length,
+        prior,
+        "opt-out allowed logout bootstrap",
+      );
+      await page.getByRole("button", { name: /Allow analytics:/ }).click();
+      await page.waitForTimeout(1000);
+      assert.ok(
+        bootstraps.length > prior && bootstraps.at(-1) === false,
+        "re-enabled logout did not use anonymous bootstrap",
+      );
+    }
+    assert.ok(
+      captures.every(
+        (event) => event.properties?.platform === expectedPlatform,
+      ),
+    );
     for (const marker of [
       "SECRET_KEY_NAME_91",
       "SECRET_KEY_MATERIAL_91",
@@ -244,6 +324,7 @@ try {
           [
             "https://www.disposabl.dev/dashboard",
             "https://www.disposabl.dev/dashboard/connections",
+            ...(electronApp ? ["https://www.disposabl.dev/login"] : []),
           ].includes(url),
         "noncanonical URL captured",
       );
@@ -260,7 +341,7 @@ try {
     console.log(
       JSON.stringify({
         views: views().map((v) => v.properties.page),
-        platform: mode,
+        platform: expectedPlatform,
         genericRequests: generic.length,
         keyActions: keyActions().map((event) => event.properties.action),
         expiredSuppressed: true,
@@ -270,6 +351,9 @@ try {
     );
   }
 } finally {
-  await context.close();
-  await browser.close();
+  if (electronApp) await electronApp.close();
+  else {
+    await context.close();
+    await browser.close();
+  }
 }
