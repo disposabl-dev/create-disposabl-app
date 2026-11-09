@@ -117,6 +117,7 @@ def main():
         for name in ('main', 'preload'):
             command(['bun', 'build', str(desktop/f'src/{name}.ts'), '--target=node', '--format=cjs', '--external=electron', '--outfile', str(compiled/f'{name}.cjs'), '--define', '__dirname='+json.dumps(str(compiled)), '--define', 'DISPOSABL_DESKTOP_ID="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"', '--define', 'DISPOSABL_WEB_URL="https://fixture.invalid"', '--define', 'DISPOSABL_UPDATE_URL=""', '--define', 'DISPOSABL_UPDATE_CHANNEL="production"'], cwd=source, env=env, log=work/f'electron-{name}-build.log')
         env['REPLAY_ELECTRON_BINARY'] = os.environ['REPLAY_ELECTRON_BINARY']
+        env['REPLAY_ELECTRON_NO_SANDBOX'] = os.environ['REPLAY_ELECTRON_NO_SANDBOX']
         entry = work/'electron-entry.cjs'
         entry.write_text("const {app}=require('electron');app.setPath('appData'," + json.dumps(str(work)) + " );app.setPath('userData'," + json.dumps(str(work/'electron-user-data')) + " );globalThis.startTestProduct=()=>require(" + json.dumps(str(compiled/'main.cjs')) + " );")
         env['REPLAY_ELECTRON_ENTRY'] = str(entry)
