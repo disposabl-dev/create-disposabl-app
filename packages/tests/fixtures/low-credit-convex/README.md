@@ -9,3 +9,19 @@ The manual-resume cases mount the real agent component, paid enqueue, worker cla
 Start a fresh local Convex backend on `127.0.0.1:3480` and `127.0.0.1:3481` with a separate database and storage, `--disable-beacon`, no Sentry DSN, and no provider credentials. Set `E2E_TELEMETRY_DISABLED=1` in that deployment before syncing fixture functions. Use only its disposable local admin key.
 
 Sync this fixture to that loopback backend, then from the repository root run `LOW_CREDIT_FIXTURE_URL=http://127.0.0.1:3480 LOW_CREDIT_BACKEND_E2E=1 E2E_TELEMETRY_DISABLED=1 bun test packages/tests/low-credit-email-integration.test.ts`. The test refuses other ports and skips without the fixture URL or explicit E2E flag. Stop only the backend you started. These checks do not prove Autumn traffic, email delivery, or production configuration.
+
+
+## Public admission regression
+
+Run from a clean checkout committed at the explicitly selected revision, with cached dependencies and local backend supplied (macOS sandbox-exec required):
+
+```sh
+PUBLIC_ADMISSION_SOURCE_REVISION="$(git rev-parse HEAD)" \
+PUBLIC_ADMISSION_DEPS=/absolute/path/to/cached/node_modules \
+CONVEX_LOCAL_BINARY=/absolute/path/to/convex-local-backend \
+python3 packages/tests/fixtures/low-credit-convex/public-admission.py
+```
+
+The runner enforces outbound isolation, the 2.5 GiB disk floor, private homes, selected Auth archive verification, and exclusive loopback ports 3480/3481. It retains private temporary artifacts including synthetic account data and logs; remove only the directory it prints when no longer needed. It never downloads dependencies.
+
+A fresh full-product archive enables payments only in the copy. Synthetic Auth calls the registered public send action; an injected billing request adapter counts checks and returns nine, unknown, error, or ten credits. Low, unknown and error create no session or component message. A fixture-seeded confirmed window still rejects low credit; two ten-credit sends each recheck and reuse its session and debit. The worker is unchanged for initial denials and inert for the active-window cases. The synthetic window, parsed provider responses, and inert worker do not establish actual provider billing, worker dispatch, or native-client behavior.
