@@ -1,4 +1,5 @@
 import { test, expect } from "bun:test";
+import { makeFunctionReference } from "convex/server";
 import {
   insertAuthorizationRequest,
   claimAuthorizationRequest,
@@ -221,5 +222,97 @@ test("OAuth authorization creation validators do not accept a client marker", as
     expect(Object.keys(args.value)).not.toContain("authorizationStartedAt");
     for (const field of ["codeVerifier", "redirectTo", "stateHash"])
       expect(Object.keys(args.value)).toContain(field);
+  }
+});
+
+test("registered OAuth creation rejects a caller-supplied marker", async () => {
+  const { convexTest } = await import("convex-test");
+  const schema = (await import("./package/src/components/google/schema.ts"))
+    .default;
+  const modules = {
+    "./_generated/api.ts": () =>
+      import("./package/src/components/google/_generated/api.ts"),
+    "./provider.ts": () =>
+      import("./package/src/components/google/provider.ts"),
+  };
+  const fixture = convexTest(schema, modules);
+  const create = makeFunctionReference<"mutation">(
+    "provider:createAuthorizationRequest",
+  );
+  const args = {
+    stateHash: "synthetic-state",
+    redirectTo: "https://fixture.test/return",
+    codeVerifier: "synthetic-verifier",
+  };
+  await expect(
+    fixture.mutation(create, { ...args, authorizationStartedAt: 1 }),
+  ).rejects.toThrow(/Unexpected field.*authorizationStartedAt/);
+  const rows = await fixture.run(async (ctx) =>
+    ctx.db.query("authorizationRequests").collect(),
+  );
+  expect(rows).toHaveLength(0);
+  const oldSite = process.env.CONVEX_SITE_URL;
+  const oldClient = process.env.CLIENT_ID;
+  try {
+    process.env.CONVEX_SITE_URL = "https://fixture.convex.site/oauth/google";
+    process.env.CLIENT_ID = "synthetic";
+    await fixture.mutation(create, args);
+    const created = await fixture.run(async (ctx) =>
+      ctx.db.query("authorizationRequests").collect(),
+    );
+    expect(created).toHaveLength(1);
+    expect(Number.isFinite(created[0].authorizationStartedAt)).toBe(true);
+    expect(created[0].authorizationStartedAt).not.toBe(1);
+  } finally {
+    if (oldSite === undefined) delete process.env.CONVEX_SITE_URL;
+    else process.env.CONVEX_SITE_URL = oldSite;
+    if (oldClient === undefined) delete process.env.CLIENT_ID;
+    else process.env.CLIENT_ID = oldClient;
+  }
+});
+
+test("malformed ticket markers cannot reach identity or session helpers", async () => {
+  const { buildCompleteSignIn } =
+    await import("./package/src/lib/oauth/redemption.ts");
+  for (const marker of [undefined, null, "invalid", NaN, Infinity]) {
+    const calls: string[] = [];
+    const handler = buildCompleteSignIn({
+      providerName: "fixture",
+      authMutation: ((definition: any) => definition.handler) as any,
+      claimTicket: async () =>
+        ({
+          encryptedPayload: "invalid-payload",
+          authorizationStartedAt: marker,
+        }) as any,
+      enforceIdentityErasure: true,
+      checkAuthorizationStart: async () => {
+        calls.push("check");
+      },
+      profile: () => {
+        calls.push("profile");
+        return { id: "fixture" };
+      },
+    }) as any;
+    const ctx = {
+      convexAuth: {
+        assertAuthorizationStart: async () => {
+          calls.push("cutoff");
+        },
+        resolveUserId: async () => {
+          calls.push("resolve");
+          return null;
+        },
+        completeSignUp: async () => {
+          calls.push("signup");
+        },
+        completeSignIn: async () => {
+          calls.push("signin");
+        },
+      },
+    };
+    await expect(
+      handler(ctx, { code: "fixture-code", state: "fixture-state" }),
+    ).rejects.toThrow("OAuth authorization start is missing");
+    expect(calls).toEqual([]);
   }
 });
