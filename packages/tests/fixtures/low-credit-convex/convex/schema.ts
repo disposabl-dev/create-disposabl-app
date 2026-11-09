@@ -8,10 +8,9 @@ export default defineSchema({
     to: v.string(),
     text: v.string(),
   }).index("by_key", ["key"]),
-  fixtureConfig: defineTable({
-    enabled: v.boolean(),
-    environment: v.string(),
-    e2e: v.string(),
-    fail: v.boolean(),
-  }),
+  fixtureReads: defineTable({
+    debitId: v.id("computeDebits"),
+    method: v.string(),
+    nonConsuming: v.boolean(),
+  }).index("by_debit", ["debitId"]),
 });
