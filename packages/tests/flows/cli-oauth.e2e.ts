@@ -1,18 +1,16 @@
 import { test } from "@e2e-dev/web";
 import { expect } from "e2e";
 import { createHash, randomUUID } from "node:crypto";
-import {
-  execFile,
-  execFileSync,
-  spawn,
-  type ChildProcess,
-} from "node:child_process";
+import { execFile, spawn, type ChildProcess } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { backendUrl, root, siteUrl } from "../project";
 import { assertOwnedSdkBackend } from "../helpers/sdk-auth/ownership";
-import { createLocalCli } from "../helpers/cli-oauth-fixture";
+import {
+  createLocalCli,
+  inspectCliCallback,
+} from "../helpers/cli-oauth-fixture";
 
 const run = promisify(execFile);
 // The default bundles local source; an explicit executable selects a published artifact.
@@ -137,18 +135,16 @@ test(
         );
         const port = Number(redirect.port);
         if (
+          redirect.protocol !== "http:" ||
+          redirect.username !== "" ||
+          redirect.password !== "" ||
           redirect.hostname !== "127.0.0.1" ||
           !port ||
           [3530, 3531, 3532].includes(port)
         )
           throw new Error("Unexpected callback listener.");
-        const listeners = execFileSync(
-          "lsof",
-          ["-nP", "-t", `-iTCP:${port}`, "-sTCP:LISTEN"],
-          { encoding: "utf8" },
-        ).trim();
-        if (listeners !== String(child.pid))
-          throw new Error("Callback listener owner mismatch.");
+        if (!child.pid) throw new Error("Missing callback owner");
+        inspectCliCallback(port, child.pid);
         callbackPort = port;
         console.log(`CLI_CALLBACK port=${port} pid=${child.pid}`);
       }
@@ -166,16 +162,7 @@ test(
       await screen.getByRole("button", "Allow", { exact: true }).tap();
       expect(await finished).toBe(0);
       if (callbackPort) {
-        try {
-          execFileSync(
-            "lsof",
-            ["-nP", "-t", `-iTCP:${callbackPort}`, "-sTCP:LISTEN"],
-            { stdio: "pipe" },
-          );
-          throw new Error("Callback port remains occupied after CLI exit.");
-        } catch (error) {
-          if ((error as { status?: number }).status !== 1) throw error;
-        }
+        inspectCliCallback(callbackPort);
         console.log(`CLI_CALLBACK_RELEASED port=${callbackPort}`);
       }
       const first = JSON.parse(await cli("login", "status")).currentUser;

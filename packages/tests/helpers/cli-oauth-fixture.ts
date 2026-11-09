@@ -1,4 +1,4 @@
-import { execFile } from "node:child_process";
+import { execFile, spawnSync } from "node:child_process";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
@@ -6,7 +6,7 @@ import { promisify } from "node:util";
 
 const run = promisify(execFile);
 
-/** Bundle the central CLI with a test-only loopback entry, never the published binary. */
+/** Use an explicit installed artifact, or bundle source with a loopback entry. */
 export async function createLocalCli(root: string, site: string) {
   if (
     ![
@@ -76,4 +76,39 @@ export async function createLocalCli(root: string, site: string) {
     await cleanup();
     throw error;
   }
+}
+
+/** Inspect the actual binding; port-selection strategy is not observable here. */
+export function inspectCliCallback(
+  port: number,
+  ownerPid?: number,
+  inspect: (args: string[]) => {
+    status: number | null;
+    stdout: string;
+    stderr: string;
+    error?: Error;
+  } = (args) => spawnSync("lsof", args, { encoding: "utf8", timeout: 5000 }),
+) {
+  if (!Number.isInteger(port) || port < 1 || port > 65535)
+    throw new Error("Invalid callback port");
+  const result = inspect(["-nP", `-iTCP:${port}`, "-sTCP:LISTEN", "-Fpn"]);
+  if (result.error || result.stderr.trim())
+    throw new Error("Callback listener inspection failed");
+  const output = result.stdout.trim();
+  if (ownerPid === undefined) {
+    if (result.status !== 1 || output)
+      throw new Error("Callback release could not be established");
+    return;
+  }
+  const fields = output.split("\n");
+  const owners = fields.filter((field) => field.startsWith("p"));
+  const addresses = fields.filter((field) => field.startsWith("n"));
+  if (
+    result.status !== 0 ||
+    owners.length !== 1 ||
+    owners[0] !== `p${ownerPid}` ||
+    addresses.length !== 1 ||
+    addresses[0] !== `n127.0.0.1:${port}`
+  )
+    throw new Error("Callback loopback listener owner mismatch");
 }
