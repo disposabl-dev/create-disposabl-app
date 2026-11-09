@@ -36,7 +36,9 @@ export async function admitSession(
       message:
         current.state === "hold"
           ? "A credit charge needs reconciliation. Please contact support."
-          : "Your sandbox is stopping. Send a new message after it stops.",
+          : current.state === "renewing"
+            ? "Your next compute window is being funded. Try sending your message again shortly."
+            : "Your sandbox is stopping. Send a new message after it stops.",
     });
   }
   return ctx.db.insert("computeSessions", {

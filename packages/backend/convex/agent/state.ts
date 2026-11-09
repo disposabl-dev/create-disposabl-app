@@ -48,7 +48,7 @@ export const claim = internalMutation({
         ? {
             status: "stopping" as const,
             error:
-              "Message delivery could not be confirmed. The remote run was stopped; resend your message.",
+              "Message delivery could not be confirmed. Retry after the remote run has stopped.",
           }
         : {}),
     };
