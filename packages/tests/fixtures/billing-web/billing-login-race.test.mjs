@@ -10,6 +10,9 @@ win.self = win;
 win.top = win;
 win.location = {
   pathname: "/billing-login",
+  get href() {
+    return `https://fixture.invalid${this.pathname}${this.hash}`;
+  },
   hash: "#A",
   replace: mock(() => {}),
 };
@@ -158,4 +161,58 @@ test("expired and empty fragments discard stale errors; framed pages remain clos
   expect(win.location.hash).toBe("");
   expect(text()).toContain("Open this link directly");
   expect(renderer.root.findAllByType("button")).toHaveLength(0);
+});
+
+for (const phase of ["redemption", "adoption"]) {
+  test(`URL change fences old ${phase} before hashchange delivery`, async () => {
+    let finish;
+    const pending = new Promise((resolve) => {
+      finish = resolve;
+    });
+    if (phase === "redemption") exchange.mockImplementationOnce(() => pending);
+    else setSession.mockImplementationOnce(() => pending);
+    await mount();
+    await act(async () => button().props.onClick());
+    // Browser URL mutation precedes the queued hashchange event.
+    win.location.hash = "#B";
+    await act(async () =>
+      finish({ userId: "alice", purchase: "topup", expiresAt: 99 }),
+    );
+    expect(setSession).toHaveBeenCalledTimes(phase === "redemption" ? 0 : 1);
+    expect(stored.size).toBe(0);
+    expect(win.location.replace).not.toHaveBeenCalled();
+    await change("B");
+    expect(text()).toContain("@bob");
+    expect(button().props.disabled).toBe(false);
+  });
+}
+
+test("obsolete rejection cannot clear the new consent's pending state", async () => {
+  let rejectOld, finishNew;
+  exchange.mockImplementationOnce(
+    () =>
+      new Promise((_resolve, reject) => {
+        rejectOld = reject;
+      }),
+  );
+  exchange.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finishNew = resolve;
+      }),
+  );
+  await mount();
+  await act(async () => button().props.onClick());
+  await change("B");
+  await act(async () => button().props.onClick());
+  expect(button().props.disabled).toBe(true);
+  await act(async () => rejectOld(new Error("obsolete rejection")));
+  expect(text()).not.toContain("could not sign you in");
+  expect(button().props.disabled).toBe(true);
+  await act(async () =>
+    finishNew({ userId: "bob", purchase: "topup", expiresAt: 99 }),
+  );
+  expect(setSession).toHaveBeenCalledTimes(1);
+  expect(setSession.mock.calls[0][0].userId).toBe("bob");
+  expect(win.location.replace).toHaveBeenCalledWith("/pricing?source=ios");
 });

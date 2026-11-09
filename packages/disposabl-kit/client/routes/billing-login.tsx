@@ -42,15 +42,18 @@ function BillingLogin() {
   const [adopting, setAdopting] = useState(false);
   const generation = useRef(0);
   const currentCode = useRef(code);
+  const consentUrl = useRef("");
   const inFlight = useRef(false);
   const adoption = useRef(false);
   useLayoutEffect(() => {
-    const scrub = () =>
+    const scrub = () => {
       window.history.replaceState(
         window.history.state,
         "",
         window.location.pathname,
       );
+      consentUrl.current = window.location.href;
+    };
     const changed = (event: HashChangeEvent) => {
       const fragment = new URL(event.newURL).hash;
       if (window.location.hash !== fragment) return;
@@ -75,17 +78,21 @@ function BillingLogin() {
       pending ||
       inFlight.current ||
       adoption.current ||
-      code !== currentCode.current
+      code !== currentCode.current ||
+      window.location.href !== consentUrl.current
     )
       return;
     const version = generation.current;
+    const current = () =>
+      version === generation.current &&
+      window.location.href === consentUrl.current;
     inFlight.current = true;
     setPending(true);
     try {
       const { purchase, expiresAt, returnClaim, ...tokens } = await exchange({
         code,
       });
-      if (version !== generation.current) return;
+      if (!current()) return;
       adoption.current = true;
       setAdopting(true);
       try {
@@ -94,7 +101,7 @@ function BillingLogin() {
         adoption.current = false;
         setAdopting(false);
       }
-      if (version !== generation.current) return;
+      if (!current()) return;
       window.sessionStorage.setItem(
         "billing-from-ios",
         JSON.stringify({
@@ -106,13 +113,13 @@ function BillingLogin() {
       );
       window.location.replace("/pricing?source=ios");
     } catch {
-      if (version === generation.current) {
+      if (current()) {
         setError(
           "This link could not sign you in. Open billing again from the app.",
         );
       }
     } finally {
-      if (version === generation.current) {
+      if (current()) {
         inFlight.current = false;
         setPending(false);
       }
