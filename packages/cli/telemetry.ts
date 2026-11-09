@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { realpathSync } from "node:fs";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, open, readFile, rm, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { lock } from "proper-lockfile";
@@ -126,6 +126,23 @@ async function send(
   return response.ok;
 }
 
+// A local marker counts an execution attempt, not installation or delivery.
+// Exclusive creation deduplicates concurrent invocations without storing inputs.
+async function firstExecution(path: string, product: Product, version: string) {
+  try {
+    const directory = join(dirname(path), "activations");
+    await mkdir(directory, { recursive: true, mode: 0o700 });
+    const name = createHash("sha256")
+      .update(`${product}:${version}`)
+      .digest("hex");
+    const file = await open(join(directory, name), "wx", 0o600);
+    await file.close();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function capture(
   version: string,
   product: Product,
@@ -153,11 +170,14 @@ export async function capture(
       "create",
     ];
     const distinctId = current.userId ?? current.anonymousId;
+    const activation =
+      outcome === "started" && (await firstExecution(path, product, version));
     const properties = {
       product,
       command: allowed.includes(command) ? command : "other",
       outcome,
       version,
+      ...(activation ? { first_execution: true } : {}),
       invocation:
         process.env.npm_command === "exec"
           ? "npx"
