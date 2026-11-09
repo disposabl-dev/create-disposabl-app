@@ -195,6 +195,17 @@ test("packaged starter and generated profiles exclude product proof fixtures", a
       }
     }
     for (const root of roots) {
+      const workflow = await readFile(
+        join(root, ".github/workflows/pipeline.yml"),
+        "utf8",
+      );
+      assert.doesNotMatch(workflow, /android-play|play-bundle\.sh/);
+      const easPath = join(root, "apps/mobile/eas.json");
+      if (existsSync(easPath)) {
+        const eas = JSON.parse(await readFile(easPath, "utf8"));
+        assert.equal(eas.submit?.production?.android, undefined);
+        assert.ok(eas.build["ios-production"]);
+      }
       assert.equal(
         existsSync(join(root, "apps/web/src/router/pricing.tsx")),
         false,

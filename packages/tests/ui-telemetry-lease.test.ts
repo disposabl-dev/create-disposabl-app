@@ -90,6 +90,28 @@ test("anonymous identity is forwarded for login but never reused across logout",
   control.stop();
 });
 
+test("unauthorized bootstrap clears in-memory anonymous linkage", async () => {
+  const bodies: unknown[] = [];
+  const control = createTelemetryLeaseController({
+    origin: "http://local",
+    transport: async (_url, init) => {
+      bodies.push(JSON.parse(String(init?.body)));
+      return bodies.length === 2
+        ? new Response(null, { status: 401 })
+        : reply();
+    },
+    adapter: { start() {}, stop() {} },
+  });
+  control.update({ enabled: true, token: null });
+  await tick();
+  control.update({ enabled: true, token: token("account") });
+  await tick();
+  control.update({ enabled: true, token: token("account") });
+  await tick();
+  assert.deepEqual(bodies, [{}, { anonymousId: id }, {}]);
+  control.stop();
+});
+
 test("disabled, malformed and unapproved bootstrap replies never start SDK", async () => {
   for (const response of [
     new Response(null, { status: 204 }),
@@ -241,6 +263,30 @@ test("a changed server identity restarts even during a same-session refresh", as
   control.update({ enabled: true, token: token("same") + "b" });
   await tick();
   assert.deepEqual(events, ["identity-1", "stop", "identity-2"]);
+  control.stop();
+});
+
+test("a reentrant opt-out while replacing an adapter cannot restart it", async () => {
+  let calls = 0;
+  const events: string[] = [];
+  let control!: ReturnType<typeof createTelemetryLeaseController>;
+  control = createTelemetryLeaseController({
+    origin: "http://local",
+    transport: async () =>
+      reply({ identified: true, distinctId: `identity-${++calls}` }),
+    adapter: {
+      start: () => events.push("start"),
+      stop: () => {
+        events.push("stop");
+        control.update({ enabled: false, token: token("same") });
+      },
+    },
+  });
+  control.update({ enabled: true, token: token("same") + "a" });
+  await tick();
+  control.update({ enabled: true, token: token("same") + "b" });
+  await tick();
+  assert.deepEqual(events, ["start", "stop"]);
   control.stop();
 });
 

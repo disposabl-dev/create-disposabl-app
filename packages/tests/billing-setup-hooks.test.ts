@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { execFile } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -35,11 +35,22 @@ test("CI uses the deployed target, runs setup before upload and stops on setup f
     join(root, ".github/workflows/pipeline.yml"),
     "utf8",
   );
-  const deploy = workflow
-    .match(
-      /      - name: Deploy\n[\s\S]*?        run: \|\n((?:          .*\n)+)/,
-    )?.[1]
-    .replace(/^ {10}/gm, "");
+  const parsed = JSON.parse(
+    execFileSync(
+      process.execPath,
+      [
+        "-e",
+        "console.log(JSON.stringify(Bun.YAML.parse(await Bun.stdin.text())))",
+      ],
+      { input: workflow, encoding: "utf8" },
+    ),
+  ) as {
+    jobs: { web: { steps: Array<{ name?: string; run?: string }> } };
+  };
+  const deploy = parsed.jobs.web.steps.find(
+    (step) => step.name === "Deploy",
+  )?.run;
+  assert.equal(typeof deploy, "string");
   assert.ok(deploy);
   const temp = await mkdtemp(join(tmpdir(), "billing-deploy-hook-"));
   try {

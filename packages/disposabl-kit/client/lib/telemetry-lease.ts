@@ -113,6 +113,8 @@ export function createTelemetryLeaseController(options: {
           signal: controller.signal,
         },
       );
+      if (epoch !== generation) return;
+      if (response.status === 401) anonymousId = undefined;
       retryable = response.status === 429 || response.status >= 500;
       if (!response.ok || response.status !== 200)
         throw new Error("bootstrap unavailable");
@@ -147,10 +149,15 @@ export function createTelemetryLeaseController(options: {
       if (unchanged && options.adapter.renew) {
         options.adapter.renew(bounded);
       } else {
-        if (active) options.adapter.stop();
+        if (active) {
+          active = false;
+          options.adapter.stop();
+          if (epoch !== generation) return;
+        }
         active = true;
         options.adapter.start(bounded);
       }
+      if (epoch !== generation) return;
       failures = 0;
       activeLease = bounded;
       anonymousId = lease.anonymousId;
