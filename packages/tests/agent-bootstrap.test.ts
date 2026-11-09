@@ -114,3 +114,29 @@ test("repository setup saves private credentials per app and origin, returning n
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+test("paid credential lifecycle uses the real issuance and access handlers", async () => {
+  const { spawnSync } = await import("node:child_process");
+  const result = spawnSync(
+    process.execPath,
+    [
+      "test",
+      join(
+        import.meta.dirname,
+        "fixtures/agent-inert-convex/paid-credential.test.mjs",
+      ),
+    ],
+    {
+      encoding: "utf8",
+      env: {
+        PATH: process.env.PATH,
+        HOME: process.env.HOME,
+        NODE_ENV: "test",
+        E2E_TELEMETRY_DISABLED: "1",
+        DO_NOT_TRACK: "1",
+      },
+    },
+  );
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stdout + result.stderr, /2 pass/);
+});
