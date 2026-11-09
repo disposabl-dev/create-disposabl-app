@@ -20,3 +20,14 @@ REPLAY_CHROMIUM="$HOME/Library/Caches/ms-playwright/chromium_headless_shell-1248
 ```
 
 The runner enters an outbound-denying sandbox, snapshots the clean commit, builds the unmodified app and checks its initial HTML, then builds a second copy with fixture-only auth and Convex aliases. It disables crawler discovery in that second build to avoid fixture redirects. Playwright intercepts every request and injects the recorder only in the test page. The test compares application errors against the same inert-auth build without replay, and reports both. Synthetic authenticated UI is not a real session, backend, chat or file runtime. It does not qualify live delivery or authorize production replay.
+
+For the current product adapter and the SDK stop diagnostic, run each command below with the same environment and sandbox prefix used by the first command above:
+
+```sh
+bun packages/tests/fixtures/posthog-replay-browser/adapter-lifecycle.mjs
+bun packages/tests/fixtures/posthog-replay-browser/sdk-stop.mjs
+```
+
+`adapter-lifecycle.mjs` bundles the actual product adapter and installed PostHog SDK. Bootstrap and ingestion are intercepted; it checks account changes, rapid routes, opt-out, re-enablement and expiry while replay remains disabled. Chromium's automation indicators are overridden inside this fixture because the SDK otherwise discards automation traffic. The real adapter makes no remote-configuration request in this mode, so this test does not claim a hostile remote configuration was applied.
+
+`sdk-stop.mjs` separately starts the installed recorder with intercepted hostile remote configuration. It checks the observable console and network suppression and tests the public stop call. The SDK can flush buffered events on stop; its internal discard method is not used. The structural mutation in this diagnostic is not guaranteed to reach the recorder before stop, and the result reports whether it was seen. The commands use the current installed dependencies and cached browser rather than a separately verified frozen dependency snapshot. Neither test enables replay in the product or proves its recording lifecycle safe.

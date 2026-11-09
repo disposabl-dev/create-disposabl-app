@@ -2,7 +2,7 @@ import { PostHog } from "posthog-js";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { pageCategory } from "../../../packages/disposabl-kit/lib/telemetry";
 import { createTelemetryLeaseController } from "../../../packages/disposabl-kit/client/lib/telemetry-lease";
-import { safeTelemetryEvent } from "./telemetry-policy";
+import { isProductAction, safeTelemetryEvent } from "./telemetry-policy";
 
 const preferenceKey = "disposabl.product.analytics.optout.v1";
 const preferenceEvent = "disposabl-product-analytics-preference";
@@ -61,6 +61,107 @@ export function AnalyticsPreference() {
   );
 }
 
+/** Product capture boundary; replay is deliberately disabled in every configuration. */
+export function createWebTelemetryAdapter(options: {
+  origin: string;
+  transport: typeof fetch;
+  page: () => string;
+  allowed: () => boolean;
+  source: "web" | "desktop";
+}) {
+  let sdk: PostHog | undefined;
+  let deadline = 0;
+  let live = false;
+  let lastView = "";
+  let capture: (() => void) | undefined;
+  const controller = createTelemetryLeaseController({
+    origin: options.origin,
+    transport: options.transport,
+    adapter: {
+      renew(lease) {
+        deadline = Math.min(lease.expiresAt, Date.now() + 30_000);
+      },
+      start(lease) {
+        live = true;
+        deadline = Math.min(lease.expiresAt, Date.now() + 30_000);
+        sdk = new PostHog();
+        sdk.init(lease.projectToken, {
+          api_host: lease.host,
+          persistence: "memory",
+          bootstrap: {
+            distinctID: lease.distinctId,
+            isIdentifiedID: lease.identified,
+          },
+          capture_pageview: false,
+          capture_pageleave: false,
+          autocapture: false,
+          disable_session_recording: true,
+          disable_surveys: true,
+          disable_external_dependency_loading: true,
+          advanced_disable_feature_flags: true,
+          advanced_disable_decide: true,
+          capture_exceptions: false,
+          capture_performance: false,
+          capture_heatmaps: false,
+          capture_dead_clicks: false,
+          enable_recording_console_log: false,
+          request_batching: false,
+          before_send(event) {
+            const properties = safeTelemetryEvent(event.event, {
+              active: live && options.allowed(),
+              deadline,
+              now: Date.now(),
+              page: options.page(),
+              action:
+                typeof event.properties.action === "string"
+                  ? event.properties.action
+                  : undefined,
+              sessionId: event.properties.$session_id,
+              windowId: event.properties.$window_id,
+              source: options.source,
+              projectToken: lease.projectToken,
+              distinctId: lease.distinctId,
+            });
+            return properties
+              ? {
+                  uuid: event.uuid,
+                  event: event.event,
+                  timestamp: event.timestamp,
+                  properties,
+                }
+              : null;
+          },
+        });
+        const sendPage = () => {
+          const key = `${lease.distinctId}:${pageCategory(options.page())}`;
+          if (key === lastView) return;
+          sdk?.capture("$pageview");
+          lastView = key;
+        };
+        capture = sendPage;
+        sendPage();
+      },
+      stop() {
+        live = false;
+        capture = undefined;
+        lastView = "";
+        sdk?.opt_out_capturing();
+        sdk?.reset(true);
+        sdk = undefined;
+      },
+    },
+  });
+  return {
+    update: controller.update,
+    stop: controller.stop,
+    page: () => capture?.(),
+    error: () => sdk?.capture("$exception"),
+    action: (action: string) => {
+      if (isProductAction(action)) sdk?.capture("product_action", { action });
+    },
+  };
+}
+
 export function ProductTelemetry({
   pathname,
   token,
@@ -87,106 +188,33 @@ export function ProductTelemetry({
       !origin
     )
       return;
-    let sdk: PostHog | undefined;
-    let deadline = 0;
-    let live = false;
-    let lastView = "";
     const source =
       (window as Window & { disposablDesktop?: { authentication?: boolean } })
         .disposablDesktop?.authentication === true
         ? "desktop"
         : "web";
-    const controller = createTelemetryLeaseController({
+    const adapter = createWebTelemetryAdapter({
       origin,
       transport: fetch,
-      adapter: {
-        renew(lease) {
-          deadline = Math.min(lease.expiresAt, Date.now() + 30_000);
-        },
-        start(lease) {
-          live = true;
-          deadline = Math.min(lease.expiresAt, Date.now() + 30_000);
-          sdk = new PostHog();
-          sdk.init(lease.projectToken, {
-            api_host: lease.host,
-            persistence: "memory",
-            bootstrap: {
-              distinctID: lease.distinctId,
-              isIdentifiedID: lease.identified,
-            },
-            capture_pageview: false,
-            capture_pageleave: false,
-            autocapture: false,
-            disable_session_recording: true,
-            disable_surveys: true,
-            disable_external_dependency_loading: true,
-            advanced_disable_feature_flags: true,
-            advanced_disable_decide: true,
-            capture_exceptions: false,
-            capture_performance: false,
-            capture_heatmaps: false,
-            capture_dead_clicks: false,
-            enable_recording_console_log: false,
-            request_batching: false,
-            before_send(event) {
-              const properties = safeTelemetryEvent(event.event, {
-                active: live && allowed(),
-                deadline,
-                now: Date.now(),
-                page: page.current,
-                action:
-                  typeof event.properties.action === "string"
-                    ? event.properties.action
-                    : undefined,
-                sessionId: event.properties.$session_id,
-                windowId: event.properties.$window_id,
-                source,
-                projectToken: lease.projectToken,
-                distinctId: lease.distinctId,
-              });
-              return properties
-                ? {
-                    uuid: event.uuid,
-                    event: event.event,
-                    timestamp: event.timestamp,
-                    properties,
-                  }
-                : null;
-            },
-          });
-          const sendPage = () => {
-            const key = `${lease.distinctId}:${pageCategory(page.current)}`;
-            if (key === lastView) return;
-            sdk?.capture("$pageview");
-            lastView = key;
-          };
-          capture.current = sendPage;
-          sendPage();
-        },
-        stop() {
-          live = false;
-          capture.current = undefined;
-          sdk?.opt_out_capturing();
-          sdk?.reset(true);
-          sdk = undefined;
-        },
-      },
+      page: () => page.current,
+      allowed,
+      source,
     });
     const update = () =>
-      controller.update({
+      adapter.update({
         enabled: allowed() && identity.current.ready,
         token: identity.current.token,
       });
-    stopActive = controller.stop;
-    const reportError = () => sdk?.capture("$exception");
+    stopActive = adapter.stop;
+    capture.current = adapter.page;
+    const reportError = () => adapter.error();
     const reportAction = (event: MouseEvent) => {
       const target = event.target;
       if (!(target instanceof Element)) return;
       const action = target
         .closest("[data-telemetry-action]")
         ?.getAttribute("data-telemetry-action");
-      if (action === "open_connections" || action === "open_api_keys")
-        sdk?.capture("product_action", { action });
+      if (isProductAction(action)) adapter.action(action);
     };
     window.addEventListener(preferenceEvent, update);
     window.addEventListener("storage", update);
@@ -199,8 +227,9 @@ export function ProductTelemetry({
       window.removeEventListener("error", reportError);
       window.removeEventListener("unhandledrejection", reportError);
       window.removeEventListener("click", reportAction);
-      if (stopActive === controller.stop) stopActive = undefined;
-      controller.stop();
+      if (stopActive === adapter.stop) stopActive = undefined;
+      capture.current = undefined;
+      adapter.stop();
     };
   }, []);
   useLayoutEffect(() => {
