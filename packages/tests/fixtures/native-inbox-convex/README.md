@@ -4,6 +4,8 @@ This disposable local Convex fixture exercises production inbox handlers. For th
 
 The fixture exposes the production webhook on its loopback site port. Synthetic Apple `REFUND_REVERSED` deliveries exercise HTTP parsing and transactional state changes, including existing tombstones, unknown writes, refunds, and a transfer hold. The refunded and tombstone states retain a review delivery without moving the purchase to `review`; the tests document that limitation rather than defining reconciliation policy.
 
+Fixture queries and mutations use builders parameterized by the fixture schema. The fixture TypeScript configuration resolves the kit's server imports to the selected source tree, so the production backend model and fixture schema use the same validators even when dependencies are reused from another checkout. The runner copies that backend model and checks the isolated functions with Convex `--typecheck enable`; a missing compiler or type error fails the run.
+
 Run from the repository root on macOS:
 
 ```sh

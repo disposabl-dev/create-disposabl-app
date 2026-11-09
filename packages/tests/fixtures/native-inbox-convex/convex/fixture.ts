@@ -1,11 +1,15 @@
 // Public entrypoints exist only in this disposable local test deployment.
 import {
-  mutationGeneric as mutation,
-  queryGeneric as query,
-  internalMutationGeneric as internalMutation,
-  internalQueryGeneric as internalQuery,
+  mutationGeneric,
+  queryGeneric,
+  internalMutationGeneric,
+  internalQueryGeneric,
+  type DataModelFromSchemaDefinition,
+  type MutationBuilder,
+  type QueryBuilder,
 } from "convex/server";
 import { v } from "convex/values";
+import schema from "./schema";
 import {
   receive,
   claim,
@@ -22,6 +26,13 @@ import {
   resolveRevenueCatRoute,
   selectRevenueCatRoute,
 } from "../../../../disposabl-kit/server/revenuecat-contract";
+
+type DataModel = DataModelFromSchemaDefinition<typeof schema>;
+const mutation: MutationBuilder<DataModel, "public"> = mutationGeneric;
+const query: QueryBuilder<DataModel, "public"> = queryGeneric;
+const internalMutation: MutationBuilder<DataModel, "internal"> =
+  internalMutationGeneric;
+const internalQuery: QueryBuilder<DataModel, "internal"> = internalQueryGeneric;
 
 export const user = mutation({
   args: { label: v.string() },

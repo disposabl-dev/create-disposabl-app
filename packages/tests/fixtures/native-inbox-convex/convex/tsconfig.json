@@ -12,6 +12,11 @@
     "jsx": "react-jsx",
     "skipLibCheck": true,
     "allowSyntheticDefaultImports": true,
+    "paths": {
+      "@disposabl/disposabl-kit/server/*": [
+        "../../../../disposabl-kit/server/*.ts"
+      ]
+    },
 
     /* These compiler options are required by Convex */
     "target": "ESNext",
