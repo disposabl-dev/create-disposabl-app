@@ -124,6 +124,7 @@ export async function exerciseBilling({
     assert.ok(
       !url ||
         [
+          "https://www.disposabl.dev/pricing",
           "https://www.disposabl.dev/dashboard",
           "https://www.disposabl.dev/dashboard/connections",
         ].includes(url),
