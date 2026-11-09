@@ -1,0 +1,890 @@
+--- a/src/browser/sessionManager.ts
++++ b/src/browser/sessionManager.ts
+@@ -410,7 +410,7 @@
+   setSession = async (
+     session: TokenBundle | SlimTokenBundle,
+   ): Promise<void> => {
+-    await this.#storeFullTokenResult(session);
++    await runWithMutex(this.#lockKey, () => this.#storeFullTokenResult(session));
+   };
+ 
+   /**
+--- a/src/component/_generated/component.ts
++++ b/src/component/_generated/component.ts
+@@ -24,6 +24,52 @@
+ export type ComponentApi<Name extends string | undefined = string | undefined> =
+   {
+     public: {
++      getIdentityErasureCutoff: FunctionReference<
++        "query",
++        "internal",
++        { provider: string; providerAccountId: string },
++        number | null,
++        Name
++      >;
++      beginUserErasure: FunctionReference<
++        "mutation",
++        "internal",
++        { userId: string },
++        null,
++        Name
++      >;
++      purgeUserLinkedAuth: FunctionReference<
++        "mutation",
++        "internal",
++        { userId: string },
++        {
++          linkedRowsCleared: boolean;
++          deletedAccounts: number;
++          deletedSessions: number;
++          deletedRefreshTokens: number;
++          legacyOrphansUnverified: true;
++        },
++        Name
++      >;
++      exchangeSession: FunctionReference<
++        "mutation",
++        "internal",
++        {
++          sessionId: string;
++          userId: string;
++          accessTokenTtlSeconds: number;
++          refreshInactivityTimeoutSeconds: number;
++          sessionMaxLifetimeSeconds: number;
++        },
++        {
++          accessToken: string;
++          refreshToken: string;
++          refreshTokenExpiresAt: number;
++          userId: string;
++        },
++        Name
++      >;
++
+       getSession: FunctionReference<
+         "query",
+         "internal",
+--- a/src/component/public.ts
++++ b/src/component/public.ts
+@@ -49,6 +49,35 @@
+ 
+ // --- Internal helpers ------------------------------------------------------
+ 
++async function erasedUser(ctx: QueryCtx, userId: string) {
++  return await ctx.db
++    .query("erasedUsers")
++    .withIndex("by_userId", (q) => q.eq("userId", userId))
++    .unique();
++}
++// Pseudonymous, stable and potentially guessable; retention policy is required.
++async function identityDigest(provider: string, account: string) {
++  return sha256Hex(JSON.stringify([provider, account]));
++}
++async function identityCutoff(
++  ctx: QueryCtx,
++  provider: string,
++  account: string,
++): Promise<number | null> {
++  const digest = await identityDigest(provider, account);
++  const tombstone = await ctx.db
++    .query("identityErasure")
++    .withIndex("by_digest", (q) => q.eq("digest", digest))
++    .unique();
++  const mapped = await accountByIdentity(ctx, provider, account);
++  const user = mapped ? await erasedUser(ctx, mapped.userId) : null;
++  return Math.max(tombstone?.cutoff ?? 0, user?.requestedAt ?? 0) || null;
++}
++async function requireActiveUser(ctx: QueryCtx, userId: string) {
++  if (await erasedUser(ctx, userId))
++    throw new Error("Auth account is unavailable.");
++}
++
+ /** Look up an account by its provider identity. */
+ function accountByIdentity(
+   ctx: QueryCtx,
+@@ -89,6 +118,7 @@
+   userId: string,
+   ttl: TtlConfig,
+ ): Promise<TokenBundle> {
++  await requireActiveUser(ctx, userId);
+   const now = Date.now();
+   await evictLeastRecentlyRefreshedSessions(ctx, userId);
+   const sessionId = await ctx.db.insert("sessions", {
+@@ -166,6 +196,10 @@
+   // identifier), so there is nothing to check yet; the pre-insert check below
+   // covers that path once the key is known.
+   if (claims.providerAccountId !== USE_USER_ID_AS_ACCOUNT_ID) {
++    if (
++      await identityCutoff(ctx, claims.providerName, claims.providerAccountId)
++    )
++      throw new Error("Identity registration is unavailable.");
+     const account = await accountByIdentity(
+       ctx,
+       claims.providerName,
+@@ -191,11 +225,14 @@
+       profile: claims.profile,
+     },
+   });
++  await requireActiveUser(ctx, userId);
+   const { providerName } = claims;
+   const providerAccountId =
+     claims.providerAccountId === USE_USER_ID_AS_ACCOUNT_ID
+       ? userId
+       : claims.providerAccountId;
++  if (await identityCutoff(ctx, providerName, providerAccountId))
++    throw new Error("Identity registration is unavailable.");
+   // The last word on uniqueness, for the `USE_USER_ID_AS_ACCOUNT_ID` path,
+   // whose key is only known now. Redundant for every other path, and cheap.
+   const existingAccount = await ctx.db
+@@ -318,6 +355,7 @@
+           `A first sign-in for an identity must go through signUp.`,
+       );
+     }
++    await requireActiveUser(ctx, account.userId);
+     await notifySignIn(ctx, claims, account.userId, args.onSignInHandle);
+     return await issueSession(ctx, account._id, account.userId, ttl);
+   },
+@@ -396,7 +434,9 @@
+     const id = ctx.db.normalizeId("sessions", sessionId);
+     if (id === null) return null;
+     const session = await ctx.db.get("sessions", id);
+-    return session === null ? null : { userId: session.userId };
++    return session === null || (await erasedUser(ctx, session.userId))
++      ? null
++      : { userId: session.userId };
+   },
+ });
+ 
+@@ -454,7 +494,8 @@
+     // `deleteSession`), so a token can outlive its session for a moment. The
+     // session ended already, thus there is nothing to refresh or revoke.
+     const session = await ctx.db.get("sessions", token.sessionId);
+-    if (session === null) return { kind: "noSession" };
++    if (session === null || (await erasedUser(ctx, session.userId)))
++      return { kind: "noSession" };
+ 
+     switch (token.state) {
+       case "spent":
+@@ -652,3 +693,140 @@
+     return revoked;
+   },
+ });
++
++/** App-server-only: exchange a verified live session for a separate device session.
++ * The calling app must authenticate the source or consume a single-use handoff.
++ */
++export const exchangeSession = mutation({
++  args: { sessionId: v.string(), userId: v.string(), ...vTtlConfigFields },
++  returns: vTokenBundle,
++  handler: async (ctx, args): Promise<TokenBundle> => {
++    const ttl = validateTtlConfig(args);
++    const id = ctx.db.normalizeId("sessions", args.sessionId);
++    const session = id ? await ctx.db.get("sessions", id) : null;
++    if (!session || session.userId !== args.userId)
++      throw new Error("Source session is no longer active.");
++    const latest = await newestIssuedToken(ctx, session._id);
++    const now = Date.now();
++    if (
++      !latest ||
++      refreshTokenInactivityExpiresAt(
++        latest,
++        ttl.refreshInactivityTimeoutSeconds,
++      ) <= now ||
++      sessionMaxLifetimeExpiresAt(session, ttl.sessionMaxLifetimeSeconds) <= now
++    )
++      throw new Error("Source session has expired.");
++    const account = await ctx.db.get("accounts", session.accountId);
++    if (!account || account.userId !== session.userId)
++      throw new Error("Source account is no longer active.");
++    return await issueSession(ctx, session.accountId, session.userId, ttl);
++  },
++});
++
++/** App-server-only fence. Coordinate with provider-component fences in one app mutation. */
++export const beginUserErasure = mutation({
++  args: { userId: v.string() },
++  returns: v.null(),
++  handler: async (ctx, { userId }) => {
++    if (!userId) throw new Error("Missing user ID.");
++    if (!(await erasedUser(ctx, userId)))
++      await ctx.db.insert("erasedUsers", { userId, requestedAt: Date.now() });
++    return null;
++  },
++});
++/** Bounded cleanup of linked records only; older orphan refresh tokens lack a user join. */
++export const purgeUserLinkedAuth = mutation({
++  args: { userId: v.string() },
++  returns: v.object({
++    linkedRowsCleared: v.boolean(),
++    deletedAccounts: v.number(),
++    deletedSessions: v.number(),
++    deletedRefreshTokens: v.number(),
++    legacyOrphansUnverified: v.literal(true),
++  }),
++  handler: async (ctx, { userId }) => {
++    if (!(await erasedUser(ctx, userId)))
++      throw new Error("Begin auth erasure first.");
++    const receipt = await ctx.db
++      .query("sessionCleanupReceipts")
++      .withIndex("by_user", (q) => q.eq("userId", userId))
++      .first();
++    if (receipt) {
++      const tokens = await ctx.db
++        .query("refreshTokens")
++        .withIndex("by_session_state", (q) =>
++          q.eq("sessionId", receipt.sessionId),
++        )
++        .take(101);
++      for (const token of tokens.slice(0, 100))
++        await ctx.db.delete("refreshTokens", token._id);
++      if (tokens.length <= 100)
++        await ctx.db.delete("sessionCleanupReceipts", receipt._id);
++      return {
++        linkedRowsCleared: false,
++        deletedAccounts: 0,
++        deletedSessions: 0,
++        deletedRefreshTokens: Math.min(tokens.length, 100),
++        legacyOrphansUnverified: true as const,
++      };
++    }
++    const session = await ctx.db
++      .query("sessions")
++      .withIndex("by_user", (q) => q.eq("userId", userId))
++      .first();
++    if (session) {
++      const tokens = await ctx.db
++        .query("refreshTokens")
++        .withIndex("by_session_state", (q) => q.eq("sessionId", session._id))
++        .take(101);
++      for (const token of tokens.slice(0, 100))
++        await ctx.db.delete("refreshTokens", token._id);
++      const deletedSessions = tokens.length <= 100 ? 1 : 0;
++      if (deletedSessions) await ctx.db.delete("sessions", session._id);
++      return {
++        linkedRowsCleared: false,
++        deletedAccounts: 0,
++        deletedSessions,
++        deletedRefreshTokens: Math.min(tokens.length, 100),
++        legacyOrphansUnverified: true as const,
++      };
++    }
++    const accounts = await ctx.db
++      .query("accounts")
++      .withIndex("by_user", (q) => q.eq("userId", userId))
++      .take(101);
++    const cutoff = (await erasedUser(ctx, userId))!.requestedAt;
++    for (const account of accounts.slice(0, 100)) {
++      const digest = await identityDigest(
++        account.provider,
++        account.providerAccountId,
++      );
++      const prior = await ctx.db
++        .query("identityErasure")
++        .withIndex("by_digest", (q) => q.eq("digest", digest))
++        .unique();
++      if (prior)
++        await ctx.db.patch("identityErasure", prior._id, {
++          cutoff: Math.max(prior.cutoff, cutoff),
++        });
++      else await ctx.db.insert("identityErasure", { digest, cutoff });
++      await ctx.db.delete("accounts", account._id);
++    }
++    return {
++      linkedRowsCleared: accounts.length <= 100,
++      deletedAccounts: Math.min(accounts.length, 100),
++      deletedSessions: 0,
++      deletedRefreshTokens: 0,
++      legacyOrphansUnverified: true as const,
++    };
++  },
++});
++
++/** App-server query: returns a cutoff while a mapped owner is fenced and after mapping purge. */
++export const getIdentityErasureCutoff = query({
++  args: { provider: v.string(), providerAccountId: v.string() },
++  returns: v.union(v.number(), v.null()),
++  handler: (ctx, { provider, providerAccountId }) =>
++    identityCutoff(ctx, provider, providerAccountId),
++});
+--- a/src/component/schema.ts
++++ b/src/component/schema.ts
+@@ -2,6 +2,20 @@
+ import { v } from "convex/values";
+ 
+ export default defineSchema({
++  erasedUsers: defineTable({
++    userId: v.string(),
++    requestedAt: v.number(),
++  }).index("by_userId", ["userId"]),
++  identityErasure: defineTable({
++    digest: v.string(),
++    cutoff: v.number(),
++  }).index("by_digest", ["digest"]),
++  sessionCleanupReceipts: defineTable({
++    userId: v.string(),
++    sessionId: v.id("sessions"),
++  })
++    .index("by_user", ["userId"])
++    .index("by_session", ["sessionId"]),
+   // Maps a provider-scoped identity to an opaque app user id. The app owns the
+   // actual users table; we only store the id string it gives us back.
+   accounts: defineTable({
+--- a/src/component/sessions.ts
++++ b/src/component/sessions.ts
+@@ -146,9 +146,17 @@
+ ): Promise<void> {
+   // `delete` throws on an id that is already gone, and the session may have
+   // been deleted by whoever we raced, which also scheduled its tokens.
+-  if ((await ctx.db.get("sessions", sessionId)) === null) {
+-    return;
+-  }
++  const session = await ctx.db.get("sessions", sessionId);
++  if (session === null) return;
++  const receipt = await ctx.db
++    .query("sessionCleanupReceipts")
++    .withIndex("by_session", (q) => q.eq("sessionId", sessionId))
++    .unique();
++  if (!receipt)
++    await ctx.db.insert("sessionCleanupReceipts", {
++      userId: session.userId,
++      sessionId,
++    });
+   await ctx.db.delete("sessions", sessionId);
+   await ctx.scheduler.runAfter(0, internal.sessions.deleteSessionTokens, {
+     sessionId,
+@@ -175,6 +183,13 @@
+       .take(TOKEN_DELETION_BATCH_SIZE);
+     for (const row of tokens) {
+       await ctx.db.delete("refreshTokens", row._id);
++    }
++    if (tokens.length < TOKEN_DELETION_BATCH_SIZE) {
++      const receipt = await ctx.db
++        .query("sessionCleanupReceipts")
++        .withIndex("by_session", (q) => q.eq("sessionId", sessionId))
++        .unique();
++      if (receipt) await ctx.db.delete("sessionCleanupReceipts", receipt._id);
+     }
+     if (tokens.length === TOKEN_DELETION_BATCH_SIZE) {
+       await ctx.scheduler.runAfter(0, internal.sessions.deleteSessionTokens, {
+--- a/src/components/apple/_generated/component.ts
++++ b/src/components/apple/_generated/component.ts
+@@ -28,7 +28,7 @@
+         "mutation",
+         "internal",
+         { stateHash: string; ticketCodeHash: string },
+-        null | { encryptedPayload: string },
++        null | { encryptedPayload: string; authorizationStartedAt?: number },
+         Name
+       >;
+       createAuthorizationRequest: FunctionReference<
+--- a/src/components/email/_generated/component.ts
++++ b/src/components/email/_generated/component.ts
+@@ -267,6 +267,7 @@
+       };
+     };
+     verifiedEmails: {
++      eraseUserBatch: FunctionReference<"mutation", "internal", { userId: string }, { emailsDeleted: number; challengesDeleted: number; complete: boolean }, Name>;
+       deleteUser: FunctionReference<
+         "mutation",
+         "internal",
+--- a/src/components/email/challenge/common.ts
++++ b/src/components/email/challenge/common.ts
+@@ -392,6 +392,9 @@
+     copy: ChallengeEmailCopy;
+   },
+ ): Promise<{ browserSecret: string; challengeId: Id<"challenges"> }> {
++  const challengeUserId = args.purpose.userId;
++  if (challengeUserId !== undefined && await ctx.db.query("erasedUsers").withIndex("by_userId", q => q.eq("userId", challengeUserId)).unique())
++    throw new Error("User identity has been erased");
+   const emailCode = generateRandomToken();
+   const browserSecret = generateRandomToken();
+   const challengeId = await ctx.db.insert("challenges", {
+@@ -496,6 +499,9 @@
+     );
+     return claimFailure("INVALID_CHALLENGE");
+   }
++  const challengeUserId = row.purpose.userId;
++  if (challengeUserId !== undefined && await ctx.db.query("erasedUsers").withIndex("by_userId", q => q.eq("userId", challengeUserId)).unique())
++    return claimFailure("INVALID_CHALLENGE");
+   // At exactly `expiresAt` the link is expired, like in the cleanup loop.
+   if (row.expiresAt <= Date.now()) {
+     console.warn(
+--- a/src/components/email/schema.ts
++++ b/src/components/email/schema.ts
+@@ -2,6 +2,7 @@
+ import { v } from "convex/values";
+ 
+ export default defineSchema({
++  erasedUsers: defineTable({ userId: v.string(), erasedAt: v.number() }).index("by_userId", ["userId"]),
+   // One row for each verified email address.
+   //
+   // Invariants the component keeps true:
+--- a/src/components/email/verifiedEmails.ts
++++ b/src/components/email/verifiedEmails.ts
+@@ -114,3 +114,18 @@
+     return null;
+   },
+ });
++
++/** App-server only. Establish a permanent fence and delete bounded attributed rows. */
++export const eraseUserBatch = mutation({
++  args: { userId: v.string() },
++  returns: v.object({ emailsDeleted: v.number(), challengesDeleted: v.number(), complete: v.boolean() }),
++  handler: async (ctx, { userId }) => {
++    const tombstone = await ctx.db.query("erasedUsers").withIndex("by_userId", q => q.eq("userId", userId)).unique();
++    if (!tombstone) await ctx.db.insert("erasedUsers", { userId, erasedAt: Date.now() });
++    const emails = await ctx.db.query("verifiedEmails").withIndex("by_userId", q => q.eq("userId", userId)).take(100);
++    const challenges = await ctx.db.query("challenges").withIndex("by_purpose_userId", q => q.eq("purpose.userId", userId)).take(100);
++    for (const row of emails) await ctx.db.delete("verifiedEmails", row._id);
++    for (const row of challenges) await ctx.db.delete("challenges", row._id);
++    return { emailsDeleted: emails.length, challengesDeleted: challenges.length, complete: emails.length < 100 && challenges.length < 100 };
++  },
++});
+--- a/src/components/github/_generated/component.ts
++++ b/src/components/github/_generated/component.ts
+@@ -28,7 +28,7 @@
+         "mutation",
+         "internal",
+         { stateHash: string; ticketCodeHash: string },
+-        null | { encryptedPayload: string },
++        null | { encryptedPayload: string; authorizationStartedAt?: number },
+         Name
+       >;
+       createAuthorizationRequest: FunctionReference<
+--- a/src/components/google/_generated/component.ts
++++ b/src/components/google/_generated/component.ts
+@@ -28,7 +28,7 @@
+         "mutation",
+         "internal",
+         { stateHash: string; ticketCodeHash: string },
+-        null | { encryptedPayload: string },
++        null | { encryptedPayload: string; authorizationStartedAt?: number },
+         Name
+       >;
+       createAuthorizationRequest: FunctionReference<
+--- a/src/components/google/convex.config.ts
++++ b/src/components/google/convex.config.ts
+@@ -17,8 +17,9 @@
+  */
+ const component = defineComponent("authGoogle", {
+   env: {
+-    CLIENT_ID: v.string(),
+-    CLIENT_SECRET: v.string(),
++    CLIENT_ID: v.optional(v.string()),
++    CLIENT_SECRET: v.optional(v.string()),
++    CALLBACK_URL: v.optional(v.string()),
+   },
+ });
+ 
+--- a/src/components/oauth/_generated/component.ts
++++ b/src/components/oauth/_generated/component.ts
+@@ -28,7 +28,7 @@
+         "mutation",
+         "internal",
+         { providerName: string; stateHash: string; ticketCodeHash: string },
+-        null | { encryptedPayload: string },
++        null | { encryptedPayload: string; authorizationStartedAt?: number },
+         Name
+       >;
+       createAuthorizationRequest: FunctionReference<
+--- a/src/components/oauth/provider.ts
++++ b/src/components/oauth/provider.ts
+@@ -57,6 +57,7 @@
+       redirectTo: v.string(),
+       callbackUrl: v.string(),
+       codeVerifier: v.string(),
++      authorizationStartedAt: v.optional(v.number()),
+       tokenEndpoint: v.string(),
+       userInfoEndpoints: v.optional(v.record(v.string(), v.string())),
+       issuers: v.optional(v.array(v.string())),
+@@ -80,6 +81,7 @@
+       redirectTo: doc.redirectTo,
+       callbackUrl: doc.callbackUrl,
+       codeVerifier: doc.codeVerifier,
++      ...(doc.authorizationStartedAt === undefined ? {} : { authorizationStartedAt: doc.authorizationStartedAt }),
+       tokenEndpoint: doc.tokenEndpoint,
+       userInfoEndpoints: doc.userInfoEndpoints,
+       issuers: doc.issuers,
+@@ -99,6 +101,7 @@
+     stateHash: v.string(),
+     ticketCodeHash: v.string(),
+     encryptedPayload: v.string(),
++    authorizationStartedAt: v.optional(v.number()),
+   },
+   returns: v.null(),
+   handler: async (ctx, args) =>
+@@ -120,6 +123,7 @@
+     v.null(),
+     v.object({
+       encryptedPayload: v.string(),
++      authorizationStartedAt: v.optional(v.number()),
+     }),
+   ),
+   handler: async (ctx, args) =>
+--- a/src/components/password/_generated/component.ts
++++ b/src/components/password/_generated/component.ts
+@@ -24,6 +24,7 @@
+ export type ComponentApi<Name extends string | undefined = string | undefined> =
+   {
+     public: {
++      eraseUserPasswords: FunctionReference<"mutation", "internal", { userId: string }, { complete: boolean; deleted: number }, Name>;
+       setPassword: FunctionReference<
+         "mutation",
+         "internal",
+--- a/src/components/password/public.ts
++++ b/src/components/password/public.ts
+@@ -68,6 +68,7 @@
+     ctx,
+     { userId, password, minimumLength },
+   ): Promise<SetPasswordResult> => {
++    if (await erasedUser(ctx, userId)) throw new Error("Password account is unavailable.");
+     const userError = validateNewPassword(password, minimumLength);
+     if (userError !== null) {
+       return { success: false, userError };
+@@ -103,6 +104,7 @@
+   args: { userId: v.string(), password: v.string() },
+   returns: verifyPasswordResult,
+   handler: async (ctx, { userId, password }): Promise<VerifyPasswordResult> => {
++    if (await erasedUser(ctx, userId)) return { success: false, userError: { error: "INVALID_CREDENTIALS" } };
+     const status = await rateLimiter.limit(ctx, "verifyPassword", {
+       key: userId,
+     });
+@@ -158,3 +160,20 @@
+     .withIndex("by_userId", (q) => q.eq("userId", userId))
+     .unique();
+ }
++
++/** App-server-only bounded erasure; tombstone prevents old-user recreation. */
++export const eraseUserPasswords = mutation({
++  args: { userId: v.string() },
++  returns: v.object({ complete: v.boolean(), deleted: v.number() }),
++  handler: async (ctx, { userId }) => {
++    if (!userId) throw new Error("Missing user ID.");
++    if (!(await erasedUser(ctx, userId)))
++      await ctx.db.insert("erasedUsers", { userId, erasedAt: Date.now() });
++    const rows = await ctx.db.query("passwords").withIndex("by_userId", q => q.eq("userId", userId)).take(101);
++    for (const row of rows.slice(0, 100)) await ctx.db.delete("passwords", row._id);
++    return { complete: rows.length <= 100, deleted: Math.min(rows.length, 100) };
++  },
++});
++async function erasedUser(ctx: QueryCtx, userId: string) {
++  return await ctx.db.query("erasedUsers").withIndex("by_userId", q => q.eq("userId", userId)).unique();
++}
+--- a/src/components/password/schema.ts
++++ b/src/components/password/schema.ts
+@@ -2,6 +2,7 @@
+ import { v } from "convex/values";
+ 
+ export default defineSchema({
++  erasedUsers: defineTable({userId: v.string(), erasedAt: v.number()}).index("by_userId", ["userId"]),
+   passwords: defineTable({
+     userId: v.string(),
+     passwordHashPHC: v.string(), // format: https://github.com/C2SP/C2SP/blob/main/phc-strings.md
+--- a/src/components/username/_generated/component.ts
++++ b/src/components/username/_generated/component.ts
+@@ -24,6 +24,7 @@
+ export type ComponentApi<Name extends string | undefined = string | undefined> =
+   {
+     public: {
++      eraseUser: FunctionReference<"mutation", "internal", { userId: string }, { deleted: boolean }, Name>;
+       deleteUsername: FunctionReference<
+         "mutation",
+         "internal",
+--- a/src/components/username/public.ts
++++ b/src/components/username/public.ts
+@@ -36,6 +36,8 @@
+   args: { userId: v.string(), username: v.string() },
+   returns: setUsernameResult,
+   handler: async (ctx, { userId, username }): Promise<SetUsernameResult> => {
++    if (await ctx.db.query("erasedUsers").withIndex("by_userId", q => q.eq("userId", userId)).unique())
++      throw new Error("User identity has been erased");
+     const userError = validateUsernameFormat(username);
+     if (userError !== null) {
+       return { success: false, userError };
+@@ -117,6 +119,20 @@
+   },
+ });
+ 
++/** Permanently fence the old user ID and remove its username. App-server only. */
++export const eraseUser = mutation({
++  args: { userId: v.string() },
++  returns: v.object({ deleted: v.boolean() }),
++  handler: async (ctx, { userId }) => {
++    const tombstone = await ctx.db.query("erasedUsers").withIndex("by_userId", q => q.eq("userId", userId)).unique();
++    if (!tombstone) await ctx.db.insert("erasedUsers", { userId, erasedAt: Date.now() });
++    const row = await rowByUserId(ctx, userId);
++    if (!row) return { deleted: false };
++    await ctx.db.delete("usernames", row._id);
++    return { deleted: true };
++  },
++});
++
+ function rowByUserId(
+   ctx: QueryCtx,
+   userId: string,
+--- a/src/components/username/schema.ts
++++ b/src/components/username/schema.ts
+@@ -2,6 +2,7 @@
+ import { v } from "convex/values";
+ 
+ export default defineSchema({
++  erasedUsers: defineTable({ userId: v.string(), erasedAt: v.number() }).index("by_userId", ["userId"]),
+   // One row for each user that has a username. The component only sees an
+   // opaque app `userId` string.
+   usernames: defineTable({
+--- a/src/lib/oauth/authorize.ts
++++ b/src/lib/oauth/authorize.ts
+@@ -57,6 +57,8 @@
+   providerName: string;
+   /** Origins `redirectTo` may point at, already validated and normalized. */
+   allowedOrigins: string[];
++  /** Optional server-side routing envelope; the browser keeps the original state. */
++  authorizationState?: (state: string) => Promise<string>;
+   /** The provider's authorization endpoint (a full URL). */
+   authorizationEndpoint: string;
+   /** Scopes to request. Left off the URL entirely when empty. */
+@@ -120,7 +122,7 @@
+         response_type: "code",
+         client_id: clientId,
+         redirect_uri: callbackUrl,
+-        state,
++        state: options.authorizationState ? await options.authorizationState(state) : state,
+         // Every provider gets a challenge. One that does not implement PKCE
+         // ignores the parameters, which RFC 6749 requires of it.
+         code_challenge: await sha256Base64Url(codeVerifier),
+--- a/src/lib/oauth/callback.ts
++++ b/src/lib/oauth/callback.ts
+@@ -265,6 +265,7 @@
+ 
+ /** What every component's claimed authorization request has in common. */
+ export type ClaimedRequest = {
++  authorizationStartedAt?: number;
+   stateHash: string;
+   redirectTo: string;
+   callbackUrl: string;
+@@ -277,6 +278,7 @@
+ 
+ /** The fields of a new ticket, for `mintTicket` to store. */
+ export type MintedTicket = {
++  authorizationStartedAt?: number;
+   ticketCodeHash: string;
+   encryptedPayload: string;
+ };
+@@ -430,6 +432,7 @@
+ 
+     const ticketCode = generateRandomToken();
+     await options.mintTicket(authRequest, {
++      ...(authRequest.authorizationStartedAt === undefined ? {} : { authorizationStartedAt: authRequest.authorizationStartedAt }),
+       ticketCodeHash: await sha256Hex(ticketCode),
+       encryptedPayload: await encryptTicketPayload(
+         ticketCode,
+--- a/src/lib/oauth/dbHelpers.ts
++++ b/src/lib/oauth/dbHelpers.ts
+@@ -58,7 +58,7 @@
+   Doc extends AuthorizationRequestContract,
+ >(
+   ctx: MutationCtx,
+-  fields: Omit<WithoutSystemFields<Doc>, "callbackUrl" | "expiresAt">,
++  fields: Omit<WithoutSystemFields<Doc>, "callbackUrl" | "expiresAt" | "authorizationStartedAt">,
+ ): Promise<{ callbackUrl: string }> {
+   // System env vars are only visible inside components on backends with
+   // convex/convex-backend@64c163a (July 2026); cloud always has it,
+@@ -72,10 +72,11 @@
+         "functions.",
+     );
+   }
+-  const callbackUrl = `${siteUrl}${CALLBACK_PATH}`;
++  const callbackUrl = process.env.CALLBACK_URL || `${siteUrl}${CALLBACK_PATH}`;
+   await ctx.db.insert("authorizationRequests", {
+     ...fields,
+     callbackUrl,
++    authorizationStartedAt: Date.now(),
+     expiresAt: Date.now() + AUTHORIZATION_REQUEST_TTL_MS,
+   });
+   return { callbackUrl };
+@@ -159,7 +160,7 @@
+     stateHash: string;
+     match?: (ticket: Doc) => boolean;
+   },
+-): Promise<{ encryptedPayload: string } | null> {
++): Promise<{ encryptedPayload: string; authorizationStartedAt?: number } | null> {
+   // The same assertion as in claimAuthorizationRequest, for the same reason.
+   const ticket = (await ctx.db
+     .query("tickets")
+@@ -181,5 +182,5 @@
+     return null;
+   }
+   await ctx.db.delete("tickets", ticket._id);
+-  return { encryptedPayload: ticket.encryptedPayload };
++  return { encryptedPayload: ticket.encryptedPayload, ...(ticket.authorizationStartedAt === undefined ? {} : { authorizationStartedAt: ticket.authorizationStartedAt }) };
+ }
+--- a/src/lib/oauth/providerFunctions.ts
++++ b/src/lib/oauth/providerFunctions.ts
+@@ -48,7 +48,7 @@
+  */
+ const createRequestArgs = v
+   .object(authorizationRequestFields)
+-  .omit("callbackUrl", "expiresAt");
++  .omit("callbackUrl", "expiresAt", "authorizationStartedAt");
+ 
+ /** The fields of a claimed request that is still live. */
+ const claimedRequestFields = v
+@@ -121,6 +121,7 @@
+         redirectTo: claimed.doc.redirectTo,
+         callbackUrl: claimed.doc.callbackUrl,
+         codeVerifier: claimed.doc.codeVerifier,
++        ...(claimed.doc.authorizationStartedAt === undefined ? {} : { authorizationStartedAt: claimed.doc.authorizationStartedAt }),
+       };
+     },
+   });
+@@ -137,7 +138,7 @@
+       ticketCodeHash: v.string(),
+       stateHash: v.string(),
+     },
+-    returns: v.union(v.null(), v.object({ encryptedPayload: v.string() })),
++    returns: v.union(v.null(), v.object({ encryptedPayload: v.string(), authorizationStartedAt: v.optional(v.number()) })),
+     handler: async (ctx, args) =>
+       await dbHelpers.claimTicket<SharedTicketDocument>(ctx, args),
+   });
+--- a/src/lib/oauth/redemption.ts
++++ b/src/lib/oauth/redemption.ts
+@@ -144,7 +144,17 @@
+   claimTicket: (
+     ctx: MutationCtx,
+     args: { ticketCodeHash: string; stateHash: string },
+-  ) => Promise<{ encryptedPayload: string } | null>;
++  ) => Promise<{
++    encryptedPayload: string;
++    authorizationStartedAt?: number;
++  } | null>;
++  enforceIdentityErasure?: boolean;
++  /** Optional server-side consumer; undefined marks legacy tickets. */
++  checkAuthorizationStart?: (
++    ctx: MutationCtx,
++    profile: Profile,
++    startedAt: number | undefined,
++  ) => Promise<void>;
+   /** Map what the provider attested to the account profile. */
+   profile: (payload: Payload) => Profile;
+ }) {
+@@ -175,6 +185,17 @@
+           `Profile mapping for provider "${options.providerName}" returned no id`,
+         );
+       }
++
++      if (options.enforceIdentityErasure)
++        await ctx.convexAuth.assertAuthorizationStart(
++          profile.id,
++          ticket.authorizationStartedAt,
++        );
++      await options.checkAuthorizationStart?.(
++        ctx,
++        profile,
++        ticket.authorizationStartedAt,
++      );
+ 
+       // The same redemption flow serves a first sign-in and a return visit, so
+       // resolve the identity to pick a path. This handler is a mutation, so the
+--- a/src/lib/oauth/schema.ts
++++ b/src/lib/oauth/schema.ts
+@@ -24,6 +24,8 @@
+    * ignores the parameters.
+    */
+   codeVerifier: v.string(),
++  /** Server time at original authorization start; absent on legacy records. */
++  authorizationStartedAt: v.optional(v.number()),
+   /** The callback rejects requests older than this. */
+   expiresAt: v.number(),
+ };
+@@ -41,6 +43,8 @@
+    * or server that initiated the flow.
+    */
+   stateHash: v.string(),
++  /** Inherited from the claimed request, never from a client. */
++  authorizationStartedAt: v.optional(v.number()),
+   /**
+    * sha256 of the server-minted ticket code. The raw value appears only
+    * in the callback redirect URL and is never stored.
+--- a/src/lib/types.ts
++++ b/src/lib/types.ts
+@@ -367,6 +367,10 @@
+    * Returns `null` when no user id is found for the account.
+    */
+   resolveUserId(providerAccountId: string): Promise<string | null>;
++  assertAuthorizationStart(
++    providerAccountId: string,
++    startedAt: number | undefined,
++  ): Promise<void>;
+   /**
+    * Revokes every session of the signed-in user other than the current one
+    * (the JWT's subject). Returns the number of active (non-expired)
+--- a/src/methods/google/server.ts
++++ b/src/methods/google/server.ts
+@@ -5,6 +5,7 @@
+  * @module
+  */
+ import { Infer, v } from "convex/values";
++import type { GenericMutationCtx, GenericDataModel } from "convex/server";
+ import type { UserCallbacks } from "../../lib/types.ts";
+ import type { AuthCore } from "../../server/setup.ts";
+ import { buildStartSignIn } from "../../lib/oauth/authorize.ts";
+@@ -70,6 +71,14 @@
+    * for open-redirect prevention.
+    */
+   allowedRedirectOrigins: string[];
++  /** Server-only pre-sign-in check; undefined is legacy authorization proof. */
++  checkAuthorizationStart?: (
++    ctx: GenericMutationCtx<GenericDataModel>,
++    profile: GoogleProfile,
++    startedAt: number | undefined,
++  ) => Promise<void>;
++  /** Optional signed state envelope for a shared callback. */
++  authorizationState?: (state: string) => Promise<string>;
+ };
+ 
+ /**
+@@ -122,6 +131,7 @@
+       const startSignIn = buildStartSignIn({
+         providerName: PROVIDER_NAME,
+         allowedOrigins,
++        authorizationState: options.authorizationState,
+         authorizationEndpoint: AUTHORIZATION_ENDPOINT,
+         scopes: SCOPES,
+         createAuthorizationRequest:
+@@ -133,7 +143,9 @@
+         { claims?: OidcClaims }
+       >({
+         providerName: PROVIDER_NAME,
++        enforceIdentityErasure: true,
+         authMutation,
++        checkAuthorizationStart: options.checkAuthorizationStart,
+         claimTicket: (ctx, args) =>
+           ctx.runMutation(options.component.provider.claimTicket, args),
+         profile: (payload) => normalizeGoogleProfile(payload.claims),
+--- a/src/server/setup.ts
++++ b/src/server/setup.ts
+@@ -393,6 +393,24 @@
+           createUserHandle: await createFunctionHandle(createUser),
+         });
+       },
++      assertAuthorizationStart: async (
++        providerAccountId: string,
++        startedAt: number | undefined,
++      ): Promise<void> => {
++        const cutoff = await ctx.runQuery(
++          component.public.getIdentityErasureCutoff,
++          { provider: name, providerAccountId },
++        );
++        if (cutoff !== null) {
++          if (startedAt === undefined || startedAt <= cutoff)
++            throw new Error(
++              "Authorization predates account erasure or lacks proof.",
++            );
++          throw new Error(
++            "Registration for this identity is unavailable pending an explicit re-registration ceremony.",
++          );
++        }
++      },
+       resolveUserId: async (
+         providerAccountId: string,
+       ): Promise<string | null> => {

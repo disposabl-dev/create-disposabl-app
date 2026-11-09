@@ -29,7 +29,7 @@
     "packages/*"
   ],
   "catalog": {
-    "@convex-dev/auth": "file:vendor/convex-auth-437831bd-disposabl.8.tgz",
+    "@convex-dev/auth": "file:vendor/convex-auth-040d8e36-disposabl.1.tgz",
     "convex": "^1.49.0",
     "lucide-react": "^1.70.0",
     "react": "19.3.0",
