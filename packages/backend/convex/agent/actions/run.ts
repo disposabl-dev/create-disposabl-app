@@ -50,36 +50,8 @@ export const tick = internalAction({
     try {
       let sandbox = await ctx.runQuery(components.boat.sandboxes.get, ref);
       if (current.status === "stopping") {
-        if (paymentsEnabled) {
-          const session =
-            current.computeSessionId &&
-            (await ctx.runQuery(internal.agent.compute.get, {
-              sessionId: current.computeSessionId,
-            }));
-          // Keep an abort pending while boundary funding is unresolved. A later
-          // confirmed renewal must not abandon the remote conversation's stop.
-          if (
-            session?.state === "renewing" ||
-            (session?.state === "active" && session.paidUntil <= Date.now())
-          ) {
-            await ctx.runMutation(internal.agent.state.finish, {
-              ...lease,
-              delay: 2000,
-            });
-            return null;
-          }
-          if (
-            !session ||
-            session.state !== "active" ||
-            session.paidUntil <= Date.now()
-          ) {
-            await ctx.runMutation(internal.agent.state.finish, {
-              ...lease,
-              suspended: true,
-            });
-            return null;
-          }
-        }
+        // Interrupting existing work does not admit or resume paid work.
+        // A lost funding result must not prevent the user from requesting a stop.
         phase = "stop";
         // Confirm the conversation stopped before accepting more work.
         if (sandbox?.sandboxId) {
@@ -149,10 +121,38 @@ export const tick = internalAction({
                 });
                 return null;
               }
+            } else if (current.promptId || current.stopUnconfirmed) {
+              await ctx.runMutation(internal.agent.state.finish, {
+                ...lease,
+                unconfirmed: true,
+              });
+              return null;
             }
-          } else if (!["archived", "deleted"].includes(sandbox.state)) {
+          } else if (sandbox.state === "archived") {
+            // An archived machine may retain its running programs for warm resume.
+            if (
+              current.promptId ||
+              current.delivery ||
+              current.stopUnconfirmed
+            ) {
+              await ctx.runMutation(internal.agent.state.finish, {
+                ...lease,
+                unconfirmed: true,
+              });
+              return null;
+            }
+          } else if (sandbox.state !== "deleted")
             throw new Error("Boat sandbox status is unavailable.");
-          }
+        } else if (
+          current.promptId ||
+          current.delivery ||
+          current.stopUnconfirmed
+        ) {
+          await ctx.runMutation(internal.agent.state.finish, {
+            ...lease,
+            unconfirmed: true,
+          });
+          return null;
         }
         await ctx.runMutation(internal.agent.state.finish, {
           ...lease,

@@ -245,8 +245,14 @@ export const finish = internalMutation({
     await ctx.scheduler.cancel(current.lease!.watchdog);
     let status = current.status;
     let pending = current.pending;
+    const unresolved = Boolean(
+      args.suspended &&
+      (current.promptId || current.delivery || current.stopUnconfirmed),
+    );
     const error = args.suspended
-      ? "Sandbox access ended. Add credits if needed, then send a new message after the sandbox stops."
+      ? unresolved
+        ? "Sandbox access ended before the remote run was confirmed stopped. Contact support to reconcile it before starting more work."
+        : "Sandbox access ended. Add credits if needed, then send a new message after the sandbox stops."
       : (args.error ?? current.error);
     if (args.suspended) {
       status = "failed";
@@ -322,9 +328,12 @@ export const finish = internalMutation({
         : error,
       lease: undefined,
       delivery:
-        args.stopped || args.suspended
+        args.stopped || (args.suspended && !unresolved)
           ? undefined
-          : args.error || args.unconfirmed || status === "stopping"
+          : unresolved ||
+              args.error ||
+              args.unconfirmed ||
+              status === "stopping"
             ? current.delivery
             : undefined,
       stopFailures: args.stopped
@@ -334,7 +343,7 @@ export const finish = internalMutation({
           : current.stopFailures,
       stopUnconfirmed: args.stopped
         ? undefined
-        : args.unconfirmed || (status === "failed" && args.error)
+        : unresolved || args.unconfirmed || (status === "failed" && args.error)
           ? true
           : current.stopUnconfirmed,
       ...(args.stopped ? { promptId: undefined } : {}),

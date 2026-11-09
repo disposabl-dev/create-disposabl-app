@@ -204,6 +204,7 @@ export default defineSchema({
       "agent.computeSessionId",
       "agent.status",
     ])
+    .index("by_userId_stopUnconfirmed", ["userId", "agent.stopUnconfirmed"])
     .index("by_threadId", ["agent.threadId"])
     .index("by_agentAccessHash", ["agent.access.hash"])
     .index("by_userId_agentUpdatedAt", ["userId", "agent.updatedAt"]),

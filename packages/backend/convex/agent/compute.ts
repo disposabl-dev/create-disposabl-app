@@ -10,6 +10,7 @@ import type { MutationCtx, QueryCtx } from "../_generated/server";
 import schema from "../schema";
 import { deletionPending } from "../users/deletion";
 import { computeSessionArgs } from "./computeValidator";
+import { assertNoUnconfirmedRuns } from "./threads";
 
 export const WINDOW_MS = 600_000;
 
@@ -19,6 +20,7 @@ export async function admitSession(
   userId: string,
   enabled = paymentsEnabled,
 ) {
+  await assertNoUnconfirmedRuns(ctx, userId);
   if (!enabled) return undefined;
   const current = await ctx.db
     .query("computeSessions")
@@ -40,6 +42,22 @@ export async function admitSession(
             ? "Your next compute window is being funded. Try sending your message again shortly."
             : "Your sandbox is stopping. Send a new message after it stops.",
     });
+  }
+  if (current) {
+    for (const status of ["processing", "stopping"] as const) {
+      const unfinished = await ctx.db
+        .query("apps")
+        .withIndex("by_computeSessionId_status", (q) =>
+          q
+            .eq("agent.computeSessionId", current._id)
+            .eq("agent.status", status),
+        )
+        .first();
+      if (unfinished)
+        throw new ConvexError(
+          "Previous sandbox work is still stopping. Try again after it finishes.",
+        );
+    }
   }
   return ctx.db.insert("computeSessions", {
     userId,
