@@ -34,7 +34,7 @@ test(
   "real Convex transactions serialize claims, boundary, stop and explicit resume",
   { skip: !url },
   async () => {
-    const userId = randomUUID(),
+    const userId = await call("seedUser", {}),
       threadId = randomUUID();
     const admissions = await Promise.all(
       Array.from({ length: 12 }, () => call("admit", { userId })),
@@ -150,7 +150,7 @@ test(
       "starting",
     );
 
-    const other = randomUUID(),
+    const other = await call("seedUser", {}),
       old = await call("admit", { userId: other });
     const otherApp = await call("app", {
       userId: other,
@@ -178,7 +178,7 @@ test(
   "a provider-denied debit is recorded without granting paid time",
   { skip: !url },
   async () => {
-    const userId = randomUUID();
+    const userId = await call("seedUser", {});
     const sessionId = await call("admit", { userId });
     const appId = await call("app", {
       userId,
@@ -281,7 +281,7 @@ test(
   { skip: !url },
   async () => {
     for (const tickBeforeMessage of [true, false]) {
-      const userId = randomUUID();
+      const userId = await call("seedUser", {});
       const sessionId = await call("admit", { userId });
       const app = await call("queuedApp", { userId, sessionId });
       const debit = await call("claim", { sessionId });
@@ -339,7 +339,7 @@ test(
   "session rebind rejects undrained work even after a denied debit's stop",
   { skip: !url },
   async () => {
-    const userId = randomUUID();
+    const userId = await call("seedUser", {});
     const sessionId = await call("admit", { userId });
     const app = await call("queuedApp", { userId, sessionId });
     const debit = await call("claim", { sessionId });
@@ -369,7 +369,7 @@ test(
   "late confirmed renewal holds old work through stop and manual recovery",
   { skip: !url },
   async () => {
-    const userId = randomUUID();
+    const userId = await call("seedUser", {});
     const sessionId = await call("admit", { userId });
     const app = await call("queuedApp", { userId, sessionId });
     const first = await call("claim", { sessionId });
@@ -459,7 +459,7 @@ test(
   "expired active window stops without dispatching another debit",
   { skip: !url },
   async () => {
-    const userId = randomUUID();
+    const userId = await call("seedUser", {});
     const sessionId = await call("admit", { userId });
     await call("app", { userId, sessionId, threadId: randomUUID() });
     const first = await call("claim", { sessionId });
@@ -481,7 +481,7 @@ test(
   { skip: !url },
   async () => {
     for (const outcome of ["confirmed", "denied"] as const) {
-      const userId = randomUUID();
+      const userId = await call("seedUser", {});
       const sessionId = await call("admit", { userId });
       const appId = await call("app", {
         userId,
@@ -520,7 +520,7 @@ test(
       "new-session",
       "new-session-dispatch",
     ]) {
-      const userId = randomUUID();
+      const userId = await call("seedUser", {});
       const sessionId = await call("admit", { userId });
       const appId = await call("app", {
         userId,
@@ -645,7 +645,7 @@ test(
   "conflict recovery requires every exact debit and preserves audit history",
   { skip: !url },
   async () => {
-    const userId = randomUUID();
+    const userId = await call("seedUser", {});
     async function deniedSession() {
       const sessionId = await call("admit", { userId });
       const appId = await call("app", {
@@ -725,7 +725,8 @@ test(
       }),
       /does not match/,
     );
-    const foreign = await call("admit", { userId: randomUUID() });
+    const foreignUserId = await call("seedUser", {});
+    const foreign = await call("admit", { userId: foreignUserId });
     await assert.rejects(
       call("resolveConflictsHold", {
         ...args,
@@ -779,7 +780,7 @@ test(
   "a new late confirmation racing conflict recovery remains held",
   { skip: !url },
   async () => {
-    const userId = randomUUID();
+    const userId = await call("seedUser", {});
     async function oldDebit() {
       const sessionId = await call("admit", { userId });
       const appId = await call("app", {
@@ -836,7 +837,7 @@ test(
   "conflict recovery cannot bypass the current session debit",
   { skip: !url },
   async () => {
-    const userId = randomUUID();
+    const userId = await call("seedUser", {});
     const old = await call("admit", { userId });
     const oldApp = await call("app", {
       userId,
@@ -910,7 +911,7 @@ test(
   "legacy untracked conflict stays held and recovery cannot alter its evidence",
   { skip: !url },
   async () => {
-    const userId = randomUUID();
+    const userId = await call("seedUser", {});
     const original = await call("admit", { userId });
     const appId = await call("app", {
       userId,
@@ -981,7 +982,7 @@ test(
   "more than 100 conflicts stay held without losing provider evidence",
   { skip: !url },
   async () => {
-    const userId = randomUUID();
+    const userId = await call("seedUser", {});
     const original = await call("admit", { userId });
     const appId = await call("app", {
       userId,
@@ -1058,7 +1059,7 @@ test(
   "conflict recovery allows only fresh same-app work after draining old workers",
   { skip: !url },
   async () => {
-    const userId = randomUUID();
+    const userId = await call("seedUser", {});
     const original = await call("admit", { userId });
     const app = await call("queuedApp", { userId, sessionId: original });
     const debit = await call("claim", { sessionId: original });
