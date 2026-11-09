@@ -107,21 +107,6 @@ export const setStartingWithDebit = mutation({
     await ctx.db.patch(sessionId, { state: "starting", paidUntil: 0 });
   },
 });
-// Models a renewal already dispatched by the previous implementation.
-export const inFlightRenewal = mutation({
-  args: { sessionId: v.id("computeSessions") },
-  handler: async (ctx, { sessionId }) => {
-    const session = await ctx.db.get(sessionId);
-    if (!session || session.state !== "active") throw new Error("Not active");
-    const debitId = await ctx.db.insert("computeDebits", {
-      sessionId,
-      state: "dispatching",
-      paidUntil: Date.now() + 600_000,
-    });
-    await ctx.db.patch(sessionId, { debitId });
-    return ctx.db.get(debitId);
-  },
-});
 export const boundary = mutation({
   args: {
     sessionId: v.id("computeSessions"),

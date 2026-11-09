@@ -115,9 +115,14 @@ test(
       await call("allowed", { sessionId, userId, now: paidUntil }, true),
       false,
     );
-    const secondDebit = await call("inFlightRenewal", { sessionId });
+    await call("expireFundedWindow", { sessionId });
+    const secondDebit = await call("claim", {
+      sessionId,
+      expectedDebit: first[0]._id,
+    });
+    assert.equal(secondDebit.paidUntil, 0);
+    assert.equal((await call("get", { sessionId }, true)).state, "renewing");
     const second = [secondDebit];
-    await call("expire", { sessionId });
     assert.equal((await call("debits", { sessionId }, true)).length, 2);
     await call("crash", { debitId: second[0]._id });
     const resolution = {
@@ -425,7 +430,7 @@ test(
 );
 
 test(
-  "late confirmed renewal holds old work through stop and manual recovery",
+  "confirmation after an unknown renewal holds old work through stop and manual recovery",
   { skip: !url },
   async () => {
     const userId = await call("seedUser", {});
@@ -433,8 +438,11 @@ test(
     const app = await call("queuedApp", { userId, sessionId });
     const first = await call("claim", { sessionId });
     await call("settleDebit", { debitId: first._id, outcome: "confirmed" });
-    const late = await call("inFlightRenewal", { sessionId });
-    await call("expire", { sessionId });
+    await call("expireFundedWindow", { sessionId });
+    const late = await call("claim", { sessionId, expectedDebit: first._id });
+    assert.equal(late.paidUntil, 0);
+    assert.equal((await call("get", { sessionId }, true)).state, "renewing");
+    await call("crash", { debitId: late._id });
     const expiredDeadline = (await call("get", { sessionId }, true)).paidUntil;
     const results = await Promise.allSettled([
       ...Array.from({ length: 8 }, () =>
@@ -457,16 +465,14 @@ test(
       false,
     );
     const debits = await call("debits", { sessionId }, true);
-    assert.equal(
-      debits.find((d: any) => d._id === late._id).state,
-      "confirmed",
-    );
+    assert.equal(debits.find((d: any) => d._id === late._id).state, "unknown");
     assert.equal(
       debits.find((d: any) => d._id === late._id).paidUntil,
       late.paidUntil,
     );
     assert.equal(
-      debits.find((d: any) => d._id === late._id).responseBalance,
+      debits.find((d: any) => d._id === late._id).lateConfirmation
+        .responseBalance,
       2,
     );
     const resolution = {
