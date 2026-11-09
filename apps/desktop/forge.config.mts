@@ -10,6 +10,8 @@ import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
 import { desktopAuthScheme } from '../../packages/disposabl-kit/lib/desktop-auth';
+import { externalUrl } from './src/navigation';
+import { configuredWebsite } from './website-config';
 
 const executableName = manifest.name.toLowerCase().replace(/[^a-z0-9-]/g, '-');
 const authScheme = desktopAuthScheme(
@@ -83,6 +85,11 @@ const config: ForgeConfig = {
   rebuildConfig: {},
   hooks: {
     prePackage: async (_config, platform, arch) => {
+      const website = configuredWebsite();
+      if (website && (!website.startsWith('https://') || !externalUrl(website)))
+        throw new Error(
+          'Desktop packaging requires a valid HTTPS website without credentials. Set CONVEX_SITE_URL or VITE_CONVEX_SITE_URL, or leave both blank for the starter.',
+        );
       const supported =
         (platform === 'darwin' && arch === 'arm64') ||
         ((platform === 'win32' || platform === 'linux') && arch === 'x64');

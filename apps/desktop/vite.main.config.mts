@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import manifest from './package.json' with { type: 'json' };
+import { configuredWebsite } from './website-config';
 
 export default defineConfig({
   define: {
@@ -12,8 +13,6 @@ export default defineConfig({
     DISPOSABL_UPDATE_CHANNEL: JSON.stringify(
       process.env.DISPOSABL_DESKTOP_UPDATE_CHANNEL || 'production',
     ),
-    DISPOSABL_WEB_URL: JSON.stringify(
-      process.env.CONVEX_SITE_URL || process.env.VITE_CONVEX_SITE_URL || '',
-    ),
+    DISPOSABL_WEB_URL: JSON.stringify(configuredWebsite()),
   },
 });
