@@ -5,6 +5,8 @@ import { gunzipSync } from "node:zlib";
 import assert from "node:assert/strict";
 
 const dist = resolve(process.env.REPLAY_APP_DIST || "");
+const mode = process.argv[2];
+assert.ok(mode === "web" || mode === "desktop", "invalid mount mode");
 assert.ok(process.env.REPLAY_APP_DIST && process.env.REPLAY_CHROMIUM);
 const browser = await chromium.launch({
   executablePath: process.env.REPLAY_CHROMIUM,
@@ -23,15 +25,15 @@ const paths = [],
   failures = [];
 page.on("pageerror", (e) => failures.push(e.message));
 try {
-  await page.addInitScript(() => {
+  await page.addInitScript((mode) => {
     Object.defineProperty(navigator, "webdriver", { get: () => false });
     Object.defineProperty(navigator, "userAgentData", {
       get: () => ({ brands: [{ brand: "Chromium", version: "130" }] }),
     });
-    window.disposablDesktop = { authentication: true };
+    if (mode === "desktop") window.disposablDesktop = { authentication: true };
     localStorage.setItem("fixture-session", "A");
     sessionStorage.setItem("disposabl.connectionsSession", "A");
-  });
+  }, mode);
   await context.route("**/*", async (route) => {
     const req = route.request(),
       url = new URL(req.url());
@@ -132,7 +134,7 @@ try {
   assert.ok(
     views().every(
       (v) =>
-        v.properties.platform === "desktop" &&
+        v.properties.platform === mode &&
         v.properties.distinct_id === "account-a",
     ),
   );
@@ -144,7 +146,7 @@ try {
   console.log(
     JSON.stringify({
       views: views().map((v) => v.properties.page),
-      platform: "desktop",
+      platform: mode,
       genericRequests: generic.length,
       pageErrors: failures,
     }),

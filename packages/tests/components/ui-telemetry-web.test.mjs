@@ -50,21 +50,23 @@ let initialized = 0;
 let sdkOptions;
 const events = [];
 const stops = mock();
-const requests = mock(
-  async () =>
-    new Response(
-      JSON.stringify({
-        enabled: true,
-        projectToken: "test",
-        host: "https://us.i.posthog.com",
-        anonymousId: "00000000-0000-4000-8000-000000000001",
-        distinctId: "server-id",
-        identified: false,
-        expiresAt: Date.now() + 30_000,
-      }),
-      { status: 200 },
-    ),
-);
+let validReceivers = 0;
+const requests = mock(async function () {
+  if (this !== window) throw new TypeError("Illegal invocation");
+  validReceivers++;
+  return new Response(
+    JSON.stringify({
+      enabled: true,
+      projectToken: "test",
+      host: "https://us.i.posthog.com",
+      anonymousId: "00000000-0000-4000-8000-000000000001",
+      distinctId: "server-id",
+      identified: false,
+      expiresAt: Date.now() + 30_000,
+    }),
+    { status: 200 },
+  );
+});
 globalThis.fetch = requests;
 mock.module("posthog-js", () => ({
   PostHog: class {
@@ -97,6 +99,13 @@ const { ProductTelemetry, AnalyticsPreference } =
 let renderer;
 afterEach(async () => {
   await act(async () => renderer?.unmount());
+});
+
+test("the bootstrap fetch mock rejects a non-window receiver", async () => {
+  await expect(requests.call({}, "http://127.0.0.1:9999")).rejects.toThrow(
+    "Illegal invocation",
+  );
+  requests.mockClear();
 });
 
 test("web E2E never initializes or contacts bootstrap", async () => {
@@ -149,6 +158,7 @@ test("web bootstraps, strips URL and stops immediately on opt-out", async () => 
     );
   });
   expect(initialized).toBe(1);
+  expect(validReceivers).toBe(1);
   expect(events[0].properties).toEqual({
     token: "test",
     distinct_id: "server-id",
