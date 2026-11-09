@@ -13,6 +13,11 @@ import {
   notice,
 } from "../backend/convex/agent/compute";
 
+import {
+  claimActivation,
+  completeActivation,
+} from "../backend/convex/agent/activation";
+
 import { resolveConflicts } from "../backend/convex/agent/computeRecovery";
 
 // Transaction fixtures exercise real handlers in serial commit order, not Convex OCC.
@@ -37,18 +42,23 @@ function fixture() {
       patch: async (_table: string, id: string, patch: any) =>
         Object.assign(rows.get(id), patch),
       query: (table: string) => {
-        const conditions: [string, unknown][] = [];
+        const conditions: [string, unknown, string][] = [];
         let reverse = false;
         const matches = () =>
           [...rows.values()]
             .filter(
               (row) =>
                 row.table === table &&
-                conditions.every(
-                  ([key, value]) =>
-                    key.split(".").reduce((r, field) => r?.[field], row) ===
-                    value,
-                ),
+                conditions.every(([key, value, op]) => {
+                  const x = key
+                    .split(".")
+                    .reduce((r, field) => r?.[field], row);
+                  return op === "eq"
+                    ? x === value
+                    : op === "lt"
+                      ? x === undefined || x < (value as string)
+                      : x !== undefined && x > (value as string);
+                }),
             )
             .sort((a, b) =>
               reverse ? b.sequence - a.sequence : a.sequence - b.sequence,
@@ -57,7 +67,15 @@ function fixture() {
           withIndex: (_name: string, select: any) => {
             const index: any = {
               eq: (field: string, value: unknown) => {
-                conditions.push([field, value]);
+                conditions.push([field, value, "eq"]);
+                return index;
+              },
+              lt: (field: string, value: unknown) => {
+                conditions.push([field, value, "lt"]);
+                return index;
+              },
+              gt: (field: string, value: unknown) => {
+                conditions.push([field, value, "gt"]);
                 return index;
               },
             };
@@ -69,6 +87,7 @@ function fixture() {
             return chain;
           },
           first: async () => matches()[0] ?? null,
+          unique: async () => matches()[0] ?? null,
           take: async (n: number) => matches().slice(0, n),
         };
         return chain;
@@ -209,6 +228,12 @@ test("confirmation at the timeout boundary stays held even if the watchdog is de
   }
 });
 
+async function activate(f: Awaited<ReturnType<typeof running>>) {
+  const args = { sessionId: f.sessionId, token: "activation" };
+  assert.equal(await claimActivation(f.ctx, args), "claimed");
+  assert.equal(await completeActivation(f.ctx, args), true);
+}
+
 test("two apps share a session; duplicate dispatch and renewal claims cannot charge twice", async () => {
   const f = await running();
   assert.equal(await admitSession(f.ctx, "owner", true), f.sessionId);
@@ -220,6 +245,7 @@ test("two apps share a session; duplicate dispatch and renewal claims cannot cha
     debitId: f.debit._id,
     outcome: "confirmed",
   });
+  await activate(f);
   assert.equal(
     await sessionAllows(f.ctx, f.sessionId, "owner", Date.now(), true),
     true,
@@ -297,6 +323,7 @@ test("renewal denial stops and uncertain outcomes hold without a repeat debit or
       debitId: f.debit._id,
       outcome: "confirmed",
     });
+    await activate(f);
     f.rows.get(f.sessionId).paidUntil = f.debit.paidUntil = 1;
     const renewal = await claimWindow(
       f.ctx,
@@ -339,6 +366,7 @@ test("deletion pending before or during renewal never grants a new window", asyn
       debitId: f.debit._id,
       outcome: "confirmed",
     });
+    await activate(f);
     f.rows.get(f.sessionId).paidUntil = f.debit.paidUntil = 1;
     if (phase === "before") f.rows.get("owner").deletionRequestedAt = 1;
     const renewal = await claimWindow(
@@ -612,4 +640,30 @@ test("an old confirmation fences the latest session and ungranted charges requir
   assert.equal(current.state, "stopped");
   assert.equal(f.rows.get(currentDebit._id).resolution.outcome, "confirmed");
   assert.equal(current.paidUntil, 0);
+});
+
+test("unactivated confirmed window cannot dispatch or consume another debit", async () => {
+  const f = await running();
+  await (settle as any)._handler(f.ctx, {
+    debitId: f.debit._id,
+    outcome: "confirmed",
+  });
+  assert.equal(
+    await sessionAllows(f.ctx, f.sessionId, "owner", Date.now(), true),
+    false,
+  );
+  f.rows.get(f.sessionId).paidUntil = f.debit.paidUntil = 1;
+  assert.equal(
+    await claimWindow(
+      f.ctx,
+      { sessionId: f.sessionId, expectedDebit: f.debit._id },
+      true,
+    ),
+    null,
+  );
+  assert.equal(f.rows.get(f.sessionId).state, "stopping");
+  assert.equal(
+    [...f.rows.values()].filter((row) => row.table === "computeDebits").length,
+    1,
+  );
 });

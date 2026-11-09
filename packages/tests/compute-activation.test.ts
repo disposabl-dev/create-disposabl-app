@@ -5,6 +5,7 @@ import {
   completeActivation,
   uncertainActivation,
   archiveStop,
+  expired,
 } from "../backend/convex/agent/activation";
 import { stopping } from "../backend/convex/agent/compute";
 
@@ -70,6 +71,9 @@ function fixture() {
           order() {
             return chain;
           },
+          async unique() {
+            return matches()[0] ?? null;
+          },
           async first() {
             return matches().at(-1) ?? null;
           },
@@ -95,10 +99,7 @@ const args = { sessionId: "s" as any, token: "a" };
 test("claims serialize, completion is token fenced, uncertain stops after action fence", async () => {
   const f = fixture();
   assert.equal(await claimActivation(f.ctx, args), "claimed");
-  assert.equal(
-    await claimActivation(f.ctx, { ...args, token: "b" }),
-    "blocked",
-  );
+  assert.equal(await claimActivation(f.ctx, { ...args, token: "b" }), "wait");
   assert.equal(await completeActivation(f.ctx, { ...args, token: "b" }), false);
   assert.equal(await uncertainActivation(f.ctx, args), true);
   assert.equal(f.session.state, "stopping");
@@ -119,6 +120,7 @@ test("legacy rows normalize in bounded batches and late uncertainty blocks", asy
   for (let i = 0; i < 101; i++)
     f.rows.push({
       _id: `app${i}`,
+      appId: `app${i}`,
       table: "apps",
       userId: "u",
       ...(i === 100
@@ -136,7 +138,11 @@ test("legacy rows normalize in bounded batches and late uncertainty blocks", asy
   assert.equal(await claimActivation(f.ctx, args), "wait");
   assert.equal(await claimActivation(f.ctx, args), "wait");
   assert.equal(await claimActivation(f.ctx, args), "blocked");
-  assert.equal(f.session.activation, "fresh");
+  assert.equal(f.session.state, "stopping");
+  assert.equal(
+    f.rows.find((row) => row._id === "app100").agent.stopUnconfirmed,
+    true,
+  );
 });
 test("expired, deleted or replaced completion cannot reactivate", async () => {
   for (const change of ["expired", "deleted", "replaced", "lease"]) {
@@ -161,9 +167,10 @@ test("fresh completion and legacy or activated archive behavior", async () => {
   const legacy = fixture();
   delete legacy.session.activation;
   assert.equal(await claimActivation(legacy.ctx, args), "blocked");
-  assert.equal(await archiveStop(legacy.ctx, { sessionId: "s" as any }), true);
+  assert.equal(legacy.session.state, "stopping");
+  assert.equal(await archiveStop(legacy.ctx, { sessionId: "s" as any }), false);
   const fresh = fixture();
-  assert.equal(await archiveStop(fresh.ctx, { sessionId: "s" as any }), false);
+  assert.equal(await archiveStop(fresh.ctx, { sessionId: "s" as any }), true);
 });
 
 test("archive during activation fences a delayed provider completion", async () => {
@@ -183,6 +190,7 @@ test("old worker lease blocks until expired without blocking current-session lea
   const lease = { token: "old", expiresAt: Date.now() + 60000, watchdog: "w" };
   const old = {
     _id: "old",
+    appId: "old",
     table: "apps",
     userId: "u",
     agent: {
@@ -218,6 +226,7 @@ test("expired old lease with delivery remains a durable block", async () => {
   const f = fixture();
   f.rows.push({
     _id: "old",
+    appId: "old",
     table: "apps",
     userId: "u",
     agent: {
@@ -244,4 +253,19 @@ test("legacy busy classification advances across multiple committed batches", as
   assert.equal(await claimActivation(f.ctx, args), "wait");
   assert.equal(await claimActivation(f.ctx, args), "wait");
   assert.equal(await claimActivation(f.ctx, args), "claimed");
+});
+
+test("activation watchdog stops expired claim without issuing a second claim", async () => {
+  const f = fixture();
+  assert.equal(await claimActivation(f.ctx, args), "claimed");
+  await (expired as any)._handler(f.ctx, args);
+  assert.equal(f.session.state, "active");
+  f.session.activationLease.until = Date.now() - 1;
+  await (expired as any)._handler(f.ctx, args);
+  assert.equal(f.session.activation, "uncertain");
+  assert.equal(f.session.state, "stopping");
+  assert.equal(
+    await claimActivation(f.ctx, { ...args, token: "new" }),
+    "blocked",
+  );
 });
