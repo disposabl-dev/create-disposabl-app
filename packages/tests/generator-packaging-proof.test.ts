@@ -34,6 +34,7 @@ const excluded = [
   "packages/tests/fixtures/telemetry-link-convex",
   "packages/tests/telemetry-link-transactions.test.ts",
   "packages/tests/platform-error-telemetry.test.ts",
+  "packages/tests/cli-first-execution.test.ts",
   "packages/tests/fixtures/posthog-replay-browser",
   "packages/tests/fixtures/telemetry-guard-convex",
   "packages/tests/telemetry-guard-transactions.test.ts",
