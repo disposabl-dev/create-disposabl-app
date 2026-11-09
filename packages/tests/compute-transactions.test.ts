@@ -907,76 +907,80 @@ test(
   },
 );
 
-test(
-  "legacy untracked conflict stays held and recovery cannot alter its evidence",
-  { skip: !url },
-  async () => {
-    const userId = await call("seedUser", {});
-    const original = await call("admit", { userId });
-    const appId = await call("app", {
-      userId,
-      sessionId: original,
-      threadId: randomUUID(),
-    });
-    const first = await call("claim", { sessionId: original });
-    await call("settleDebit", { debitId: first._id, outcome: "denied" });
-    await call("stop", { sessionId: original, token: "stop" });
-    await call("setStatus", { appId, status: "idle" });
-    await call("stoppedResult", {
-      sessionId: original,
-      token: "stop",
-      archived: true,
-    });
-    const [debitId] = await call("seedDeniedDebits", {
-      sessionId: original,
-      count: 1,
-    });
-    const currentSessionId = await call("admit", { userId });
-    await call("legacyConflictHold", { sessionId: currentSessionId });
-    await call("settleDebit", {
-      debitId,
-      outcome: "confirmed",
-      responseBalance: 7,
-    });
-    await call("stop", { sessionId: currentSessionId, token: "stop" });
-    await call("stoppedResult", {
-      sessionId: currentSessionId,
-      token: "stop",
-      archived: true,
-    });
-    const sessionBefore = await call(
-      "get",
-      { sessionId: currentSessionId },
-      true,
-    );
-    const debitBefore = (
-      await call("debits", { sessionId: original }, true)
-    ).find((d: any) => d._id === debitId);
-    assert.equal(sessionBefore.untrackedConflicts, true);
-    assert.equal(debitBefore.lateConfirmation.responseBalance, 7);
-    await assert.rejects(
-      call("resolveConflictsHold", {
-        currentSessionId,
-        operator: "fixture",
-        conflicts: [
-          { sessionId: original, debitId, evidence: "provider reference" },
-        ],
-      }),
-      /Untracked conflicts/,
-    );
-    assert.deepEqual(
-      await call("get", { sessionId: currentSessionId }, true),
-      sessionBefore,
-    );
-    assert.deepEqual(
-      (await call("debits", { sessionId: original }, true)).find(
-        (d: any) => d._id === debitId,
-      ),
-      debitBefore,
-    );
-    await assert.rejects(call("admit", { userId }), /reconciliation/);
-  },
-);
+for (const empty of [false, true])
+  test(
+    `inconsistent ${empty ? "empty" : "missing"} conflict list stays held and preserves evidence`,
+    { skip: !url },
+    async () => {
+      const userId = await call("seedUser", {});
+      const original = await call("admit", { userId });
+      const appId = await call("app", {
+        userId,
+        sessionId: original,
+        threadId: randomUUID(),
+      });
+      const first = await call("claim", { sessionId: original });
+      await call("settleDebit", { debitId: first._id, outcome: "denied" });
+      await call("stop", { sessionId: original, token: "stop" });
+      await call("setStatus", { appId, status: "idle" });
+      await call("stoppedResult", {
+        sessionId: original,
+        token: "stop",
+        archived: true,
+      });
+      const [debitId] = await call("seedDeniedDebits", {
+        sessionId: original,
+        count: 1,
+      });
+      const currentSessionId = await call("admit", { userId });
+      await call("inconsistentConflictHold", {
+        sessionId: currentSessionId,
+        empty,
+      });
+      await call("settleDebit", {
+        debitId,
+        outcome: "confirmed",
+        responseBalance: 7,
+      });
+      await call("stop", { sessionId: currentSessionId, token: "stop" });
+      await call("stoppedResult", {
+        sessionId: currentSessionId,
+        token: "stop",
+        archived: true,
+      });
+      const sessionBefore = await call(
+        "get",
+        { sessionId: currentSessionId },
+        true,
+      );
+      const debitBefore = (
+        await call("debits", { sessionId: original }, true)
+      ).find((d: any) => d._id === debitId);
+      assert.equal(sessionBefore.untrackedConflicts, true);
+      assert.equal(debitBefore.lateConfirmation.responseBalance, 7);
+      await assert.rejects(
+        call("resolveConflictsHold", {
+          currentSessionId,
+          operator: "fixture",
+          conflicts: [
+            { sessionId: original, debitId, evidence: "provider reference" },
+          ],
+        }),
+        /Untracked conflicts/,
+      );
+      assert.deepEqual(
+        await call("get", { sessionId: currentSessionId }, true),
+        sessionBefore,
+      );
+      assert.deepEqual(
+        (await call("debits", { sessionId: original }, true)).find(
+          (d: any) => d._id === debitId,
+        ),
+        debitBefore,
+      );
+      await assert.rejects(call("admit", { userId }), /reconciliation/);
+    },
+  );
 
 test(
   "more than 100 conflicts stay held without losing provider evidence",

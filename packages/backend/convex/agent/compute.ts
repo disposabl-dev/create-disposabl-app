@@ -186,9 +186,11 @@ export const settle = internalMutation({
       if (conflict || !debit.resolution) {
         if (current) {
           const existing = current.conflictDebits ?? [];
+          // A flagged hold without recorded conflicts cannot become recoverable
+          // merely because another conflict was subsequently recorded.
           const untracked =
             current.untrackedConflicts ||
-            (current.reconciliationConflict && !current.conflictDebits);
+            (current.reconciliationConflict && !current.conflictDebits?.length);
           const overflow = conflict && existing.length >= 100;
           await ctx.db.patch("computeSessions", current._id, {
             state: "hold",

@@ -145,7 +145,7 @@ export const beginStop = mutation({
     ctx.db.patch(sessionId, { state: "stopping" }),
 });
 
-// Test-only records representing old denied operations and a pre-association hold.
+// Test-only denied operations for late-confirmation and overflow scenarios.
 export const seedDeniedDebits = mutation({
   args: { sessionId: v.id("computeSessions"), count: v.number() },
   handler: async (ctx, { sessionId, count }) => {
@@ -163,13 +163,13 @@ export const seedDeniedDebits = mutation({
     return ids;
   },
 });
-export const legacyConflictHold = mutation({
-  args: { sessionId: v.id("computeSessions") },
-  handler: (ctx, { sessionId }) =>
+export const inconsistentConflictHold = mutation({
+  args: { sessionId: v.id("computeSessions"), empty: v.boolean() },
+  handler: (ctx, { sessionId, empty }) =>
     ctx.db.patch(sessionId, {
       state: "hold",
       reconciliationConflict: true,
-      conflictDebits: undefined,
+      conflictDebits: empty ? [] : undefined,
       untrackedConflicts: undefined,
     }),
 });
