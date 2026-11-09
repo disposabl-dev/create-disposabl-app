@@ -20,7 +20,11 @@ const listeners = new Set<() => void>();
 let stopActive: (() => void) | undefined;
 let sendAction: ((action: MobileAction) => void) | undefined;
 export function captureProductAction(action: MobileAction) {
-  if (isMobileAction(action)) sendAction?.(action);
+  try {
+    if (isMobileAction(action)) sendAction?.(action);
+  } catch {
+    // Analytics must not interrupt navigation or an acquired billing transaction.
+  }
 }
 function notify() {
   for (const listener of listeners) listener();

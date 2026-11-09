@@ -5,6 +5,7 @@ import { api } from "../../../../../packages/backend/convex/_generated/api";
 import { Button } from "@disposabl/disposabl-kit/client/components/ui/button";
 import { Input } from "@disposabl/disposabl-kit/client/components/ui/input";
 import config from "../../../../../disposabl.json";
+import { captureProductAction } from "../../telemetry";
 
 export const Route = createFileRoute(
   "/_providers/_authenticated/dashboard/api-keys",
@@ -39,10 +40,11 @@ function ApiKeys() {
         className="flex gap-2"
         onSubmit={async (event) => {
           event.preventDefault();
-          if (pending) return;
+          if (pending || !name.trim() || key) return;
           setPending(true);
           setError(undefined);
           try {
+            captureProductAction("api_key_create_attempt");
             const result = await create({ name: name.trim(), scopes: [] });
             setKey(result.apiKey);
             setName("");
@@ -91,6 +93,7 @@ function ApiKeys() {
             <Button
               onClick={async () => {
                 try {
+                  captureProductAction("api_key_copy_attempt");
                   await navigator.clipboard.writeText(key);
                   setCopied(true);
                 } catch {
@@ -130,9 +133,11 @@ function ApiKeys() {
                 variant="outline"
                 disabled={pending}
                 onClick={async () => {
+                  if (pending) return;
                   setPending(true);
                   setError(undefined);
                   try {
+                    captureProductAction("api_key_revoke_attempt");
                     await revoke({ id: connection.id });
                     setKey(undefined);
                   } catch {

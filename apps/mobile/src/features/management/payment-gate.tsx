@@ -7,6 +7,7 @@ import { useWebCheckout } from "../../../../../packages/disposabl-kit/mobile/bil
 import { useTopup } from "../../../../../packages/disposabl-kit/mobile/billing/use-topup";
 import { creditQuantity } from "../../../../../packages/disposabl-kit/payments/config";
 import { Action } from "../studio/ui";
+import { captureProductAction } from "../product-telemetry";
 import {
   monthlyOfferingId,
   presentMonthlyPaywall,
@@ -105,10 +106,13 @@ export function PaymentGate({
       data.hasMonthlyPlan !== false ||
       data.monthlyCheckoutPending !== false ||
       busy ||
+      web.busy ||
+      !billingSession.current(customerId, version.current) ||
       topup.busy
     )
       return;
     if (!billingSession.beginTransaction()) return;
+    captureProductAction("billing_native_subscription_attempt");
     const generation = version.current;
     const current = () => billingSession.current(customerId, generation);
     setBusy(true);
@@ -137,6 +141,28 @@ export function PaymentGate({
     } finally {
       billingSession.endTransaction();
       if (current()) setBusy(false);
+    }
+  }
+  function checkout(
+    kind: "native_topup" | "website_monthly" | "website_topup",
+  ) {
+    if (
+      !key ||
+      busy ||
+      web.busy ||
+      topup.busy ||
+      !billingSession.current(customerId, version.current)
+    )
+      return;
+    if (kind === "native_topup" && topup.product) {
+      captureProductAction("billing_native_topup_attempt");
+      void topup.purchase();
+    } else if (kind === "website_monthly" && web.available && productId) {
+      captureProductAction("billing_website_monthly_attempt");
+      void web.open();
+    } else if (kind === "website_topup" && web.topupAvailable) {
+      captureProductAction("billing_website_topup_attempt");
+      void web.open("topup");
     }
   }
   return (
@@ -182,14 +208,14 @@ export function PaymentGate({
       {web.available && (
         <Action
           label="Buy monthly on website"
-          onPress={() => void web.open()}
+          onPress={() => checkout("website_monthly")}
           disabled={busy || web.busy || topup.busy}
         />
       )}
       {topup.product && (
         <Action
           label={`Buy ${creditQuantity("topup")} credits · ${topup.product.priceString}`}
-          onPress={() => void topup.purchase()}
+          onPress={() => checkout("native_topup")}
           disabled={busy || web.busy || topup.busy}
         />
       )}
@@ -197,7 +223,7 @@ export function PaymentGate({
         <Action
           label="Buy top-up on website"
           disabled={busy || web.busy || topup.busy}
-          onPress={() => void web.open("topup")}
+          onPress={() => checkout("website_topup")}
         />
       )}
       {!!topup.message && (
