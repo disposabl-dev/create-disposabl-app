@@ -151,6 +151,7 @@ try {
     window.adapter.action("copy_setup");
     window.adapter.action("open_setup");
     window.adapter.action("SECRET_PROMPT_91");
+    window.adapter.action(null);
   });
   await page.waitForTimeout(250);
   // Rapid route changes while the actual adapter remains recording-disabled.

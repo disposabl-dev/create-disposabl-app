@@ -161,6 +161,7 @@ test("web bootstraps, strips URL and stops immediately on opt-out", async () => 
   window.clickTarget(
     new TestElement(undefined, new TestElement("SECRET_PROMPT_91")),
   );
+  window.clickTarget(new TestElement(undefined));
   expect(
     events
       .filter((event) => event.event === "product_action")

@@ -156,7 +156,7 @@ export function createWebTelemetryAdapter(options: {
     stop: controller.stop,
     page: () => capture?.(),
     error: () => sdk?.capture("$exception"),
-    action: (action: string) => {
+    action: (action: unknown) => {
       if (isProductAction(action)) sdk?.capture("product_action", { action });
     },
   };
@@ -214,7 +214,7 @@ export function ProductTelemetry({
       const action = target
         .closest("[data-telemetry-action]")
         ?.getAttribute("data-telemetry-action");
-      if (isProductAction(action)) adapter.action(action);
+      adapter.action(action);
     };
     window.addEventListener(preferenceEvent, update);
     window.addEventListener("storage", update);
