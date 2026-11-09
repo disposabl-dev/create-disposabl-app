@@ -12,6 +12,11 @@ import appCss from "../index.css?url";
 import { TelemetryOverrideContext } from "@disposabl/disposabl-kit/client/lib/telemetry";
 import { AnalyticsPreference, ProductTelemetry } from "../telemetry";
 import { publicReplayPath } from "../telemetry-replay";
+import { useSyncExternalStore } from "react";
+
+const subscribeHydration = () => () => {};
+const clientSnapshot = () => true;
+const serverSnapshot = () => false;
 
 export const Route = createRootRoute({
   head: ({ matches }) => {
@@ -103,13 +108,20 @@ function RootDocument({ children }: { children: React.ReactNode }) {
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   });
+  const hydrated = useSyncExternalStore(
+    subscribeHydration,
+    clientSnapshot,
+    serverSnapshot,
+  );
   return (
     <html lang="en" data-type="software" suppressHydrationWarning>
       <head>
         <HeadContent />
       </head>
       <body
-        data-replay-public={publicReplayPath(pathname) ? "true" : undefined}
+        data-replay-public={
+          hydrated && publicReplayPath(pathname) ? "true" : undefined
+        }
       >
         <TelemetryOverrideContext.Provider value={ProductTelemetry}>
           {children}
