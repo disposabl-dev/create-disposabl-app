@@ -50,11 +50,6 @@ export function createTelemetryLeaseController(options: {
   transport: typeof fetch;
   adapter: Adapter;
   now?: () => number;
-  anonymousStorage?: {
-    read: () => string | null;
-    write: (id: string) => void;
-    clear: () => void;
-  };
 }) {
   const now = options.now ?? Date.now;
   let generation = 0;
@@ -62,22 +57,11 @@ export function createTelemetryLeaseController(options: {
   let failures = 0;
   let token: string | null = null;
   let anonymousId: string | undefined;
-  let storageLoaded = false;
   let controller: AbortController | undefined;
   let refresh: ReturnType<typeof setTimeout> | undefined;
   let expiry: ReturnType<typeof setTimeout> | undefined;
   let active = false;
   let activeLease: TelemetryLease | undefined;
-
-  function clearAnonymous() {
-    anonymousId = undefined;
-    storageLoaded = true;
-    try {
-      options.anonymousStorage?.clear();
-    } catch {
-      // Storage is optional; capture must not depend on it.
-    }
-  }
 
   function halt() {
     generation++;
@@ -130,7 +114,7 @@ export function createTelemetryLeaseController(options: {
         },
       );
       if (epoch !== generation) return;
-      if (response.status === 401) clearAnonymous();
+      if (response.status === 401) anonymousId = undefined;
       retryable = response.status === 429 || response.status >= 500;
       if (!response.ok || response.status !== 200)
         throw new Error("bootstrap unavailable");
@@ -165,7 +149,11 @@ export function createTelemetryLeaseController(options: {
       if (unchanged && options.adapter.renew) {
         options.adapter.renew(bounded);
       } else {
-        if (active) options.adapter.stop();
+        if (active) {
+          active = false;
+          options.adapter.stop();
+          if (epoch !== generation) return;
+        }
         active = true;
         options.adapter.start(bounded);
       }
@@ -173,12 +161,6 @@ export function createTelemetryLeaseController(options: {
       failures = 0;
       activeLease = bounded;
       anonymousId = lease.anonymousId;
-      try {
-        if (token || lease.identified) options.anonymousStorage?.clear();
-        else options.anonymousStorage?.write(lease.anonymousId);
-      } catch {
-        // Keep the in-memory capability if storage is unavailable.
-      }
       clearTimeout(refresh);
       clearTimeout(expiry);
       expiry = setTimeout(() => recover(true), remaining);
@@ -196,15 +178,6 @@ export function createTelemetryLeaseController(options: {
   return {
     update(input: { enabled: boolean; token: string | null }) {
       enabled = input.enabled && (!input.token || !!sessionId(input.token));
-      if (enabled && !storageLoaded) {
-        storageLoaded = true;
-        try {
-          const saved = options.anonymousStorage?.read();
-          if (saved && uuid.test(saved)) anonymousId = saved;
-        } catch {
-          // Start with a fresh capability when storage is unavailable.
-        }
-      }
       const changed = token !== input.token;
       const sameSession =
         token === input.token ||
@@ -225,7 +198,7 @@ export function createTelemetryLeaseController(options: {
           token !== null &&
           sessionId(token) !== sessionId(input.token))
       )
-        clearAnonymous();
+        anonymousId = undefined;
       token = input.token;
       if (enabled) void acquire(generation);
     },

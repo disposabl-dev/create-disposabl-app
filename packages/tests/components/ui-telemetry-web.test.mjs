@@ -38,14 +38,6 @@ Object.defineProperty(globalThis, "navigator", {
   configurable: true,
 });
 const values = new Map();
-const sessionValues = new Map();
-const sessionWrite = mock((key, value) => sessionValues.set(key, value));
-const sessionClear = mock((key) => sessionValues.delete(key));
-globalThis.sessionStorage = {
-  getItem: (key) => sessionValues.get(key) ?? null,
-  setItem: sessionWrite,
-  removeItem: sessionClear,
-};
 globalThis.localStorage = {
   getItem: (key) => values.get(key) ?? null,
   setItem: (key, value) => values.set(key, value),
@@ -128,37 +120,8 @@ test("web E2E never initializes or contacts bootstrap", async () => {
   });
   expect(initialized).toBe(0);
   expect(requests).toHaveBeenCalledTimes(0);
-  expect(sessionValues.size).toBe(0);
-  expect(sessionWrite).not.toHaveBeenCalled();
-  expect(sessionClear).not.toHaveBeenCalled();
   window.clickTarget(new TestElement(undefined, new TestElement("copy_setup")));
   expect(events).toHaveLength(0);
-});
-
-test("auth loading preserves anonymous capability, but a cross-tab opt-out clears it", async () => {
-  process.env.VITE_E2E = "false";
-  values.clear();
-  sessionValues.set(
-    "disposabl.product.analytics.anonymous.v1",
-    "00000000-0000-4000-8000-000000000001",
-  );
-  await act(async () => {
-    renderer = create(
-      createElement(ProductTelemetry, {
-        pathname: "/",
-        token: null,
-        ready: false,
-      }),
-    );
-  });
-  expect(sessionValues.size).toBe(1);
-  expect(requests).toHaveBeenCalledTimes(0);
-  values.set("disposabl.product.analytics.optout.v1", "1");
-  await act(async () => window.dispatchEvent(new Event("storage")));
-  expect(sessionValues.size).toBe(0);
-  values.clear();
-  sessionWrite.mockClear();
-  sessionClear.mockClear();
 });
 
 test("Do Not Track prevents web bootstrap and SDK initialization", async () => {
@@ -175,7 +138,6 @@ test("Do Not Track prevents web bootstrap and SDK initialization", async () => {
   });
   expect(initialized).toBe(0);
   expect(requests).toHaveBeenCalledTimes(0);
-  expect(sessionValues.size).toBe(0);
   navigator.doNotTrack = "0";
 });
 
@@ -196,9 +158,6 @@ test("web bootstraps, strips URL and stops immediately on opt-out", async () => 
     );
   });
   expect(initialized).toBe(1);
-  expect(sessionValues.get("disposabl.product.analytics.anonymous.v1")).toBe(
-    "00000000-0000-4000-8000-000000000001",
-  );
   expect(validReceivers).toBe(1);
   expect(events[0].properties).toEqual({
     token: "test",
@@ -247,7 +206,6 @@ test("web bootstraps, strips URL and stops immediately on opt-out", async () => 
     renderer.root.findByType("button").props.onClick();
   });
   expect(stops).toHaveBeenCalled();
-  expect(sessionValues.size).toBe(0);
   window.clickTarget(new TestElement(undefined, new TestElement("copy_setup")));
   expect(
     events.filter((event) => event.event === "product_action"),

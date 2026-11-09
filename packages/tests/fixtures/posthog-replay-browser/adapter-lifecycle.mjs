@@ -112,54 +112,157 @@ try {
     return route.abort();
   });
   await page.goto("https://fixture.invalid/");
-  async function mount() {
-    if (mode === "desktop")
-      await page.evaluate(() => {
-        window.disposablDesktop = { authentication: true };
-      });
-    await page.addScriptTag({ content: await bundle.outputs[0].text() });
-    await page.evaluate(() => {
-      window.fixtureAllowed = true;
-      window.adapter = window.createWebTelemetryAdapter({
-        origin: "https://fixture.invalid",
-        transport: (...args) => {
-          window.fixtureAttempts = (window.fixtureAttempts || 0) + 1;
-          return fetch(...args)
-            .then(async (response) => {
-              window.fixtureStatus = response.status;
-              window.fixtureReply = await response.clone().json();
-              return response;
-            })
-            .catch((error) => {
-              window.fixtureTransportError = error.message;
-              throw error;
-            });
-        },
-        page: () => location.pathname,
-        allowed: () => window.fixtureAllowed,
-        source: window.productTelemetrySource(),
-      });
-      window.adapter.update({ enabled: true, token: null });
-    });
-  }
-  await mount();
-  await page.waitForTimeout(500);
-  assert.equal(
-    await page.evaluate(() =>
-      sessionStorage.getItem("disposabl.product.analytics.anonymous.v1"),
-    ),
-    "00000000-0000-4000-8000-000000000001",
+  const storageKey = "disposabl.product.analytics.anonymous.v1";
+  const oldId = "00000000-0000-4000-8000-000000000001";
+  await page.evaluate(
+    ([key, value]) => sessionStorage.setItem(key, value),
+    [storageKey, oldId],
   );
-  await page.evaluate(() => window.adapter.stop());
-  await page.reload();
-  await mount();
-  await page.waitForTimeout(500);
-  assert.deepEqual(JSON.parse(bootstrapBodies[0]), {});
-  assert.deepEqual(JSON.parse(bootstrapBodies[1]), {
-    anonymousId: "00000000-0000-4000-8000-000000000001",
+  const popupPending = page.waitForEvent("popup");
+  await page.evaluate(() => window.open("https://fixture.invalid/", "_blank"));
+  const popup = await popupPending;
+  await popup.waitForLoadState("domcontentloaded");
+  assert.equal(
+    await popup.evaluate((key) => sessionStorage.getItem(key), storageKey),
+    oldId,
+    "browser did not clone opener sessionStorage",
+  );
+  await popup.evaluate((key) => {
+    Object.defineProperty(navigator, "webdriver", { get: () => false });
+    Object.defineProperty(navigator, "userAgentData", {
+      get: () => ({ brands: [{ brand: "Chromium", version: "130" }] }),
+    });
+    const get = Storage.prototype.getItem;
+    const remove = Storage.prototype.removeItem;
+    window.fixtureStorageReads = 0;
+    window.fixtureStorageClears = 0;
+    Storage.prototype.getItem = function (name) {
+      if (name === key) window.fixtureStorageReads++;
+      return get.call(this, name);
+    };
+    Storage.prototype.removeItem = function (name) {
+      if (name === key) {
+        window.fixtureStorageClears++;
+        throw new Error("storage denied");
+      }
+      return remove.call(this, name);
+    };
+    try {
+      sessionStorage.removeItem(key);
+      throw new Error("fixture expected storage denial");
+    } catch (error) {
+      if (error.message !== "storage denied") throw error;
+    }
+    window.fixtureStorageClears = 0;
+  }, storageKey);
+  await popup.addScriptTag({ content: await bundle.outputs[0].text() });
+  await popup.evaluate((source) => {
+    const make = () =>
+      window.createWebTelemetryAdapter({
+        origin: "https://fixture.invalid",
+        transport: fetch.bind(window),
+        page: () => location.pathname,
+        allowed: () => true,
+        source,
+      });
+    window.fixtureMake = make;
+    window.fixtureAdapter = make();
+    window.fixtureAdapter.update({ enabled: true, token: null });
+  }, mode);
+  await popup.waitForTimeout(400);
+  await popup.evaluate(() => {
+    window.fixtureAdapter.update({ enabled: false, token: null });
+    window.fixtureAdapter.stop();
+    window.fixtureAdapter = window.fixtureMake();
+    window.fixtureAdapter.update({ enabled: true, token: null });
   });
+  await popup.waitForTimeout(400);
+  assert.deepEqual(
+    bootstrapBodies.map(JSON.parse),
+    [{}, {}],
+    "cloned or revoked storage capability was reused",
+  );
+  assert.deepEqual(
+    await popup.evaluate(() => [
+      window.fixtureStorageReads,
+      window.fixtureStorageClears,
+    ]),
+    [0, 0],
+  );
+  await popup.evaluate(() => window.fixtureAdapter.stop());
+  await popup.reload();
+  await popup.evaluate(() => {
+    Object.defineProperty(navigator, "webdriver", { get: () => false });
+    Object.defineProperty(navigator, "userAgentData", {
+      get: () => ({ brands: [{ brand: "Chromium", version: "130" }] }),
+    });
+  });
+  assert.equal(
+    await popup.evaluate((key) => sessionStorage.getItem(key), storageKey),
+    oldId,
+  );
+  await popup.addScriptTag({ content: await bundle.outputs[0].text() });
+  await popup.evaluate((source) => {
+    window.fixtureAdapter = window.createWebTelemetryAdapter({
+      origin: "https://fixture.invalid",
+      transport: fetch.bind(window),
+      page: () => location.pathname,
+      allowed: () => true,
+      source,
+    });
+    window.fixtureAdapter.update({ enabled: true, token: null });
+  }, mode);
+  await popup.waitForTimeout(400);
+  assert.deepEqual(
+    bootstrapBodies.map(JSON.parse),
+    [{}, {}, {}],
+    "reload reused revoked capability",
+  );
+  await popup.evaluate(() => window.fixtureAdapter.stop());
+  await popup.close();
+  requests.length = 0;
+  bootstrapBodies.length = 0;
+  bootstrapCount = 0;
+  if (mode === "desktop")
+    await page.evaluate(() => {
+      window.disposablDesktop = { authentication: true };
+    });
+  await page.addScriptTag({ content: await bundle.outputs[0].text() });
+  await page.evaluate(() => {
+    window.fixtureAllowed = true;
+    window.adapter = window.createWebTelemetryAdapter({
+      origin: "https://fixture.invalid",
+      transport: (...args) => {
+        window.fixtureAttempts = (window.fixtureAttempts || 0) + 1;
+        return fetch(...args)
+          .then(async (response) => {
+            window.fixtureStatus = response.status;
+            window.fixtureReply = await response.clone().json();
+            return response;
+          })
+          .catch((error) => {
+            window.fixtureTransportError = error.message;
+            throw error;
+          });
+      },
+      page: () => location.pathname,
+      allowed: () => window.fixtureAllowed,
+      source: window.productTelemetrySource(),
+    });
+    window.adapter.update({ enabled: true, token: null });
+  });
+  await page.waitForTimeout(500);
+  assert.deepEqual(
+    JSON.parse(bootstrapBodies[0]),
+    {},
+    "stale tab storage was reused",
+  );
+  assert.equal(
+    await page.evaluate((key) => sessionStorage.getItem(key), storageKey),
+    oldId,
+  );
   const firstView = requests.length;
-  assert.equal(firstView, 2, "each page load must capture once");
+  assert.equal(firstView, 1, "initial view must capture once");
   await page.evaluate(() => {
     window.adapter.page();
     window.adapter.page();
@@ -209,19 +312,8 @@ try {
     await page.waitForTimeout(400);
   }
   await state("A");
-  assert.deepEqual(JSON.parse(bootstrapBodies.at(-1)), {
-    anonymousId: "00000000-0000-4000-8000-000000000001",
-  });
-  assert.equal(
-    await page.evaluate(() =>
-      sessionStorage.getItem("disposabl.product.analytics.anonymous.v1"),
-    ),
-    null,
-  );
   await state("B");
-  assert.deepEqual(JSON.parse(bootstrapBodies.at(-1)), {});
   await state(null);
-  assert.deepEqual(JSON.parse(bootstrapBodies.at(-1)), {});
   await page.evaluate(() => {
     window.adapter.action("copy_setup");
     window.adapter.action("open_setup");
@@ -250,12 +342,6 @@ try {
   });
   const countAtOptOut = requests.length;
   await page.waitForTimeout(400);
-  assert.equal(
-    await page.evaluate(() =>
-      sessionStorage.getItem("disposabl.product.analytics.anonymous.v1"),
-    ),
-    null,
-  );
   assert.equal(requests.length, countAtOptOut, "new capture after opt-out");
   const beforeReenable = requests.length;
   await page.evaluate(() => {
@@ -263,7 +349,6 @@ try {
     window.adapter.update({ enabled: true, token: null });
   });
   await page.waitForTimeout(400);
-  assert.deepEqual(JSON.parse(bootstrapBodies.at(-1)), {});
   await page.evaluate(() => window.adapter.action("open_connections"));
   await page.waitForTimeout(400);
   assert.ok(
