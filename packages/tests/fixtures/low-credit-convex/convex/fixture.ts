@@ -433,6 +433,7 @@ import { enqueueMessageHandler } from "../../../../backend/convex/agent/internal
 import {
   readThread,
   patchThread,
+  assertSessionRebind,
 } from "../../../../backend/convex/agent/threads";
 import { stopping, stopped } from "../../../../backend/convex/agent/compute";
 
@@ -556,6 +557,21 @@ export const manualGuard = mutation({
           }
         : undefined,
     });
+  },
+});
+// Direct guard coverage avoids admission rejecting processing before rebind runs.
+export const manualRebind = query({
+  args: { appId: v.string() },
+  handler: async (ctx, args) => {
+    const app = await ctx.db
+      .query("apps")
+      .withIndex("by_appId", (q) => q.eq("appId", args.appId))
+      .unique();
+    const thread = readThread(app as any);
+    if (!thread?.computeSessionId)
+      throw new Error("Expected paid fixture thread");
+    assertSessionRebind(thread, undefined);
+    return null;
   },
 });
 export const manualMessages = query({

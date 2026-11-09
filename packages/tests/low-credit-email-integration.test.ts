@@ -429,12 +429,18 @@ test(
       assert.equal(Boolean(guarded.delivery), kind === "delivery");
       assert.equal(guarded.stopUnconfirmed, undefined);
       await assertRejectedMessage(f, error);
+      // Enqueue can reject at admission first; exercise the rebind guard separately.
+      await assert.rejects(
+        call("manualRebind", { appId: f.appId }, true),
+        error,
+      );
     }
     await call("manualGuard", {
       appId: f.appId,
       userId: f.userId,
       kind: "clear",
     });
+    assert.equal(await call("manualRebind", { appId: f.appId }, true), null);
     const oldCount = (
       await call("debitRequests", { sessionId: f.oldSession }, true)
     ).length;
