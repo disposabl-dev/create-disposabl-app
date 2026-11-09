@@ -2,6 +2,8 @@
 import {
   mutationGeneric as mutation,
   queryGeneric as query,
+  internalMutationGeneric as internalMutation,
+  internalQueryGeneric as internalQuery,
 } from "convex/server";
 import { v } from "convex/values";
 import {
@@ -25,6 +27,86 @@ export const user = mutation({
   args: { label: v.string() },
   returns: v.id("users"),
   handler: (ctx, a) => ctx.db.insert("users", a),
+});
+export const deleteUser = mutation({
+  args: { id: v.id("users") },
+  returns: v.null(),
+  handler: async (ctx, { id }) => {
+    await ctx.db.delete("users", id);
+    return null;
+  },
+});
+export const controlCreate = mutation({
+  args: { balanceId: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await ctx.db.insert("workerControls", {
+      ...args,
+      enabled: false,
+      released: false,
+      arrived: 0,
+      finished: 0,
+      providerCalls: 0,
+      claimAttempts: 0,
+    });
+    return null;
+  },
+});
+export const controlSet = mutation({
+  args: { balanceId: v.string(), enabled: v.boolean(), released: v.boolean() },
+  returns: v.null(),
+  handler: async (ctx, { balanceId, ...changes }) => {
+    const row = await ctx.db
+      .query("workerControls")
+      .withIndex("by_balanceId", (q) => q.eq("balanceId", balanceId))
+      .unique();
+    if (!row) throw new Error("Missing control");
+    await ctx.db.patch("workerControls", row._id, changes);
+    return null;
+  },
+});
+export const controlInternal = internalQuery({
+  args: { balanceId: v.string() },
+  returns: v.any(),
+  handler: (ctx, { balanceId }) =>
+    ctx.db
+      .query("workerControls")
+      .withIndex("by_balanceId", (q) => q.eq("balanceId", balanceId))
+      .unique(),
+});
+export const controlState = query({
+  args: { balanceId: v.string() },
+  returns: v.any(),
+  handler: (ctx, { balanceId }) =>
+    ctx.db
+      .query("workerControls")
+      .withIndex("by_balanceId", (q) => q.eq("balanceId", balanceId))
+      .unique(),
+});
+export const markInternal = internalMutation({
+  args: {
+    balanceId: v.string(),
+    field: v.union(
+      v.literal("arrived"),
+      v.literal("finished"),
+      v.literal("providerCalls"),
+      v.literal("claimAttempts"),
+    ),
+    customer: v.optional(v.string()),
+  },
+  returns: v.null(),
+  handler: async (ctx, { balanceId, field, customer }) => {
+    const row = await ctx.db
+      .query("workerControls")
+      .withIndex("by_balanceId", (q) => q.eq("balanceId", balanceId))
+      .unique();
+    if (!row) throw new Error("Missing control");
+    await ctx.db.patch("workerControls", row._id, {
+      [field]: row[field] + 1,
+      ...(customer ? { providerCustomer: customer } : {}),
+    });
+    return null;
+  },
 });
 export const deliver = mutation({
   args: { event: v.object(purchaseEventFields), balanceId: v.string() },

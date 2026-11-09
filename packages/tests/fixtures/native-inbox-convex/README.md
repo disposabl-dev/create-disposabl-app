@@ -1,5 +1,11 @@
 # Native inbox transaction fixture
 
-Disposable local Convex only. This fixture reuses the production inbox handlers and validators with a minimal users table. Its scheduled `revenuecat:dispatch` is inert: it never calls Autumn, RevenueCat, or a store. Tests manually claim and reconcile operations to model worker crashes and provider outcomes. This proves local Convex transactional behavior, not provider delivery, a store purchase, scheduling guarantees, or exactly-once provider writes.
+This disposable local Convex fixture exercises production inbox handlers. For the worker tests it enables payments in a temporary copy of `disposabl.json`, supplies synthetic route settings on the disposable backend, and invokes the production dispatch handler through a test-only barrier. Its fetch adapter records the synthetic request and returns success without calling a provider. Other scheduled dispatches remain inert. These tests do not prove provider behavior or exactly-once writes.
 
-Check ports 3490 and 3491 are free. From this directory, start `CONVEX_AGENT_MODE=anonymous E2E_TELEMETRY_DISABLED=1 DO_NOT_TRACK=1 bunx convex dev --local-cloud-port 3490 --local-site-port 3491 --typecheck disable --codegen disable`. From the repository root run `NATIVE_INBOX_FIXTURE_URL=http://127.0.0.1:3490 E2E_TELEMETRY_DISABLED=1 DO_NOT_TRACK=1 bun test packages/tests/native-inbox-transactions.test.ts`. Stop the process after testing. Use a fresh isolated anonymous deployment; never point this fixture at shared or cloud data. The test rejects other URLs. These fixture files and test must be excluded from generated starters by the integrator.
+Run from the repository root on macOS:
+
+```sh
+/usr/bin/sandbox-exec -p '(version 1)(allow default)(deny network-outbound)(allow network-outbound (remote ip "localhost:*"))(allow network-outbound (remote unix-socket))' env E2E_TELEMETRY_DISABLED=1 DO_NOT_TRACK=1 python3 packages/tests/fixtures/native-inbox-convex/run.py
+```
+
+The runner checks outbound denial, verifies that installed Convex Auth matches the selected archive, checks that ports 3490 and 3491 are free, and creates a fresh isolated backend and source copy. It stops its own backend, removes the disposable files, and verifies the ports are free. It never uses a shared or cloud backend. The handler tests order the hold or customer deletion after scheduled worker arrival and before its claim; this is a forced sequence, not an OCC overlap test. The existing simultaneous review and purchase tests exercise concurrent transactions. These fixture files and the transaction test must remain excluded from generated starters.

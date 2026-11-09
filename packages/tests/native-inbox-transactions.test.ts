@@ -50,6 +50,72 @@ const scope = (e: PurchaseEvent, id: string) => ({
 const state = (id: string) => call("state", { balanceId: id }, true);
 const evidence = "fixture provider record";
 
+async function awaitControl(
+  balanceId: string,
+  predicate: (row: any) => boolean,
+) {
+  for (let i = 0; i < 200; i++) {
+    const row = await call("controlState", { balanceId }, true);
+    if (predicate(row)) return row;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  throw new Error("Timed out waiting for fixture worker");
+}
+
+for (const scenario of ["new hold", "deleted customer", "success"] as const) {
+  test(
+    `scheduled production worker: ${scenario} before claim`,
+    { skip: !url },
+    async () => {
+      const [alice, bob] = await Promise.all([user(), user()]);
+      const purchase = event(alice),
+        id = await balanceId(purchase);
+      await call("controlCreate", { balanceId: id });
+      await deliver(purchase);
+      await awaitControl(id, (row) => row.finished === 1);
+      assert.equal((await state(id)).purchase.state, "queued");
+      await call("controlSet", {
+        balanceId: id,
+        enabled: true,
+        released: false,
+      });
+      assert.equal(
+        await call("retryQueued", { ...scope(purchase, id), customer: alice }),
+        true,
+      );
+      await awaitControl(id, (row) => row.arrived === 1);
+      if (scenario === "new hold") {
+        await call("transfer", {
+          project: purchase.project,
+          app: purchase.app,
+          environment: purchase.environment,
+          deliveryId: randomUUID(),
+          from: [alice],
+          to: [bob],
+        });
+      } else if (scenario === "deleted customer") {
+        await call("deleteUser", { id: alice });
+      }
+      await call("controlSet", {
+        balanceId: id,
+        enabled: true,
+        released: true,
+      });
+      const done = await awaitControl(id, (row) => row.finished === 2);
+      assert.equal(done.claimAttempts, 1);
+      assert.equal(done.providerCalls, scenario === "success" ? 1 : 0);
+      assert.equal(
+        done.providerCustomer,
+        scenario === "success" ? alice : undefined,
+      );
+      assert.equal(
+        (await state(id)).purchase.state,
+        scenario === "success" ? "granted" : "queued",
+      );
+    },
+  );
+}
+
 test(
   "concurrent transfer reviews retain all holds and reject stale decisions",
   { skip: !url },
