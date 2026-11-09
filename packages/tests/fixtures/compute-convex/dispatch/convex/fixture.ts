@@ -6,6 +6,7 @@ import {
 } from "convex/server";
 import { v } from "convex/values";
 import { fund as productFund } from "./agent/actions/productCompute";
+import { admitSession } from "@PRODUCT@/agent/compute";
 export const seed = mutation({
   args: {
     outcome: v.union(
@@ -131,6 +132,55 @@ export const outcome = query({
 export const timeout = mutation({
   args: { debitId: v.id("computeDebits") },
   handler: (ctx, args) => ctx.runMutation(anyApi.agent.compute.uncertain, args),
+});
+// This is an explicit synthetic archived result, not a Boat observation.
+export const simulateArchivedDrain = mutation({
+  args: { sessionId: v.id("computeSessions") },
+  handler: async (ctx, { sessionId }) => {
+    const app = await ctx.db
+      .query("apps")
+      .withIndex("by_computeSessionId_status", (q) =>
+        q
+          .eq("agent.computeSessionId", sessionId)
+          .eq("agent.status", "processing"),
+      )
+      .first();
+    if (!app?.agent) throw new Error("Expected fixture work");
+    await ctx.db.patch(app._id, { agent: { ...app.agent, status: "idle" } });
+    const token = "synthetic-archived-stop";
+    if (
+      !(await ctx.runMutation(anyApi.agent.compute.stopping, {
+        sessionId,
+        token,
+      }))
+    )
+      throw new Error("Stop lease unavailable");
+    await ctx.runMutation(anyApi.agent.compute.stopped, {
+      sessionId,
+      token,
+      archived: true,
+    });
+  },
+});
+// Model a new user message's admission; this is not a UI or provider call.
+export const simulateFreshMessage = mutation({
+  args: { userId: v.string() },
+  handler: async (ctx, { userId }) => {
+    const sessionId = await admitSession(ctx as any, userId, true);
+    const app = await ctx.db
+      .query("apps")
+      .withIndex("by_appId", (q) => q.eq("appId", userId))
+      .first();
+    if (!app?.agent || !sessionId) throw new Error("Expected fixture app");
+    await ctx.db.patch(app._id, {
+      agent: {
+        ...app.agent,
+        status: "processing",
+        computeSessionId: sessionId,
+      },
+    });
+    return sessionId;
+  },
 });
 export const markNotice = mutation({
   args: { debitId: v.id("computeDebits") },

@@ -1,7 +1,13 @@
 import { internalMutationGeneric as mutation } from "convex/server";
 import { v } from "convex/values";
 import { claimWindow } from "@PRODUCT@/agent/compute";
-export { get, settle, uncertain } from "@PRODUCT@/agent/compute";
+export {
+  get,
+  settle,
+  uncertain,
+  stopping,
+  stopped,
+} from "@PRODUCT@/agent/compute";
 // Product claim logic, explicitly paid only in this isolated fixture.
 export const claim = mutation({
   args: {

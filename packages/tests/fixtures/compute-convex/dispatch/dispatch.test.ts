@@ -95,6 +95,24 @@ test(
     after = await q("inspect", { userId, sessionId });
     assert.equal(after.calls, 2);
     assert.notEqual(after.session.state, "active");
+    await assert.rejects(m("simulateFreshMessage", { userId }));
+    await m("simulateArchivedDrain", { sessionId });
+    assert.equal(
+      (await q("inspect", { userId, sessionId })).session.state,
+      "stopped",
+    );
+    assert.equal((await q("inspect", { userId, sessionId })).calls, 2);
+    await m("setOutcome", { userId, outcome: "confirmed" });
+    const newSessionId = await m("simulateFreshMessage", { userId });
+    assert.notEqual(newSessionId, sessionId);
+    assert.equal(
+      (await q("inspect", { userId, sessionId: newSessionId })).calls,
+      2,
+    );
+    await a("fund", { sessionId: newSessionId });
+    const resumed = await q("inspect", { userId, sessionId: newSessionId });
+    assert.equal(resumed.calls, 3);
+    assert.equal(resumed.session.state, "active");
   },
 );
 
