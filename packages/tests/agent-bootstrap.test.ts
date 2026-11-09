@@ -35,6 +35,17 @@ test("sandbox bootstrap privately installs the owning app's session without a to
         grants.push(args);
         return Date.now() + 14_400_000;
       },
+      runQuery: async (_ref: unknown, args: any) => {
+        const grant = grants.find((item) => item.hash === args.hash);
+        assert.equal(args.worker.token, "lease");
+        return (
+          grant && {
+            userId: grant.userId,
+            appId: grant.appId,
+            threadId: grant.id,
+          }
+        );
+      },
     } as any;
     for (const appId of ["app-a", "app-b"])
       await authorizeSandbox(
@@ -138,5 +149,5 @@ test("paid credential lifecycle uses the real issuance and access handlers", asy
     },
   );
   assert.equal(result.status, 0, result.stdout + result.stderr);
-  assert.match(result.stdout + result.stderr, /4 pass/);
+  assert.match(result.stdout + result.stderr, /7 pass/);
 });
