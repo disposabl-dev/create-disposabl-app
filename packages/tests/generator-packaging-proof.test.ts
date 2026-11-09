@@ -222,7 +222,10 @@ test("packaged starter and generated profiles exclude product proof fixtures", a
         join(root, ".github/workflows/pipeline.yml"),
         "utf8",
       );
-      assert.doesNotMatch(workflow, /android-play|play-bundle\.sh/);
+      assert.doesNotMatch(
+        workflow,
+        /android-play|play-bundle\.sh|product-checks/,
+      );
       const easPath = join(root, "apps/mobile/eas.json");
       if (existsSync(easPath)) {
         const eas = JSON.parse(await readFile(easPath, "utf8"));
