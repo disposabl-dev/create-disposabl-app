@@ -41,3 +41,18 @@ test("account changes fence billing and attachment cleanup", () => {
   );
   assert.equal(result.status, 0, result.stdout + result.stderr);
 });
+
+test("conversation menu keeps settings without a preview launcher", () => {
+  const result = spawnSync(
+    process.execPath,
+    [
+      "test",
+      join(
+        import.meta.dirname,
+        "fixtures/compute-convex/mobile-conversation-header.test.mjs",
+      ),
+    ],
+    { encoding: "utf8" },
+  );
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+});

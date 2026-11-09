@@ -2,14 +2,7 @@ import { VariableContextProvider } from "nativewind";
 import { MenuView } from "../../../../../packages/disposabl-kit/mobile/design/nativewind";
 import { useQuery } from "convex/react";
 import { Stack, useRouter } from "expo-router";
-import {
-  Alert,
-  Linking,
-  Pressable,
-  Text,
-  View,
-  useWindowDimensions,
-} from "react-native";
+import { Pressable, Text, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api } from "../../../../../packages/backend/convex/_generated/api";
 import { Icon } from "../studio/ui";
@@ -25,8 +18,6 @@ export function ConversationHeader({ appId }: { appId: string }) {
     paginationOpts: { numItems: 1, cursor: null },
   });
   const preview = previews?.page[0];
-  const web = preview?.platforms.web;
-  const previewUrl = web?.latest?.status === "ready" ? web.url : undefined;
   return (
     <Stack.Screen
       options={{
@@ -87,30 +78,13 @@ export function ConversationHeader({ appId }: { appId: string }) {
               <Icon name="compose" size={23} />
             </Pressable>
             <MenuView
-              actions={[
-                {
-                  id: "settings",
-                  title: "App settings",
-                },
-                ...(previewUrl && /^https:\/\//.test(previewUrl)
-                  ? [
-                      {
-                        id: "preview",
-                        title: "Open preview",
-                      },
-                    ]
-                  : []),
-              ]}
+              actions={[{ id: "settings", title: "App settings" }]}
               onPressAction={({ nativeEvent }) => {
                 if (nativeEvent.event === "settings")
                   router.push({
                     pathname: "/apps/[appId]/details",
                     params: { appId },
                   });
-                if (nativeEvent.event === "preview" && previewUrl)
-                  void Linking.openURL(previewUrl).catch(() =>
-                    Alert.alert("Preview unavailable", "Please try again."),
-                  );
               }}
             >
               <View
