@@ -7,6 +7,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createApp } from "../create-disposabl-app/scaffold";
 import { reconfigureApp } from "../create-disposabl-app/reconfigure";
+import { mergePurchasesManifest } from "../create-disposabl-app/mobile-payments";
 import { version as generatorVersion } from "../create-disposabl-app/package.json";
 
 const template = resolve(
@@ -21,6 +22,26 @@ if (!existsSync(template)) {
 }
 const version = "test-version";
 const read = (dir: string, path: string) => readFile(join(dir, path), "utf8");
+
+test("payment manifest merge preserves the iOS build-properties dependency", () => {
+  const manifest = (payments: boolean) => ({
+    dependencies: {
+      "expo-build-properties": "~58.0.11",
+      ...(payments ? { "react-native-purchases": "10.16.0" } : {}),
+    },
+  });
+  const bytes = (value: unknown) => Buffer.from(JSON.stringify(value));
+  const off = manifest(false);
+  const on = manifest(true);
+  const custom = {
+    dependencies: { ...off.dependencies, "user-package": "1.0.0" },
+  };
+  const enabled = mergePurchasesManifest(bytes(off), bytes(on), bytes(custom));
+  assert.ok(enabled);
+  const disabled = mergePurchasesManifest(bytes(on), bytes(off), enabled);
+  assert.ok(disabled);
+  assert.deepEqual(JSON.parse(disabled.toString()), custom);
+});
 
 test(
   "code-only CLI reconfiguration preserves identity and installs both skills without setup",
