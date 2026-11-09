@@ -16,7 +16,7 @@ import urllib.request
 
 ROOT = Path(__file__).resolve().parents[4]
 BINARY = Path.home() / '.cache/convex/binaries/precompiled-2026-10-22-1447815/convex-local-backend'
-EXPECTED_AUTH = '2.0.0-beta.0-reboot.437831bd-disposabl.8'
+from selected_auth import verify_selected_auth
 
 
 # The supervisor stays alive after the command exits. Its PID pins the process
@@ -131,9 +131,8 @@ def main():
     if subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True).strip():
         raise RuntimeError('Commit the candidate before running the fixture')
     sha = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
-    auth_version = json.loads((ROOT / 'node_modules/@convex-dev/auth/package.json').read_text())['version']
-    if auth_version != EXPECTED_AUTH:
-        raise RuntimeError('Installed auth component does not match required .8')
+    auth = verify_selected_auth(ROOT)
+    print(f"verified selected auth {auth['version']} sha256 {auth['sha256']} ({auth['files']} files)", flush=True)
     stage = Path(tempfile.mkdtemp(prefix='disposabl-sdk-owned-', dir='/tmp')).resolve()
     os.chmod(stage, 0o700)
     marker = stage / 'ownership.json'

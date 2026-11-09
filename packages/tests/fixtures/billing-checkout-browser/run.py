@@ -53,9 +53,10 @@ def main():
     if subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True).strip():
         raise RuntimeError('Commit the exact fixture candidate before running')
     sha = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
-    version = json.loads((ROOT / 'node_modules/@convex-dev/auth/package.json').read_text())['version']
-    if version != '2.0.0-beta.0-reboot.437831bd-disposabl.8':
-        raise RuntimeError('Expected installed auth .8')
+    sys.path.insert(0, str(ROOT / 'packages/tests/helpers/sdk-auth'))
+    from selected_auth import verify_selected_auth
+    auth = verify_selected_auth(ROOT)
+    print(f"verified selected auth {auth['version']} sha256 {auth['sha256']} ({auth['files']} files)", flush=True)
     stage = Path(tempfile.mkdtemp(prefix='disposabl-checkout-browser-', dir='/tmp')).resolve()
     stage.chmod(0o700)
     marker = stage / 'ownership.json'

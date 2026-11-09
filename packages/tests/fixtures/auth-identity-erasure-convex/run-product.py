@@ -1,5 +1,5 @@
 """Disposable synthetic Convex product fixture. Never run on shared or cloud backends."""
-import os, pathlib, secrets, shutil, socket, subprocess, tempfile, time, urllib.request
+import os, pathlib, secrets, shutil, socket, subprocess, sys, tempfile, time, urllib.request
 for port in (3550, 3551):
     with socket.socket() as probe:
         probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -7,11 +7,15 @@ for port in (3550, 3551):
         except OSError as exc: raise RuntimeError(f'Fixture port {port} is unavailable') from exc
 here = pathlib.Path(__file__).resolve().parent
 root = here.parents[3]
+sys.path.insert(0, str(root / 'packages/tests/helpers/sdk-auth'))
+from selected_auth import verify_selected_auth
+auth = verify_selected_auth(root)
+print(f"verified selected auth {auth['version']} sha256 {auth['sha256']} ({auth['files']} files)", flush=True)
 binary = pathlib.Path.home() / '.cache/convex/binaries/precompiled-2026-10-22-1447815/convex-local-backend'
 work = pathlib.Path(tempfile.mkdtemp(prefix='disposabl-auth8-product-'))
 shutil.copytree(here / 'convex', work / 'convex')
 (work / 'authpkg').mkdir()
-subprocess.run(['tar', '-xzf', str(root / 'vendor/convex-auth-437831bd-disposabl.8.tgz'), '-C', str(work / 'authpkg'), '--strip-components=1'], check=True)
+subprocess.run(['tar', '-xzf', auth['archive'], '-C', str(work / 'authpkg'), '--strip-components=1'], check=True)
 (work / 'node_modules').symlink_to(root / 'node_modules', target_is_directory=True)
 (work / 'authpkg/node_modules').symlink_to(root / 'node_modules', target_is_directory=True)
 base = root / 'packages/tests/fixtures/auth-erasure-convex'
