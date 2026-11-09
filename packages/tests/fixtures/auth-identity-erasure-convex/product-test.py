@@ -2,12 +2,20 @@
 import concurrent.futures
 import json
 import os
+from pathlib import Path
+import subprocess
 import urllib.request
 import uuid
 
 BASE = os.environ.get("LOCAL_AUTH_FIXTURE_URL")
 if BASE != "http://127.0.0.1:3490":
     raise RuntimeError("Run only through the owned 3490/3491 fixture runner")
+ownership = Path(__file__).resolve().parents[4] / 'packages/tests/helpers/sdk-auth/ownership.ts'
+subprocess.run(['bun', '-e', '''
+const { assertOwnedSdkBackend } = await import(process.argv[1]);
+assertOwnedSdkBackend({ markerVariable: "LOCAL_AUTH_OWNERSHIP_FILE",
+  ports: [3490, 3491], claimDirectory: ".auth-erasure-claimed" });
+''', str(ownership)], check=True)
 class NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         raise RuntimeError("Fixture redirect rejected")

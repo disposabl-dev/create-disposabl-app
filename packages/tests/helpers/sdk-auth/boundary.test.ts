@@ -61,3 +61,22 @@ test("SDK ownership rejects absent, exposed, symlinked and unrelated markers", (
     else process.env.E2E_SDK_OWNERSHIP_FILE = original;
   }
 });
+
+test("auth erasure requires its own ownership marker", () => {
+  const saved = process.env.LOCAL_AUTH_OWNERSHIP_FILE;
+  try {
+    delete process.env.LOCAL_AUTH_OWNERSHIP_FILE;
+    assert.throws(
+      () =>
+        assertOwnedSdkBackend({
+          markerVariable: "LOCAL_AUTH_OWNERSHIP_FILE",
+          ports: [3490, 3491],
+          claimDirectory: ".auth-erasure-claimed",
+        }),
+      /own fresh backend/,
+    );
+  } finally {
+    if (saved === undefined) delete process.env.LOCAL_AUTH_OWNERSHIP_FILE;
+    else process.env.LOCAL_AUTH_OWNERSHIP_FILE = saved;
+  }
+});

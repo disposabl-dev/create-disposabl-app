@@ -31,8 +31,16 @@ function inspect(command: string, args: string[]) {
 }
 
 /** Local process evidence only. The launcher creates the marker before the database. */
-export function assertOwnedSdkBackend() {
-  const supplied = process.env.E2E_SDK_OWNERSHIP_FILE;
+export function assertOwnedSdkBackend({
+  markerVariable = "E2E_SDK_OWNERSHIP_FILE",
+  ports = [3530, 3531],
+  claimDirectory = ".sdk-auth-claimed",
+}: {
+  markerVariable?: string;
+  ports?: readonly [number, number];
+  claimDirectory?: string;
+} = {}) {
+  const supplied = process.env[markerVariable];
   if (!supplied || !isAbsolute(supplied)) fail();
   const marker = realpathSync(supplied);
   const directory = dirname(marker);
@@ -91,7 +99,7 @@ export function assertOwnedSdkBackend() {
     db.birthtimeMs < metadata.birthtimeMs
   )
     fail();
-  for (const port of [3530, 3531]) {
+  for (const port of ports) {
     const listener = inspect("lsof", [
       "-nP",
       "-a",
@@ -116,5 +124,5 @@ export function assertOwnedSdkBackend() {
   ]);
   if (!opened.split("\n").includes(`n${database}`)) fail();
   // No retries may silently reuse a database already mutated by an earlier run.
-  mkdirSync(join(directory, ".sdk-auth-claimed"), { mode: 0o700 });
+  mkdirSync(join(directory, claimDirectory), { mode: 0o700 });
 }

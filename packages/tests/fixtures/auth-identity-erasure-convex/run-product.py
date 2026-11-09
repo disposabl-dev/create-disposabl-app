@@ -45,6 +45,9 @@ def main():
         raise RuntimeError('Set CONVEX_LOCAL_BINARY to the cached backend')
     sha = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=checkout, text=True).strip()
     work = Path(tempfile.mkdtemp(prefix='disposabl-auth-product-', dir='/tmp'))
+    marker = work / 'ownership.json'
+    marker.write_text('{}')
+    marker.chmod(0o600)
     archive = work / 'source.tar'
     subprocess.run(['git', 'archive', '--format=tar', '--output', str(archive), sha], cwd=checkout, check=True)
     root = work / 'source'
@@ -116,6 +119,8 @@ def main():
                     time.sleep(.1)
             else:
                 raise RuntimeError('Backend readiness timeout')
+            marker.write_text(json.dumps({'version': 1, 'launcherPid': os.getpid(),
+                                          'backendPid': proc.pid, 'database': str(work / 'db.sqlite3')}))
             body = json.dumps({'changes': [{'name': 'E2E_TELEMETRY_DISABLED', 'value': '1'}, {'name': 'BOAT_API_KEY', 'value': ''}]}).encode()
             req = urllib.request.Request(f'http://127.0.0.1:{PORT}/api/update_environment_variables', data=body, headers={'Content-Type': 'application/json', 'Authorization': 'Convex ' + key}, method='POST')
             with urllib.request.urlopen(req, timeout=10) as response:
@@ -128,6 +133,7 @@ def main():
                     raise RuntimeError('Fixture sync failed; inspect sync.log')
             testenv = {k: v for k, v in env.items() if not k.startswith('CONVEX_SELF_HOSTED_')}
             testenv['LOCAL_AUTH_FIXTURE_URL'] = f'http://127.0.0.1:{PORT}'
+            testenv['LOCAL_AUTH_OWNERSHIP_FILE'] = str(marker)
             with owner.owned_backend([sys.executable, str(here / 'product-test.py')], process_group=True, stop_timeout=1, cwd=project, env=testenv, stdout=tests, stderr=subprocess.STDOUT) as child:
                 if child.wait():
                     raise RuntimeError('Fixture test failed; inspect tests.log')
