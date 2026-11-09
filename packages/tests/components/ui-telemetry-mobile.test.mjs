@@ -96,6 +96,9 @@ test("concurrent preference consumers share one read and opt-out cannot be overw
   expect(readPreference).toHaveBeenCalledTimes(1);
   expect(initialized).toBe(0);
   expect(requests).toHaveBeenCalledTimes(0);
+  captureProductAction("agent_send_attempt");
+  captureProductAction("agent_stop_attempt");
+  expect(events).toHaveLength(0);
   await act(async () => finishRead(null));
   await act(async () => {
     renderer.root.findByType("PreferenceRow").props.onPress();
@@ -156,22 +159,31 @@ test("production waits for bootstrap, sanitizes screen and stops on local opt-ou
   });
   captureProductAction("open_create");
   expect(events[1].properties.action).toBe("open_create");
-  for (const action of ["open_connections", "open_app", "open_settings"])
+  for (const action of [
+    "open_connections",
+    "open_app",
+    "open_settings",
+    "agent_send_attempt",
+    "agent_stop_attempt",
+  ])
     captureProductAction(action);
   expect(events.slice(1).map((event) => event.properties.action)).toEqual([
     "open_create",
     "open_connections",
     "open_app",
     "open_settings",
+    "agent_send_attempt",
+    "agent_stop_attempt",
   ]);
   captureProductAction("private-app-id");
-  expect(events).toHaveLength(5);
+  expect(events).toHaveLength(7);
   expect(JSON.stringify(events)).not.toContain("private-id");
   const now = Date.now;
   Date.now = () => now() + 31_000;
-  captureProductAction("open_app");
+  captureProductAction("agent_send_attempt");
+  captureProductAction("agent_stop_attempt");
   Date.now = now;
-  expect(events).toHaveLength(5);
+  expect(events).toHaveLength(7);
   await act(async () => {
     renderer.update(
       createElement(
@@ -187,15 +199,16 @@ test("production waits for bootstrap, sanitizes screen and stops on local opt-ou
     );
   });
   captureProductAction("open_settings");
-  expect(events).toHaveLength(5);
+  expect(events).toHaveLength(7);
   await act(async () => {
     renderer.root.findByType("PreferenceRow").props.onPress();
     await Promise.resolve();
   });
   expect(saved).toBe("1");
   expect(stops).toHaveBeenCalled();
-  captureProductAction("open_create");
-  expect(events).toHaveLength(5);
+  captureProductAction("agent_send_attempt");
+  captureProductAction("agent_stop_attempt");
+  expect(events).toHaveLength(7);
 });
 
 test("a validated same-session token refresh resumes actions without recreating the SDK", async () => {

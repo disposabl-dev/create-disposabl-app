@@ -6,6 +6,7 @@ import { join } from "node:path";
 test("mobile product action handlers and lease gates", () => {
   for (const file of [
     "mobile-action-navigation.test.mjs",
+    "mobile-agent-composer.test.mjs",
     "ui-telemetry-mobile.test.mjs",
   ]) {
     const result = spawnSync(

@@ -21,9 +21,11 @@ let pending;
 let uploadPending;
 let sendPending;
 const sent = mock(() => sendPending?.promise ?? Promise.resolve({}));
+const aborted = mock(() => Promise.resolve());
+const actions = [];
 const removed = [];
 mock.module("../../../../apps/mobile/src/features/product-telemetry", () => ({
-  captureProductAction: () => {},
+  captureProductAction: (action) => actions.push(action),
 }));
 mock.module("@convex-dev/auth/react", () => ({
   useAuthToken: () => useContext(Session),
@@ -42,7 +44,7 @@ mock.module("convex/react", () => ({
       };
     return sent;
   },
-  useMutation: () => mock(),
+  useMutation: () => aborted,
   useQuery: (ref) => {
     const name = getFunctionName(ref);
     if (name.endsWith("users/index:current")) return { id: activeOwner };
@@ -70,6 +72,7 @@ mock.module("react-native", () => ({
   Platform: { OS: "ios" },
   Alert: { alert() {} },
   View: "View",
+  ActivityIndicator: "ActivityIndicator",
   Text: "Text",
   ScrollView: "ScrollView",
   KeyboardAvoidingView: "KeyboardAvoidingView",
@@ -118,7 +121,14 @@ mock.module("../../../../apps/mobile/src/features/studio/ui", () => ({
   Action: "Action",
   Label: "Label",
   Screen: "Screen",
+  Touch: "Touch",
 }));
+mock.module(
+  "../../../../packages/disposabl-kit/mobile/design/use-theme",
+  () => ({
+    useTheme: () => ({}),
+  }),
+);
 mock.module(
   "../../../../apps/mobile/src/features/studio/connection-panel",
   () => ({ ConnectionPanel: "ConnectionPanel" }),
@@ -153,12 +163,65 @@ const { ConnectionProvider } =
   await import("../../../../apps/mobile/src/features/studio/connections");
 const { AppScreen } =
   await import("../../../../apps/mobile/src/features/management/app");
+const { ManagementHome } =
+  await import("../../../../apps/mobile/src/features/management/home");
 const tree = (id, signature) =>
   createElement(
     Session.Provider,
     { value: token(id, signature) },
     createElement(ConnectionProvider, null, createElement(AppScreen)),
   );
+
+test("send and stop handlers record only fixed attempts at the action boundary", async () => {
+  activeOwner = "A";
+  pending = { promise: Promise.resolve({ balance: 10 }) };
+  sendPending = undefined;
+  actions.length = 0;
+  sent.mockClear();
+  aborted.mockClear();
+  let renderer;
+  await act(async () => {
+    renderer = create(tree("session-A"));
+  });
+  await act(async () =>
+    renderer.root.findByType("Composer").props.onSend("  "),
+  );
+  expect(actions).toEqual([]);
+  await act(async () =>
+    renderer.root.findByType("Composer").props.onSend("private prompt"),
+  );
+  expect(sent).toHaveBeenCalledTimes(1);
+  expect(actions).toEqual(["agent_send_attempt"]);
+  await act(async () => renderer.root.findByType("Composer").props.onStop());
+  expect(aborted).toHaveBeenCalledTimes(1);
+  expect(actions).toEqual(["agent_send_attempt", "agent_stop_attempt"]);
+  expect(JSON.stringify(actions)).not.toContain("private");
+  await act(async () => renderer.unmount());
+});
+
+test("new-app submission emits one attempt when it actually sends", async () => {
+  activeOwner = "A";
+  pending = { promise: Promise.resolve({ balance: 10 }) };
+  sendPending = undefined;
+  actions.length = 0;
+  sent.mockClear();
+  let renderer;
+  await act(async () => {
+    renderer = create(
+      createElement(
+        Session.Provider,
+        { value: token("session-A") },
+        createElement(ManagementHome),
+      ),
+    );
+  });
+  await act(async () =>
+    renderer.root.findByType("Composer").props.onSend("private prompt"),
+  );
+  expect(sent).toHaveBeenCalledTimes(1);
+  expect(actions).toEqual(["agent_send_attempt"]);
+  await act(async () => renderer.unmount());
+});
 
 test("session replacement fences pending snapshot and retains prior owner's uploaded file", async () => {
   pending = deferred();

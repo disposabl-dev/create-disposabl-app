@@ -3,6 +3,8 @@ export const mobileActions = [
   "open_connections",
   "open_app",
   "open_settings",
+  "agent_send_attempt",
+  "agent_stop_attempt",
 ] as const;
 export type MobileAction = (typeof mobileActions)[number];
 export function isMobileAction(value: unknown): value is MobileAction {
