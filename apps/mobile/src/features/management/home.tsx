@@ -156,6 +156,7 @@ function Composer() {
       }
       if (!beginSend(fileIds)) return;
       started = true;
+      captureProductAction("agent_send_attempt");
       const result = await send({
         prompt: text.trim(),
         ...(fileIds.length ? { fileIds } : {}),

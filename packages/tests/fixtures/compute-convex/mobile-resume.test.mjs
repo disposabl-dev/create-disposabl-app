@@ -9,6 +9,9 @@ let appStateListener;
 const send = mock(async () => ({}));
 const file = { id: "draft-file", name: "draft.txt" };
 const markSent = mock();
+mock.module("../../../../apps/mobile/src/features/product-telemetry", () => ({
+  captureProductAction: () => {},
+}));
 const resumeText =
   "Sandbox access ended. Add credits if needed, then send a new message after the sandbox stops.";
 mock.module("convex/react", () => ({

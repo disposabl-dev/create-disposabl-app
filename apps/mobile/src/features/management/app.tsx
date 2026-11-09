@@ -26,6 +26,7 @@ import { Button, ErrorBoundary, Loading } from "./ui";
 import { isNearConversationEnd } from "./conversation-scroll";
 import { ResponseProgress } from "./response-progress";
 import { ConversationHeader } from "./conversation-header";
+import { captureProductAction } from "../product-telemetry";
 
 export function AppScreen() {
   const { appId } = useLocalSearchParams<{ appId: string }>();
@@ -144,6 +145,7 @@ function Chat({ appId }: { appId: string }) {
       const submitted = text;
       const originalPrompt = prompt;
       followLatest.current = true;
+      captureProductAction("agent_send_attempt");
       await send({
         appId,
         prompt: submitted.trim(),
@@ -178,6 +180,7 @@ function Chat({ appId }: { appId: string }) {
     setBusy(true);
     setError("");
     try {
+      captureProductAction("agent_stop_attempt");
       await abort({ appId });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not stop the agent.");
