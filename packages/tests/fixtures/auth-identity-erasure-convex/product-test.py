@@ -1,10 +1,19 @@
-"""Exercise the product operator mutation with synthetic users on loopback 3550."""
+"""Exercise synthetic product auth erasure on the runner-owned backend."""
 import concurrent.futures
 import json
+import os
 import urllib.request
 import uuid
 
-URL = "http://127.0.0.1:3550/api/mutation"
+BASE = os.environ.get("LOCAL_AUTH_FIXTURE_URL")
+if BASE != "http://127.0.0.1:3490":
+    raise RuntimeError("Run only through the owned 3490/3491 fixture runner")
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        raise RuntimeError("Fixture redirect rejected")
+
+urllib.request.install_opener(urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect()))
+URL = BASE + "/api/mutation"
 def call(name, args):
     req = urllib.request.Request(URL, data=json.dumps({"path": "product:" + name, "args": args, "format": "json"}).encode(), headers={"Content-Type": "application/json"})
     result = json.load(urllib.request.urlopen(req))
@@ -17,7 +26,7 @@ def identity(name, args):
     if result["status"] != "success": raise RuntimeError(result.get("errorMessage", "unknown error"))
     return result["value"]
 def authenticated(token):
-    req = urllib.request.Request("http://127.0.0.1:3550/api/query", data=json.dumps({"path": "product:isAuthenticated", "args": {}, "format": "json"}).encode(), headers={"Content-Type": "application/json", "Authorization": "Bearer " + token})
+    req = urllib.request.Request(BASE + "/api/query", data=json.dumps({"path": "product:isAuthenticated", "args": {}, "format": "json"}).encode(), headers={"Content-Type": "application/json", "Authorization": "Bearer " + token})
     result = json.load(urllib.request.urlopen(req))
     assert result["status"] == "success", result
     return result["value"]
