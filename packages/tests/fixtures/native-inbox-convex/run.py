@@ -30,6 +30,12 @@ try:
         try: urllib.request.urlopen('http://127.0.0.1:3490/version',timeout=1); break
         except Exception: time.sleep(.1)
     else: raise RuntimeError('backend not ready')
+    # A successful HTTP response alone could belong to another process that
+    # acquired the port after the preflight. Never configure that backend.
+    for port in (3490,3491):
+        listeners=subprocess.run(['/usr/sbin/lsof','-nP',f'-tiTCP:{port}','-sTCP:LISTEN'],capture_output=True,text=True)
+        if p.poll() is not None or listeners.returncode != 0 or listeners.stderr or set(listeners.stdout.split()) != {str(p.pid)}:
+            raise RuntimeError(f'Cannot establish owned backend listener on {port}')
     cli=str(root/'node_modules/.bin/convex')
     values={'REVENUECAT_CONSUMABLE_OWNER':'custom','REVENUECAT_WEBHOOK_AUTH':'fixture-only','REVENUECAT_PROJECT_ID':'project','REVENUECAT_ENVIRONMENT':'SANDBOX','AUTUMN_SECRET_KEY':'am_sk_test_fixture','REVENUECAT_ROUTES':'[{"app":"apple","store":"APP_STORE","product":"apple-coins"}]'}
     for k,v in values.items(): subprocess.run([cli,'env','set',k,v],cwd=workfixture,env=env,check=True,stdout=subprocess.DEVNULL)
