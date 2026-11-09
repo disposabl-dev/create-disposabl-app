@@ -74,6 +74,7 @@ test("web events emit only fixed fields and stop at the lease deadline", () => {
   assert.deepEqual(safeTelemetryEvent("$pageview", input), {
     token: "public",
     distinct_id: "server-id",
+    $geoip_disable: true,
     platform: "web",
     page: "connections",
     $current_url: "https://www.disposabl.dev/dashboard/connections",
@@ -91,6 +92,7 @@ test("web events emit only fixed fields and stop at the lease deadline", () => {
     {
       token: "public",
       distinct_id: "server-id",
+      $geoip_disable: true,
       platform: "web",
       action: "open_connections",
     },
@@ -103,6 +105,7 @@ test("web events emit only fixed fields and stop at the lease deadline", () => {
   assert.deepEqual(safeTelemetryEvent("$exception", input), {
     token: "public",
     distinct_id: "server-id",
+    $geoip_disable: true,
     platform: "web",
     $exception_list: [
       {
