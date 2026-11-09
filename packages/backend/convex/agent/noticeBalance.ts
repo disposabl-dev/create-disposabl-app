@@ -1,7 +1,7 @@
 import { billingRequest } from "@disposabl/disposabl-kit/server/billing";
 import { pricing } from "../../../disposabl-kit/payments/config";
 
-/** Observe the balance without consuming or creating a customer. */
+/** Check the balance without recording usage. */
 export async function observeNoticeBalance(
   userId: string,
   key: string | undefined,
