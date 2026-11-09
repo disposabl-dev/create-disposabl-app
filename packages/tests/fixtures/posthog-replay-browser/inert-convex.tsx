@@ -11,8 +11,17 @@ export class ConvexReactClient {
 export function ConvexProvider({ children }: { children: ReactNode }) {
   return children;
 }
+const convex = { url: "https://fixture.invalid" };
 export function useConvex() {
-  return { url: "https://fixture.invalid" };
+  return convex;
+}
+export class ConvexHttpClient {
+  setAuth() {}
+  async query(reference: Parameters<typeof getFunctionName>[0]) {
+    return getFunctionName(reference) === "auth:account"
+      ? { username: "SECRET_ACCOUNT_91" }
+      : { id: "SECRET_CUSTOMER_91" };
+  }
 }
 export function useConvexAuth() {
   return { isAuthenticated: !!useSession(), isLoading: false };
@@ -26,11 +35,26 @@ export function Unauthenticated({ children }: { children: ReactNode }) {
 export function AuthLoading() {
   return null;
 }
+const actions: Record<string, (...args: any[]) => Promise<unknown>> = {
+  "mcp:createApiKey": async () => ({ apiKey: "SECRET_KEY_MATERIAL_91" }),
+  "billing:snapshot": async () => ({
+    balance: 424242,
+    hasMonthlyPlan: false,
+    checkoutNeedsReview: false,
+    customerId: "SECRET_CUSTOMER_91",
+  }),
+  "billing:checkout": async ({ purchase }: { purchase: string }) => {
+    (window as any).fixtureBillingCalls.push(purchase);
+    return { url: null };
+  },
+  "billing:portal": async () => {
+    (window as any).fixtureBillingCalls.push("portal");
+    throw new Error("SECRET_PROVIDER_ERROR_91");
+  },
+};
+const noopAction = async () => ({});
 export function useAction(reference: Parameters<typeof getFunctionName>[0]) {
-  return async () =>
-    getFunctionName(reference) === "mcp:createApiKey"
-      ? { apiKey: "SECRET_KEY_MATERIAL_91" }
-      : {};
+  return actions[getFunctionName(reference)] ?? noopAction;
 }
 export function useMutation() {
   return async () => ({});
