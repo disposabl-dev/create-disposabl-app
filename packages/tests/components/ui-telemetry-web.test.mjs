@@ -162,6 +162,7 @@ test("web bootstraps, strips URL and stops immediately on opt-out", async () => 
   expect(events[0].properties).toEqual({
     token: "test",
     distinct_id: "server-id",
+    $geoip_disable: true,
     page: "connections",
     platform: "web",
     $current_url: "https://www.disposabl.dev/dashboard/connections",

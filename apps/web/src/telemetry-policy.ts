@@ -37,6 +37,7 @@ export function safeTelemetryEvent(
   const common = {
     token: input.projectToken,
     distinct_id: input.distinctId,
+    $geoip_disable: true,
     platform: input.source,
     ...(typeof input.sessionId === "string" && uuid.test(input.sessionId)
       ? { $session_id: input.sessionId }

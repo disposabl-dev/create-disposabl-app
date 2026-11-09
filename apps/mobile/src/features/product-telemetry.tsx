@@ -158,6 +158,7 @@ export function ProductTelemetry({
             disableRemoteFeatureFlags: true,
             preloadFeatureFlags: false,
             disableSurveys: true,
+            disableGeoip: true,
             flushAt: 1,
             fetchRetryCount: 0,
             before_send(event) {
@@ -181,6 +182,7 @@ export function ProductTelemetry({
                 properties: {
                   token: lease.projectToken,
                   distinct_id: lease.distinctId,
+                  $geoip_disable: true,
                   ...(event.event === "$screen"
                     ? { $screen_name: screenCategory(page.current) }
                     : { action: String(action) }),

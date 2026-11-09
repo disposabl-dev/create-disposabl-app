@@ -169,10 +169,12 @@ test("production waits for bootstrap, sanitizes screen and stops on local opt-ou
   expect(initialized).toBe(1);
   expect(instances[0].options.capturePushNotificationSubscriptions).toBe(false);
   expect(instances[0].options.capturePushNotificationOpened).toBe(false);
+  expect(instances[0].options.disableGeoip).toBe(true);
   expect(requests).toHaveBeenCalledTimes(1);
   expect(events[0].properties).toEqual({
     token: "test",
     distinct_id: "server-id",
+    $geoip_disable: true,
     $screen_name: "app_detail",
     platform: "mobile",
   });
@@ -196,6 +198,9 @@ test("production waits for bootstrap, sanitizes screen and stops on local opt-ou
   ]);
   captureProductAction("private-app-id");
   expect(events).toHaveLength(7);
+  expect(
+    events.every((event) => event.properties.$geoip_disable === true),
+  ).toBe(true);
   expect(JSON.stringify(events)).not.toContain("private-id");
   const now = Date.now;
   Date.now = () => now() + 31_000;
