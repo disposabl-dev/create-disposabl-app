@@ -79,6 +79,12 @@ test(
     const { userId, sessionId } = await call("seedUnclaimed");
     await call("fundFixture", { sessionId, responseBalance: 20 }, false, true);
     const first = await call("session", { sessionId }, true);
+    assert.equal((await debit(first.debitId)).state, "confirmed");
+    await call("activateFixture", { sessionId });
+    assert.equal(
+      (await call("session", { sessionId }, true)).activation,
+      "active",
+    );
     await call("shortenWindow", {
       debitId: first.debitId,
       paidUntil: Date.now() - 1,

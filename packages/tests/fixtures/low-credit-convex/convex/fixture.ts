@@ -7,6 +7,10 @@ import {
 } from "convex/server";
 import { v } from "convex/values";
 import {
+  claimActivation,
+  completeActivation,
+} from "../../../../backend/convex/agent/activation";
+import {
   deliverNotice,
   fund,
 } from "../../../../backend/convex/agent/actions/compute";
@@ -276,6 +280,7 @@ export const seedUnclaimed = mutation({
       userId,
       state: "starting",
       paidUntil: 0,
+      activation: "fresh",
     });
     await ctx.db.insert("apps", {
       appId: sessionId,
@@ -291,6 +296,17 @@ export const seedUnclaimed = mutation({
       },
     });
     return { userId, sessionId };
+  },
+});
+// Model a successful inert sandbox activation before testing renewal.
+export const activateFixture = mutation({
+  args: { sessionId: v.id("computeSessions") },
+  handler: async (ctx, { sessionId }) => {
+    const args = { sessionId, token: "synthetic-activation" };
+    if ((await claimActivation(ctx as any, args as any)) !== "claimed")
+      throw new Error("Fixture activation was not claimed");
+    if (!(await completeActivation(ctx as any, args as any)))
+      throw new Error("Fixture activation did not complete");
   },
 });
 export const session = query({
