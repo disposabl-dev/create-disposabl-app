@@ -149,13 +149,39 @@ try {
   });
   await page.waitForTimeout(200);
   assert.equal(requests.length, firstView, "duplicate view captured");
+  for (const route of ["pricing", "build", "stack", "why-disposabl"]) {
+    const before = requests.length;
+    await page.evaluate((route) => {
+      history.pushState({}, "", `/${route}?SECRET_QUERY_91#SECRET_HASH_91`);
+      window.adapter.page();
+      window.adapter.page();
+    }, route);
+    await page.waitForTimeout(200);
+    assert.equal(
+      requests.length,
+      before + 1,
+      `${route} view must capture once`,
+    );
+  }
+  await page.evaluate(() => {
+    history.pushState({}, "", "/pricing-secret/SECRET_PATH_91?SECRET_QUERY_91");
+    window.adapter.page();
+    history.pushState({}, "", "/dashboard/SECRET_PATH_91");
+    window.adapter.page();
+  });
+  await page.waitForTimeout(200);
+  const beforeConnections = requests.length;
   await page.evaluate(() => {
     history.pushState({}, "", "/dashboard/connections?SECRET_QUERY_91");
     window.adapter.page();
     window.adapter.page();
   });
   await page.waitForTimeout(200);
-  assert.equal(requests.length, firstView + 1, "navigation must capture once");
+  assert.equal(
+    requests.length,
+    beforeConnections + 1,
+    "navigation must capture once",
+  );
   async function state(id) {
     await page.evaluate((id) => {
       const token = id
@@ -190,6 +216,9 @@ try {
     window.fixtureAllowed = false;
     window.adapter.update({ enabled: false, token: null });
     window.adapter.action("open_connections");
+    history.pushState({}, "", "/pricing");
+    window.adapter.page();
+    history.pushState({}, "", "/");
   });
   const countAtOptOut = requests.length;
   await page.waitForTimeout(400);
@@ -210,7 +239,11 @@ try {
   holdRefresh = true;
   await page.waitForTimeout(7000);
   assert.equal(typeof releaseRefresh, "function", "refresh was not held");
-  await page.evaluate(() => window.adapter.action("open_connections"));
+  await page.evaluate(() => {
+    window.adapter.action("open_connections");
+    history.pushState({}, "", "/build");
+    window.adapter.page();
+  });
   await page.waitForTimeout(400);
   assert.equal(requests.length, beforeExpiry, "new capture after lease expiry");
   await page.evaluate(() => window.adapter.stop());
@@ -237,6 +270,25 @@ try {
   assert.ok(payload.some((x) => x.properties?.action === "copy_setup"));
   assert.ok(payload.some((x) => x.properties?.action === "open_setup"));
   assert.ok(payload.every((x) => x.properties?.platform === mode));
+  for (const route of ["pricing", "build", "stack", "why-disposabl"])
+    assert.equal(
+      payload.filter(
+        (x) =>
+          x.event === "$pageview" &&
+          x.properties?.page === route &&
+          x.properties?.$current_url === `https://www.disposabl.dev/${route}`,
+      ).length,
+      1,
+      `${route} canonical event`,
+    );
+  assert.ok(
+    payload.some(
+      (x) =>
+        x.event === "$pageview" &&
+        x.properties?.page === "other" &&
+        !x.properties?.$current_url,
+    ),
+  );
   assert.ok(
     payload.every((x) => x.properties?.$geoip_disable === true),
     "SDK event missing GeoIP opt-out",
@@ -262,6 +314,7 @@ try {
     "SECRET_PRIVATE_91",
     "SECRET_PUBLIC_91",
     "SECRET_PROMPT_91",
+    "SECRET_PATH_91",
     "private-structure-marker",
   ])
     assert.equal(
