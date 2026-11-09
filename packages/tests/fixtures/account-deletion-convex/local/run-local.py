@@ -1,20 +1,29 @@
 import os, pathlib, shutil, socket, subprocess, time, secrets, json, urllib.request, threading, tempfile, signal, importlib.util, sys
 from contextlib import ExitStack
+from prepare import prepare
+
+PROFILE = '(version 1)(allow default)(deny network-outbound)(allow network-outbound (remote ip "localhost:*"))(allow network-outbound (remote unix-socket))'
 
 def main():
- root=pathlib.Path(__file__).resolve().parents[5]
+ if os.environ.get('LOCAL_DELETION_SANDBOXED') != '1':
+  env={'PATH':os.environ['PATH'],'HOME':str(pathlib.Path.home()),'LOCAL_DELETION_SANDBOXED':'1','CONVEX_LOCAL_BINARY':os.environ.get('CONVEX_LOCAL_BINARY','')}
+  os.execve('/usr/bin/sandbox-exec',['sandbox-exec','-p',PROFILE,sys.executable,__file__],env)
+ with socket.socket() as probe:
+  probe.settimeout(1)
+  if probe.connect_ex(('1.1.1.1',443)) != 1: raise RuntimeError('Outbound sandbox is not enforced')
+ checkout=pathlib.Path(__file__).resolve().parents[5]
+ if subprocess.check_output(['git','status','--porcelain'],cwd=checkout,text=True).strip():
+  raise RuntimeError('Commit the candidate before running this fixture')
+ if shutil.disk_usage('/tmp').free < 2.5*1024**3: raise RuntimeError('Insufficient free space (<2.5 GiB)')
+ work=pathlib.Path(tempfile.mkdtemp(prefix='disposabl-local-deletion-',dir='/tmp'))
+ root,sha=prepare(checkout,work)
  helper=importlib.util.spec_from_file_location('sdk_runner',root/'packages/tests/helpers/sdk-auth/run.py')
  owner=importlib.util.module_from_spec(helper); helper.loader.exec_module(owner)
- if subprocess.check_output(['git','status','--porcelain'],cwd=root,text=True).strip():
-  raise RuntimeError('Commit the candidate before running this fixture')
- sha=subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True).strip()
- version=json.loads((root/'node_modules/@convex-dev/auth/package.json').read_text())['version']
- if version != owner.EXPECTED_AUTH: raise RuntimeError('Installed auth component must match selected .8')
- work=pathlib.Path(tempfile.mkdtemp(prefix='disposabl-local-deletion-')); project=work/'project'; project.mkdir(); (work/'home').mkdir(); fixture=pathlib.Path(__file__).resolve().parent/'convex'
- shutil.copy2(pathlib.Path(__file__).resolve().parent/'block-remote.cjs',work/'block-remote.cjs')
+ project=work/'project'; project.mkdir(); (work/'home').mkdir()
+ fixture=root/'packages/tests/fixtures/account-deletion-convex/local/convex'
+ shutil.copy2(fixture.parent/'block-remote.cjs',work/'block-remote.cjs')
  print('Fixture source:',sha,'artifacts:',work,flush=True)
- (work/'source-sha.txt').write_text(sha+'\n')
- if shutil.disk_usage('/tmp').free < 2.5*1024**3: raise RuntimeError('Insufficient free space (<2.5 GiB)')
+ if shutil.disk_usage('/tmp').free < 2.5*1024**3: raise RuntimeError('Insufficient free space after snapshot')
  for port in (3480,3481):
   with socket.socket() as s:
    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1); s.bind(('127.0.0.1',port))

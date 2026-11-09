@@ -169,10 +169,31 @@ test(
     const owner = await m("create", { requestedAt });
     const other = await m("create", {});
     const args = { userId: owner, expectedRequestedAt: requestedAt };
-    await m("key", { userId: owner, hash: "synthetic-owner-key-1" });
-    await m("key", { userId: owner, hash: "synthetic-owner-key-2" });
+    const keys = await Promise.all(
+      ["synthetic-owner-key-1", "synthetic-owner-key-2"].map(async (hash) => ({
+        hash,
+        grantId: await m("key", { userId: owner, hash }),
+      })),
+    );
+    const otherKey = {
+      hash: "synthetic-other-key",
+      grantId: await m("key", { userId: other, hash: "synthetic-other-key" }),
+    };
+    const otherKeyBefore = await q("keyRecord", otherKey);
+    assert.ok(otherKeyBefore.grant && otherKeyBefore.token);
+    for (const key of keys) {
+      const before = await q("keyRecord", key);
+      assert.ok(before.grant && before.token);
+    }
     await m("username", { userId: owner, username: "synthetic-owner" });
     await m("seed", { userId: owner, count: 205 });
+    await m("seed", { userId: other, count: 2 });
+    const ownerRowsBefore = await q("rows", { userId: owner });
+    assert.equal(ownerRowsBefore.handoffs.length, 205);
+    assert.equal(ownerRowsBefore.identities.length, 205);
+    const otherRowsBefore = await q("rows", { userId: other });
+    assert.equal(otherRowsBefore.handoffs.length, 2);
+    assert.equal(otherRowsBefore.identities.length, 2);
     const file = await m("r2", { userId: owner });
     await assert.rejects(
       m("advance", { ...args, expectedRequestedAt: requestedAt + 1 }),
@@ -199,6 +220,9 @@ test(
     }
     assert.equal(previous.mcpDeletion.state, "attributed_complete");
     assert.ok(previous.mcpDeletion.batches > 1);
+    for (const key of keys)
+      assert.deepEqual(await q("keyRecord", key), { grant: null, token: null });
+    assert.deepEqual(await q("keyRecord", otherKey), otherKeyBefore);
     assert.equal((await m("advance", args)).stage, "auth");
     let current = await q("inspect", { userId: owner });
     assert.equal(current.authDeletion.usernameCleared, true);
@@ -220,6 +244,11 @@ test(
     assert.equal(current.ephemeralDeletion.batches, 3);
     assert.equal(current.ephemeralDeletion.billingHandoffsDeleted, 205);
     assert.equal(current.ephemeralDeletion.telemetryIdentitiesDeleted, 205);
+    assert.deepEqual(await q("rows", { userId: owner }), {
+      handoffs: [],
+      identities: [],
+    });
+    assert.deepEqual(await q("rows", { userId: other }), otherRowsBefore);
     let result = await m("advance", args);
     assert.equal(result.stage, "files");
     assert.equal(result.outcome, "blocked");

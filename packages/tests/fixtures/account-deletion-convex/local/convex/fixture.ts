@@ -88,3 +88,23 @@ export const inspect = query({
   args: { userId: v.id("users") },
   handler: async (ctx, { userId }) => ctx.db.get("users", userId),
 });
+
+export const rows = query({
+  args: { userId: v.id("users") },
+  returns: v.any(),
+  handler: async (ctx, { userId }) => ({
+    handoffs: await ctx.db
+      .query("billingHandoffs")
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
+      .take(206),
+    identities: await ctx.db
+      .query("telemetryIdentities")
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
+      .take(206),
+  }),
+});
+export const keyRecord = query({
+  args: { grantId: v.string(), hash: v.string() },
+  returns: v.any(),
+  handler: (ctx, args) => ctx.runQuery(c.mcp.fixtureProbe.records, args),
+});
