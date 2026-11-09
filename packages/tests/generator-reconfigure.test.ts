@@ -270,10 +270,12 @@ test(
         assert.ok(
           existsSync(join(app, "packages/backend/convex/billingHandoff.ts")),
         );
-        assert.equal(
-          existsSync(join(app, "packages/tests/native-billing.test.ts")),
-          features === "payments",
-        );
+        for (const path of [
+          "packages/tests/native-billing.test.ts",
+          "packages/tests/mobile-storefront-observer.test.ts",
+          "packages/tests/components/mobile-storefront-observer.test.mjs",
+        ])
+          assert.equal(existsSync(join(app, path)), features === "payments");
       }
       const config = await read(app, "disposabl.json");
       const manifestBefore = await read(app, manifestPath);

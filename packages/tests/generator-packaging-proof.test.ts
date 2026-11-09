@@ -13,6 +13,7 @@ import {
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createApp } from "../create-disposabl-app/scaffold";
+import { reconfigureApp } from "../create-disposabl-app/reconfigure";
 import {
   selectFeatures,
   selectPlatforms,
@@ -146,6 +147,8 @@ test("packaged starter and generated profiles exclude product proof fixtures", a
     for (const [name, platforms, features] of [
       ["web-minimal", "web", "none"],
       ["web-payments", "web", "authentication,payments"],
+      ["mobile-enabled", "web,android,ios", "authentication,payments"],
+      ["mobile-minimal", "web,android,ios", "none"],
       [
         "all-platforms",
         "web,android,ios,macos,windows,linux,api,mcp,cli,typescript-sdk",
@@ -159,6 +162,26 @@ test("packaged starter and generated profiles exclude product proof fixtures", a
         features: selectFeatures(features),
       });
       roots.push(destination);
+      const module = join(
+        destination,
+        "apps/mobile/modules/storefront-observer",
+      );
+      const mobile = platforms.includes("ios") || platforms.includes("android");
+      assert.equal(
+        existsSync(module),
+        mobile,
+        `${name}: native module selection`,
+      );
+      for (const path of [
+        "packages/tests/mobile-storefront-observer.test.ts",
+        "packages/tests/components/mobile-storefront-observer.test.mjs",
+      ]) {
+        assert.equal(
+          existsSync(join(destination, path)),
+          mobile && features.includes("payments"),
+          `${name}: ${path} must match mobile payments selection`,
+        );
+      }
       for (const path of [
         "packages/tests/helpers/mobile-simulator/preflight.py",
         "packages/tests/helpers/mobile-simulator/test_preflight.py",
@@ -251,6 +274,53 @@ test("packaged starter and generated profiles exclude product proof fixtures", a
       assert.doesNotMatch(backendApi, /localDeletion/);
       const mobileConfigPath = join(root, "apps/mobile/app.json");
       if (existsSync(mobileConfigPath)) {
+        const module = join(root, "apps/mobile/modules/storefront-observer");
+        const moduleConfig = JSON.parse(
+          await readFile(join(module, "expo-module.config.json"), "utf8"),
+        );
+        assert.deepEqual(moduleConfig.platforms, ["ios"]);
+        assert.deepEqual(moduleConfig.ios.modules, [
+          "StorefrontObserverModule",
+        ]);
+        assert.equal(
+          JSON.parse(await readFile(join(module, "package.json"), "utf8")).name,
+          "storefront-observer",
+        );
+        assert.match(
+          await readFile(
+            join(module, "ios/StorefrontObserver.podspec"),
+            "utf8",
+          ),
+          /s\.name\s*=\s*['"]StorefrontObserver['"]/,
+        );
+        assert.match(
+          await readFile(
+            join(module, "ios/StorefrontObserverModule.swift"),
+            "utf8",
+          ),
+          /Name\("StorefrontObserver"\)/,
+        );
+        const billingDir = join(root, "packages/disposabl-kit/mobile/billing");
+        if (existsSync(billingDir)) {
+          for (const file of await readdir(billingDir)) {
+            if (!/\.tsx?$/.test(file)) continue;
+            const source = await readFile(join(billingDir, file), "utf8");
+            for (const match of source.matchAll(
+              /from\s+["'](\.\/[^"']+)["']/g,
+            )) {
+              assert.ok(
+                [".ts", ".tsx", "/index.ts", "/index.tsx"].some((extension) =>
+                  existsSync(join(billingDir, match[1] + extension)),
+                ),
+                `${root}: ${file} import ${match[1]} must resolve`,
+              );
+            }
+          }
+          assert.match(
+            await readFile(join(billingDir, "web-checkout.ts"), "utf8"),
+            /from ["']\.\/storefront-observer["']/,
+          );
+        }
         const mobilePackage = JSON.parse(
           await readFile(join(root, "apps/mobile/package.json"), "utf8"),
         );
@@ -262,20 +332,22 @@ test("packaged starter and generated profiles exclude product proof fixtures", a
           mobilePackage.dependencies["@posthog/react-native-plugin"],
           undefined,
         );
-        const billing = await readFile(
-          join(root, "packages/disposabl-kit/mobile/billing/paywall.ts"),
-          "utf8",
-        );
-        const paymentsGuide = await readFile(
-          join(root, "packages/disposabl-kit/PAYMENTS.md"),
-          "utf8",
-        );
-        const plugin = await readFile(
-          join(root, "packages/disposabl-kit/mobile/expo-plugin.cjs"),
-          "utf8",
-        );
-        for (const source of [billing, paymentsGuide, plugin])
-          assert.match(source, /EXPO_PUBLIC_REVENUECAT_OFFERING_ID/);
+        if (
+          existsSync(
+            join(root, "packages/disposabl-kit/mobile/billing/paywall.ts"),
+          )
+        ) {
+          for (const path of [
+            "packages/disposabl-kit/mobile/billing/paywall.ts",
+            "packages/disposabl-kit/PAYMENTS.md",
+            "packages/disposabl-kit/mobile/expo-plugin.cjs",
+          ]) {
+            assert.match(
+              await readFile(join(root, path), "utf8"),
+              /EXPO_PUBLIC_REVENUECAT_OFFERING_ID/,
+            );
+          }
+        }
         const mobileConfig = JSON.parse(
           await readFile(mobileConfigPath, "utf8"),
         );
@@ -341,11 +413,13 @@ test("packaged starter and generated profiles exclude product proof fixtures", a
           assert.ok(!legal.names.includes(name));
         assert.deepEqual(
           legal.names,
-          root.endsWith("web-minimal")
+          root.endsWith("web-minimal") || root.endsWith("mobile-minimal")
             ? ["Convex"]
             : root.endsWith("web-payments")
               ? ["Convex", "Google", "Autumn"]
-              : ["Convex", "Google", "PostHog", "Autumn", "RevenueCat"],
+              : root.endsWith("mobile-enabled")
+                ? ["Convex", "Google", "Autumn", "RevenueCat"]
+                : ["Convex", "Google", "PostHog", "Autumn", "RevenueCat"],
         );
       }
 
@@ -375,6 +449,16 @@ test("packaged starter and generated profiles exclude product proof fixtures", a
         "packages/tests/flows/mobile.e2e.ts",
       ])
         assert.equal(existsSync(join(root, path)), true, `${root}: ${path}`);
+    }
+    const reconfigured = join(temp, "mobile-enabled");
+    await reconfigureApp(input, reconfigured, "test", {
+      features: "authentication",
+    });
+    for (const path of [
+      "packages/tests/mobile-storefront-observer.test.ts",
+      "packages/tests/components/mobile-storefront-observer.test.mjs",
+    ]) {
+      assert.equal(existsSync(join(reconfigured, path)), false, path);
     }
   } finally {
     await rm(temp, { recursive: true, force: true });

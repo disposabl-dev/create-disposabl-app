@@ -11,7 +11,7 @@ import { existsSync } from "node:fs";
 import { basename, join, normalize } from "node:path";
 import { randomUUID } from "node:crypto";
 import { execFileSync, spawnSync } from "node:child_process";
-import { omitMobilePayments } from "./mobile-payments";
+import { nativeBillingTests, omitMobilePayments } from "./mobile-payments";
 import { validateAndroidArchitectures } from "../disposabl-kit/android-architectures";
 import {
   selectedFolders,
@@ -113,6 +113,8 @@ export async function createApp(
         await rm(join(tests, entry));
     }
     if (!folders.includes("apps/mobile")) {
+      for (const path of nativeBillingTests)
+        await rm(join(destination, path), { force: true });
       await rm(join(tests, "helpers/mobile-simulator"), {
         recursive: true,
         force: true,

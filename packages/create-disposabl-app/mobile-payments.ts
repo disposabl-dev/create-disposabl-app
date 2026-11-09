@@ -4,11 +4,16 @@ import { join, sep } from "node:path";
 
 export const nativeBillingPath =
   join("packages", "disposabl-kit", "mobile", "billing") + sep;
-export const nativeBillingTest = join(
-  "packages",
-  "tests",
-  "native-billing.test.ts",
-);
+export const nativeBillingTests = [
+  join("packages", "tests", "native-billing.test.ts"),
+  join("packages", "tests", "mobile-storefront-observer.test.ts"),
+  join(
+    "packages",
+    "tests",
+    "components",
+    "mobile-storefront-observer.test.mjs",
+  ),
+];
 export const purchasesPackage = "react-native-purchases";
 const purchasesPackages = [purchasesPackage, "react-native-purchases-ui"];
 const dependencyFields = [
@@ -78,5 +83,6 @@ export async function omitMobilePayments(root: string) {
       ),
   );
   await rm(join(root, nativeBillingPath), { recursive: true, force: true });
-  await rm(join(root, nativeBillingTest), { force: true });
+  for (const path of nativeBillingTests)
+    await rm(join(root, path), { force: true });
 }
