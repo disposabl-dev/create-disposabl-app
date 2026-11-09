@@ -222,6 +222,13 @@ export function createPlatforms(
           await record("success");
         } catch (error) {
           await record("error");
+          if (
+            !(error instanceof ConvexError) &&
+            !(error instanceof SyntaxError)
+          ) {
+            console.error("platform_api_internal_error");
+            return Response.json({ error: "internal_error" }, { status: 500 });
+          }
           throw error;
         }
         return new Response(
@@ -248,7 +255,14 @@ export function createPlatforms(
           );
         if (error instanceof SyntaxError)
           return Response.json({ error: "invalid_request" }, { status: 400 });
-        console.error(error);
+        const operation = spec.find((item) => item.path === url.pathname)!;
+        const header = request.headers.get("X-Disposabl-Source");
+        await scheduleTelemetry(ctx, "api_operation", {
+          source: header === "cli" || header === "sdk" ? header : "api",
+          operation: operation.name,
+          outcome: "error",
+        });
+        console.error("platform_api_internal_error");
         return Response.json({ error: "internal_error" }, { status: 500 });
       }
     },
