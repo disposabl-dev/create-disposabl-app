@@ -53,6 +53,43 @@ def report_e2e(path):
     print('E2E counts: ' + (', '.join(f'{name}={counts[name]}' for name in ('passed', 'failed', 'skipped') if name in counts) or 'unavailable'), flush=True)
 
 
+
+def report_failure(path, source):
+    """Print fixed error categories and committed flow locations, never raw payloads."""
+    text = path.read_text(errors='replace') if path.exists() else ''
+    categories = {
+        'connection-refused': r'ECONNREFUSED|Connection refused',
+        'address-in-use': r'EADDRINUSE|Address already in use',
+        'missing-file': r'ENOENT|No such file or directory',
+        'browser-not-installed': r"Executable doesn.t exist|playwright install",
+        'missing-library': r'error while loading shared libraries',
+        'timeout': r'TimeoutError|timed out|Timeout exceeded',
+        'assertion': r'AssertionError|expect\(|assertion failed',
+        'network-denied': r'ENETUNREACH|Network is unreachable|Operation not permitted',
+    }
+    matched = [name for name, pattern in categories.items() if re.search(pattern, text)]
+    print('Failure categories: ' + (', '.join(matched) or 'unclassified'), flush=True)
+    report = source / 'packages/tests/.e2e/report.json'
+    if not report.is_file():
+        return
+    try:
+        results = json.loads(report.read_text())['run']['results']
+        allowed = {f'flows/{file.name}': len(file.read_text().splitlines())
+                   for file in (source / 'packages/tests/flows').glob('*.e2e.ts')}
+        locations = set()
+        for result in results:
+            if result.get('status') in ('passed', 'skipped'):
+                continue
+            location = result.get('source') or {}
+            file, line = location.get('file'), location.get('line')
+            if file in allowed and type(line) is int and 0 < line <= allowed[file]:
+                locations.add(f'{file}:{line}')
+        for location in sorted(locations):
+            print('Failed flow declaration: ' + location, flush=True)
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
+        print('Failure report could not be summarized safely', flush=True)
+
+
 def load(path, name):
     spec = importlib.util.spec_from_file_location(name, path)
     module = importlib.util.module_from_spec(spec)
@@ -120,6 +157,8 @@ def main():
                 if log == 'e2e.log':
                     report_e2e(work / log)
                 if code:
+                    if not sensitive:
+                        report_failure(work / name, source)
                     raise RuntimeError(f'Fixture command failed (exit {code}); inspect {name if not sensitive else "private key generation"}')
             out.seek(0)
             return out.read()
@@ -161,6 +200,8 @@ def main():
             str(work / 'database.sqlite3')], env=env, stdout=log, stderr=subprocess.STDOUT))
         for _ in range(100):
             if proc.poll() is not None:
+                log.flush()
+                report_failure(work / 'backend.log', source)
                 raise RuntimeError('Owned backend exited before readiness')
             try:
                 urllib.request.urlopen('http://127.0.0.1:3520/version', timeout=1).close()
@@ -168,6 +209,8 @@ def main():
             except OSError:
                 time.sleep(.1)
         else:
+            log.flush()
+            report_failure(work / 'backend.log', source)
             raise RuntimeError('Owned backend readiness timed out')
         for port in PORTS:
             pids = listeners(port)

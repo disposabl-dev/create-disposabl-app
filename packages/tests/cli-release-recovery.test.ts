@@ -64,6 +64,16 @@ function fixture() {
   const git = (...args: string[]) =>
     execFileSync("git", args, { cwd: dir, stdio: "pipe" });
   git("init", "-q");
+  for (const path of [
+    ".github/scripts/product-browser-check.py",
+    ".github/scripts/product-browser-check-test.py",
+    "packages/tests/helpers/sdk-auth/run.py",
+    "packages/tests/helpers/sdk-auth/selected_auth.py",
+  ]) {
+    mkdirSync(join(dir, path, ".."), { recursive: true });
+    writeFileSync(join(dir, path), "# inert harness fixture\n");
+    git("add", path);
+  }
   git(
     "-c",
     "user.name=test",
@@ -238,6 +248,12 @@ test("shared checks use the resolved SHA and block every failed or skipped gate"
     evaluate("publish", needs("success", "success", "success"), cliRecovery),
   ).toBe(false);
   for (const result of ["failure", "cancelled", "skipped"]) {
+    expect(
+      evaluate("cli", needs("success", result, "success"), cliRecovery),
+    ).toBe(false);
+    expect(
+      evaluate("publish", needs("success", "success", result), normal),
+    ).toBe(false);
     expect(evaluate("cli", needs("success", result, "success"), normal)).toBe(
       false,
     );
@@ -337,6 +353,11 @@ test("recovery checks the actual historical tag commit and rejects detached or c
   expect(f.git("rev-parse", "HEAD").toString().trim()).toBe(old);
   f.git("checkout", "--detach", head);
   f.git("tag", "-f", "v1.0.0", head);
+  f.git("tag", "-f", "@disposabl/cli@1.0.0", head);
+  expect(
+    f.run("Verify CLI recovery tag", { VERSION: "1.0.0", RESOLVED_SHA: old })
+      .status,
+  ).not.toBe(0);
   expect(
     f.run(
       "Verify recovery tag",
@@ -837,3 +858,42 @@ test(
     }
   },
 );
+
+test("recovery rejects absent or outdated browser harness before testing or publishing", () => {
+  for (const mode of ["missing", "changed"]) {
+    const f = fixture();
+    const path = ".github/scripts/product-browser-check.py";
+    if (mode === "missing") {
+      f.git("rm", path);
+      f.git(
+        "-c",
+        "user.name=test",
+        "-c",
+        "user.email=test@example.test",
+        "commit",
+        "-qm",
+        "historical missing harness",
+      );
+    }
+    f.git("tag", "v1.2.0");
+    writeFileSync(join(f.dir, path), "# current harness fixture\n");
+    f.git("add", path);
+    f.git(
+      "-c",
+      "user.name=test",
+      "-c",
+      "user.email=test@example.test",
+      "commit",
+      "-qm",
+      "current harness",
+    );
+    const result = f.run(
+      "Resolve release source",
+      { GENERATOR_RECOVERY: "1.2.0" },
+      "resolve",
+    );
+    expect(result.status).not.toBe(0);
+    expect(result.stdout).toContain("Recovery unsupported:");
+    expect(existsSync(join(f.dir, "published"))).toBe(false);
+  }
+});

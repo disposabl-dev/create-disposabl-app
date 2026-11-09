@@ -2,6 +2,7 @@
 import importlib.util
 import contextlib
 import io
+import json
 from pathlib import Path
 import socket
 import subprocess
@@ -54,6 +55,27 @@ class RunnerTests(unittest.TestCase):
             with contextlib.redirect_stdout(output):
                 runner.report_e2e(path)
             self.assertEqual(output.getvalue(), 'E2E counts: passed=43, skipped=25\n')
+
+    def test_failed_flow_summary_excludes_private_payloads_and_unknown_paths(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            flows = root / 'packages/tests/flows'
+            flows.mkdir(parents=True)
+            (flows / 'safe.e2e.ts').write_text('test declaration\n')
+            report = root / 'packages/tests/.e2e/report.json'
+            report.parent.mkdir()
+            report.write_text(json.dumps({'run': {'results': [
+                {'status': 'failed', 'source': {'file': 'flows/safe.e2e.ts', 'line': 1},
+                 'titlePath': ['private-secret'], 'error': 'private-secret'},
+                {'status': 'failed', 'source': {'file': 'private-secret', 'line': 1}},
+                {'status': 'failed', 'source': {'file': 'flows/safe.e2e.ts', 'line': 99999}},
+            ]}}))
+            log = root / 'failure.log'
+            log.write_text('TimeoutError private-secret https://private-secret\n')
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                runner.report_failure(log, root)
+            self.assertEqual(output.getvalue(), 'Failure categories: timeout\nFailed flow declaration: flows/safe.e2e.ts:1\n')
 
     def test_isolation_rejects_root_on_linux(self):
         with patch.object(runner.sys, 'platform', 'linux'), patch.object(runner.os, 'geteuid', return_value=0):

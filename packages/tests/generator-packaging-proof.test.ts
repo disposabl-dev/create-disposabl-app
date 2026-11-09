@@ -154,17 +154,76 @@ test("product browser gate uses the reusable exact-source workflow", async () =>
         with: { source_sha: string };
         secrets?: unknown;
       };
-      web: { needs: string[] };
+      web: { needs: string[]; if: string };
+      publish: { needs: string[] };
+      packages: { needs: string[] };
+      "android-play": { needs: string[] };
     };
   };
   const reusable = (await parseWorkflow("product-checks.yml")) as {
     on: { workflow_call: { inputs: { source_sha: unknown } } };
     permissions: unknown;
-    jobs: { check: { steps: Array<{ name?: string; run?: string }> } };
+    jobs: {
+      check: {
+        steps: Array<{
+          name?: string;
+          run?: string;
+          uses?: string;
+          with?: Record<string, unknown>;
+        }>;
+      };
+    };
   };
   const gate = pipeline.jobs["product-checks"];
   assert.equal(gate.uses, "./.github/workflows/product-checks.yml");
   assert.ok(pipeline.jobs.web.needs.includes("product-checks"));
+  const webAllowed = new Function(
+    "needs",
+    "github",
+    "always",
+    "cancelled",
+    `return ${pipeline.jobs.web.if.replaceAll("needs.product-checks", 'needs["product-checks"]')}`,
+  );
+  for (const status of ["success", "failure", "cancelled", "skipped"]) {
+    assert.equal(
+      webAllowed(
+        {
+          changes: { result: "success", outputs: { changed: "true" } },
+          "product-checks": { result: status },
+        },
+        {
+          repository: "disposabl-dev/create-disposabl-app",
+          event_name: "push",
+        },
+        () => true,
+        () => false,
+      ),
+      status === "success",
+    );
+  }
+  for (const name of ["publish", "packages", "android-play"] as const)
+    assert.ok(pipeline.jobs[name].needs.includes("web"));
+  const checkout = reusable.jobs.check.steps.find((step) =>
+    step.uses?.startsWith("actions/checkout@"),
+  );
+  assert.equal(checkout?.with?.ref, "${{ inputs.source_sha }}");
+  const runStep = (name: string) =>
+    reusable.jobs.check.steps.find((step) => step.name === name)?.run ?? "";
+  assert.equal(
+    runStep("Install frozen dependencies"),
+    "bun install --frozen-lockfile",
+  );
+  assert.match(runStep("Verify requested source"), /git rev-parse HEAD/);
+  assert.match(runStep("Verify requested source"), /EXPECTED_SOURCE/);
+  assert.match(
+    runStep("Run isolated product web and backend E2E"),
+    /sudo unshare --net --fork/,
+  );
+  assert.match(
+    runStep("Run isolated product web and backend E2E"),
+    /exec runuser -u/,
+  );
+  assert.match(runStep("Run isolated product web and backend E2E"), /env -i/);
   assert.match(
     gate.with.source_sha,
     /github\.event\.pull_request\.head\.sha \|\| github\.sha/,

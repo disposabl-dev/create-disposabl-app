@@ -60,6 +60,12 @@ jobs:
             fi
             sha=$(git rev-parse --verify "refs/tags/${tag}^{commit}")
             git merge-base --is-ancestor "$sha" "$EVENT_SHA"
+            # Historical recovery is supported only with the current isolation harness.
+            for path in .github/scripts/product-browser-check.py .github/scripts/product-browser-check-test.py packages/tests/helpers/sdk-auth/run.py packages/tests/helpers/sdk-auth/selected_auth.py; do
+              current=$(git rev-parse --verify "${EVENT_SHA}:${path}")
+              candidate=$(git rev-parse --verify "${sha}:${path}" 2>/dev/null) || { echo "Recovery unsupported: missing current browser harness (${path})."; exit 1; }
+              [[ "$current" == "$candidate" ]] || { echo "Recovery unsupported: browser harness differs (${path})."; exit 1; }
+            done
           fi
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
 
