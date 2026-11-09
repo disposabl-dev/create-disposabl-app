@@ -80,8 +80,14 @@ export const renew = action({
 });
 export const expire = mutation({
   args: { sessionId: v.id("computeSessions") },
-  handler: (ctx, { sessionId }) =>
-    ctx.db.patch(sessionId, { paidUntil: Date.now() - 1 }),
+  handler: async (ctx, { sessionId }) => {
+    const session = await ctx.db.get(sessionId);
+    if (!session || session.state !== "active" || !session.debitId)
+      throw new Error("Expected a funded active session");
+    const deadline = Date.now() - 1;
+    await ctx.db.patch(sessionId, { paidUntil: deadline });
+    await ctx.db.patch(session.debitId, { paidUntil: deadline });
+  },
 });
 export const setOutcome = mutation({
   args: {
