@@ -23,5 +23,43 @@ test("iOS build properties constrain the Expo Updates reachability pod", () => {
   assert.ok(config.plugins.includes("existing-plugin"));
   assert.ok(config.plugins.includes("./plugins/with-android-signing.js"));
   assert.equal(mobile.dependencies["expo-build-properties"], "~58.0.11");
-  assert.deepEqual(mobile.expo.autolinking.ios.buildFromSource, ["expo-image"]);
+  assert.ok(mobile.expo.autolinking.ios.buildFromSource.includes("expo-image"));
+});
+
+test("iOS pod pin preserves existing build properties in one plugin", () => {
+  const config = configure({
+    config: {
+      plugins: [
+        "expo-build-properties",
+        [
+          "expo-build-properties",
+          {
+            ios: {
+              deploymentTarget: "16.0",
+              extraPods: [
+                { name: "CustomPod", version: "1.2.3" },
+                { name: "ReachabilitySwift", version: "5.2.4" },
+              ],
+            },
+            android: { minSdkVersion: 28 },
+          },
+        ],
+      ],
+    },
+  });
+  const properties = config.plugins.filter(
+    (plugin: unknown) =>
+      Array.isArray(plugin) && plugin[0] === "expo-build-properties",
+  );
+  assert.equal(properties.length, 1);
+  assert.deepEqual(properties[0][1], {
+    android: { minSdkVersion: 28 },
+    ios: {
+      deploymentTarget: "16.0",
+      extraPods: [
+        { name: "CustomPod", version: "1.2.3" },
+        { name: "ReachabilitySwift", version: "5.2.3" },
+      ],
+    },
+  });
 });

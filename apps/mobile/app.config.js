@@ -46,6 +46,32 @@ module.exports = ({ config }) => {
       );
     }
   }
+  const plugins = config.plugins || [];
+  const isBuildProperties = (plugin) =>
+    (Array.isArray(plugin) ? plugin[0] : plugin) === "expo-build-properties";
+  const buildProperties = plugins
+    .filter(isBuildProperties)
+    .reduce((merged, plugin) => {
+      const options = Array.isArray(plugin) ? plugin[1] || {} : {};
+      return {
+        ...merged,
+        ...options,
+        android: { ...merged.android, ...options.android },
+        ios: {
+          ...merged.ios,
+          ...options.ios,
+          extraPods: [
+            ...(merged.ios?.extraPods || []),
+            ...(options.ios?.extraPods || []),
+          ],
+        },
+      };
+    }, {});
+  // 5.2.4 omits the collected-data array used by Xcode's privacy report.
+  // Revisit when https://github.com/ashleymills/Reachability.swift/issues/423 is fixed.
+  const extraPods = (buildProperties.ios?.extraPods || []).filter(
+    (pod) => pod.name !== "ReachabilitySwift",
+  );
   return {
     ...config,
     scheme:
@@ -89,14 +115,19 @@ module.exports = ({ config }) => {
       versionCode,
     },
     plugins: [
-      ...(config.plugins || []),
+      ...plugins.filter((plugin) => !isBuildProperties(plugin)),
       "./plugins/with-android-signing.js",
-      // 5.2.4 omits the collected-data array used by Xcode's privacy report.
-      // Revisit when https://github.com/ashleymills/Reachability.swift/issues/423 is fixed.
       [
         "expo-build-properties",
         {
-          ios: { extraPods: [{ name: "ReachabilitySwift", version: "5.2.3" }] },
+          ...buildProperties,
+          ios: {
+            ...buildProperties.ios,
+            extraPods: [
+              ...extraPods,
+              { name: "ReachabilitySwift", version: "5.2.3" },
+            ],
+          },
         },
       ],
       ...(process.env.EXPO_PUBLIC_E2E === "true"
