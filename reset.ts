@@ -25,6 +25,7 @@ if (
 // Product-only proof harnesses must not enter generated apps. Keep the same
 // paths in the symlink validation and removal inventories.
 const productProofTests = [
+  "packages/tests/compute-stop.test.ts",
   "packages/tests/flows/billing-checkout-auth.e2e.ts",
   "packages/tests/fixtures/billing-checkout-browser",
   "packages/tests/flows/sdk-auth.e2e.ts",
@@ -97,6 +98,7 @@ const touched = [
   "packages/backend/convex/users/authDeletion.ts",
   "packages/backend/convex/users/fileDeletion.ts",
   "packages/backend/convex/users/ephemeralDeletion.ts",
+  "packages/backend/convex/users/localDeletion.ts",
   "packages/backend/convex",
   "packages/backend/generated",
   "packages/backend/package.json",
@@ -334,6 +336,7 @@ for (const path of [
   "packages/backend/convex/users/authDeletion.ts",
   "packages/backend/convex/users/fileDeletion.ts",
   "packages/backend/convex/users/ephemeralDeletion.ts",
+  "packages/backend/convex/users/localDeletion.ts",
   "packages/tests/generator-service-origin.test.ts",
   "packages/tests/mobile-attachment-lifecycle.test.ts",
   "packages/tests/components/mobile-attachment-lifecycle.test.mjs",

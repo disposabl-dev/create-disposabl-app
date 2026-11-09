@@ -12,6 +12,8 @@ import {
 } from "../create-disposabl-app/options";
 
 const excluded = [
+  "packages/tests/compute-stop.test.ts",
+  "packages/backend/convex/users/localDeletion.ts",
   "packages/tests/flows/billing-checkout-auth.e2e.ts",
   "packages/tests/fixtures/billing-checkout-browser",
   "packages/tests/flows/sdk-auth.e2e.ts",
