@@ -12,6 +12,8 @@ import {
 } from "../create-disposabl-app/options";
 
 const excluded = [
+  "packages/tests/fixtures/starter-payment-reconfigure",
+  "packages/tests/starter-payment-reconfigure.test.ts",
   "packages/tests/flows/support-contact.e2e.ts",
   "packages/tests/fixtures/compute-convex",
   "packages/tests/fixtures/telemetry-guard-convex",
