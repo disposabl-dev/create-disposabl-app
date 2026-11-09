@@ -4,6 +4,7 @@ export const computeSessionFields = {
   userId: v.string(),
   state: v.union(
     v.literal("starting"),
+    v.literal("renewing"),
     v.literal("active"),
     v.literal("stopping"),
     v.literal("stopped"),

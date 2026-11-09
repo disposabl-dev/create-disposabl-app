@@ -232,7 +232,19 @@ test("two apps share a session; duplicate dispatch and renewal claims cannot cha
     await sessionAllows(f.ctx, f.sessionId, "owner", f.debit.paidUntil, true),
     false,
   );
-  f.rows.get(f.sessionId).paidUntil = 0;
+  f.rows.get(f.sessionId).paidUntil = f.debit.paidUntil = 1;
+  const next = await claimWindow(
+    f.ctx,
+    { sessionId: f.sessionId, expectedDebit: f.debit._id },
+    true,
+  );
+  assert.ok(next);
+  assert.equal(f.rows.get(f.sessionId).state, "renewing");
+  assert.equal(
+    await sessionAllows(f.ctx, f.sessionId, "owner", Date.now(), true),
+    false,
+  );
+  await assert.rejects(admitSession(f.ctx, "owner", true));
   assert.equal(
     await claimWindow(
       f.ctx,
@@ -241,10 +253,20 @@ test("two apps share a session; duplicate dispatch and renewal claims cannot cha
     ),
     null,
   );
-  assert.equal(f.rows.get(f.sessionId).state, "stopping");
+  await (settle as any)._handler(f.ctx, {
+    debitId: next._id,
+    outcome: "confirmed",
+    responseBalance: 0,
+  });
+  assert.equal(f.rows.get(f.sessionId).state, "active");
+  assert.equal(
+    f.rows.get(f.sessionId).paidUntil,
+    f.rows.get(next._id).paidUntil,
+  );
+  assert.ok(f.rows.get(f.sessionId).paidUntil >= Date.now() + 599_000);
   assert.equal(
     [...f.rows.values()].filter((r) => r.table === "computeDebits").length,
-    1,
+    2,
   );
 });
 
@@ -268,13 +290,91 @@ test("lost debit response stays held, even after stop and a late success respons
   );
 });
 
+test("renewal denial stops and uncertain outcomes hold without a repeat debit or late revival", async () => {
+  for (const outcome of ["denied", "unknown"] as const) {
+    const f = await running();
+    await (settle as any)._handler(f.ctx, {
+      debitId: f.debit._id,
+      outcome: "confirmed",
+    });
+    f.rows.get(f.sessionId).paidUntil = f.debit.paidUntil = 1;
+    const renewal = await claimWindow(
+      f.ctx,
+      { sessionId: f.sessionId, expectedDebit: f.debit._id },
+      true,
+    );
+    assert.ok(renewal);
+    await (settle as any)._handler(f.ctx, { debitId: renewal._id, outcome });
+    assert.equal(
+      f.rows.get(f.sessionId).state,
+      outcome === "denied" ? "stopping" : "hold",
+    );
+    assert.equal(
+      await claimWindow(
+        f.ctx,
+        { sessionId: f.sessionId, expectedDebit: renewal._id },
+        true,
+      ),
+      null,
+    );
+    await (settle as any)._handler(f.ctx, {
+      debitId: renewal._id,
+      outcome: "confirmed",
+      responseBalance: 4,
+    });
+    assert.equal(f.rows.get(f.sessionId).state, "hold");
+    assert.equal(f.rows.get(renewal._id).lateConfirmation.responseBalance, 4);
+    assert.equal(
+      [...f.rows.values()].filter((row) => row.table === "computeDebits")
+        .length,
+      2,
+    );
+  }
+});
+
+test("deletion pending before or during renewal never grants a new window", async () => {
+  for (const phase of ["before", "during"] as const) {
+    const f = await running();
+    await (settle as any)._handler(f.ctx, {
+      debitId: f.debit._id,
+      outcome: "confirmed",
+    });
+    f.rows.get(f.sessionId).paidUntil = f.debit.paidUntil = 1;
+    if (phase === "before") f.rows.get("owner").deletionRequestedAt = 1;
+    const renewal = await claimWindow(
+      f.ctx,
+      { sessionId: f.sessionId, expectedDebit: f.debit._id },
+      true,
+    );
+    if (phase === "before") {
+      assert.equal(renewal, null);
+      assert.equal(f.rows.get(f.sessionId).state, "stopping");
+    } else {
+      assert.ok(renewal);
+      f.rows.get("owner").deletionRequestedAt = 1;
+      await (settle as any)._handler(f.ctx, {
+        debitId: renewal._id,
+        outcome: "confirmed",
+        responseBalance: 0,
+      });
+      assert.equal(f.rows.get(f.sessionId).state, "hold");
+      assert.equal(f.rows.get(renewal._id).state, "confirmed");
+      assert.equal(f.rows.get(renewal._id).paidUntil, 0);
+    }
+    assert.equal(
+      await sessionAllows(f.ctx, f.sessionId, "owner", Date.now(), true),
+      false,
+    );
+  }
+});
+
 test("idle boundary stops without another debit and old timers cannot charge a new session", async () => {
   const f = await running();
   await (settle as any)._handler(f.ctx, {
     debitId: f.debit._id,
     outcome: "confirmed",
   });
-  f.rows.get(f.sessionId).paidUntil = 0;
+  f.rows.get(f.sessionId).paidUntil = f.debit.paidUntil = 1;
   f.rows.get(f.appId).agent.status = "idle";
   assert.equal(
     await claimWindow(

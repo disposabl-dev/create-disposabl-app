@@ -93,18 +93,39 @@ export async function claimWindow(
   const session = await ctx.db.get("computeSessions", sessionId);
   if (!session || !["starting", "active"].includes(session.state)) return null;
   if (session.debitId !== expectedDebit) return null;
+  if (session.state === "starting" && expectedDebit) return null;
   if (session.state === "active") {
+    if (!expectedDebit || session.paidUntil <= 0) return null;
     if (session.paidUntil > Date.now()) return null;
-    // A debit dispatched after expiry cannot prove the balance existed at the deadline.
+  }
+  if (expectedDebit) {
+    const previous = await ctx.db.get("computeDebits", expectedDebit);
+    if (
+      previous?.state !== "confirmed" ||
+      previous.sessionId !== sessionId ||
+      (session.state === "active" && previous.paidUntil !== session.paidUntil)
+    )
+      return null;
+  }
+  const latest = await ctx.db
+    .query("computeSessions")
+    .withIndex("by_userId", (q) => q.eq("userId", session.userId))
+    .order("desc")
+    .first();
+  if (
+    latest?._id !== sessionId ||
+    session.reconciliationConflict ||
+    session.untrackedConflicts ||
+    session.stopConfirmed ||
+    session.stopLease
+  )
+    return null;
+  if (await deletionPending(ctx, session.userId)) {
     await ctx.db.patch("computeSessions", sessionId, { state: "stopping" });
     await ctx.scheduler.runAfter(0, internal.agent.actions.compute.stop, {
       sessionId,
     });
     return null;
-  }
-  if (expectedDebit) {
-    const previous = await ctx.db.get("computeDebits", expectedDebit);
-    if (previous?.state !== "confirmed") return null;
   }
   const active = await ctx.db
     .query("apps")
@@ -124,9 +145,13 @@ export async function claimWindow(
   const debitId = await ctx.db.insert("computeDebits", {
     sessionId,
     state: "dispatching",
+    // A window is granted only when this debit is confirmed.
     paidUntil: 0,
   });
-  await ctx.db.patch("computeSessions", sessionId, { debitId });
+  await ctx.db.patch("computeSessions", sessionId, {
+    debitId,
+    ...(session.state === "active" ? { state: "renewing" as const } : {}),
+  });
   await ctx.scheduler.runAfter(60_000, internal.agent.compute.uncertain, {
     debitId,
   });
@@ -220,11 +245,12 @@ export const settle = internalMutation({
     }
     if (!session || session.debitId !== debitId) return null;
     const now = Date.now();
-    const initial = session.state === "starting";
-    const activateInitial =
+    const funding =
+      session.state === "starting" || session.state === "renewing";
+    const activateFunding =
       outcome === "confirmed" &&
-      initial &&
-      session.paidUntil === 0 &&
+      funding &&
+      (session.state === "renewing" || session.paidUntil === 0) &&
       !session.reconciliationConflict &&
       !session.untrackedConflicts &&
       !session.stopConfirmed &&
@@ -232,19 +258,13 @@ export const settle = internalMutation({
       now < debit._creationTime + 60_000 &&
       current?._id === session._id &&
       !(await deletionPending(ctx, session.userId));
-    const paidUntil = activateInitial ? now + WINDOW_MS : debit.paidUntil;
+    const paidUntil = activateFunding ? now + WINDOW_MS : debit.paidUntil;
     await ctx.db.patch("computeDebits", debitId, {
       state: outcome,
-      ...(activateInitial ? { paidUntil } : {}),
+      ...(activateFunding ? { paidUntil } : {}),
       ...(responseBalance !== undefined ? { responseBalance } : {}),
     });
-    if (
-      outcome === "confirmed" &&
-      (activateInitial ||
-        (session.state === "active" &&
-          session.paidUntil > now &&
-          paidUntil > now))
-    ) {
+    if (outcome === "confirmed" && activateFunding) {
       await ctx.db.patch("computeSessions", session._id, {
         state: "active",
         paidUntil,

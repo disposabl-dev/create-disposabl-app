@@ -58,7 +58,7 @@ export async function computeAccess(
     await fund(ctx, sessionId);
     session = await ctx.runQuery(internal.agent.compute.get, { sessionId });
   }
-  if (!session || !["starting", "active"].includes(session.state))
+  if (!session || !["starting", "active", "renewing"].includes(session.state))
     return "blocked";
   return session.state === "active" && session.paidUntil > Date.now()
     ? "ready"

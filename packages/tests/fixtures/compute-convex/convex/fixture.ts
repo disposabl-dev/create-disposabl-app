@@ -150,6 +150,24 @@ export const expire = mutation({
   args: { sessionId: v.id("computeSessions") },
   handler: (ctx, a) => ctx.db.patch(a.sessionId, { paidUntil: Date.now() - 1 }),
 });
+// Move both sides of a confirmed synthetic window to its boundary.
+export const expireFundedWindow = mutation({
+  args: { sessionId: v.id("computeSessions") },
+  handler: async (ctx, { sessionId }) => {
+    const session = await ctx.db.get(sessionId);
+    const debit = session?.debitId && (await ctx.db.get(session.debitId));
+    if (
+      !session ||
+      session.state !== "active" ||
+      !debit ||
+      debit.state !== "confirmed"
+    )
+      throw new Error("Expected a confirmed active window");
+    const paidUntil = Date.now() - 1;
+    await ctx.db.patch(sessionId, { paidUntil });
+    await ctx.db.patch(debit._id, { paidUntil });
+  },
+});
 export const beginStop = mutation({
   args: { sessionId: v.id("computeSessions") },
   handler: (ctx, { sessionId }) =>

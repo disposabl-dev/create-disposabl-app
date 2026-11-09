@@ -484,7 +484,7 @@ test(
 );
 
 test(
-  "expired active window stops without dispatching another debit",
+  "expired active window serializes one renewal and fences work pending confirmation",
   { skip: !url },
   async () => {
     const userId = await call("seedUser", {});
@@ -492,15 +492,66 @@ test(
     await call("app", { userId, sessionId, threadId: randomUUID() });
     const first = await call("claim", { sessionId });
     await call("settleDebit", { debitId: first._id, outcome: "confirmed" });
-    await call("expire", { sessionId });
+    await call("expireFundedWindow", { sessionId });
     const claims = await Promise.all(
       Array.from({ length: 8 }, () =>
         call("claim", { sessionId, expectedDebit: first._id }),
       ),
     );
-    assert.ok(claims.every((claim) => claim === null));
-    assert.equal((await call("debits", { sessionId }, true)).length, 1);
-    assert.equal((await call("get", { sessionId }, true)).state, "stopping");
+    const next = claims.filter(Boolean);
+    assert.equal(next.length, 1);
+    assert.equal((await call("debits", { sessionId }, true)).length, 2);
+    assert.equal((await call("get", { sessionId }, true)).state, "renewing");
+    assert.equal(
+      await call("allowed", { sessionId, userId, now: Date.now() }, true),
+      false,
+    );
+    await assert.rejects(call("admit", { userId }));
+    const before = Date.now();
+    await call("settleDebit", {
+      debitId: next[0]._id,
+      outcome: "confirmed",
+      responseBalance: 0,
+    });
+    const session = await call("get", { sessionId }, true);
+    assert.equal(session.state, "active");
+    assert.ok(session.paidUntil >= before + 600_000);
+    assert.equal(
+      await call("allowed", { sessionId, userId, now: Date.now() }, true),
+      true,
+    );
+  },
+);
+
+test(
+  "denied and ambiguous renewal results fence the session without another charge",
+  { skip: !url },
+  async () => {
+    for (const outcome of ["denied", "unknown"] as const) {
+      const userId = await call("seedUser", {});
+      const sessionId = await call("admit", { userId });
+      await call("app", { userId, sessionId, threadId: randomUUID() });
+      const first = await call("claim", { sessionId });
+      await call("settleDebit", { debitId: first._id, outcome: "confirmed" });
+      await call("expireFundedWindow", { sessionId });
+      const renewal = await call("claim", {
+        sessionId,
+        expectedDebit: first._id,
+      });
+      await call("settleDebit", { debitId: renewal._id, outcome });
+      const session = await call("get", { sessionId }, true);
+      assert.equal(session.state, outcome === "denied" ? "stopping" : "hold");
+      assert.equal(
+        await call("allowed", { sessionId, userId, now: Date.now() }, true),
+        false,
+      );
+      assert.equal(
+        await call("claim", { sessionId, expectedDebit: renewal._id }),
+        null,
+      );
+      assert.equal((await call("debits", { sessionId }, true)).length, 2);
+      await assert.rejects(call("admit", { userId }));
+    }
   },
 );
 
