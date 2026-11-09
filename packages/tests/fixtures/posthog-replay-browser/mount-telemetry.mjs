@@ -373,7 +373,7 @@ try {
       );
     }
     assert.ok(
-      !paths.some((path) => path.includes("/s/") || path.includes("/config")),
+      !paths.some((path) => /\/(?:s|config)(?:[/.]|$)/.test(path)),
       "recording or remote configuration request",
     );
     assert.equal(
