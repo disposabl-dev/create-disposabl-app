@@ -68,13 +68,56 @@ test(
       await m("link:begin", { id: row._id, eventId, attempts: 1 }),
       true,
     );
+    for (const attempts of [2, 3, 4])
+      assert.equal(
+        await m("link:begin", { id: row._id, eventId, attempts }),
+        true,
+      );
+    await m("link:setRetryAfter", {
+      id: row._id,
+      retryAfter: Date.now() + 300_000,
+    });
+    await m("link:claim", {
+      hash: "synthetic-anon",
+      newHash: "before-cooldown",
+      userId: owner.userId,
+      link: candidate,
+    });
+    assert.equal(
+      (await q("link:identity", { hash: "synthetic-anon" })).link.attempts,
+      5,
+    );
+    await m("link:setRetryAfter", { id: row._id, retryAfter: 0 });
+    await Promise.all([
+      m("link:claim", {
+        hash: "synthetic-anon",
+        newHash: "after-one",
+        userId: owner.userId,
+        link: candidate,
+      }),
+      m("link:claim", {
+        hash: "synthetic-anon",
+        newHash: "after-two",
+        userId: owner.userId,
+        link: candidate,
+      }),
+    ]);
+    const restarted = (await q("link:identity", { hash: "synthetic-anon" }))
+      .link;
+    assert.equal(restarted.attempts, 0);
+    assert.equal(restarted.eventId, eventId);
+    assert.equal(restarted.createdAt, row.link.createdAt);
+    assert.equal(
+      await m("link:begin", { id: row._id, eventId, attempts: 0 }),
+      true,
+    );
     await m("link:finish", { id: row._id, eventId, success: true });
     assert.equal(
       (await q("link:identity", { hash: "synthetic-anon" })).link,
       undefined,
     );
     assert.equal(
-      await m("link:begin", { id: row._id, eventId, attempts: 2 }),
+      await m("link:begin", { id: row._id, eventId, attempts: 1 }),
       false,
     );
     const cross = await m("link:claim", {
@@ -88,6 +131,15 @@ test(
       (await q("link:identity", { hash: "synthetic-anon" })).userId,
       owner.userId,
     );
+    await m("link:claim", { newHash: "deleting-anon" });
+    await m("link:claim", {
+      hash: "deleting-anon",
+      newHash: "unused-delete",
+      userId: owner.userId,
+      link: candidate,
+    });
+    const deletingRow = await q("link:identity", { hash: "deleting-anon" });
+    assert.ok(await q("link:lookup", { id: deletingRow._id }));
     await m("fixture:reRequest", { userId: owner.userId, requestedAt: 111 });
     await assert.rejects(
       m("link:claim", {
@@ -97,6 +149,6 @@ test(
         link: candidate,
       }),
     );
-    assert.equal(await q("link:lookup", { id: row._id }), null);
+    assert.equal(await q("link:lookup", { id: deletingRow._id }), null);
   },
 );

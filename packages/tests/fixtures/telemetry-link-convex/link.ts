@@ -47,3 +47,14 @@ export const identity = query({
       .withIndex("by_hash", (q) => q.eq("hash", hash))
       .unique(),
 });
+
+// Only the test fixture may move the synthetic cooldown; production time is unchanged.
+export const setRetryAfter = mutation({
+  args: { id: v.id("telemetryIdentities"), retryAfter: v.number() },
+  handler: async (ctx, { id, retryAfter }) => {
+    const row = await ctx.db.get(id);
+    if (!row?.link) throw new Error("Missing synthetic pending link");
+    await ctx.db.patch(id, { link: { ...row.link, retryAfter } });
+    return null;
+  },
+});
