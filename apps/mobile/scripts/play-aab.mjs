@@ -32,6 +32,15 @@ if (
   )
 )
   throw new Error("Invalid upload certificate SHA256");
+const rawPlayCertSha1 = env.PLAY_UPLOAD_CERT_SHA1 || "";
+if (
+  rawPlayCertSha1 &&
+  !/^(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{2}(?::[0-9a-fA-F]{2}){19})$/.test(
+    rawPlayCertSha1,
+  )
+)
+  throw new Error("Invalid upload certificate SHA1");
+const playCertSha1 = rawPlayCertSha1.replaceAll(":", "").toUpperCase();
 const version = required("DISPOSABL_ANDROID_VERSION_CODE");
 const previous = env.PLAY_PREVIOUS_VERSION_CODE || "";
 if (!/^[1-9]\d*$/.test(version) || BigInt(version) > 2100000000n)
@@ -84,6 +93,19 @@ const keyInfo = run(
   { env: { ...env, LANG: "C", LC_ALL: "C" } },
 );
 const signingCert = fingerprint(keyInfo);
+if (playCertSha1) {
+  const values = [
+    ...keyInfo.matchAll(
+      /^\s*SHA1:\s*((?:[0-9a-fA-F]{2}:){19}[0-9a-fA-F]{2})\s*$/gm,
+    ),
+  ];
+  if (values.length !== 1)
+    throw new Error("Expected exactly one SHA1 certificate fingerprint");
+  if (values[0][1].replaceAll(":", "").toUpperCase() !== playCertSha1)
+    throw new Error(
+      "Keystore certificate SHA1 does not match supplied Play upload certificate",
+    );
+}
 if (playCert && signingCert !== playCert)
   throw new Error(
     "Keystore certificate does not match verified Play upload certificate",
@@ -185,6 +207,9 @@ console.log(
       signingCertificateSha256: signingCert,
       signingCertificateSource: "selected keystore",
       playUploadCertificate: playCert
+        ? "matched supplied fingerprint"
+        : "unchecked",
+      playUploadCertificateSha1: playCertSha1
         ? "matched supplied fingerprint"
         : "unchecked",
       playPreviousVersion: previous

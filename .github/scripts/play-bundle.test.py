@@ -30,6 +30,7 @@ assert "needs.web.outputs.android_build == 'true' && !(github.event_name == 'pus
 job=workflow.split('  android-play:',1)[1].split('  android-failure:',1)[0]
 assert "needs: [changes, web]" in job and "github.event_name == 'push' && github.repository == 'disposabl-dev/create-disposabl-app'" in job
 assert 'EXPO_PUBLIC_DISPOSABL_ANALYTICS_ENABLED: "true"' in job and 'UPDATE_POLICY: disabled' in job
+assert 'PLAY_UPLOAD_CERT_SHA1: "B5:8D:03:56:8C:BC:03:62:D4:A8:7A:0E:63:EC:83:C9:55:B0:29:A7"' in job
 assert 'eas-cli@27.2.0 submit --platform android --profile production --path' in job
 assert '$((1000 + 100 * GITHUB_RUN_NUMBER + GITHUB_RUN_ATTEMPT))' in job
 allocation=textwrap.dedent(job.split('      - name: Build signed production bundle',1)[1].split('        run: |\n',1)[1].split('          bash .github/scripts/play-bundle.sh build',1)[0])
