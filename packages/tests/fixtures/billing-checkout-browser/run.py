@@ -79,7 +79,7 @@ def main():
         (scope / dep.name).symlink_to(source / 'packages/disposabl-kit' if dep.name == 'disposabl-kit' else dep, target_is_directory=dep.is_dir())
     home = stage / 'home'
     home.mkdir()
-    env = {'PATH': os.environ['PATH'], 'HOME': str(home), 'TMPDIR': str(stage), 'E2E_TELEMETRY_DISABLED': '1', 'DO_NOT_TRACK': '1', 'EXPO_NO_TELEMETRY': '1'}
+    env = {'PATH': os.environ['PATH'], 'HOME': str(home), 'TMPDIR': str(stage), 'E2E_TELEMETRY_DISABLED': '1', 'DO_NOT_TRACK': '1', 'EXPO_NO_TELEMETRY': '1', 'PLAYWRIGHT_BROWSERS_PATH': str(Path.home() / 'Library/Caches/ms-playwright')}
     subprocess.run(['bun', str(source / 'packages/tests/fixtures/billing-checkout-browser/prepare.ts'), str(source)], cwd=source, env=env, check=True)
     name = 'billing-checkout-fixture'
     secret = secrets.token_hex(32)
