@@ -112,37 +112,54 @@ try {
     return route.abort();
   });
   await page.goto("https://fixture.invalid/");
-  if (mode === "desktop")
+  async function mount() {
+    if (mode === "desktop")
+      await page.evaluate(() => {
+        window.disposablDesktop = { authentication: true };
+      });
+    await page.addScriptTag({ content: await bundle.outputs[0].text() });
     await page.evaluate(() => {
-      window.disposablDesktop = { authentication: true };
+      window.fixtureAllowed = true;
+      window.adapter = window.createWebTelemetryAdapter({
+        origin: "https://fixture.invalid",
+        transport: (...args) => {
+          window.fixtureAttempts = (window.fixtureAttempts || 0) + 1;
+          return fetch(...args)
+            .then(async (response) => {
+              window.fixtureStatus = response.status;
+              window.fixtureReply = await response.clone().json();
+              return response;
+            })
+            .catch((error) => {
+              window.fixtureTransportError = error.message;
+              throw error;
+            });
+        },
+        page: () => location.pathname,
+        allowed: () => window.fixtureAllowed,
+        source: window.productTelemetrySource(),
+      });
+      window.adapter.update({ enabled: true, token: null });
     });
-  await page.addScriptTag({ content: await bundle.outputs[0].text() });
-  await page.evaluate(() => {
-    window.fixtureAllowed = true;
-    window.adapter = window.createWebTelemetryAdapter({
-      origin: "https://fixture.invalid",
-      transport: (...args) => {
-        window.fixtureAttempts = (window.fixtureAttempts || 0) + 1;
-        return fetch(...args)
-          .then(async (response) => {
-            window.fixtureStatus = response.status;
-            window.fixtureReply = await response.clone().json();
-            return response;
-          })
-          .catch((error) => {
-            window.fixtureTransportError = error.message;
-            throw error;
-          });
-      },
-      page: () => location.pathname,
-      allowed: () => window.fixtureAllowed,
-      source: window.productTelemetrySource(),
-    });
-    window.adapter.update({ enabled: true, token: null });
-  });
+  }
+  await mount();
   await page.waitForTimeout(500);
+  assert.equal(
+    await page.evaluate(() =>
+      sessionStorage.getItem("disposabl.product.analytics.anonymous.v1"),
+    ),
+    "00000000-0000-4000-8000-000000000001",
+  );
+  await page.evaluate(() => window.adapter.stop());
+  await page.reload();
+  await mount();
+  await page.waitForTimeout(500);
+  assert.deepEqual(JSON.parse(bootstrapBodies[0]), {});
+  assert.deepEqual(JSON.parse(bootstrapBodies[1]), {
+    anonymousId: "00000000-0000-4000-8000-000000000001",
+  });
   const firstView = requests.length;
-  assert.equal(firstView, 1, "initial view must capture once");
+  assert.equal(firstView, 2, "each page load must capture once");
   await page.evaluate(() => {
     window.adapter.page();
     window.adapter.page();
@@ -192,8 +209,19 @@ try {
     await page.waitForTimeout(400);
   }
   await state("A");
+  assert.deepEqual(JSON.parse(bootstrapBodies.at(-1)), {
+    anonymousId: "00000000-0000-4000-8000-000000000001",
+  });
+  assert.equal(
+    await page.evaluate(() =>
+      sessionStorage.getItem("disposabl.product.analytics.anonymous.v1"),
+    ),
+    null,
+  );
   await state("B");
+  assert.deepEqual(JSON.parse(bootstrapBodies.at(-1)), {});
   await state(null);
+  assert.deepEqual(JSON.parse(bootstrapBodies.at(-1)), {});
   await page.evaluate(() => {
     window.adapter.action("copy_setup");
     window.adapter.action("open_setup");
@@ -222,6 +250,12 @@ try {
   });
   const countAtOptOut = requests.length;
   await page.waitForTimeout(400);
+  assert.equal(
+    await page.evaluate(() =>
+      sessionStorage.getItem("disposabl.product.analytics.anonymous.v1"),
+    ),
+    null,
+  );
   assert.equal(requests.length, countAtOptOut, "new capture after opt-out");
   const beforeReenable = requests.length;
   await page.evaluate(() => {
@@ -229,6 +263,7 @@ try {
     window.adapter.update({ enabled: true, token: null });
   });
   await page.waitForTimeout(400);
+  assert.deepEqual(JSON.parse(bootstrapBodies.at(-1)), {});
   await page.evaluate(() => window.adapter.action("open_connections"));
   await page.waitForTimeout(400);
   assert.ok(

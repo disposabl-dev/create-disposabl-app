@@ -9,6 +9,7 @@ import {
 
 const preferenceKey = "disposabl.product.analytics.optout.v1";
 const preferenceEvent = "disposabl-product-analytics-preference";
+const anonymousKey = "disposabl.product.analytics.anonymous.v1";
 let storageFailed = false;
 function allowed() {
   try {
@@ -95,6 +96,11 @@ export function createWebTelemetryAdapter(options: {
   const controller = createTelemetryLeaseController({
     origin: options.origin,
     transport: options.transport,
+    anonymousStorage: {
+      read: () => sessionStorage.getItem(anonymousKey),
+      write: (id) => sessionStorage.setItem(anonymousKey, id),
+      clear: () => sessionStorage.removeItem(anonymousKey),
+    },
     adapter: {
       renew(lease) {
         deadline = Math.min(lease.expiresAt, Date.now() + 30_000);
@@ -213,12 +219,21 @@ export function ProductTelemetry({
       allowed,
       source: productTelemetrySource(),
     });
-    const update = () =>
+    const update = () => {
+      if (!allowed())
+        return adapter.update({
+          enabled: false,
+          token: identity.current.token,
+        });
+      if (!identity.current.ready) return adapter.stop();
       adapter.update({
-        enabled: allowed() && identity.current.ready,
+        enabled: true,
         token: identity.current.token,
       });
-    stopActive = adapter.stop;
+    };
+    const optOut = () =>
+      adapter.update({ enabled: false, token: identity.current.token });
+    stopActive = optOut;
     sendAction = adapter.action;
     capture.current = adapter.page;
     const reportError = () => adapter.error();
@@ -241,7 +256,7 @@ export function ProductTelemetry({
       window.removeEventListener("error", reportError);
       window.removeEventListener("unhandledrejection", reportError);
       window.removeEventListener("click", reportAction);
-      if (stopActive === adapter.stop) stopActive = undefined;
+      if (stopActive === optOut) stopActive = undefined;
       if (sendAction === adapter.action) sendAction = undefined;
       capture.current = undefined;
       adapter.stop();

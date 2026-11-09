@@ -21,6 +21,195 @@ const reply = (extra = {}) =>
   );
 const tick = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
+test("anonymous capability survives stop and reload, links once, and rotates on logout or account switch", async () => {
+  let saved: string | null = null;
+  const store = {
+    read: () => saved,
+    write: (value: string) => {
+      saved = value;
+    },
+    clear: () => {
+      saved = null;
+    },
+  };
+  const bodies: Array<Record<string, string>> = [];
+  const make = () =>
+    createTelemetryLeaseController({
+      origin: "http://local",
+      anonymousStorage: store,
+      transport: async (_url, init) => {
+        bodies.push(JSON.parse(String(init?.body)));
+        return reply({
+          identified: Boolean(
+            (init?.headers as Record<string, string>)?.Authorization,
+          ),
+        });
+      },
+      adapter: { start() {}, stop() {} },
+    });
+  let c = make();
+  c.update({ enabled: true, token: null });
+  await tick();
+  assert.equal(saved, id);
+  c.stop();
+  assert.equal(saved, id);
+  c = make();
+  c.update({ enabled: true, token: null });
+  await tick();
+  c.update({ enabled: true, token: token("a") });
+  await tick();
+  assert.equal(saved, null);
+  c.update({ enabled: true, token: token("b") });
+  await tick();
+  c.update({ enabled: true, token: null });
+  await tick();
+  assert.deepEqual(bodies, [
+    {},
+    { anonymousId: id },
+    { anonymousId: id },
+    {},
+    {},
+  ]);
+  assert.equal(saved, id);
+  c.update({ enabled: false, token: null });
+  assert.equal(saved, null);
+  c.update({ enabled: true, token: null });
+  await tick();
+  assert.deepEqual(bodies.at(-1), {});
+  c.stop();
+});
+
+test("bad or unavailable storage falls back without blocking capture", async () => {
+  for (const fail of [false, true]) {
+    const bodies: unknown[] = [];
+    let starts = 0;
+    const c = createTelemetryLeaseController({
+      origin: "http://local",
+      anonymousStorage: {
+        read: () => {
+          if (fail) throw Error();
+          return "bad";
+        },
+        write: () => {
+          if (fail) throw Error();
+        },
+        clear: () => {
+          if (fail) throw Error();
+        },
+      },
+      transport: async (_url, init) => {
+        bodies.push(JSON.parse(String(init?.body)));
+        return reply();
+      },
+      adapter: {
+        start() {
+          starts++;
+        },
+        stop() {},
+      },
+    });
+    c.update({ enabled: true, token: null });
+    await tick();
+    assert.deepEqual(bodies, [{}]);
+    assert.equal(starts, 1);
+    c.update({ enabled: false, token: null });
+    c.stop();
+  }
+});
+
+test("late bootstrap cannot restore a capability after opt-out", async () => {
+  let saved: string | null = null;
+  let finish!: (response: Response) => void;
+  const c = createTelemetryLeaseController({
+    origin: "http://local",
+    anonymousStorage: {
+      read: () => saved,
+      write: (value) => {
+        saved = value;
+      },
+      clear: () => {
+        saved = null;
+      },
+    },
+    transport: () =>
+      new Promise((done) => {
+        finish = done;
+      }),
+    adapter: {
+      start() {
+        throw Error("must not start");
+      },
+      stop() {},
+    },
+  });
+  c.update({ enabled: true, token: null });
+  c.update({ enabled: false, token: null });
+  finish(reply());
+  await tick();
+  assert.equal(saved, null);
+  c.stop();
+});
+
+test("a rejected authenticated bootstrap clears stored anonymous linkage", async () => {
+  let saved: string | null = id;
+  const c = createTelemetryLeaseController({
+    origin: "http://local",
+    anonymousStorage: {
+      read: () => saved,
+      write: (value) => {
+        saved = value;
+      },
+      clear: () => {
+        saved = null;
+      },
+    },
+    transport: async () => new Response(null, { status: 401 }),
+    adapter: {
+      start() {
+        throw Error("must not start");
+      },
+      stop() {},
+    },
+  });
+  c.update({ enabled: true, token: token("rejected") });
+  await tick();
+  assert.equal(saved, null);
+  c.stop();
+});
+
+test("superseded anonymous response cannot persist after account replacement", async () => {
+  let saved: string | null = null;
+  const pending: Array<(response: Response) => void> = [];
+  const c = createTelemetryLeaseController({
+    origin: "http://local",
+    anonymousStorage: {
+      read: () => saved,
+      write: (value) => {
+        saved = value;
+      },
+      clear: () => {
+        saved = null;
+      },
+    },
+    transport: () =>
+      new Promise((done) => {
+        pending.push(done);
+      }),
+    adapter: { start() {}, stop() {} },
+  });
+  c.update({ enabled: true, token: null });
+  c.update({ enabled: true, token: token("account-a") });
+  c.update({ enabled: true, token: token("account-b") });
+  pending[1](reply({ identified: true }));
+  pending[0](reply());
+  await tick();
+  assert.equal(saved, null);
+  pending[2](reply({ identified: true }));
+  await tick();
+  assert.equal(saved, null);
+  c.stop();
+});
+
 test("disabled emits nothing; opt-out stops an active adapter synchronously", async () => {
   let calls = 0;
   const events: string[] = [];
