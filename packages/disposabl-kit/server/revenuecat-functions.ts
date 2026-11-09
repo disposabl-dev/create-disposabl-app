@@ -1,4 +1,10 @@
-import { httpActionGeneric, makeFunctionReference } from "convex/server";
+import {
+  docValidator,
+  httpActionGeneric,
+  makeFunctionReference,
+  paginationOptsValidator,
+  paginationResultValidator,
+} from "convex/server";
 import { v } from "convex/values";
 import {
   internalAction,
@@ -19,7 +25,10 @@ import {
   type PurchaseEvent,
   type RevenueCatConfig,
 } from "./revenuecat-contract";
-import { purchaseEventFields } from "./revenuecat-validator";
+import {
+  purchaseEventFields,
+  revenueCatDeliveries,
+} from "./revenuecat-validator";
 
 const receiveRef = makeFunctionReference<
   "mutation",
@@ -238,6 +247,27 @@ export const inspectConflicts = internalQuery({
       .withIndex("by_conflict", (q) => q.eq("conflict", true))
       .order("desc")
       .take(100),
+});
+
+// Historical delivery archive, not a queue of unresolved reviews.
+export const inspectReviewDeliveries = internalQuery({
+  args: { paginationOpts: paginationOptsValidator },
+  returns: paginationResultValidator(
+    docValidator("revenueCatDeliveries", revenueCatDeliveries),
+  ),
+  handler: async (ctx, { paginationOpts }) => {
+    if (
+      !Number.isInteger(paginationOpts.numItems) ||
+      paginationOpts.numItems < 1 ||
+      paginationOpts.numItems > 100
+    )
+      throw new Error("Page size must be between 1 and 100");
+    return ctx.db
+      .query("revenueCatDeliveries")
+      .withIndex("by_type", (q) => q.eq("type", "review"))
+      .order("desc")
+      .paginate(paginationOpts);
+  },
 });
 
 export const receive = internalMutation({

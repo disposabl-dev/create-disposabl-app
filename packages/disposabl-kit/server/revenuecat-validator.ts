@@ -22,6 +22,7 @@ export const revenueCatDeliveries = defineTable({
   conflict: v.boolean(),
 })
   .index("by_delivery", ["project", "app", "environment", "deliveryId"])
+  .index("by_type", ["type"])
   .index("by_conflict", ["conflict"]);
 export const revenueCatPurchases = defineTable({
   balanceId: v.string(),
