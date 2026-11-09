@@ -4,6 +4,8 @@ import site from "../../site.json";
 import { isAccountPage } from "@disposabl/disposabl-kit/lib/indexing";
 
 import appCss from "../index.css?url";
+import { TelemetryOverrideContext } from "@disposabl/disposabl-kit/client/lib/telemetry";
+import { AnalyticsPreference, ProductTelemetry } from "../telemetry";
 
 export const Route = createRootRoute({
   head: ({ matches }) => {
@@ -98,7 +100,10 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body>
-        {children}
+        <TelemetryOverrideContext.Provider value={ProductTelemetry}>
+          {children}
+          <AnalyticsPreference />
+        </TelemetryOverrideContext.Provider>
         <Scripts />
       </body>
     </html>

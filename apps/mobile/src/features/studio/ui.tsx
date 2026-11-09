@@ -16,6 +16,7 @@ import { useRouter, Stack } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { type ComponentProps, type ReactNode } from "react";
 import { AccountButton } from "./account-button";
+import { captureProductAction } from "../product-telemetry";
 import { type Target, targetNames } from "./data";
 export {
   NativeLabel as Label,
@@ -138,7 +139,10 @@ export function HeaderActions() {
     <View className="flex-row gap-[4px]">
       <Touch
         label="Create a new app"
-        onPress={() => router.push("/compose")}
+        onPress={() => {
+          captureProductAction("open_create");
+          router.push("/compose");
+        }}
         className="w-[44px] items-center justify-center"
       >
         <Icon name="plus" />

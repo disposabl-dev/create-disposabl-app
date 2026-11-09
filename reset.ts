@@ -25,6 +25,13 @@ if (
 // Product-only proof harnesses must not enter generated apps. Keep the same
 // paths in the symlink validation and removal inventories.
 const productProofTests = [
+  "packages/tests/ui-telemetry-policy.test.ts",
+  "packages/tests/components/ui-telemetry-mobile.test.mjs",
+  "packages/tests/components/ui-telemetry-web.test.mjs",
+  "apps/web/src/telemetry.tsx",
+  "apps/web/src/telemetry-policy.ts",
+  "apps/mobile/src/features/product-telemetry.tsx",
+  "apps/mobile/src/features/telemetry-policy.ts",
   "packages/tests/compute-stop.test.ts",
   "packages/tests/auth-deletion-current.test.ts",
   "packages/tests/flows/billing-checkout-auth.e2e.ts",
@@ -112,6 +119,7 @@ const touched = [
   "starter",
   ".github/workflows",
   "apps/web/src/router",
+  "apps/web/package.json",
   "apps/mobile/src/app/index.tsx",
   "apps/mobile/package.json",
   "apps/mobile/app.json",
@@ -276,6 +284,7 @@ const starterCopies = [
   ],
   ["starter/legal/publisher.ts", "packages/disposabl-kit/legal/publisher.ts"],
   ["starter/web/index.tsx", "apps/web/src/router/index.tsx"],
+  ["starter/web/root.tsx", "apps/web/src/router/__root.tsx"],
   ["starter/cli/README.md", "packages/cli/README.md"],
   ["starter/cli/commands.ts", "packages/cli/commands.ts"],
   [
@@ -436,6 +445,15 @@ lock.workspaces["packages/backend"] = {
 delete turbo.tasks["create-disposabl-app#build"];
 // Chat capture and rendering belong to the Disposabl product.
 const mobile = await json("apps/mobile/package.json");
+const web = await json("apps/web/package.json");
+delete web.dependencies["posthog-js"];
+for (const name of [
+  "posthog-react-native",
+  "@posthog/react-native-plugin",
+  "expo-application",
+  "expo-localization",
+])
+  delete mobile.dependencies[name];
 const mobileConfig = await json("apps/mobile/app.json");
 // Store listing identities belong to Disposabl, not newly generated apps.
 delete mobileConfig.expo.ios.bundleIdentifier;
@@ -457,6 +475,7 @@ mobileConfig.expo.plugins = mobileConfig.expo.plugins.filter(
 );
 for (const [path, value] of [
   ["apps/mobile/package.json", mobile],
+  ["apps/web/package.json", web],
   ["apps/mobile/app.json", mobileConfig],
   ["packages/disposabl-kit/package.json", kit],
   [backendPath, backend],

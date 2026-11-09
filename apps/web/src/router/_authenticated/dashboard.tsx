@@ -61,9 +61,16 @@ function Dashboard() {
       <h1 className="text-2xl font-semibold">Dashboard</h1>
       <AgentOnboarding />
       <nav className="flex gap-4 pt-4 text-sm">
-        <Link to="/dashboard/connections">Connections</Link>
+        <Link
+          to="/dashboard/connections"
+          data-telemetry-action="open_connections"
+        >
+          Connections
+        </Link>
         {config.platforms.includes("api") && (
-          <Link to="/dashboard/api-keys">API keys</Link>
+          <Link to="/dashboard/api-keys" data-telemetry-action="open_api_keys">
+            API keys
+          </Link>
         )}
       </nav>
     </main>

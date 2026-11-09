@@ -158,3 +158,32 @@ test("failed refresh stops capture and cannot revive an expired lease", async ()
   assert.deepEqual(events, ["start", "stop"]);
   control.stop();
 });
+
+test("lease expiry stops capture while refresh hangs and ignores a late reply", async () => {
+  let calls = 0;
+  let finish!: (response: Response) => void;
+  const events: string[] = [];
+  const control = createTelemetryLeaseController({
+    origin: "http://local",
+    transport: async () => {
+      calls++;
+      return calls === 1
+        ? reply({ expiresAt: Date.now() + 5_100 })
+        : new Promise<Response>((resolve) => {
+            finish = resolve;
+          });
+    },
+    adapter: {
+      start: () => events.push("start"),
+      stop: () => events.push("stop"),
+    },
+  });
+  control.update({ enabled: true, token: null });
+  await new Promise<void>((resolve) => setTimeout(resolve, 5_250));
+  assert.equal(calls, 2);
+  assert.deepEqual(events, ["start", "stop"]);
+  finish(reply());
+  await tick();
+  assert.deepEqual(events, ["start", "stop"]);
+  control.stop();
+});

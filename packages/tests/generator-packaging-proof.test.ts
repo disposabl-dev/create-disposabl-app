@@ -12,6 +12,13 @@ import {
 } from "../create-disposabl-app/options";
 
 const excluded = [
+  "packages/tests/ui-telemetry-policy.test.ts",
+  "packages/tests/components/ui-telemetry-mobile.test.mjs",
+  "packages/tests/components/ui-telemetry-web.test.mjs",
+  "apps/web/src/telemetry.tsx",
+  "apps/web/src/telemetry-policy.ts",
+  "apps/mobile/src/features/product-telemetry.tsx",
+  "apps/mobile/src/features/telemetry-policy.ts",
   "packages/tests/compute-stop.test.ts",
   "packages/tests/auth-deletion-current.test.ts",
   "packages/backend/convex/users/localDeletion.ts",
@@ -121,6 +128,18 @@ test("packaged starter and generated profiles exclude product proof fixtures", a
       }
     }
     for (const root of roots) {
+      const webRoot = await readFile(
+        join(root, "apps/web/src/router/__root.tsx"),
+        "utf8",
+      );
+      assert.doesNotMatch(
+        webRoot,
+        /ProductTelemetry|AnalyticsPreference|telemetry-policy/,
+      );
+      const webPackage = JSON.parse(
+        await readFile(join(root, "apps/web/package.json"), "utf8"),
+      );
+      assert.equal(webPackage.dependencies["posthog-js"], undefined);
       const backendApi = await readFile(
         join(root, "packages/backend/convex/_generated/api.d.ts"),
         "utf8",
@@ -128,6 +147,17 @@ test("packaged starter and generated profiles exclude product proof fixtures", a
       assert.doesNotMatch(backendApi, /localDeletion/);
       const mobileConfigPath = join(root, "apps/mobile/app.json");
       if (existsSync(mobileConfigPath)) {
+        const mobilePackage = JSON.parse(
+          await readFile(join(root, "apps/mobile/package.json"), "utf8"),
+        );
+        assert.equal(
+          mobilePackage.dependencies["posthog-react-native"],
+          undefined,
+        );
+        assert.equal(
+          mobilePackage.dependencies["@posthog/react-native-plugin"],
+          undefined,
+        );
         const billing = await readFile(
           join(root, "packages/disposabl-kit/mobile/billing/paywall.ts"),
           "utf8",
