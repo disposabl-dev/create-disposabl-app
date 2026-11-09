@@ -173,7 +173,21 @@ test(
         const result = await response.json();
         if (result.status !== "success")
           throw new Error("Evidence query failed");
-        return result.value;
+        const account = await fetch("http://127.0.0.1:3540/api/query", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            path: "users/index:current",
+            args: {},
+            format: "json",
+          }),
+        }).then((r) => r.json());
+        if (account.status !== "success")
+          throw new Error("Account query failed");
+        return { ...result.value, username: account.value?.username };
       });
     await screen.getByRole("button", "Choose monthly").tap();
     await expect(
@@ -182,12 +196,14 @@ test(
     await app.screenshot("local-test-checkout");
     await app.open("/pricing");
     const first = await evidence();
+    expect(first.username).toBe(username);
     expect(first.calls).toHaveLength(1);
     expect(first.calls[0].planId).toBe("credits_monthly");
     expect(first.calls[0].userId).toBe(first.userId);
     expect(first.attempts).toHaveLength(1);
     expect(first.attempts[0].userId).toBe(first.userId);
     expect(first.attempts[0].purchase).toBe("monthly");
+    expect(first.attempts[0].requestId).toMatch(/^[0-9a-f-]{36}$/);
     expect(first.attempts[0].url).toBe(
       "http://127.0.0.1:3549/local-test-checkout",
     );
@@ -202,5 +218,27 @@ test(
     const again = await evidence();
     expect(again.calls).toHaveLength(1);
     expect(again.attempts).toHaveLength(1);
+    await expect(
+      screen.getByText("Available credits: 42", { exact: false }),
+    ).toBeVisible();
+    await screen.getByRole("button", "Buy top-up").tap();
+    await expect(
+      screen.getByRole("heading", "Local test checkout"),
+    ).toBeVisible();
+    await app.open("/pricing");
+    const topup = await evidence();
+    expect(topup.calls).toHaveLength(2);
+    const topupCall = topup.calls.find(
+      (call: { planId: string }) => call.planId === "credits_topup",
+    );
+    expect(topupCall.userId).toBe(topup.userId);
+    expect(topupCall.feature).toBe("credits");
+    expect(topupCall.quantity).toBe(500);
+    const topupAttempt = topup.attempts.find(
+      (attempt: { purchase: string }) => attempt.purchase === "topup",
+    );
+    expect(topupAttempt.userId).toBe(topup.userId);
+    expect(topupAttempt.requestId).toMatch(/^[0-9a-f-]{36}$/);
+    expect(topupAttempt.url).toBe("http://127.0.0.1:3549/local-test-checkout");
   },
 );
