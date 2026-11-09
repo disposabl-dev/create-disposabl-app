@@ -57,6 +57,17 @@ export const seedUser = mutation({
   returns: v.id("users"),
   handler: (ctx) => ctx.db.insert("users", {}),
 });
+// Model a displaced in-flight dispatch without inventing a confirmed provider stop.
+export const seedNewerSession = mutation({
+  args: { userId: v.string() },
+  returns: v.id("computeSessions"),
+  handler: (ctx, { userId }) =>
+    ctx.db.insert("computeSessions", {
+      userId,
+      state: "starting",
+      paidUntil: 0,
+    }),
+});
 export const app = mutation({
   args: {
     userId: v.string(),

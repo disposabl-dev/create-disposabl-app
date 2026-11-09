@@ -31,6 +31,37 @@ async function call(name: string, args: object, query = false) {
 }
 
 test(
+  "a displaced in-flight confirmation fences the newer session and preserves evidence",
+  { skip: !url },
+  async () => {
+    const userId = await call("seedUser", {});
+    const old = await call("admit", { userId });
+    await call("app", { userId, sessionId: old, threadId: randomUUID() });
+    const debit = await call("claim", { sessionId: old });
+    const current = await call("seedNewerSession", { userId });
+    await Promise.all(
+      Array.from({ length: 6 }, () =>
+        call("settleDebit", {
+          debitId: debit._id,
+          outcome: "confirmed",
+          responseBalance: 3,
+        }),
+      ),
+    );
+    const held = await call("get", { sessionId: current }, true);
+    assert.equal(held.state, "hold");
+    assert.equal(held.stopConfirmed, undefined);
+    assert.equal(held.reconciliationConflict, true);
+    assert.deepEqual(held.conflictDebits, [debit._id]);
+    const [recorded] = await call("debits", { sessionId: old }, true);
+    assert.equal(recorded.state, "dispatching");
+    assert.equal(recorded.lateConfirmation.responseBalance, 3);
+    assert.equal(recorded.reconciliationConflict, true);
+    await assert.rejects(call("admit", { userId }), /reconciliation/);
+  },
+);
+
+test(
   "real Convex transactions serialize claims, boundary, stop and explicit resume",
   { skip: !url },
   async () => {
