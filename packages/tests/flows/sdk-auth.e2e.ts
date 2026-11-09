@@ -2,9 +2,10 @@ import { test, expect } from "e2e";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { backendUrl, siteUrl, project } from "../project.ts";
 import { packagedSdk } from "../helpers/sdk-auth/prepare.ts";
+import { assertOwnedSdkBackend } from "../helpers/sdk-auth/ownership.ts";
 
 test(
-  "packed SDK follows real username session identity and logout",
+  "packed SDK distinguishes OAuth revocation from username session logout",
   { platforms: ["backend"], tags: ["sdk"] },
   async () => {
     test.skip(
@@ -16,6 +17,7 @@ test(
         !project.platforms.includes("api"),
       "Requires authentication and API",
     );
+    assertOwnedSdkBackend();
     if (project.features.includes("payments"))
       throw new Error("SDK fixture requires payments disabled");
     if (
@@ -205,16 +207,42 @@ test(
       });
       expect(revoked.ok).toBe(true);
     }
+    expect((await sdk.usersCurrent()).response?.status).toBe(401);
+    expect(
+      await auth("auth:isAuthenticated", {}, second.accessToken, "query"),
+    ).toBe(true);
     await auth(
       "auth:signOut",
       { refreshToken: second.refreshToken },
       second.accessToken,
     );
-    expect((await sdk.usersCurrent()).response?.status).toBe(401);
     expect(
       await auth("auth:isAuthenticated", {}, second.accessToken, "query"),
     ).toBe(false);
+
+    const third = await account();
+    const thirdGrant = await grant(third.accessToken);
+    sdk.client.setConfig({ auth: thirdGrant.accessToken });
+    const beforeSignOut = await sdk.usersCurrent();
+    expect(beforeSignOut.response?.status).toBe(200);
+    expect(beforeSignOut.data?.username).toBe(third.username);
+    expect(
+      await auth("auth:isAuthenticated", {}, third.accessToken, "query"),
+    ).toBe(true);
+    await auth(
+      "auth:signOut",
+      { refreshToken: third.refreshToken },
+      third.accessToken,
+    );
+    expect(
+      await auth("auth:isAuthenticated", {}, third.accessToken, "query"),
+    ).toBe(false);
+    const afterSignOut = await sdk.usersCurrent();
+    expect(afterSignOut.response?.status).toBe(200);
+    expect(afterSignOut.data?.username).toBe(third.username);
     sdk.client.setConfig({ auth: firstGrant.accessToken });
-    expect((await sdk.usersCurrent()).data?.username).toBe(first.username);
+    const unaffected = await sdk.usersCurrent();
+    expect(unaffected.response?.status).toBe(200);
+    expect(unaffected.data?.username).toBe(first.username);
   },
 );
