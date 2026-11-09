@@ -29,6 +29,7 @@ work = pathlib.Path(tempfile.mkdtemp(prefix='disposabl-telemetry-http-'))
 os.chmod(work, 0o700)
 shutil.copytree(root / 'packages/tests/fixtures/ephemeral-deletion-convex/convex', work / 'convex')
 shutil.copy2(here / 'http.ts', work / 'convex/http.ts')
+shutil.copy2(here / 'users-internal.ts', work / 'convex/users/internal.ts')
 (work / 'convex/telemetry.ts').write_text('export * from \"../../../../backend/convex/telemetry\";\n')
 (work / 'node_modules').symlink_to(root / 'node_modules', target_is_directory=True)
 for p in (work / 'convex').rglob('*.ts'):
