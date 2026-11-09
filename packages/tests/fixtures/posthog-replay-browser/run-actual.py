@@ -27,7 +27,8 @@ def command(args, *, cwd, env, log, timeout=180):
 
 
 def main():
-    telemetry_mount = os.environ.get('REPLAY_TELEMETRY_MOUNT') == '1'
+    billing_mount = os.environ.get('REPLAY_BILLING_MOUNT') == '1'
+    telemetry_mount = billing_mount or os.environ.get('REPLAY_TELEMETRY_MOUNT') == '1'
     executable = Path(os.environ['REPLAY_CHROMIUM'])
     if not executable.is_file():
         raise RuntimeError('REPLAY_CHROMIUM must name cached Chromium')
@@ -79,10 +80,13 @@ def main():
     fixture = source/'packages/tests/fixtures/posthog-replay-browser'
     convex = json.dumps(str(fixture/'inert-convex.tsx'))
     auth = json.dumps(str(fixture/'inert-session.tsx'))
+    features = json.dumps(str(fixture/'inert-features.ts'))
     alias = ('resolve: { tsconfigPaths: true, alias: ['
              '{ find: /^convex\\/react$/, replacement: '+convex+' },'
              '{ find: /^@convex-dev\\/auth\\/react$/, replacement: '+auth+' },'
              '{ find: /^@convex-dev\\/auth\\/methods\\/(username-password|email-password|google)\\/react$/, replacement: '+auth+' }] },')
+    if billing_mount:
+        alias = alias.replace('alias: [', 'alias: [{ find: /^convex\/browser$/, replacement: '+convex+' },{ find: /^(?:@disposabl\/disposabl-kit\/features|(?:\.\.\/)+features)$/, replacement: '+features+' },')
     text = text.replace(needle, alias).replace('crawlLinks: true,', 'crawlLinks: false,')
     if telemetry_mount:
         # Only this isolated build forces the production analytics gate on;
@@ -99,6 +103,8 @@ def main():
     config.write_text(text)
     command(['bun', 'run', 'build'], cwd=app, env=env, log=work/'inert-auth-build.log')
     env['REPLAY_APP_DIST'] = str(dist)
+    if billing_mount:
+        env['REPLAY_BILLING_MOUNT'] = '1'
     script = 'mount-telemetry.mjs' if telemetry_mount else 'actual-app.mjs'
     modes = ['web', 'desktop'] if telemetry_mount else [None]
     for mode in modes:
@@ -111,6 +117,6 @@ def main():
 
 
 if __name__ == '__main__':
-    allowed = {'PATH': os.environ.get('PATH', '/usr/bin:/bin'), 'REPLAY_CHROMIUM': os.environ.get('REPLAY_CHROMIUM', ''), 'REPLAY_TELEMETRY_MOUNT': os.environ.get('REPLAY_TELEMETRY_MOUNT', '')}
+    allowed = {'PATH': os.environ.get('PATH', '/usr/bin:/bin'), 'REPLAY_CHROMIUM': os.environ.get('REPLAY_CHROMIUM', ''), 'REPLAY_TELEMETRY_MOUNT': os.environ.get('REPLAY_TELEMETRY_MOUNT', ''), 'REPLAY_BILLING_MOUNT': os.environ.get('REPLAY_BILLING_MOUNT', '')}
     entry = 'import runpy,sys; runpy.run_path(sys.argv[1])["main"]()'
     os.execve('/usr/bin/sandbox-exec', ['sandbox-exec', '-p', PROFILE, sys.executable, '-c', entry, __file__], allowed)
