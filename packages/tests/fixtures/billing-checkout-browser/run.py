@@ -18,7 +18,7 @@ import urllib.request
 
 ROOT = Path(__file__).resolve().parents[4]
 BINARY = Path.home() / '.cache/convex/binaries/precompiled-2026-10-22-1447815/convex-local-backend'
-PROFILE = '(version 1)(allow default)(deny network-outbound)(allow network-outbound (remote ip "localhost:*"))'
+PROFILE = '(version 1)(allow default)(deny network-outbound)(allow network-outbound (remote ip "localhost:*"))(allow network-outbound (remote unix-socket))'
 
 class Checkout(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
