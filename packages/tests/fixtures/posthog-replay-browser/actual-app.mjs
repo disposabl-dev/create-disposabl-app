@@ -108,6 +108,7 @@ try {
   await page.addInitScript({ content: sdk });
   await page.addInitScript({ content: bundle });
   await page.addInitScript(() => {
+    if (window.top !== window) return;
     window.fixtureInitialBody = "unobserved";
     const observer = new MutationObserver(() => {
       if (document.body && window.fixtureInitialBody === "unobserved") {
