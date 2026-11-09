@@ -221,7 +221,8 @@ export async function runCli(
         }
       }
     }
-    await program.parseAsync(argv);
+    if (argv.length <= 2) program.outputHelp();
+    else await program.parseAsync(argv);
   }
   const command = ["--version", "-V"].includes(argv[2] ?? "")
     ? "version"
