@@ -476,8 +476,56 @@ export const manualApp = query({
       .withIndex("by_appId", (q) => q.eq("appId", args.appId))
       .unique(),
 });
-export const manualThreadState = mutation({
-  args: { appId: v.string(), userId: v.string(), drain: v.boolean() },
+import {
+  claim as realWorkerClaim,
+  finish as realWorkerFinish,
+} from "../../../../backend/convex/agent/state";
+import { listMessages } from "@convex-dev/agent";
+
+export const manualClaim = mutation({
+  args: { id: v.string(), token: v.string() },
+  handler: (ctx, args) =>
+    (realWorkerClaim as any)._handler(ctx, { ...args, activationProtocol: 1 }),
+});
+export const manualFinish = mutation({
+  args: {
+    id: v.string(),
+    token: v.string(),
+    suspended: v.optional(v.boolean()),
+    stopped: v.optional(v.boolean()),
+  },
+  handler: (ctx, args) => (realWorkerFinish as any)._handler(ctx, args),
+});
+export const manualSetRemote = mutation({
+  args: { appId: v.string(), userId: v.string() },
+  handler: async (ctx, args) => {
+    const app = await ctx.db
+      .query("apps")
+      .withIndex("by_appId", (q) => q.eq("appId", args.appId))
+      .unique();
+    const thread = readThread(app as any);
+    if (!thread || thread.userId !== args.userId || !thread.lease)
+      throw new Error("Expected owned leased thread");
+    await patchThread(ctx as any, thread, {
+      conversationId: "synthetic-conversation",
+      promptId: "synthetic-prompt",
+      cursor: "synthetic-cursor",
+    });
+  },
+});
+// Isolate each rebind guard on an already stopped synthetic session.
+export const manualGuard = mutation({
+  args: {
+    appId: v.string(),
+    userId: v.string(),
+    kind: v.union(
+      v.literal("clear"),
+      v.literal("lease"),
+      v.literal("pending"),
+      v.literal("processing"),
+      v.literal("delivery"),
+    ),
+  },
   handler: async (ctx, args) => {
     const app = await ctx.db
       .query("apps")
@@ -486,38 +534,45 @@ export const manualThreadState = mutation({
     const thread = readThread(app as any);
     if (!thread || thread.userId !== args.userId)
       throw new Error("Fixture ownership mismatch");
-    const watchdog = args.drain
-      ? undefined
-      : await ctx.scheduler.runAfter(
-          600_000,
-          makeFunctionReference("agent/actions/run:tick") as any,
-          { id: thread.threadId },
-        );
-    await patchThread(
-      ctx as any,
-      thread,
-      args.drain
+    const watchdog =
+      args.kind === "lease"
+        ? await ctx.scheduler.runAfter(
+            600_000,
+            makeFunctionReference("agent/actions/run:tick") as any,
+            { id: thread.threadId },
+          )
+        : undefined;
+    await patchThread(ctx as any, thread, {
+      status: args.kind === "processing" ? "processing" : "idle",
+      pending: args.kind === "pending" ? ["synthetic-pending"] : [],
+      delivery:
+        args.kind === "delivery" ? "synthetic-uncertain-delivery" : undefined,
+      lease: watchdog
         ? {
-            status: "idle",
-            pending: [],
-            lease: undefined,
-            promptId: undefined,
-            delivery: undefined,
-            turnCompleted: true,
+            token: "guard-lease",
+            watchdog,
+            expiresAt: Date.now() + 600_000,
+            activationProtocol: 1,
           }
-        : {
-            conversationId: "synthetic-conversation",
-            promptId: "synthetic-prompt",
-            cursor: "synthetic-cursor",
-            lease: {
-              token: "synthetic-worker",
-              watchdog: watchdog!,
-              expiresAt: Date.now() + 600_000,
-              activationProtocol: 1,
-            },
-          },
-    );
+        : undefined,
+    });
   },
+});
+export const manualMessages = query({
+  args: { threadId: v.string() },
+  handler: (ctx, args) =>
+    listMessages(ctx as any, componentsGeneric().agent, {
+      threadId: args.threadId,
+      paginationOpts: { numItems: 100, cursor: null },
+    }),
+});
+export const manualSessions = query({
+  args: { userId: v.string() },
+  handler: (ctx, args) =>
+    ctx.db
+      .query("computeSessions")
+      .withIndex("by_userId", (q) => q.eq("userId", args.userId))
+      .take(20),
 });
 export const manualStopClaim = mutation({
   args: { sessionId: v.id("computeSessions"), token: v.string() },
