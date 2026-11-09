@@ -1,5 +1,4 @@
 import { v } from "convex/values";
-import { makeFunctionReference } from "convex/server";
 import { platform } from "./validator";
 import { httpAction, internalAction } from "./_generated/server";
 import {
@@ -9,7 +8,7 @@ import {
 import {
   createClaimIdentity,
   captureTelemetry,
-  hashTelemetryIdentity,
+  claimTelemetryClient,
   telemetryEnabled,
   bootstrapTelemetry,
   createLinkLookup,
@@ -23,12 +22,6 @@ export {
 } from "@disposabl/disposabl-kit/server/lib/telemetry";
 export const claimIdentity = createClaimIdentity(requireNotDeleting);
 export const getLink = createLinkLookup(requireNotDeleting);
-
-const claimIdentityRef = makeFunctionReference<
-  "mutation",
-  { hash?: string; newHash: string; userId?: string },
-  boolean | null
->("telemetry:claimIdentity");
 
 const pageNames = [
   "home",
@@ -117,14 +110,9 @@ export const page = httpAction(async (ctx, request) => {
       return new Response(null, { status: 401, headers });
     const existingId =
       "anonymousId" in body ? (body.anonymousId as string) : undefined;
-    const issuedId = crypto.randomUUID();
-    const accepted = await ctx.runMutation(claimIdentityRef, {
-      ...(existingId ? { hash: await hashTelemetryIdentity(existingId) } : {}),
-      newHash: await hashTelemetryIdentity(issuedId),
-      ...(userId ? { userId } : {}),
-    });
-    if (accepted === null) return new Response(null, { status: 429, headers });
-    const anonymousId = accepted && existingId ? existingId : issuedId;
+    const identity = await claimTelemetryClient(ctx, existingId, userId);
+    if (!identity) return new Response(null, { status: 429, headers });
+    const { anonymousId } = identity;
     await captureTelemetry(
       body.platform === "web" ? "page_view" : "screen_view",
       { page: body.page as (typeof pageNames)[number] },

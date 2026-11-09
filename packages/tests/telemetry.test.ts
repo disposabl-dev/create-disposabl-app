@@ -186,13 +186,14 @@ function identityContext() {
 }
 
 test("page ingestion issues and binds an anonymous identity only to the verified account", async () => {
-  const { page, claimIdentity } = await import("../backend/convex/telemetry");
+  const { page, bootstrap, claimIdentity } =
+    await import("../backend/convex/telemetry");
   const { default: app } = await import("../../disposabl.json");
   const originalFeatures = [...app.features];
   if (!app.features.includes("analytics" as never))
     (app.features as string[]).push("analytics");
   process.env.DISPOSABL_ENVIRONMENT = "production";
-  process.env.POSTHOG_PROJECT_TOKEN = "test-token";
+  process.env.POSTHOG_PROJECT_TOKEN = "phc_fixture_public";
   process.env.POSTHOG_HOST = "https://us.i.posthog.com";
   delete process.env.E2E_TELEMETRY_DISABLED;
   delete process.env.POSTHOG_ENABLED;
@@ -234,11 +235,28 @@ test("page ingestion issues and binds an anonymous identity only to the verified
     user = "verified-user";
     const login = await (page as any)._handler(ctx, request(anonymousId, true));
     assert.equal((await login.json()).anonymousId, anonymousId);
-    assert.equal(events[1].event, "$identify");
-    assert.equal(events[1].properties.$anon_distinct_id, anonymousDistinct);
+    assert.equal(events[1].event, "page_view");
+    const linkedRow = [...fixture.rows.values()].find(
+      (row) => row.userId === user,
+    ) as any;
+    assert.equal(linkedRow.link.anonymous, anonymousDistinct);
+    assert.equal(linkedRow.link.distinct, events[1].properties.distinct_id);
+    const reserved = { ...linkedRow.link };
+    const jobCountBeforeBootstrap = fixture.jobs.length;
+    const bootstrapResult = await (bootstrap as any)._handler(
+      ctx,
+      new Request("https://example.com/telemetry/bootstrap", {
+        method: "POST",
+        headers: { Authorization: "Bearer private-token" },
+        body: JSON.stringify({ anonymousId }),
+      }),
+    );
+    assert.equal(bootstrapResult.status, 200);
+    assert.deepEqual(linkedRow.link, reserved);
+    assert.equal(fixture.jobs.length, jobCountBeforeBootstrap);
     assert.equal(
-      events[2].properties.distinct_id,
-      events[1].properties.distinct_id,
+      events.filter((event) => event.event === "$identify").length,
+      0,
     );
     assert.doesNotMatch(
       JSON.stringify(events),
@@ -254,16 +272,23 @@ test("page ingestion issues and binds an anonymous identity only to the verified
     const crypto = await import("node:crypto");
     const fabricatedDistinct = crypto
       .createHash("sha256")
-      .update(`disposabl:test-token:anonymous:${fabricated}`)
+      .update(`disposabl:phc_fixture_public:anonymous:${fabricated}`)
       .digest("hex");
-    assert.notEqual(events[3].properties.$anon_distinct_id, fabricatedDistinct);
+    assert.ok(
+      ![...fixture.rows.values()].some(
+        (row: any) => row.link?.anonymous === fabricatedDistinct,
+      ),
+    );
     user = "different-user";
     const switched = await (page as any)._handler(
       ctx,
       request(anonymousId, true),
     );
     assert.notEqual((await switched.json()).anonymousId, anonymousId);
-    assert.notEqual(events[5].properties.$anon_distinct_id, anonymousDistinct);
+    assert.notEqual(
+      events[3].properties.distinct_id,
+      events[1].properties.distinct_id,
+    );
     fixture.exhaust();
     const eventCount = events.length;
     const rowCount = fixture.rows.size;
@@ -624,6 +649,25 @@ test("link delivery stops after five failed attempts and leaves its pending reco
     await (deliverLink as any)._handler(actionCtx, { id: row._id });
   assert.equal(calls, 5);
   assert.equal(row.link.attempts, 5);
+  const previous = { ...row.link };
+  const jobsBefore = fixture.jobs.length;
+  const claim = () =>
+    (claimIdentity as any)._handler(fixture.ctx, {
+      hash: "issued",
+      newHash: "unused",
+      userId: "verified-user",
+    });
+  // Current owner refresh cannot create an immediate retry loop.
+  await claim();
+  assert.equal(fixture.jobs.length, jobsBefore);
+  row.link.retryAfter = Date.now() - 1;
+  await claim();
+  assert.equal(row.link.attempts, 0);
+  assert.equal(row.link.eventId, previous.eventId);
+  assert.equal(row.link.createdAt, previous.createdAt);
+  assert.equal(fixture.jobs.length, jobsBefore + 2);
+  await claim();
+  assert.equal(fixture.jobs.length, jobsBefore + 2);
 });
 
 test("issuance budget refills at one identity per minute", async () => {
@@ -649,7 +693,7 @@ test("issuance budget refills at one identity per minute", async () => {
   }
 });
 
-test("anonymous capture and identify use the same opaque identity", async () => {
+test("capture emits only the categorized event; identity merges belong to the durable claim", async () => {
   process.env.CONVEX_SITE_URL = config.productionConvexSiteUrl;
   delete process.env.E2E_TELEMETRY_DISABLED;
   delete process.env.POSTHOG_ENABLED;
@@ -661,13 +705,12 @@ test("anonymous capture and identify use the same opaque identity", async () => 
   const id = "12345678-1234-4123-8123-123456789abc";
   await captureTelemetry("page_view", { page: "home" }, undefined, config, id);
   await captureTelemetry("page_view", { page: "login" }, "user-a", config, id);
-  assert.equal(
-    events[0].properties.distinct_id,
-    events[1].properties.$anon_distinct_id,
+  assert.deepEqual(
+    events.map((event) => event.event),
+    ["page_view", "page_view"],
   );
-  assert.equal(events[1].event, "$identify");
-  assert.equal(
-    events[2].properties.distinct_id,
+  assert.notEqual(
+    events[0].properties.distinct_id,
     events[1].properties.distinct_id,
   );
 });

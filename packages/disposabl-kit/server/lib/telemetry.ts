@@ -126,7 +126,14 @@ export const createClaimIdentity = (
           await ctx.db.patch("telemetryIdentities", row._id, {
             userId,
             ...(link
-              ? { link: { ...link, createdAt: Date.now(), attempts: 0 } }
+              ? {
+                  link: {
+                    ...link,
+                    createdAt: Date.now(),
+                    attempts: 0,
+                    retryAfter: Date.now(),
+                  },
+                }
               : {}),
           });
           if (link) {
@@ -137,6 +144,17 @@ export const createClaimIdentity = (
             });
             return "linked";
           }
+        }
+        if (
+          row.link &&
+          row.link.attempts >= 5 &&
+          Date.now() >= row.link.retryAfter
+        ) {
+          await ctx.db.patch("telemetryIdentities", row._id, {
+            link: { ...row.link, attempts: 0, retryAfter: Date.now() },
+          });
+          await ctx.scheduler.runAfter(0, deliverLinkRef, { id: row._id });
+          await ctx.scheduler.runAfter(30_000, deliverLinkRef, { id: row._id });
         }
         return true;
       }
@@ -183,6 +201,7 @@ const linkValue = v.object({
   eventId: v.string(),
   createdAt: v.number(),
   attempts: v.number(),
+  retryAfter: v.number(),
 });
 export const createLinkLookup = (
   checkUser?: (ctx: QueryCtx, userId: string) => Promise<void>,
@@ -234,7 +253,11 @@ export const beginLink = internalMutation({
     )
       return false;
     await ctx.db.patch("telemetryIdentities", id, {
-      link: { ...row.link, attempts: attempts + 1 },
+      link: {
+        ...row.link,
+        attempts: attempts + 1,
+        retryAfter: Date.now() + 5 * 60_000,
+      },
     });
     if (attempts + 1 < 5)
       await ctx.scheduler.runAfter(2 ** (attempts + 1) * 1000, deliverLinkRef, {
@@ -252,6 +275,7 @@ const getLinkRef = makeFunctionReference<
     eventId: string;
     createdAt: number;
     attempts: number;
+    retryAfter: number;
   } | null
 >("telemetry:getLink");
 const finishLinkRef = makeFunctionReference<
@@ -362,6 +386,46 @@ const bootstrapHeaders = {
   "Cache-Control": "no-store",
 };
 
+/** Shared by SDK bootstrap and categorized page capture; linking is transactional. */
+export async function claimTelemetryClient(
+  ctx: ActionCtx,
+  existing: string | undefined,
+  userId: string | null,
+) {
+  const projectToken =
+    settings.analytics?.projectToken ?? process.env.POSTHOG_PROJECT_TOKEN!;
+  const issued = crypto.randomUUID();
+  const anonymousDistinct = existing
+    ? await opaqueId(`disposabl:${projectToken}:anonymous:${existing}`)
+    : undefined;
+  const userDistinct = userId
+    ? await opaqueId(`disposabl:${projectToken}:${userId}`)
+    : undefined;
+  const claim = await ctx.runMutation(bootstrapClaim, {
+    ...(existing ? { hash: await hashTelemetryIdentity(existing) } : {}),
+    newHash: await hashTelemetryIdentity(issued),
+    ...(userId ? { userId } : {}),
+    ...(anonymousDistinct && userDistinct
+      ? {
+          link: {
+            anonymous: anonymousDistinct,
+            distinct: userDistinct,
+            eventId: crypto.randomUUID(),
+          },
+        }
+      : {}),
+  });
+  if (claim === null) return null;
+  const anonymousId = claim && existing ? existing : issued;
+  const chosenAnonymousDistinct = await opaqueId(
+    `disposabl:${projectToken}:anonymous:${anonymousId}`,
+  );
+  const distinctId = userId
+    ? await opaqueId(`disposabl:${projectToken}:${userId}`)
+    : chosenAnonymousDistinct;
+  return { anonymousId, distinctId };
+}
+
 /** The expiry governs client refresh; it cannot revoke the public project token. */
 export async function bootstrapTelemetry(
   ctx: ActionCtx,
@@ -401,51 +465,23 @@ export async function bootstrapTelemetry(
     return new Response(null, { status: 401, headers: bootstrapHeaders });
   const existing =
     "anonymousId" in body ? (body.anonymousId as string) : undefined;
-  const issued = crypto.randomUUID();
-  const anonymousDistinct = existing
-    ? await opaqueId(`disposabl:${projectToken}:anonymous:${existing}`)
-    : undefined;
-  const userDistinct = userId
-    ? await opaqueId(`disposabl:${projectToken}:${userId}`)
-    : undefined;
-  let claim: boolean | null | "linked";
+  let identity: Awaited<ReturnType<typeof claimTelemetryClient>>;
   try {
-    claim = await ctx.runMutation(bootstrapClaim, {
-      ...(existing ? { hash: await hashTelemetryIdentity(existing) } : {}),
-      newHash: await hashTelemetryIdentity(issued),
-      ...(userId ? { userId } : {}),
-      ...(anonymousDistinct && userDistinct
-        ? {
-            link: {
-              anonymous: anonymousDistinct,
-              distinct: userDistinct,
-              eventId: crypto.randomUUID(),
-            },
-          }
-        : {}),
-    });
+    identity = await claimTelemetryClient(ctx, existing, userId);
   } catch {
     return new Response(null, {
       status: userId ? 401 : 503,
       headers: bootstrapHeaders,
     });
   }
-  if (claim === null)
+  if (!identity)
     return new Response(null, { status: 429, headers: bootstrapHeaders });
-  const anonymousId = claim && existing ? existing : issued;
-  const chosenAnonymousDistinct = await opaqueId(
-    `disposabl:${projectToken}:anonymous:${anonymousId}`,
-  );
-  const distinctId = userId
-    ? await opaqueId(`disposabl:${projectToken}:${userId}`)
-    : chosenAnonymousDistinct;
   return Response.json(
     {
       enabled: true,
       projectToken,
       host,
-      anonymousId,
-      distinctId,
+      ...identity,
       identified: !!userId,
       expiresAt: Date.now() + 30_000,
     },
@@ -526,25 +562,6 @@ export async function captureTelemetry(
           .map((key) => [key, properties[key]]),
       ),
     };
-    if (userId && anonymousId) {
-      const response = await fetch(`${host}/capture/`, {
-        method: "POST",
-        signal: AbortSignal.timeout(2000),
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          api_key: token,
-          event: "$identify",
-          properties: {
-            distinct_id: identity,
-            $anon_distinct_id: await opaqueId(
-              `disposabl:${token}:anonymous:${anonymousId}`,
-            ),
-            $ip: "0.0.0.0",
-          },
-        }),
-      });
-      if (!response.ok) return;
-    }
     await fetch(`${host}/capture/`, {
       method: "POST",
       signal: AbortSignal.timeout(2000),

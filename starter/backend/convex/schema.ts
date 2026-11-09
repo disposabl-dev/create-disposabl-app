@@ -26,6 +26,7 @@ export default defineSchema({
         eventId: v.string(),
         createdAt: v.number(),
         attempts: v.number(),
+        retryAfter: v.number(),
       }),
     ),
   }).index("by_hash", ["hash"]),
