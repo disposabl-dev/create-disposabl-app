@@ -247,7 +247,10 @@ export const finish = internalMutation({
     let pending = current.pending;
     const unresolved = Boolean(
       args.suspended &&
-      (current.promptId || current.delivery || current.stopUnconfirmed),
+      (current.promptId ||
+        current.conversationId ||
+        current.delivery ||
+        current.stopUnconfirmed),
     );
     const error = args.suspended
       ? unresolved

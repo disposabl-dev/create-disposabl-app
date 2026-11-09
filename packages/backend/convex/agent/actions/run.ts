@@ -132,6 +132,7 @@ export const tick = internalAction({
             // An archived machine may retain its running programs for warm resume.
             if (
               current.promptId ||
+              current.conversationId ||
               current.delivery ||
               current.stopUnconfirmed
             ) {
@@ -145,6 +146,7 @@ export const tick = internalAction({
             throw new Error("Boat sandbox status is unavailable.");
         } else if (
           current.promptId ||
+          current.conversationId ||
           current.delivery ||
           current.stopUnconfirmed
         ) {
