@@ -64,7 +64,7 @@ export function verifyBundle({
     expectedCert
   )
     throw new Error(
-      "Bundle signer does not match verified Play upload certificate",
+      "Bundle signer does not match expected signing certificate",
     );
   return {
     bundle,

@@ -8,15 +8,15 @@ on:
         required: true
         type: string
       upload_cert_sha256:
-        description: Independently verified Play upload certificate SHA-256
-        required: true
+        description: Optional independently verified Play upload certificate SHA-256
+        required: false
         type: string
       previous_version_code:
-        description: Freshly verified highest Play version code
-        required: true
+        description: Optional freshly verified highest Play version code
+        required: false
         type: string
       next_version_code:
-        description: New version code greater than the Play maximum
+        description: Candidate version code; Play acceptance remains unverified
         required: true
         type: string
       convex_url:

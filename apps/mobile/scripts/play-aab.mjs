@@ -23,19 +23,22 @@ function run(command, args, options = {}) {
 const packageId = required("PLAY_PACKAGE_ID");
 if (!/^[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z][a-zA-Z0-9_]*)+$/.test(packageId))
   throw new Error("Invalid Play package ID");
-const expectedCert = required("PLAY_UPLOAD_CERT_SHA256")
-  .replaceAll(":", "")
-  .toUpperCase();
-if (!/^[0-9A-F]{64}$/.test(expectedCert))
+const rawPlayCert = env.PLAY_UPLOAD_CERT_SHA256 || "";
+const playCert = rawPlayCert.replaceAll(":", "").toUpperCase();
+if (
+  rawPlayCert &&
+  !/^(?:[0-9a-fA-F]{64}|[0-9a-fA-F]{2}(?::[0-9a-fA-F]{2}){31})$/.test(
+    rawPlayCert,
+  )
+)
   throw new Error("Invalid upload certificate SHA256");
 const version = required("DISPOSABL_ANDROID_VERSION_CODE");
-const previous = required("PLAY_PREVIOUS_VERSION_CODE");
-if (
-  !/^[1-9]\d*$/.test(version) ||
-  !/^(0|[1-9]\d*)$/.test(previous) ||
-  Number(version) > 2100000000 ||
-  BigInt(version) <= BigInt(previous)
-)
+const previous = env.PLAY_PREVIOUS_VERSION_CODE || "";
+if (!/^[1-9]\d*$/.test(version) || BigInt(version) > 2100000000n)
+  throw new Error("Invalid candidate version code");
+if (previous && !/^(0|[1-9]\d*)$/.test(previous))
+  throw new Error("Invalid previous Play version code");
+if (previous && BigInt(version) <= BigInt(previous))
   throw new Error(
     "Version code must be greater than the verified Play version code",
   );
@@ -80,7 +83,8 @@ const keyInfo = run(
   ],
   { env: { ...env, LANG: "C", LC_ALL: "C" } },
 );
-if (fingerprint(keyInfo) !== expectedCert)
+const signingCert = fingerprint(keyInfo);
+if (playCert && signingCert !== playCert)
   throw new Error(
     "Keystore certificate does not match verified Play upload certificate",
   );
@@ -92,7 +96,7 @@ if (
   String(config.android?.versionCode) !== version
 )
   throw new Error(
-    "Expo package or version does not match verified Play identity",
+    "Expo package or candidate version does not match requested inputs",
   );
 const architectures = config.extra?.disposablAndroidArchitectures;
 if (
@@ -127,7 +131,7 @@ if (
   !gradle.includes(`versionCode ${version}\n`)
 )
   throw new Error(
-    "Fresh Android project does not match verified Play identity",
+    "Fresh Android project does not match requested package and candidate version",
   );
 run(
   "./gradlew",
@@ -169,8 +173,25 @@ const verified = verifyBundle({
   packageId,
   version,
   architectures,
-  expectedCert,
+  expectedCert: signingCert,
   bundletool: required("BUNDLETOOL_JAR"),
   production: true,
 });
-console.log(JSON.stringify(verified, null, 2));
+const { uploadCertificateSha256: _certificate, ...bundleResult } = verified;
+console.log(
+  JSON.stringify(
+    {
+      ...bundleResult,
+      signingCertificateSha256: signingCert,
+      signingCertificateSource: "selected keystore",
+      playUploadCertificate: playCert
+        ? "matched supplied fingerprint"
+        : "unchecked",
+      playPreviousVersion: previous
+        ? "checked against supplied version"
+        : "unchecked",
+    },
+    null,
+    2,
+  ),
+);
