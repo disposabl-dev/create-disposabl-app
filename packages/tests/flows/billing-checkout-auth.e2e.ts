@@ -143,7 +143,7 @@ test(
     }
     const username = `checkout${randomUUID().replaceAll("-", "")}`;
     const password = `Fixture-${randomUUID()}!`;
-    await app.open("/signup");
+    await app.open("/signup?returnTo=%2Fpricing");
     await screen.getByLabel("Username").fill(username);
     await screen.getByLabel("Password", { exact: true }).fill(password);
     await screen.getByLabel("Confirm password").fill(password);
