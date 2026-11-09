@@ -148,7 +148,7 @@ test(
     await screen.getByLabel("Password", { exact: true }).fill(password);
     await screen.getByLabel("Confirm password").fill(password);
     await screen.getByRole("button", "Create account").tap();
-    await app.open("/pricing");
+    await expect(screen.getByRole("heading", "Pricing")).toBeVisible();
     await expect(
       screen.getByText("Available credits: 42", { exact: false }),
     ).toBeVisible();
