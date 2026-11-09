@@ -27,7 +27,15 @@ test(
       ).toBe(true);
     }
     await app.screenshot("support-mobile");
-    const privacyLink = screen.getByRole("link", "Privacy requests");
+    const legalLink = screen.getByRole("link", "Legal and privacy information");
+    await legalLink.focus();
+    await expect(legalLink).toBeFocused();
+    await legalLink.press("Enter");
+    await expect(screen.getByRole("heading", "Legal & privacy")).toBeVisible();
+    const privacyLink = screen.getByRole(
+      "link",
+      "Privacy requests Ask to access, correct, export, or delete your personal information.",
+    );
     await privacyLink.focus();
     await expect(privacyLink).toBeFocused();
     await privacyLink.press("Enter");
@@ -62,10 +70,9 @@ test(
       "mailto:vivek@yast.ai",
     );
     await expect(
-      screen.getByText(
-        "This page does not delete your account or create a deletion receipt",
-        { exact: false },
-      ),
+      screen.getByText("A request does not itself delete your account", {
+        exact: false,
+      }),
     ).toBeVisible();
     expect(
       await browser.evaluate(
