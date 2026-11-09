@@ -10,11 +10,16 @@ for case,overrides,ok in [('valid',{},True),('wrong-sha',{'GITHUB_SHA':'b'*40},F
  assert not (tmp/'play-upload.jks').exists(),case
  if ok: assert 'helper-invoked' in r.stdout
  print(case,'PASS')
-workflow=(root/'.github/workflows/play-bundle.yml').read_text()
-assert 'workflow_dispatch:' not in workflow and 'push:' in workflow and 'branches: [main]' in workflow
-assert 'EXPO_PUBLIC_DISPOSABL_ANALYTICS_ENABLED: "true"' in workflow and 'UPDATE_POLICY: disabled' in workflow
-assert 'eas-cli@27.2.0 submit --platform android --profile production --path' in workflow
-assert 'actions/upload-artifact' not in workflow and 'eas-cli@27.2.0 build' not in workflow
+workflow=(root/'.github/workflows/pipeline.yml').read_text()
+assert not (root/'.github/workflows/play-bundle.yml').exists()
+assert workflow.count("needs.changes.outputs.android == 'true' && !(github.event_name == 'push' && github.repository == 'disposabl-dev/create-disposabl-app')") == 3
+assert "needs.web.outputs.android_build == 'true' && !(github.event_name == 'push' && github.repository == 'disposabl-dev/create-disposabl-app')" in workflow
+job=workflow.split('  android-play:',1)[1].split('  android-failure:',1)[0]
+assert "needs: [changes, web]" in job and "github.event_name == 'push' && github.repository == 'disposabl-dev/create-disposabl-app'" in job
+assert 'EXPO_PUBLIC_DISPOSABL_ANALYTICS_ENABLED: "true"' in job and 'UPDATE_POLICY: disabled' in job
+assert 'eas-cli@27.2.0 submit --platform android --profile production --path' in job
+assert '$((1000 + GITHUB_RUN_NUMBER))' in job
+assert 'actions/upload-artifact' not in job and 'eas-cli@27.2.0 build' not in job
 profile=json.loads((root/'apps/mobile/eas.json').read_text())['submit']['production']['android']
 assert profile == {'track':'production','releaseStatus':'completed','applicationId':'com.yastai.disposabl'}
 print('workflow/profile PASS')

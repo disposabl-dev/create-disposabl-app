@@ -66,7 +66,7 @@ jobs:
     name: Web
     needs: changes
     # Fork code must not run in a job with deployment credentials.
-    if: needs.changes.outputs.changed == 'true'
+    if: needs.changes.outputs.changed == 'true' || (github.event_name == 'push' && github.repository == 'disposabl-dev/create-disposabl-app')
     permissions: &release-permissions
       contents: read
       pull-requests: read
@@ -140,16 +140,16 @@ jobs:
         if: always()
         run: node .github/scripts/disposabl.mjs report web,api,mcp ${{ steps.deploy.outcome == 'success' && 'ready' || 'failed' }}
       - name: Expo
-        if: needs.changes.outputs.android == 'true'
+        if: needs.changes.outputs.android == 'true' && !(github.event_name == 'push' && github.repository == 'disposabl-dev/create-disposabl-app')
         working-directory: apps/mobile
         run: bash "$GITHUB_WORKSPACE/.github/scripts/mobile.sh" expo-env
       - name: Channel
-        if: needs.changes.outputs.android == 'true'
+        if: needs.changes.outputs.android == 'true' && !(github.event_name == 'push' && github.repository == 'disposabl-dev/create-disposabl-app')
         working-directory: apps/mobile
         run: bash "$GITHUB_WORKSPACE/.github/scripts/mobile.sh" expo-channel
       - name: Fingerprint
         id: fingerprint
-        if: needs.changes.outputs.android == 'true'
+        if: needs.changes.outputs.android == 'true' && !(github.event_name == 'push' && github.repository == 'disposabl-dev/create-disposabl-app')
         working-directory: apps/mobile
         run: bash "$GITHUB_WORKSPACE/.github/scripts/mobile.sh" expo-fingerprint
       - name: Update
@@ -178,7 +178,7 @@ jobs:
   android:
     name: Android
     needs: [changes, web]
-    if: needs.web.outputs.android_build == 'true'
+    if: needs.web.outputs.android_build == 'true' && !(github.event_name == 'push' && github.repository == 'disposabl-dev/create-disposabl-app')
     permissions: *release-permissions
     runs-on: ${{ needs.changes.outputs.android_runner }}
     timeout-minutes: 20
@@ -241,10 +241,73 @@ jobs:
         run: bash "$GITHUB_WORKSPACE/.github/scripts/mobile.sh" android-build
       - *publish
       - *artifacts
+  android-play:
+    name: Android Play submission
+    needs: [changes, web]
+    if: github.event_name == 'push' && github.repository == 'disposabl-dev/create-disposabl-app'
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      EXPECTED_SOURCE_SHA: ${{ github.sha }}
+      PLAY_PACKAGE_ID: com.yastai.disposabl
+      EXPO_PUBLIC_CONVEX_URL: ${{ needs.web.outputs.convex_url }}
+      EXPO_PUBLIC_CONVEX_SITE_URL: ${{ needs.web.outputs.convex_site_url }}
+      EXPO_PUBLIC_DISPOSABL_ANALYTICS_ENABLED: "true"
+      UPDATE_POLICY: disabled
+      EXPO_PROJECT_ID: ""
+      DISPOSABL_ANDROID_CHANNEL: production
+      DO_NOT_TRACK: "1"
+      BUN_TELEMETRY_DISABLE: "1"
+      EXPO_NO_TELEMETRY: "1"
+      EXPO_NO_DOTENV: "1"
+      E2E_TELEMETRY_DISABLED: "1"
+      CI: "1"
+    steps:
+      - *checkout
+      - name: Verify exact current main
+        run: bash .github/scripts/play-bundle.sh verify-source
+      - *node
+      - *bun
+      - uses: actions/setup-java@v5
+        with: { distribution: temurin, java-version: "17" }
+      - uses: android-actions/setup-android@v3
+        with: { packages: platform-tools }
+      - name: Install pinned dependencies
+        run: bun install --frozen-lockfile --filter @disposabl/mobile
+      - name: Download verified bundletool
+        run: |
+          curl --fail --location --silent --show-error --retry 3 \
+            https://github.com/google/bundletool/releases/download/1.18.3/bundletool-all-1.18.3.jar \
+            --output "$RUNNER_TEMP/bundletool.jar"
+          echo 'a099cfa1543f55593bc2ed16a70a7c67fe54b1747bb7301f37fdfd6d91028e29  '"$RUNNER_TEMP/bundletool.jar" | sha256sum --check --status
+      - name: Build signed production bundle
+        env:
+          DISPOSABL_ANDROID_SIGNING: ${{ secrets.DISPOSABL_ANDROID_SIGNING }}
+          BUNDLETOOL_JAR: ${{ runner.temp }}/bundletool.jar
+        run: |
+          [[ "$GITHUB_RUN_NUMBER" =~ ^[1-9][0-9]*$ && "$GITHUB_RUN_NUMBER" -le 2099999000 ]] || { echo 'Invalid pipeline run number' >&2; exit 1; }
+          export DISPOSABL_ANDROID_VERSION_CODE=$((1000 + GITHUB_RUN_NUMBER))
+          echo "Candidate version code: $DISPOSABL_ANDROID_VERSION_CODE; availability on Play remains unchecked."
+          bash .github/scripts/play-bundle.sh build
+      - name: Submit production bundle to Play
+        working-directory: apps/mobile
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EXPO_PROJECT_ID: ${{ secrets.EXPO_PROJECT_ID || vars.EXPO_PROJECT_ID }}
+          EXPO_OWNER: ${{ secrets.EXPO_OWNER || vars.EXPO_OWNER }}
+          EXPO_SLUG: ${{ secrets.EXPO_SLUG || vars.EXPO_SLUG }}
+        run: |
+          : "${EXPO_TOKEN:?Expo token is required for submission}"
+          : "${EXPO_PROJECT_ID:?Verified Expo submission project ID is required}"
+          bash "$GITHUB_WORKSPACE/.github/scripts/play-bundle.sh" verify-source
+          bun x eas-cli@27.2.0 submit --platform android --profile production --path android/app/build/outputs/bundle/release/app-release.aab --non-interactive --wait
+          echo 'Expo reports a completed submission. Play review and rollout are separate.' >> "$GITHUB_STEP_SUMMARY"
   android-failure:
     name: Report Android failure
-    needs: android
-    if: always() && (needs.android.result == 'failure' || needs.android.result == 'cancelled')
+    needs: [android, android-play]
+    if: always() && (needs.android.result == 'failure' || needs.android.result == 'cancelled' || needs.android-play.result == 'failure' || needs.android-play.result == 'cancelled')
     permissions:
       contents: read
       id-token: write
