@@ -152,6 +152,15 @@ test(
     await expect(
       screen.getByText("Available credits: 42", { exact: false }),
     ).toBeVisible();
+    await expect(screen.getByText(username, { exact: true })).toBeVisible();
+    await browser.evaluate(() => {
+      Array.from(document.querySelectorAll("strong"))
+        .find((element) =>
+          element.parentElement?.textContent?.startsWith("Signed in as"),
+        )
+        ?.scrollIntoView({ block: "center" });
+      return null;
+    });
     await app.screenshot("pricing-before-checkout");
     const evidence = async () =>
       browser.evaluate(async () => {
@@ -195,6 +204,7 @@ test(
     ).toBeVisible();
     await app.screenshot("local-test-checkout");
     await app.open("/pricing");
+    await expect(screen.getByText(username, { exact: true })).toBeVisible();
     const first = await evidence();
     expect(first.username).toBe(username);
     expect(first.calls).toHaveLength(1);
@@ -215,6 +225,7 @@ test(
       screen.getByRole("heading", "Local test checkout"),
     ).toBeVisible();
     await app.open("/pricing");
+    await expect(screen.getByText(username, { exact: true })).toBeVisible();
     const again = await evidence();
     expect(again.calls).toHaveLength(1);
     expect(again.attempts).toHaveLength(1);
@@ -225,7 +236,9 @@ test(
     await expect(
       screen.getByRole("heading", "Local test checkout"),
     ).toBeVisible();
+    await app.screenshot("topup-local-test-checkout");
     await app.open("/pricing");
+    await expect(screen.getByText(username, { exact: true })).toBeVisible();
     const topup = await evidence();
     expect(topup.calls).toHaveLength(2);
     const topupCall = topup.calls.find(
