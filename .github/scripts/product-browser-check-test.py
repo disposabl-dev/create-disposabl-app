@@ -77,6 +77,26 @@ class RunnerTests(unittest.TestCase):
                 runner.report_failure(log, root)
             self.assertEqual(output.getvalue(), 'Failure categories: timeout\nFailed flow declaration: flows/safe.e2e.ts:1\n')
 
+    def test_failure_stack_locations_are_validated_without_exposing_messages(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            flows = root / 'packages/tests/flows'
+            flows.mkdir(parents=True)
+            (flows / 'safe.e2e.ts').write_text('declaration\nassertion\n')
+            report = root / 'packages/tests/.e2e/report.json'
+            report.parent.mkdir()
+            report.write_text(json.dumps({'run': {'results': []}}))
+            log = root / 'failure.log'
+            log.write_text('AssertionError private-secret\n'
+                           ' at fn (/private-secret/flows/safe.e2e.ts:2:14)\n'
+                           ' at fn (/private-secret/flows/safe.e2e.ts:2:14)\n'
+                           ' at fn (/private-secret/flows/safe.e2e.ts:99999:1)\n'
+                           ' at fn (/private-secret/flows/unknown.e2e.ts:1:1)\n')
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                runner.report_failure(log, root)
+            self.assertEqual(output.getvalue(), 'Failure categories: assertion\nFailure stack location: flows/safe.e2e.ts:2\n')
+
     def test_isolation_rejects_root_on_linux(self):
         with patch.object(runner.sys, 'platform', 'linux'), patch.object(runner.os, 'geteuid', return_value=0):
             with self.assertRaisesRegex(RuntimeError, 'must not run as root'):

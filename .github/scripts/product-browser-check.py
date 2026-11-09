@@ -76,6 +76,15 @@ def report_failure(path, source):
         results = json.loads(report.read_text())['run']['results']
         allowed = {f'flows/{file.name}': len(file.read_text().splitlines())
                    for file in (source / 'packages/tests/flows').glob('*.e2e.ts')}
+        # Stack locations identify the assertion, whereas report.source names
+        # only the test declaration. Emit validated repository locations only.
+        stack_locations = set()
+        for match in re.finditer(r'(?:^|[/\s(])(flows/[A-Za-z0-9_.-]+\.e2e\.ts):(\d+)(?::\d+)?', text, re.MULTILINE):
+            file, line = match.group(1), int(match.group(2))
+            if file in allowed and 0 < line <= allowed[file]:
+                stack_locations.add(f'{file}:{line}')
+        for location in sorted(stack_locations):
+            print('Failure stack location: ' + location, flush=True)
         locations = set()
         for result in results:
             if result.get('status') in ('passed', 'skipped'):
