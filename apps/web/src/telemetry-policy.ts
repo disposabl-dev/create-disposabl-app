@@ -8,6 +8,9 @@ const productActions = [
   "api_key_create_attempt",
   "api_key_revoke_attempt",
   "api_key_copy_attempt",
+  "billing_monthly_checkout_attempt",
+  "billing_topup_checkout_attempt",
+  "billing_portal_attempt",
 ] as const;
 export function isProductAction(
   value: unknown,
