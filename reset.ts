@@ -22,6 +22,13 @@ if (
     "Refusing to reset a working checkout or an invalid staging directory.",
   );
 
+// This release workflow targets Disposabl's package and signing identity.
+const productReleaseFiles = [
+  ".github/workflows/play-bundle.yml",
+  ".github/scripts/play-bundle.sh",
+  ".github/scripts/play-bundle.test.py",
+];
+
 // Product-only proof harnesses must not enter generated apps. Keep the same
 // paths in the symlink validation and removal inventories.
 const productProofTests = [
@@ -126,6 +133,7 @@ const productProofTests = [
 // Validate every required input before removing anything. Unrelated skill
 // symlinks may be packaged, but reset must never read or write through a link.
 const touched = [
+  ...productReleaseFiles,
   ...productProofTests,
   "packages/backend/convex/users/receipts.ts",
   "packages/backend/convex/users/authDeletion.ts",
@@ -382,6 +390,7 @@ for (const entry of await readdir(convex)) {
     await rm(join(convex, entry), { recursive: true, force: true });
 }
 for (const path of [
+  ...productReleaseFiles,
   ...productProofTests,
   "packages/backend/convex/users/receipts.ts",
   "packages/backend/convex/users/authDeletion.ts",
