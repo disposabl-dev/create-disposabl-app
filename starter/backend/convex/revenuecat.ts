@@ -9,5 +9,7 @@ export {
   confirmUnknown,
   receiveTransfer,
   inspectTransfers,
+  recordTransferReview,
+  redispatchQueued,
   inspectConflicts,
 } from "@disposabl/disposabl-kit/server/revenuecat-functions";

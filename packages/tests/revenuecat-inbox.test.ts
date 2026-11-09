@@ -16,6 +16,8 @@ import {
   complete,
   confirmFullRefund,
   receiveTransfer,
+  recordTransferReview,
+  redispatchQueued,
   createWebhook,
   webhookAuthorized,
   webhook,
@@ -684,6 +686,83 @@ describe("RevenueCat consumable inbox", () => {
       (await call(claim, f.ctx, scopedClaim(otherId))).kind,
       "grant",
     );
+  });
+  test("transfer review is scoped, idempotent and retains holds; redispatch is targeted", async () => {
+    const f = fixture();
+    const id = await balanceId(event);
+    await call(receive, f.ctx, { event, balanceId: id });
+    const transfer = {
+      project: "proj",
+      app: "app",
+      environment: "SANDBOX",
+      deliveryId: "transfer",
+      from: ["user-1"],
+      to: ["user-2"],
+    };
+    await call(receiveTransfer, f.ctx, transfer);
+    await call(receiveTransfer, f.ctx, { ...transfer, deliveryId: "second" });
+    const review = { ...transfer, evidence: " provider case 123 " };
+    assert.equal(
+      await call(recordTransferReview, f.ctx, { ...review, app: "wrong" }),
+      false,
+    );
+    assert.equal(
+      await call(recordTransferReview, f.ctx, { ...review, to: ["user-3"] }),
+      false,
+    );
+    await assert.rejects(
+      call(recordTransferReview, f.ctx, { ...review, evidence: " " }),
+      /Provider evidence/,
+    );
+    await assert.rejects(
+      call(recordTransferReview, f.ctx, {
+        ...review,
+        evidence: "x".repeat(1001),
+      }),
+      /Provider evidence/,
+    );
+    assert.equal(await call(recordTransferReview, f.ctx, review), true);
+    const saved = f.tables.revenueCatTransfers![0].review;
+    assert.equal(saved.decision, "retain_hold");
+    assert.equal(saved.evidence, "provider case 123");
+    assert.equal(typeof saved.reviewedAt, "number");
+    assert.equal(await call(recordTransferReview, f.ctx, review), true);
+    assert.equal(
+      await call(recordTransferReview, f.ctx, {
+        ...review,
+        evidence: "different",
+      }),
+      false,
+    );
+    assert.deepEqual(f.tables.revenueCatTransfers![0].review, saved);
+    await call(receiveTransfer, f.ctx, transfer);
+    assert.ok(f.tables.revenueCatTransferHolds!.every((hold) => hold.active));
+    const target = { ...scopedClaim(id), customer: event.customer };
+    const jobs = f.jobs.length;
+    assert.equal(await call(redispatchQueued, f.ctx, target), false);
+    assert.equal(await call(claim, f.ctx, scopedClaim(id)), null);
+    assert.equal(f.jobs.length, jobs);
+    // Simulate independently reconciled holds to exercise redispatch without defining a release policy.
+    f.tables.revenueCatTransferHolds!.forEach((hold) => {
+      hold.active = false;
+    });
+    assert.equal(
+      await call(redispatchQueued, f.ctx, { ...target, customer: "user-2" }),
+      false,
+    );
+    assert.equal(
+      await call(redispatchQueued, f.ctx, { ...target, product: "wrong" }),
+      false,
+    );
+    assert.equal(await call(redispatchQueued, f.ctx, target), true);
+    assert.equal(f.jobs.length, jobs + 1);
+    await call(receiveTransfer, f.ctx, { ...transfer, deliveryId: "third" });
+    assert.equal(await call(claim, f.ctx, scopedClaim(id)), null);
+    f.tables.revenueCatTransferHolds!.forEach((hold) => {
+      hold.active = false;
+    });
+    assert.equal((await call(claim, f.ctx, scopedClaim(id))).kind, "grant");
+    assert.equal(await call(redispatchQueued, f.ctx, target), false);
   });
   test("disabled and incomplete configuration cannot read or dispatch payments", () => {
     assert.equal(revenueCatConfigs(false, {}), null);

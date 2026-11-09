@@ -51,6 +51,59 @@ const state = (id: string) => call("state", { balanceId: id }, true);
 const evidence = "fixture provider record";
 
 test(
+  "concurrent transfer reviews retain all holds and reject stale decisions",
+  { skip: !url },
+  async () => {
+    const [alice, bob] = await Promise.all([user(), user()]);
+    const purchase = event(alice),
+      id = await balanceId(purchase);
+    await deliver(purchase);
+    const transfer = {
+      project: purchase.project,
+      app: purchase.app,
+      environment: purchase.environment,
+      deliveryId: randomUUID(),
+      from: [alice],
+      to: [bob],
+    };
+    const second = { ...transfer, deliveryId: randomUUID() };
+    await Promise.all([call("transfer", transfer), call("transfer", second)]);
+    const review = { ...transfer, evidence };
+    const results = await Promise.all(
+      Array.from({ length: 12 }, () => call("reviewTransfer", review)),
+    );
+    assert.ok(results.every(Boolean));
+    assert.equal(
+      await call("reviewTransfer", { ...review, evidence: "different" }),
+      false,
+    );
+    assert.equal(
+      await call("reviewTransfer", { ...review, to: [alice] }),
+      false,
+    );
+    const lookup = {
+      project: transfer.project,
+      app: transfer.app,
+      environment: transfer.environment,
+      deliveryId: transfer.deliveryId,
+      customer: alice,
+    };
+    const saved = await call("transferState", lookup, true);
+    assert.equal(saved.transfer.review.evidence, evidence);
+    assert.equal(saved.transfer.review.decision, "retain_hold");
+    assert.equal(saved.holds.length, 2);
+    assert.equal(
+      await call("retryQueued", { ...scope(purchase, id), customer: alice }),
+      false,
+    );
+    assert.equal(await call("take", scope(purchase, id)), null);
+    await call("transfer", transfer);
+    assert.equal((await call("transferState", lookup, true)).holds.length, 2);
+    assert.equal((await state(id)).purchase.state, "queued");
+  },
+);
+
+test(
   "real Convex serializes duplicate Apple deliveries and preserves ownership",
   { skip: !url },
   async () => {

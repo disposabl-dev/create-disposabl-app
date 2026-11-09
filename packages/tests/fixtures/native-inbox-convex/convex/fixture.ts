@@ -10,6 +10,9 @@ import {
   complete,
   confirmUnknown,
   confirmFullRefund,
+  receiveTransfer,
+  recordTransferReview,
+  redispatchQueued,
 } from "../../../../disposabl-kit/server/revenuecat-functions";
 import { purchaseEventFields } from "../../../../disposabl-kit/server/revenuecat-validator";
 import {
@@ -68,6 +71,61 @@ export const approveRefund = mutation({
   args: { balanceId: v.string(), evidence: v.string() },
   returns: v.boolean(),
   handler: (ctx, a) => (confirmFullRefund as any)._handler(ctx, a),
+});
+const transferScope = {
+  project: v.string(),
+  app: v.string(),
+  environment: v.string(),
+  deliveryId: v.string(),
+  from: v.array(v.string()),
+  to: v.array(v.string()),
+};
+export const transfer = mutation({
+  args: transferScope,
+  returns: v.null(),
+  handler: (ctx, a) => (receiveTransfer as any)._handler(ctx, a),
+});
+export const reviewTransfer = mutation({
+  args: { ...transferScope, evidence: v.string() },
+  returns: v.boolean(),
+  handler: (ctx, a) => (recordTransferReview as any)._handler(ctx, a),
+});
+export const retryQueued = mutation({
+  args: { ...scope, customer: v.string() },
+  returns: v.boolean(),
+  handler: (ctx, a) => (redispatchQueued as any)._handler(ctx, a),
+});
+export const transferState = query({
+  args: {
+    project: v.string(),
+    app: v.string(),
+    environment: v.string(),
+    deliveryId: v.string(),
+    customer: v.string(),
+  },
+  returns: v.any(),
+  handler: async (ctx, a) => ({
+    transfer: await ctx.db
+      .query("revenueCatTransfers")
+      .withIndex("by_delivery", (q) =>
+        q
+          .eq("project", a.project)
+          .eq("app", a.app)
+          .eq("environment", a.environment)
+          .eq("deliveryId", a.deliveryId),
+      )
+      .unique(),
+    holds: await ctx.db
+      .query("revenueCatTransferHolds")
+      .withIndex("by_customer_active", (q) =>
+        q
+          .eq("project", a.project)
+          .eq("environment", a.environment)
+          .eq("customer", a.customer)
+          .eq("active", true),
+      )
+      .take(10),
+  }),
 });
 export const state = query({
   args: { balanceId: v.string() },
