@@ -11,6 +11,7 @@ export async function createLocalCli(root: string, site: string) {
   if (
     ![
       "http://127.0.0.1:3311",
+      ...(process.env.E2E_CLI_EXECUTABLE ? ["http://127.0.0.1:3531"] : []),
       "http://127.0.0.1:3541",
       "http://127.0.0.1:3551",
     ].includes(site)
@@ -23,6 +24,7 @@ export async function createLocalCli(root: string, site: string) {
       "The CLI fixture requires a temporary directory outside the home directory.",
     );
   const directory = await mkdtemp(join(tempRoot, "disposabl-cli-oauth-"));
+  const published = process.env.E2E_CLI_EXECUTABLE;
   const entry = join(directory, "entry.ts");
   const binary = join(directory, "cli.js");
   const env: NodeJS.ProcessEnv = {
@@ -41,6 +43,21 @@ export async function createLocalCli(root: string, site: string) {
     NO_PROXY: "localhost,127.0.0.1,::1",
   };
   const cleanup = () => rm(directory, { recursive: true, force: true });
+  if (published) {
+    if (site !== "http://127.0.0.1:3531" || !published.startsWith("/")) {
+      await cleanup();
+      throw new Error(
+        "Published CLI requires an absolute executable and owned loopback site.",
+      );
+    }
+    return {
+      directory,
+      binary: published,
+      env: { ...env, DISPOSABL_API_ORIGIN: site },
+      cleanup,
+      published: true,
+    };
+  }
   try {
     await writeFile(
       join(directory, "package.json"),
@@ -54,7 +71,7 @@ export async function createLocalCli(root: string, site: string) {
       env,
       timeout: 30_000,
     });
-    return { directory, entry, binary, env, cleanup };
+    return { directory, entry, binary, env, cleanup, published: false };
   } catch (error) {
     await cleanup();
     throw error;

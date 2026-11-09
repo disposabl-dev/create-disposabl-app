@@ -1,16 +1,21 @@
 import { test } from "@e2e-dev/web";
 import { expect } from "e2e";
 import { createHash, randomUUID } from "node:crypto";
-import { execFile, spawn, type ChildProcess } from "node:child_process";
+import {
+  execFile,
+  execFileSync,
+  spawn,
+  type ChildProcess,
+} from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { backendUrl, root, siteUrl } from "../project";
+import { assertOwnedSdkBackend } from "../helpers/sdk-auth/ownership";
 import { createLocalCli } from "../helpers/cli-oauth-fixture";
 
 const run = promisify(execFile);
-// This bundles the central CLI's actual command and auth code with a local-only
-// test entry point. The published npm binary continues to use its fixed origin.
+// The default bundles local source; an explicit executable selects a published artifact.
 test(
   "local bundled CLI restores and logs out of an OAuth session",
   {
@@ -27,6 +32,9 @@ test(
     const site = siteUrl();
     if (
       ![
+        ...(process.env.E2E_CLI_EXECUTABLE
+          ? [["http://127.0.0.1:3530", "http://127.0.0.1:3531"]]
+          : []),
         ["http://127.0.0.1:3310", "http://127.0.0.1:3311"],
         ["http://127.0.0.1:3540", "http://127.0.0.1:3541"],
         ["http://127.0.0.1:3550", "http://127.0.0.1:3551"],
@@ -38,16 +46,25 @@ test(
     if (process.env.E2E_TELEMETRY_DISABLED !== "1")
       throw new Error("CLI OAuth fixture requires disabled E2E telemetry.");
 
+    if (process.env.E2E_CLI_EXECUTABLE) assertOwnedSdkBackend();
     const fixture = await createLocalCli(root, site);
     const { binary, env } = fixture;
+    const executable = fixture.published ? binary : "node";
+    const args = (values: string[]) =>
+      fixture.published ? values : [binary, ...values];
     let child: ChildProcess | undefined;
     let finished: Promise<number | null> | undefined;
+    let callbackPort: number | undefined;
     try {
       const cli = async (...args: string[]) => {
-        const result = await run("node", [binary, ...args], {
-          env,
-          timeout: 30_000,
-        });
+        const result = await run(
+          executable,
+          fixture.published ? args : [binary, ...args],
+          {
+            env,
+            timeout: 30_000,
+          },
+        );
         return result.stdout.trim();
       };
       expect(JSON.parse(await cli("login", "status")).currentUser).toBe(null);
@@ -56,7 +73,7 @@ test(
       // deployed static assets. Discovery, authorization and token endpoints stay real.
       if ((await fetch(`${site}/consent`)).status === 404)
         await browser.route(
-          /^http:\/\/127\.0\.0\.1:(?:3311|3541|3551)\/mcp\/oauth\/authorize(?:\?.*)?$/,
+          /^http:\/\/127\.0\.0\.1:(?:3311|3531|3541|3551)\/mcp\/oauth\/authorize(?:\?.*)?$/,
           async (route) => {
             const upstream = await route.fetch();
             const location = upstream.headers.location;
@@ -75,7 +92,7 @@ test(
           },
         );
 
-      child = spawn("node", [binary, "login", "--no-browser"], {
+      child = spawn(executable, args(["login", "--no-browser"]), {
         env,
         stdio: ["ignore", "ignore", "pipe"],
       });
@@ -95,7 +112,7 @@ test(
         child!.stderr!.on("data", (chunk: Buffer) => {
           text += chunk.toString();
           const match = text.match(
-            /http:\/\/127\.0\.0\.1:(?:3311|3541|3551)\/[^\s]+(?=\r?\n)/,
+            /http:\/\/127\.0\.0\.1:(?:3311|3531|3541|3551)\/[^\s]+(?=\r?\n)/,
           );
           if (match) {
             clearTimeout(timer);
@@ -114,6 +131,27 @@ test(
       const authorizationUrl = new URL(authorization);
       if (authorizationUrl.origin !== site)
         throw new Error("Unexpected authorization origin.");
+      if (fixture.published) {
+        const redirect = new URL(
+          authorizationUrl.searchParams.get("redirect_uri")!,
+        );
+        const port = Number(redirect.port);
+        if (
+          redirect.hostname !== "127.0.0.1" ||
+          !port ||
+          [3530, 3531, 3532].includes(port)
+        )
+          throw new Error("Unexpected callback listener.");
+        const listeners = execFileSync(
+          "lsof",
+          ["-nP", "-t", `-iTCP:${port}`, "-sTCP:LISTEN"],
+          { encoding: "utf8" },
+        ).trim();
+        if (listeners !== String(child.pid))
+          throw new Error("Callback listener owner mismatch.");
+        callbackPort = port;
+        console.log(`CLI_CALLBACK port=${port} pid=${child.pid}`);
+      }
       await browser.goto(authorizationUrl.href);
       const username = `clie2e${randomUUID().replaceAll("-", "")}`;
       const password = `Cli-${randomUUID()}!`;
@@ -127,6 +165,19 @@ test(
       await expect(screen.getByText(username, { exact: true })).toBeVisible();
       await screen.getByRole("button", "Allow", { exact: true }).tap();
       expect(await finished).toBe(0);
+      if (callbackPort) {
+        try {
+          execFileSync(
+            "lsof",
+            ["-nP", "-t", `-iTCP:${callbackPort}`, "-sTCP:LISTEN"],
+            { stdio: "pipe" },
+          );
+          throw new Error("Callback port remains occupied after CLI exit.");
+        } catch (error) {
+          if ((error as { status?: number }).status !== 1) throw error;
+        }
+        console.log(`CLI_CALLBACK_RELEASED port=${callbackPort}`);
+      }
       const first = JSON.parse(await cli("login", "status")).currentUser;
       expect(typeof first?.id).toBe("string");
       expect(first?.username).toBe(username);
