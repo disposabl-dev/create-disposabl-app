@@ -1,6 +1,6 @@
 # Local deletion coordinator fixture
 
-Run only on a fresh disposable loopback backend, with ports 3480/3481 free and at least 2.5 GiB available. The script starts and stops its own backend, configures backend E2E telemetry off and an empty Boat key before sync, blocks non-loopback Node fetch, and retains its logs and synthetic database in a new `/tmp/disposabl-local-deletion-*` directory. It terminates its backend on interruption or if free space drops below 2.5 GiB. It requires the repository's installed dependencies, including the selected patched MCP and `.8` auth components; it does not install dependencies.
+Run only on a fresh disposable loopback backend, with ports 3480/3481 free and at least 2.5 GiB available. The script starts and stops its own backend, configures backend E2E telemetry off and an empty Boat key before sync, blocks non-loopback Node fetch, and retains its logs and synthetic database in a new `/tmp/disposabl-local-deletion-*` directory. It uses the shared owned-process helper to terminate and reap the backend and sync/test process groups on interruption or if free space drops below 2.5 GiB. It requires a clean committed checkout and records its source SHA. It requires the repository's installed dependencies, including the selected patched MCP and `.8` auth components; it does not install dependencies.
 
 ```sh
 CONVEX_LOCAL_BINARY=/absolute/path/to/convex-local-backend \
