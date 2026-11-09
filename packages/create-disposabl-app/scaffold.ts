@@ -112,6 +112,21 @@ export async function createApp(
       )
         await rm(join(tests, entry));
     }
+    if (!folders.includes("apps/mobile")) {
+      await rm(join(tests, "helpers/mobile-simulator"), {
+        recursive: true,
+        force: true,
+      });
+      const readme = join(tests, "README.md");
+      const text = await readFile(readme, "utf8");
+      await writeFile(
+        readme,
+        text.replace(
+          /<!-- mobile-simulator-preflight:start -->[\s\S]*?<!-- mobile-simulator-preflight:end -->\n?/,
+          "",
+        ),
+      );
+    }
     if (!config.features.includes("authentication")) {
       // These are auth screens and starter examples, not backend capabilities.
       for (const path of authStarterPaths) {

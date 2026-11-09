@@ -100,9 +100,14 @@ def main():
     command(['bun', 'run', 'build'], cwd=app, env=env, log=work/'inert-auth-build.log')
     env['REPLAY_APP_DIST'] = str(dist)
     script = 'mount-telemetry.mjs' if telemetry_mount else 'actual-app.mjs'
-    command(['bun', f'packages/tests/fixtures/posthog-replay-browser/{script}'], cwd=source, env=env, log=work/'actual-app.log', timeout=120)
+    modes = ['web', 'desktop'] if telemetry_mount else [None]
+    for mode in modes:
+        args = ['bun', f'packages/tests/fixtures/posthog-replay-browser/{script}']
+        if mode: args.append(mode)
+        command(args, cwd=source, env=env, log=work/(f'actual-app-{mode}.log' if mode else 'actual-app.log'), timeout=120)
     print(f'source={sha} artifacts={work}', flush=True)
-    print((work/'actual-app.log').read_text(), end='', flush=True)
+    for mode in modes:
+        print((work/(f'actual-app-{mode}.log' if mode else 'actual-app.log')).read_text(), end='', flush=True)
 
 
 if __name__ == '__main__':
