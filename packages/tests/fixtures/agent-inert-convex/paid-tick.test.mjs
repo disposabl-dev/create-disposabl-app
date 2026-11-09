@@ -10,6 +10,10 @@ globalThis.fetch = async () => {
   state.calls.network++;
   throw new Error("unexpected network");
 };
+mock.module("@convex-dev/agent", () => ({
+  saveMessage: async () => ({ messageId: "new-message" }),
+  listMessages: async () => [],
+}));
 mock.module("@disposabl/disposabl-kit/features", () => ({
   paymentsEnabled: true,
 }));
@@ -90,8 +94,11 @@ mock.module(paths("events.ts"), () => ({
 }));
 mock.module(paths("attachments.ts"), () => ({
   attachmentPrompt: async () => "",
+  ownedAttachments: async () => [],
+  attachmentReferences: async () => [],
 }));
 const { tick } = await import(paths("actions/run.ts"));
+const { enqueueMessageHandler } = await import(paths("internal.ts"));
 const { finish } = await import(paths("state.ts"));
 const { settle, stopping, stopped, workBlocked } = await import(
   paths("compute.ts")
@@ -169,12 +176,15 @@ function make({
   };
   const ctx = {
     db: {
+      normalizeId: (_table, id) => id,
       get: async (table, id) =>
-        table === "computeSessions" && id === "session"
-          ? state.session
-          : table === "computeDebits" && id === "debit"
-            ? state.debit
-            : null,
+        table === "users"
+          ? {}
+          : table === "computeSessions" && id === "session"
+            ? state.session
+            : table === "computeDebits" && id === "debit"
+              ? state.debit
+              : null,
       query: (table) => {
         let index;
         const chain = {
@@ -280,6 +290,7 @@ function make({
     settle: (args) => settle._handler(ctx, args),
     stop: () => stop._handler(ctx, { sessionId: "session" }),
     state,
+    context: ctx,
   };
 }
 function verifyNoExternal(s) {
@@ -556,4 +567,65 @@ test("another app becoming unconfirmed at refresh fences an already-admitted res
   expect(f.state.calls.authorize).toBe(0);
   expect(f.state.calls.debit).toBe(0);
   expect(f.state.calls.network).toBe(0);
+});
+
+test("legacy completed history is normalized only when completion is unambiguous", async () => {
+  const appId = "12345678-1234-4123-8123-123456789abc";
+  for (const [variant, patch, expected] of [
+    ["completed", {}, true],
+    ["failed", { status: "failed", error: "failed" }, false],
+    ["uncertain delivery", { delivery: "unknown" }, false],
+    ["unordered timestamps", { finishedAt: 9 }, false],
+    [
+      "active lease",
+      { lease: { token: "lease", expiresAt: 9999999999999 } },
+      false,
+    ],
+  ]) {
+    const f = make({
+      agent: {
+        status: "idle",
+        computeSessionId: undefined,
+        promptId: "old-prompt",
+        conversationId: "conversation",
+        startedAt: 10,
+        finishedAt: 20,
+        ...patch,
+      },
+    });
+    f.state.app.appId = appId;
+    const ctx = f.context;
+    await enqueueMessageHandler(
+      ctx,
+      { userId: "owner", appId, prompt: "next" },
+      () => true,
+      false,
+    );
+    expect(f.state.app.agent.promptId).toBe(
+      expected ? undefined : "old-prompt",
+    );
+    expect(f.state.app.agent.turnCompleted).toBe(expected ? true : undefined);
+    expect(f.state.app.agent.conversationId).toBe("conversation");
+  }
+  const blocked = make({
+    agent: {
+      status: "idle",
+      computeSessionId: undefined,
+      promptId: "old-prompt",
+      conversationId: "conversation",
+      startedAt: 10,
+      finishedAt: 20,
+      stopUnconfirmed: true,
+    },
+  });
+  blocked.state.app.appId = appId;
+  await expect(
+    enqueueMessageHandler(
+      blocked.context,
+      { userId: "owner", appId, prompt: "next" },
+      () => true,
+      false,
+    ),
+  ).rejects.toThrow(/could not be stopped/);
+  expect(blocked.state.app.agent.promptId).toBe("old-prompt");
 });
