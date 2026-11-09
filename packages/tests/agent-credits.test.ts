@@ -245,3 +245,30 @@ test("pending deletion prevents balance lookup before admission", async () => {
   );
   assert.equal(charged, false);
 });
+
+test("paid worker tick fences provider dispatch in an isolated subprocess", async () => {
+  const { spawnSync } = await import("node:child_process");
+  const { join } = await import("node:path");
+  const result = spawnSync(
+    process.execPath,
+    [
+      "test",
+      join(
+        import.meta.dirname,
+        "fixtures/agent-inert-convex/paid-tick.test.mjs",
+      ),
+    ],
+    {
+      encoding: "utf8",
+      env: {
+        PATH: process.env.PATH,
+        HOME: process.env.HOME,
+        E2E_TELEMETRY_DISABLED: "1",
+        DO_NOT_TRACK: "1",
+        NODE_ENV: "test",
+      },
+    },
+  );
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stdout + result.stderr, /4 pass/);
+});
