@@ -24,6 +24,7 @@ test(
     const app = join(temp, "app");
     const requests: { path: string; method: string; input: unknown }[] = [];
     let registeredName: string | undefined;
+    let contractRequests = 0;
     const server = createServer(async (request, response) => {
       const json = (value: unknown) =>
         response
@@ -60,7 +61,8 @@ test(
             }),
           );
       }
-      if (url.pathname === "/openapi.json")
+      if (url.pathname === "/openapi.json") {
+        contractRequests++;
         return json({
           paths: {
             "/api/tasks/list": {
@@ -98,6 +100,7 @@ test(
             },
           },
         });
+      }
       if (request.headers.authorization !== "Bearer local-cli-fixture")
         return response.writeHead(401).end();
       const body: Buffer[] = [];
@@ -170,14 +173,25 @@ test(
       const origin = `http://127.0.0.1:${address.port}`;
       const apiHelp = await run("--origin", origin, "--help");
       assert.equal(apiHelp.code, 0, apiHelp.err);
-      assert.match(apiHelp.out, /\n\s+tasks(?:\s|\[)/);
+      assert.match(
+        apiHelp.out,
+        /API commands are loaded from the configured service/,
+      );
+      assert.doesNotMatch(apiHelp.out, /\n\s+tasks(?:\s|\[)/);
+      assert.equal(
+        contractRequests,
+        0,
+        "root help must not fetch the contract",
+      );
       const taskHelp = await run("--origin", origin, "help", "tasks");
       assert.equal(taskHelp.code, 0, taskHelp.err);
       assert.match(taskHelp.out, /list/);
       assert.match(taskHelp.out, /create/);
+      assert.equal(contractRequests, 1);
       const listHelp = await run("--origin", origin, "tasks", "list", "--help");
       assert.equal(listHelp.code, 0, listHelp.err);
       assert.match(listHelp.out, /--limit/);
+      assert.equal(contractRequests, 2);
       const registration = await run(
         "--origin",
         origin,
@@ -186,6 +200,7 @@ test(
       );
       assert.equal(registration.code, 1);
       assert.equal(registeredName, "tasks CLI", registration.err);
+      assert.equal(contractRequests, 2, "login must not fetch the contract");
       for (const args of [
         ["tasks", "list", "--limit", "2"],
         ["tasks", "create", "--title", "Ship the app", "--done", "false"],
@@ -202,6 +217,7 @@ test(
           input: { title: "Ship the app", done: false },
         },
       ]);
+      assert.equal(contractRequests, 4);
       const web = join(temp, "web");
       await createApp(template, web, "web-only", {
         version: "test",
