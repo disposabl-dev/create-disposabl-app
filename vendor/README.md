@@ -12,7 +12,7 @@ At product revisions `5319558` and fixture-only follow-on `5d4a279`, the selecte
 
 Fresh isolated Convex runs passed product identity fencing and bounded erasure, independent SDK OAuth-grant revocation, API authentication, and email/password signup, verification, change and recovery. The email flow also denied login and recovery for the fenced identity while preserving the other account. Senders and provider adapters were inert; no real email or provider login was performed. The corrected ownership guard passed before product fixture mutations. Generated auth-off and auth/payments web profiles passed installation, typechecks and retained email setup tests.
 
-These results establish local package and component behavior. They do not establish production authentication, real provider delivery, native runtime behavior or complete account deletion. The combined web/backend regression gate remains separately pending. The older artifacts and descriptions below are historical evidence, not supported compatibility paths or current rebuild instructions.
+These results establish local package and component behavior. They do not establish production authentication, real provider delivery, native runtime behavior or complete account deletion. The combined web/backend gate at `5319558` passed 292 unit tests and 43 E2E tests, with 55 unit and 24 E2E skips explicitly recorded. Separate `.2` fixtures also passed the local deletion coordinator and authenticated browser handoff/session exchange. Skipped opt-in fixtures are not implied coverage. The older artifacts and descriptions below are historical evidence, not supported compatibility paths or current rebuild instructions.
 
 ## Historical snapshots
 
