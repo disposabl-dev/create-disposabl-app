@@ -2,6 +2,58 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { safeTelemetryEvent } from "../../apps/web/src/telemetry-policy";
 import { screenCategory } from "../../apps/mobile/src/features/telemetry-policy";
+import {
+  publicReplayPath,
+  replayProperties,
+} from "../../apps/web/src/telemetry-replay";
+
+test("replay only permits fixed public paths and validated session identifiers", () => {
+  assert.equal(publicReplayPath("/"), true);
+  for (const path of [
+    "/signup",
+    "/login",
+    "/consent",
+    "/apps/private",
+    "/account",
+    "/dashboard",
+  ])
+    assert.equal(publicReplayPath(path), false);
+  const id = "01890abc-1234-7123-8123-123456789abc";
+  assert.equal(
+    replayProperties(
+      {
+        $snapshot_data: [],
+        $snapshot_bytes: 1,
+        $session_id: "private",
+        $window_id: id,
+      },
+      "test",
+      "id",
+    ),
+    null,
+  );
+  assert.deepEqual(
+    replayProperties(
+      {
+        $snapshot_data: [],
+        $snapshot_bytes: 1,
+        $session_id: id,
+        $window_id: id,
+        secret: "drop",
+      },
+      "test",
+      "id",
+    ),
+    {
+      token: "test",
+      distinct_id: "id",
+      $snapshot_data: [],
+      $snapshot_bytes: 1,
+      $session_id: id,
+      $window_id: id,
+    },
+  );
+});
 
 test("mobile categories never expose app identifiers or unknown routes", () => {
   assert.equal(screenCategory("/apps/private-app-id"), "app_detail");
@@ -24,6 +76,7 @@ test("web events emit only fixed fields and stop at the lease deadline", () => {
     distinct_id: "server-id",
     platform: "web",
     page: "connections",
+    $current_url: "https://www.disposabl.dev/dashboard/connections",
   });
   assert.equal(safeTelemetryEvent("$autocapture", input), null);
   assert.equal(

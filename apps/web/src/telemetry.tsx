@@ -100,6 +100,9 @@ export function ProductTelemetry({
       origin,
       transport: fetch,
       adapter: {
+        renew(lease) {
+          deadline = Math.min(lease.expiresAt, Date.now() + 30_000);
+        },
         start(lease) {
           live = true;
           deadline = Math.min(lease.expiresAt, Date.now() + 30_000);
@@ -123,6 +126,7 @@ export function ProductTelemetry({
             capture_performance: false,
             capture_heatmaps: false,
             capture_dead_clicks: false,
+            enable_recording_console_log: false,
             request_batching: false,
             before_send(event) {
               const properties = safeTelemetryEvent(event.event, {
@@ -134,6 +138,8 @@ export function ProductTelemetry({
                   typeof event.properties.action === "string"
                     ? event.properties.action
                     : undefined,
+                sessionId: event.properties.$session_id,
+                windowId: event.properties.$window_id,
                 source,
                 projectToken: lease.projectToken,
                 distinctId: lease.distinctId,

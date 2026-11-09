@@ -4,6 +4,7 @@ import { act, create } from "react-test-renderer";
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 globalThis.window = new EventTarget();
+window.location = { pathname: "/" };
 Object.defineProperty(globalThis, "navigator", {
   value: { doNotTrack: "0" },
   configurable: true,
@@ -18,6 +19,7 @@ process.env.VITE_CONVEX_SITE_URL = "http://127.0.0.1:9999";
 process.env.VITE_DISPOSABL_ANALYTICS_ENABLED = "true";
 process.env.VITE_E2E = "true";
 let initialized = 0;
+let sdkOptions;
 const events = [];
 const stops = mock();
 const requests = mock(
@@ -41,6 +43,7 @@ mock.module("posthog-js", () => ({
     init(_key, options) {
       initialized++;
       this.options = options;
+      sdkOptions = options;
     }
     capture(event, properties = {}) {
       const result = this.options.before_send({
@@ -57,6 +60,8 @@ mock.module("posthog-js", () => ({
       stops();
     }
     reset() {}
+    startSessionRecording() {}
+    stopSessionRecording() {}
   },
 }));
 const { ProductTelemetry, AnalyticsPreference } =
@@ -119,10 +124,28 @@ test("web bootstraps, strips URL and stops immediately on opt-out", async () => 
     distinct_id: "server-id",
     page: "connections",
     platform: "web",
+    $current_url: "https://www.disposabl.dev/dashboard/connections",
   });
+  const id = "01890abc-1234-7123-8123-123456789abc";
+  const snapshot = {
+    uuid: "test",
+    event: "$snapshot",
+    properties: {
+      $snapshot_data: [],
+      $snapshot_bytes: 1,
+      $session_id: id,
+      $window_id: id,
+      private: "drop",
+    },
+  };
+  expect(sdkOptions.before_send(snapshot)).toBeNull();
+  window.location.pathname = "/login";
+  expect(sdkOptions.before_send(snapshot)).toBeNull();
+  window.location.pathname = "/";
   await act(async () => {
     renderer.root.findByType("button").props.onClick();
   });
   expect(stops).toHaveBeenCalled();
   expect(values.get("disposabl.product.analytics.optout.v1")).toBe("1");
+  expect(sdkOptions.before_send(snapshot)).toBeNull();
 });
