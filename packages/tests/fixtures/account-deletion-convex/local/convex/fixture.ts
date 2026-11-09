@@ -49,24 +49,6 @@ export const username = mutation({
   handler: (ctx, args) =>
     ctx.runMutation(c.authUsername.public.setUsername, args),
 });
-export const legacy = mutation({
-  args: { userId: v.id("users") },
-  handler: (ctx, { userId }) =>
-    ctx.db.patch("users", userId, {
-      authDeletion: {
-        state: "linked_auth_cleared",
-        batches: 1,
-        passwordsDeleted: 0,
-        accountsDeleted: 0,
-        sessionsDeleted: 0,
-        refreshTokensDeleted: 0,
-        passwordsCleared: true,
-        linkedRowsCleared: true,
-        legacyOrphansUnverified: true,
-        updatedAt: 1,
-      },
-    }),
-});
 export const r2 = mutation({
   args: { userId: v.id("users") },
   handler: (ctx, { userId }) =>

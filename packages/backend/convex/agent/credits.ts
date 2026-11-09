@@ -41,12 +41,3 @@ export async function requireCredits(
       message: "At least 10 credits are required to start work.",
     });
 }
-
-/** Old installed clients use mutations, which cannot contact the billing provider. */
-export function requireCurrentClient(enabled = paymentsEnabled) {
-  if (enabled)
-    throw new ConvexError({
-      code: "update_required",
-      message: "Update Disposabl to continue creating and changing apps.",
-    });
-}

@@ -26,6 +26,7 @@ if (
 // paths in the symlink validation and removal inventories.
 const productProofTests = [
   "packages/tests/compute-stop.test.ts",
+  "packages/tests/auth-deletion-current.test.ts",
   "packages/tests/flows/billing-checkout-auth.e2e.ts",
   "packages/tests/fixtures/billing-checkout-browser",
   "packages/tests/flows/sdk-auth.e2e.ts",

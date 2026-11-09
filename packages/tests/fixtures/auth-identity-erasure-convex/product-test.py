@@ -64,7 +64,7 @@ assert call("verifyPassword", {"userId": other, "password": password})["success"
 for _ in range(20):
     result = call("productAuthCleanup", args)
     if result["state"] == "linked_auth_cleared": break
-assert result["state"] == "linked_auth_cleared" and result["legacyOrphansUnverified"]
+assert result["state"] == "linked_auth_cleared" and result["unattributedAuthRowsUnverified"]
 assert result["passwordsDeleted"] == 1 and result["accountsDeleted"] == 202
 assert result["usernamesDeleted"] == 1 and result["emailsDeleted"] == 201 and result["emailChallengesDeleted"] == 202
 assert result["usernameCleared"] and result["attributedEmailsCleared"] and result["unattributedEmailChallengesUnverified"]
@@ -82,19 +82,4 @@ call("googleStart", {"state": state})
 call("googleMint", {"state": state, "code": code, "sub": sub, "legacy": False})
 denied(lambda: call("completeSignInWithGoogle", {"state": state, "code": code}), "re-registration")
 assert call("googleLookup", {"sub": other_sub}) == other
-legacy_sub, legacy, legacy_access = google_user()
-legacy_request = call("requestProductDeletion", {"userId": legacy})
-call("beginBoth", {"userId": legacy})
-for _ in range(10):
-    if call("purgeCore", {"userId": legacy})["linkedRowsCleared"]: break
-identity("setUsername", {"userId": legacy, "username": "legacy" + uuid.uuid4().hex})
-identity("seed", {"userId": legacy, "count": 2})
-call("seedLegacyProgress", {"userId": legacy})
-legacy_args = {"userId": legacy, "expectedRequestedAt": legacy_request}
-upgraded = call("productAuthCleanup", legacy_args)
-assert upgraded["state"] == "linked_auth_cleared" and upgraded["batches"] == 8
-assert upgraded["passwordsDeleted"] == 4 and upgraded["accountsDeleted"] == 3
-assert upgraded["usernamesDeleted"] == 1 and upgraded["emailsDeleted"] == 2 and upgraded["emailChallengesDeleted"] == 3
-assert call("productAuthCleanup", legacy_args) == upgraded
-assert call("cutoff", {"sub": legacy_sub}) is not None and not authenticated(legacy_access)
 print("PASS: product atomic auth fence, concurrent batches, stale request, cutoff and unaffected owner")

@@ -259,23 +259,3 @@ export const failAuthBatch = mutation({
     );
   },
 });
-
-export const seedLegacyProgress = mutation({
-  args: { userId: v.id("users") },
-  handler: async (ctx, { userId }) => {
-    await ctx.db.patch(userId, {
-      authDeletion: {
-        state: "linked_auth_cleared",
-        batches: 7,
-        passwordsDeleted: 4,
-        accountsDeleted: 3,
-        sessionsDeleted: 2,
-        refreshTokensDeleted: 1,
-        passwordsCleared: true,
-        linkedRowsCleared: true,
-        legacyOrphansUnverified: true,
-        updatedAt: Date.now(),
-      },
-    });
-  },
-});

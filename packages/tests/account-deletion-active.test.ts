@@ -38,7 +38,7 @@ test(
   },
 );
 
-test("local operator advances one existing stage, resumes legacy auth, and reports blockers", async () => {
+test("local operator advances one current stage and reports blockers", async () => {
   const { advanceLocalBatch } =
     await import("../backend/convex/users/localDeletion");
   const { getFunctionName } = await import("convex/server");
@@ -110,11 +110,6 @@ test("local operator advances one existing stage, resumes legacy auth, and repor
   await assert.rejects(advance(), /interrupted/);
   assert.equal((await advance()).stage, "mcp");
   assert.equal((await advance()).stage, "mcp");
-  user.authDeletion = {
-    state: "linked_auth_cleared",
-    passwordsCleared: true,
-    linkedRowsCleared: true,
-  };
   assert.equal((await advance()).stage, "auth");
   user.ephemeralDeletion = {
     requestedAt: 122,
@@ -177,7 +172,6 @@ test(
     await m("key", { userId: owner, hash: "synthetic-owner-key-1" });
     await m("key", { userId: owner, hash: "synthetic-owner-key-2" });
     await m("username", { userId: owner, username: "synthetic-owner" });
-    await m("legacy", { userId: owner });
     await m("seed", { userId: owner, count: 205 });
     const file = await m("r2", { userId: owner });
     await assert.rejects(
@@ -213,9 +207,10 @@ test(
       current.authDeletion.unattributedEmailChallengesUnverified,
       true,
     );
-    assert.ok(current.authDeletion.batches > 1);
+    assert.equal(current.authDeletion.batches, 1);
     await assert.rejects(
       m("username", { userId: owner, username: "synthetic-another" }),
+      /User identity has been erased/,
     );
     for (let i = 0; i < 4; i++) {
       assert.equal((await m("advance", args)).stage, "ephemeral");

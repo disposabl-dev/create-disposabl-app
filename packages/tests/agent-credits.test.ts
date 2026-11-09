@@ -1,10 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { getFunctionName } from "convex/server";
-import {
-  requireCredits,
-  requireCurrentClient,
-} from "../backend/convex/agent/credits";
+import { requireCredits } from "../backend/convex/agent/credits";
 import { guardedEnqueue } from "../backend/convex/agent/internal";
 import { createPlatforms } from "../disposabl-kit/server/lib/platform-spec";
 import * as agent from "../backend/convex/agent/internal";
@@ -175,12 +172,7 @@ test("ownership and credits precede enqueue, with no public unchecked endpoint",
 });
 
 test("agent guard and checked configuration contracts are retained", () => {
-  assert.doesNotThrow(() => requireCurrentClient(false));
-  assert.throws(
-    () => requireCurrentClient(true),
-    (error: any) => error.data?.code === "update_required",
-  );
-  assert.equal((agentNative.sendMessage as any).isMutation, true);
+  assert.equal("sendMessage" in agentNative, false);
   assert.equal((agentNative.sendMessageChecked as any).isAction, true);
   assert.equal("requestConfiguration" in appsNative, false);
   assert.equal((appsNative.requestConfigurationChecked as any).isAction, true);
