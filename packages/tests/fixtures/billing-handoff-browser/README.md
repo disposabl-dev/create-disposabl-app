@@ -1,6 +1,12 @@
 # Authenticated billing handoff browser fixture
 
-`python3 packages/tests/fixtures/billing-handoff-browser/run.py` reserves 127.0.0.1:3530/3531, archives the committed checkout into a disposable `/tmp/disposabl-billing-local-*` copy, applies the existing fixture-only billing configuration adapter, installs frozen dependencies, and starts an owned local Convex backend with its beacon disabled. It sets backend `E2E_TELEMETRY_DISABLED=1` and an empty Boat key before syncing. The existing fixture readiness query rejects configured provider credentials. Only this process's backend is stopped afterward.
+The runner requires `CONVEX_LOCAL_BINARY` and `PLAYWRIGHT_BROWSERS_PATH` pointing to the cached backend and browser directory. It checks ports 3530/3531 and at least 2.5 GiB free, snapshots the clean commit, verifies the installed Auth package against the selected archive, and uses cached dependencies. A network-denying sandbox permits loopback only; telemetry and the backend beacon are disabled, and the Boat key is empty before sync. The flow requires a private single-use marker proving both listeners and the fresh database belong to its launcher. The shared supervisor terminates and reaps its backend and child process groups on exit, interruption or low disk. Logs, traces and the synthetic database are retained privately under `/tmp/disposabl-billing-local-*`.
+
+```sh
+CONVEX_LOCAL_BINARY=/absolute/path/to/convex-local-backend \
+PLAYWRIGHT_BROWSERS_PATH=/absolute/path/to/browser-cache \
+  python3 packages/tests/fixtures/billing-handoff-browser/run.py
+```
 
 The opt-in TesterArmy flow uses the product billing-login page, real handoff handlers and real auth session exchange with a synthetic account. It checks consent, browser identity, single use, expiry and deletion-pending rejection. Payments remain off in the web app; it stops at the product's payments-off pricing page and never calls checkout or a provider. This does not test real payments, native storefronts, production, or a provider sandbox. The fixture adapter's marker and unauthenticated expiry bridge are restricted to the disposable backend copy and must be excluded from starter packages.
 

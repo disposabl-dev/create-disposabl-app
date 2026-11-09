@@ -1,59 +1,150 @@
-"""Run the browser handoff proof against an owned provider-inert 3530 fixture."""
-import os, pathlib, secrets, socket, subprocess, tempfile, time, urllib.request
+"""Run the browser handoff against a fresh, supervised local-only backend."""
+import importlib.util
+import json
+import os
+from pathlib import Path
+import secrets
+import shutil
+import signal
+import socket
+import subprocess
+import sys
+import tempfile
+import threading
+import time
+import urllib.request
+from contextlib import ExitStack
 
-root = pathlib.Path(__file__).resolve().parents[4]
-for port in (3530, 3531):
+ROOT = Path(__file__).resolve().parents[4]
+MIN_FREE = int(2.5 * 1024**3)
+PROFILE = '(version 1)(allow default)(deny network-outbound)(allow network-outbound (remote ip "localhost:*"))(allow network-outbound (remote unix-socket))'
+
+
+def load(path, name):
+    spec = importlib.util.spec_from_file_location(name, path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def main():
+    if os.environ.get('BILLING_FIXTURE_SANDBOXED') != '1':
+        env = {'PATH': os.environ['PATH'], 'HOME': str(Path.home()),
+               'BILLING_FIXTURE_SANDBOXED': '1',
+               'CONVEX_LOCAL_BINARY': os.environ.get('CONVEX_LOCAL_BINARY', ''),
+               'PLAYWRIGHT_BROWSERS_PATH': os.environ.get('PLAYWRIGHT_BROWSERS_PATH', '')}
+        os.execve('/usr/bin/sandbox-exec', ['sandbox-exec', '-p', PROFILE, sys.executable, __file__], env)
     with socket.socket() as probe:
-        probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        probe.settimeout(1)
+        if probe.connect_ex(('1.1.1.1', 443)) != 1:
+            raise RuntimeError('Outbound sandbox is not enforced')
+    if subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True).strip():
+        raise RuntimeError('Commit the candidate before running the fixture')
+    if shutil.disk_usage('/tmp').free < MIN_FREE:
+        raise RuntimeError('Insufficient free space (<2.5 GiB)')
+    for port in (3530, 3531):
+        with socket.socket() as probe:
+            probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            probe.bind(('127.0.0.1', port))
+    binary = Path(os.environ.get('CONVEX_LOCAL_BINARY', ''))
+    if not binary.is_file():
+        raise RuntimeError('Set CONVEX_LOCAL_BINARY to the cached backend')
+    browsers = os.environ.get('PLAYWRIGHT_BROWSERS_PATH', '')
+    if not browsers or not Path(browsers).is_dir():
+        raise RuntimeError('Set PLAYWRIGHT_BROWSERS_PATH to the cached browser directory')
+    sha = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
+    work = Path(tempfile.mkdtemp(prefix='disposabl-billing-local-', dir='/tmp')).resolve()
+    work.chmod(0o700)
+    marker = work / 'ownership.json'
+    marker.write_text('{}')
+    marker.chmod(0o600)
+    source = work / 'source'
+    source.mkdir()
+    archive = work / 'source.tar'
+    subprocess.run(['git', 'archive', '--format=tar', '--output', str(archive), sha], cwd=ROOT, check=True)
+    subprocess.run(['/usr/bin/tar', '-xf', str(archive), '-C', str(source)], check=True)
+    selected = load(source / 'packages/tests/helpers/sdk-auth/selected_auth.py', 'selected_auth')
+    auth = selected.verify_selected_auth(source, ROOT / 'node_modules/@convex-dev/auth')
+    owner = load(source / 'packages/tests/helpers/sdk-auth/run.py', 'sdk_runner')
+    modules = source / 'node_modules'
+    modules.mkdir()
+    for dep in (ROOT / 'node_modules').iterdir():
+        if dep.name == '@disposabl' and dep.is_dir():
+            scope = modules / dep.name
+            scope.mkdir()
+            for package in dep.iterdir():
+                target = source / 'packages/disposabl-kit' if package.name == 'disposabl-kit' else package.resolve()
+                (scope / package.name).symlink_to(target, target_is_directory=target.is_dir())
+        else:
+            (modules / dep.name).symlink_to(dep.resolve(), target_is_directory=dep.is_dir())
+    (source / '.billing-handoff-local-fixture').touch()
+    (work / 'home').mkdir()
+    shutil.copyfile(source / 'packages/tests/fixtures/account-deletion-convex/local/block-remote.cjs', work / 'block-remote.cjs')
+    env = {'HOME': str(work / 'home'), 'PATH': os.environ['PATH'], 'TMPDIR': str(work),
+           'LANG': 'en_US.UTF-8', 'CI': '1', 'DO_NOT_TRACK': '1', 'DISPOSABL_TELEMETRY_DISABLED': '1',
+           'E2E_TELEMETRY_DISABLED': '1', 'DISABLE_BEACON': '1', 'EXPO_NO_TELEMETRY': '1',
+           'EXPO_NO_DOTENV': '1', 'NODE_OPTIONS': '--require=' + str(work / 'block-remote.cjs'),
+           'PLAYWRIGHT_BROWSERS_PATH': browsers}
+    print(f"source {sha}; auth {auth['version']} sha256 {auth['sha256']} ({auth['files']} files); artifacts {work}", flush=True)
+    if shutil.disk_usage('/tmp').free < MIN_FREE:
+        raise RuntimeError('Insufficient free space after snapshot')
+    name, secret = 'billing-browser-fixture', secrets.token_hex(32)
+    key = subprocess.check_output([str(binary), 'keygen', 'admin-key', '--instance-name', name,
+                                   '--instance-secret', secret], env=env, text=True, stderr=subprocess.PIPE).strip()
+    stopped = threading.Event()
+    with ExitStack() as stack:
+        def group(command, cwd, log_name, child_env=env):
+            out = stack.enter_context((work / log_name).open('w'))
+            with owner.owned_backend(command, process_group=True, stop_timeout=1, cwd=cwd,
+                                     env=child_env, stdout=out, stderr=subprocess.STDOUT) as child:
+                if child.wait():
+                    raise RuntimeError(f'{log_name} failed; inspect retained log')
+        group(['bun', str(source / 'packages/tests/fixtures/billing-handoff-local/prepare.ts'), str(source)], source, 'prepare.log')
+        log = stack.enter_context((work / 'backend.log').open('w'))
+        proc = stack.enter_context(owner.owned_backend([str(binary), '--interface', '127.0.0.1', '--port', '3530',
+            '--site-proxy-port', '3531', '--convex-origin', 'http://127.0.0.1:3530', '--convex-site',
+            'http://127.0.0.1:3531', '--instance-name', name, '--instance-secret', secret, '--disable-beacon',
+            '--local-storage', str(work / 'storage'), str(work / 'database.sqlite3')], env=env, stdout=log, stderr=subprocess.STDOUT))
+        def guard():
+            while not stopped.wait(.5):
+                if shutil.disk_usage('/tmp').free < MIN_FREE:
+                    print('Disk threshold reached; cancelling owned fixture', flush=True)
+                    os.kill(os.getpid(), signal.SIGTERM)
+                    return
+        threading.Thread(target=guard, daemon=True).start()
         try:
-            probe.bind(("127.0.0.1", port))
-        except OSError as error:
-            raise SystemExit(f"Fixture port {port} is unavailable: {error}")
-base = pathlib.Path(tempfile.mkdtemp(prefix="disposabl-billing-local-", dir="/tmp"))
-archive = subprocess.Popen(["git", "archive", "HEAD"], cwd=root, stdout=subprocess.PIPE)
-subprocess.run(["tar", "-xf", "-", "-C", str(base)], stdin=archive.stdout, check=True)
-archive.stdout.close()
-if archive.wait() != 0:
-    raise RuntimeError("Could not archive source revision")
-(base / ".billing-handoff-local-fixture").touch()
-env = {k: v for k, v in os.environ.items() if k in ("PATH", "HOME", "TMPDIR", "USER", "LOGNAME")}
-env.update({"CONVEX_SELF_HOSTED_URL": "http://127.0.0.1:3530", "E2E_CONVEX_URL": "http://127.0.0.1:3530", "E2E_CONVEX_SITE_URL": "http://127.0.0.1:3531", "EXPO_PUBLIC_CONVEX_URL": "http://127.0.0.1:3530", "EXPO_PUBLIC_CONVEX_SITE_URL": "http://127.0.0.1:3531", "E2E_BILLING_HANDOFF_BROWSER": "1", "E2E_TELEMETRY_DISABLED": "1", "DISPOSABL_TELEMETRY_DISABLED": "1", "DO_NOT_TRACK": "1", "EXPO_NO_TELEMETRY": "1", "EXPO_NO_DOTENV": "1", "NODE_USE_ENV_PROXY": "1", "HTTP_PROXY": "http://127.0.0.1:9", "HTTPS_PROXY": "http://127.0.0.1:9", "NO_PROXY": "localhost,127.0.0.1,::1"})
-binary = pathlib.Path.home() / ".cache/convex/binaries/precompiled-2026-10-22-1447815/convex-local-backend"
-name, secret = "billing-browser-fixture", secrets.token_hex(32)
-key = subprocess.check_output([str(binary), "keygen", "admin-key", "--instance-name", name, "--instance-secret", secret], text=True).strip()
-env["CONVEX_SELF_HOSTED_ADMIN_KEY"] = key
+            for _ in range(100):
+                if proc.poll() is not None:
+                    raise RuntimeError('Backend exited before readiness')
+                try:
+                    urllib.request.urlopen('http://127.0.0.1:3530/version', timeout=1).close()
+                    break
+                except OSError:
+                    time.sleep(.1)
+            else:
+                raise RuntimeError('Backend startup timed out')
+            marker.write_text(json.dumps({'version': 1, 'launcherPid': os.getpid(), 'backendPid': proc.pid,
+                                          'database': str(work / 'database.sqlite3')}))
+            body = json.dumps({'changes': [{'name': 'E2E_TELEMETRY_DISABLED', 'value': '1'},
+                                           {'name': 'BOAT_API_KEY', 'value': ''}]}).encode()
+            req = urllib.request.Request('http://127.0.0.1:3530/api/update_environment_variables', data=body,
+                headers={'Content-Type': 'application/json', 'Authorization': 'Convex ' + key}, method='POST')
+            with urllib.request.urlopen(req, timeout=10) as response:
+                if response.status != 200: raise RuntimeError('Fixture environment configuration failed')
+            admin = env | {'CONVEX_SELF_HOSTED_URL': 'http://127.0.0.1:3530', 'CONVEX_SELF_HOSTED_ADMIN_KEY': key}
+            group(['node', str(source / 'node_modules/convex/bin/main.js'), 'dev', '--once', '--typecheck', 'disable', '--codegen', 'disable'], source / 'packages/backend', 'sync.log', admin)
+            testenv = env | {'E2E_CONVEX_URL': 'http://127.0.0.1:3530', 'E2E_CONVEX_SITE_URL': 'http://127.0.0.1:3531',
+                'E2E_BILLING_HANDOFF_BROWSER': '1', 'E2E_BILLING_OWNERSHIP_FILE': str(marker)}
+            group(['bun', 'run', 'e2e', 'run', 'billing-handoff-auth.e2e.ts', '--target', 'web', '--retries', '0',
+                   '--no-cache', '--output', '.e2e/billing-handoff-auth'], source, 'e2e.log', testenv)
+            print('Browser handoff fixture passed', flush=True)
+        finally:
+            stopped.set()
 
-def run(args, cwd):
-    print("RUN", " ".join(args), flush=True)
-    subprocess.run(args, cwd=cwd, env=env, check=True)
 
-run(["bun", str(root / "packages/tests/fixtures/billing-handoff-local/prepare.ts"), str(base)], root)
-run(["bun", "install", "--frozen-lockfile", "--ignore-scripts"], base)
-log = (base / "backend.log").open("w")
-p = subprocess.Popen([str(binary), "--interface", "127.0.0.1", "--port", "3530", "--site-proxy-port", "3531", "--convex-origin", "http://127.0.0.1:3530", "--convex-site", "http://127.0.0.1:3531", "--instance-name", name, "--instance-secret", secret, "--disable-beacon", "--local-storage", str(base / "storage"), str(base / "database.sqlite3")], env=env, stdout=log, stderr=subprocess.STDOUT)
-try:
-    for _ in range(100):
-        if p.poll() is not None:
-            raise RuntimeError("Backend exited before readiness")
-        try:
-            urllib.request.urlopen("http://127.0.0.1:3530/version", timeout=1)
-            break
-        except Exception:
-            time.sleep(0.1)
-    else:
-        raise RuntimeError("Backend startup timed out")
-    cli = str(base / "node_modules/.bin/convex")
-    backend = base / "packages/backend"
-    run([cli, "env", "set", "E2E_TELEMETRY_DISABLED", "1"], backend)
-    run([cli, "env", "set", "BOAT_API_KEY", ""], backend)
-    run([cli, "dev", "--once", "--typecheck", "disable", "--codegen", "disable"], backend)
-    run(["bun", "run", "e2e", "run", "billing-handoff-auth.e2e.ts", "--target", "web", "--retries", "0", "--no-cache", "--output", ".e2e/billing-handoff-auth"], root)
-finally:
-    p.terminate()
+if __name__ == '__main__':
     try:
-        p.wait(timeout=10)
-    except subprocess.TimeoutExpired:
-        p.kill()
-        p.wait()
-    log.close()
-    print("Stopped owned backend; fixture:", base, flush=True)
+        main()
+    except subprocess.SubprocessError:
+        print('Fixture subprocess failed; inspect retained logs', file=sys.stderr)
+        sys.exit(1)

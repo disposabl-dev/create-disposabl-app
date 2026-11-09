@@ -1,6 +1,7 @@
 import { test } from "@e2e-dev/web";
 import { expect } from "e2e";
 import { randomUUID } from "node:crypto";
+import { assertOwnedSdkBackend } from "../helpers/sdk-auth/ownership";
 
 const backend = "http://127.0.0.1:3530";
 async function call(
@@ -39,6 +40,11 @@ test(
       throw new Error(
         "Billing handoff browser fixture requires the isolated 3530/3531 backend and disabled telemetry.",
       );
+    assertOwnedSdkBackend({
+      markerVariable: "E2E_BILLING_OWNERSHIP_FILE",
+      ports: [3530, 3531],
+      claimDirectory: ".billing-handoff-claimed",
+    });
     expect(await call("query", "fixtureBillingHandoff:ready", {})).toBe(true);
     const username = `billing${randomUUID().replaceAll("-", "")}`;
     const password = `Fixture-${randomUUID()}!`;
