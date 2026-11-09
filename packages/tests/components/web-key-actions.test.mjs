@@ -25,6 +25,7 @@ process.env.PROD = "true";
 process.env.VITE_CONVEX_SITE_URL = "http://127.0.0.1:9999";
 process.env.VITE_DISPOSABL_ANALYTICS_ENABLED = "true";
 const events = [];
+let captureThrows = false;
 const request = mock(async function () {
   if (this !== window) throw new TypeError("Illegal invocation");
   return Response.json({
@@ -44,6 +45,7 @@ mock.module("posthog-js", () => ({
       this.options = options;
     }
     capture(event, properties = {}) {
+      if (captureThrows) throw new Error("synthetic SDK failure");
       const result = this.options.before_send({
         uuid: "fixture",
         event,
@@ -117,6 +119,7 @@ afterEach(async () => {
   await act(async () => renderer?.unmount());
   renderer = undefined;
   events.length = 0;
+  captureThrows = false;
   values.clear();
   request.mockClear();
   createKey.mockClear();
@@ -207,6 +210,24 @@ test("failed operations still record attempts without error details", async () =
     "api_key_revoke_attempt",
   ]);
   expect(JSON.stringify(events)).not.toContain("SECRET_ERROR_91");
+});
+
+test("SDK failure does not interrupt create, copy or revoke handlers", async () => {
+  await mount(false);
+  captureThrows = true;
+  await act(async () =>
+    renderer.root.findByType("input").props.onChange({
+      target: { value: "SECRET_INPUT_91" },
+    }),
+  );
+  await submit();
+  await act(async () => button("Copy key").props.onClick());
+  await act(async () => button("Revoke").props.onClick());
+  expect(createKey).toHaveBeenCalledTimes(1);
+  expect(copied).toHaveBeenCalledTimes(1);
+  expect(revokeKey).toHaveBeenCalledTimes(1);
+  expect(actions()).toEqual([]);
+  expect(renderer.root.findAllByProps({ role: "alert" })).toHaveLength(0);
 });
 
 test("E2E and opt-out or expired leases suppress handler events", async () => {
