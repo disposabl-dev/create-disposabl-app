@@ -31,6 +31,8 @@ const excluded = [
   "packages/tests/starter-payment-reconfigure.test.ts",
   "packages/tests/flows/support-contact.e2e.ts",
   "packages/tests/fixtures/compute-convex",
+  "packages/tests/fixtures/telemetry-http-convex",
+  "packages/tests/telemetry-http-integration.test.ts",
   "packages/tests/fixtures/telemetry-link-convex",
   "packages/tests/telemetry-link-transactions.test.ts",
   "packages/tests/platform-error-telemetry.test.ts",
