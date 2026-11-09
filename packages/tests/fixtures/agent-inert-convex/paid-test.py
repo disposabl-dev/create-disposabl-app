@@ -111,3 +111,49 @@ for _ in range(8):
 else: raise AssertionError('legacy work was not fenced')
 assert call('paidInspect',{'userId':legacy_user,'appId':legacy_app})['sessions'][0]['state']=='stopping'
 print('PASS: bounded legacy batches retain an intervening unresolved marker')
+
+# Simultaneous requests: the final persisted classification must reflect the real patchThread write.
+race_user=call('paidUser',{}); race_app=str(uuid.uuid4())
+call('paidApp',{'userId':race_user,'appId':race_app})
+call('activationSeedLegacy',{'userId':race_user,'count':70})
+with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+    futures=[pool.submit(call,'activationNormalize',{'userId':race_user}),pool.submit(call,'activationPatchApp',{'userId':race_user,'appId':race_app})]
+    for future in futures: future.result()
+for _ in range(5):
+    observed=call('activationNormalize',{'userId':race_user})
+    if not observed['pending']: break
+assert not observed['pending'] and observed['unresolved']
+state=call('paidInspect',{'userId':race_user,'appId':race_app})['app']
+assert state['agentRemoteUnresolved'] and state['agentResumeBusy'] and state['agent']['delivery']=='simultaneous-delivery'
+print('PASS: simultaneous normalization and patchThread preserve final unresolved classification (overlap not measured)')
+
+# Deletion stop checks a displaced activation lease and an old worker without session ID.
+del_user=call('paidUser',{}); deletion=call('deletionSeed',{'userId':del_user}); d={'userId':del_user,'token':'deletion'}
+assert not call('deletionClaim',d)
+call('deletionExpire',{**deletion,'kind':'activation'})
+assert not call('deletionClaim',d)
+call('deletionExpire',{**deletion,'kind':'worker'})
+assert call('deletionClaim',d)
+call('deletionRenewWorker',{'app':deletion['app']})
+assert not call('deletionFinish',d)
+call('deletionExpire',{**deletion,'kind':'worker'})
+assert call('deletionFinish',d)
+print('PASS: deletion fences displaced activation and old worker, rejects stale archived result')
+
+# Simulate drained old workers and a confirmed archived stop before a new user message.
+for app in confirmed_apps: call('activationDrainApp',{'userId':confirmed_user,'appId':app})
+assert call('activationStop',{'sessionId':confirmed_session,'token':'normal-stop'})
+call('activationStopComplete',{'sessionId':confirmed_session,'token':'normal-stop'})
+assert call('paidInspect',{'userId':confirmed_user,'appId':confirmed_apps[0]})['sessions'][0]['state']=='stopped'
+assert call('paidClaim',{'sessionId':confirmed_session,'expectedDebit':confirmed_debit['_id']}) is None
+call('paidSend',start)
+new_state=call('paidInspect',{'userId':confirmed_user,'appId':confirmed_apps[0]})
+new_session=new_state['app']['agent']['computeSessionId']
+assert new_session != confirmed_session and len(new_state['sessions'])==2
+new_debit=call('paidClaim',{'sessionId':new_session}); assert new_debit
+assert call('paidClaim',{'sessionId':new_session}) is None
+call('paidConfirm',{'debitId':new_debit['_id']})
+assert call('activationClaim',{'sessionId':new_session,'token':'new-activation'})=='claimed'
+assert call('activationComplete',{'sessionId':new_session,'token':'new-activation'})
+assert call('paidClaim',{'sessionId':confirmed_session,'expectedDebit':confirmed_debit['_id']}) is None
+print('PASS: confirmed stop plus explicit message admits one new session and debit')

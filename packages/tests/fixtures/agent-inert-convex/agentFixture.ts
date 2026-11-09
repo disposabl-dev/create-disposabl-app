@@ -378,3 +378,151 @@ export const activationLegacyDelivery = internalMutationGeneric({
     return null;
   },
 });
+
+import {
+  normalizeRemoteWork,
+  patchThread,
+  readThread,
+} from "../../../../backend/convex/agent/threads";
+import {
+  claimDeletionStop,
+  finishDeletionStop,
+} from "../../../../backend/convex/users/internal";
+import { stopped } from "../../../../backend/convex/agent/compute";
+export const activationNormalize = internalMutationGeneric({
+  args: { userId: v.string() },
+  returns: v.any(),
+  handler: (ctx, args) => normalizeRemoteWork(ctx as any, args.userId),
+});
+export const activationPatchApp = internalMutationGeneric({
+  args: { appId: v.string(), userId: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const app = await ctx.db
+      .query("apps")
+      .withIndex("by_appId", (q: any) => q.eq("appId", args.appId))
+      .unique();
+    const thread = readThread(app as any);
+    if (!thread || thread.userId !== args.userId)
+      throw Error("fixture ownership");
+    await patchThread(ctx as any, thread, {
+      delivery: "simultaneous-delivery",
+    });
+    return null;
+  },
+});
+export const activationDrainApp = internalMutationGeneric({
+  args: { appId: v.string(), userId: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const app = await ctx.db
+      .query("apps")
+      .withIndex("by_appId", (q: any) => q.eq("appId", args.appId))
+      .unique();
+    const thread = readThread(app as any);
+    if (!thread || thread.userId !== args.userId)
+      throw Error("fixture ownership");
+    await patchThread(ctx as any, thread, {
+      status: "idle",
+      pending: [],
+      lease: undefined,
+    });
+    return null;
+  },
+});
+export const activationStopComplete = internalMutationGeneric({
+  args: { sessionId: v.id("computeSessions"), token: v.string() },
+  returns: v.any(),
+  handler: (ctx, args) =>
+    (stopped as any)._handler(paidScheduler(ctx), { ...args, archived: true }),
+});
+export const deletionSeed = internalMutationGeneric({
+  args: { userId: v.id("users") },
+  returns: v.any(),
+  handler: async (ctx, { userId }) => {
+    await ctx.db.patch(userId, { deletionRequestedAt: Date.now() });
+    const old = await ctx.db.insert("computeSessions", {
+      userId,
+      state: "active",
+      paidUntil: Date.now() + 60000,
+      activation: "claimed",
+      activationLease: { token: "old", until: Date.now() + 60000 },
+    });
+    await ctx.db.insert("computeSessions", {
+      userId,
+      state: "stopped",
+      paidUntil: 0,
+    });
+    const watchdog = await ctx.scheduler.runAfter(
+      0,
+      anyApi.agentFixture.noop,
+      {},
+    );
+    const app = await ctx.db.insert("apps", {
+      userId,
+      appId: `deletion-${userId}`,
+      name: "fixture",
+      platforms: ["web"],
+      agent: {
+        threadId: "fixture",
+        status: "processing",
+        pending: [],
+        updatedAt: Date.now(),
+        lease: { token: "old-worker", watchdog, expiresAt: Date.now() + 60000 },
+      },
+    });
+    return { old, app };
+  },
+});
+export const deletionExpire = internalMutationGeneric({
+  args: { old: v.id("computeSessions"), app: v.id("apps"), kind: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    if (args.kind === "activation") {
+      const row = await ctx.db.get(args.old);
+      if (!row?.activationLease) throw Error("fixture");
+      await ctx.db.patch(args.old, {
+        activationLease: { ...row.activationLease, until: Date.now() - 1 },
+      });
+    } else {
+      const row = await ctx.db.get(args.app);
+      if (!row?.agent?.lease) throw Error("fixture");
+      await ctx.db.patch(args.app, {
+        agent: {
+          ...row.agent,
+          lease: { ...row.agent.lease, expiresAt: Date.now() - 1 },
+        },
+      });
+    }
+    return null;
+  },
+});
+export const deletionRenewWorker = internalMutationGeneric({
+  args: { app: v.id("apps") },
+  returns: v.null(),
+  handler: async (ctx, { app }) => {
+    const row = await ctx.db.get(app);
+    if (!row?.agent?.lease) throw Error("fixture");
+    await ctx.db.patch(app, {
+      agent: {
+        ...row.agent,
+        lease: { ...row.agent.lease, expiresAt: Date.now() + 60000 },
+      },
+    });
+    return null;
+  },
+});
+export const deletionClaim = internalMutationGeneric({
+  args: { userId: v.id("users"), token: v.string() },
+  returns: v.boolean(),
+  handler: (ctx, args) => (claimDeletionStop as any)._handler(ctx, args),
+});
+export const deletionFinish = internalMutationGeneric({
+  args: { userId: v.id("users"), token: v.string() },
+  returns: v.boolean(),
+  handler: (ctx, args) =>
+    (finishDeletionStop as any)._handler(ctx, {
+      ...args,
+      outcome: "archived_observed",
+    }),
+});
