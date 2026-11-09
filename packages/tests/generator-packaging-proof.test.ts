@@ -50,6 +50,8 @@ const excluded = [
   "packages/tests/web-action-policy.test.ts",
   "packages/tests/components/mobile-payment-attempts.test.mjs",
   "packages/tests/mobile-payment-attempts.test.ts",
+  "packages/tests/components/mobile-guide-actions.test.mjs",
+  "packages/tests/mobile-guide-actions.test.ts",
   "packages/tests/components/web-key-actions.test.mjs",
   "packages/tests/web-key-actions.test.ts",
   "packages/tests/mobile-product-actions.test.ts",
