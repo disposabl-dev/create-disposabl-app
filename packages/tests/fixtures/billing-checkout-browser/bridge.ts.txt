@@ -1,5 +1,6 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { getAuthUserId } from "@convex-dev/auth/server";
 
 export const record = mutation({
   args: { userId: v.string(), planId: v.string(), feature: v.optional(v.string()), quantity: v.optional(v.number()) },
@@ -10,9 +11,8 @@ export const evidence = query({
   args: {},
   returns: v.any(),
   handler: async (ctx) => {
-    const id = await ctx.auth.getUserIdentity();
-    if (!id) throw new Error("Authentication required");
-    const userId = id.subject.split("|")[0];
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Authentication required");
     const attempts = await ctx.db.query("billingAttempts").withIndex("by_userId_requestId", q => q.eq("userId", userId)).take(10);
     const calls = await ctx.db.query("fixtureCheckoutDispatches").withIndex("by_userId", q => q.eq("userId", userId)).take(10);
     return { userId, attempts, calls };
