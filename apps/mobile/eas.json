@@ -3,6 +3,15 @@
     "version": ">= 27.2.0",
     "appVersionSource": "local"
   },
+  "submit": {
+    "production": {
+      "android": {
+        "track": "production",
+        "releaseStatus": "completed",
+        "applicationId": "com.yastai.disposabl"
+      }
+    }
+  },
   "build": {
     "ios-preview": {
       "developmentClient": false,

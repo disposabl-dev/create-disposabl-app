@@ -1,78 +1,36 @@
-name: Prepare Play bundle (manual)
+name: Android Play submission
 
 on:
-  workflow_dispatch:
-    inputs:
-      source_sha:
-        description: Exact current main commit SHA
-        required: true
-        type: string
-      upload_cert_sha256:
-        description: Optional independently verified Play upload certificate SHA-256
-        required: false
-        type: string
-      previous_version_code:
-        description: Optional freshly verified highest Play version code
-        required: false
-        type: string
-      next_version_code:
-        description: Candidate version code; Play acceptance remains unverified
-        required: true
-        type: string
-      convex_url:
-        description: Verified production Convex HTTPS origin
-        required: true
-        type: string
-      convex_site_url:
-        description: Verified production Convex site HTTPS origin
-        required: true
-        type: string
-      analytics_enabled:
-        description: Verified production public analytics setting
-        required: true
-        type: choice
-        options: ["false", "true"]
-      update_policy:
-        description: Verified production update policy
-        required: true
-        type: choice
-        options: [disabled, expo]
-      expo_project_id:
-        description: Verified Expo project ID, required only for expo update policy
-        required: false
-        type: string
-      storage_budget_verified:
-        description: One-day artifact storage and runner budget independently verified
-        required: true
-        type: boolean
-        default: false
+  push:
+    branches: [main]
 
 permissions:
   contents: read
 
+concurrency:
+  group: android-play-production
+  cancel-in-progress: false
+
 jobs:
-  bundle:
+  submit:
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 60
     env:
-      STORAGE_BUDGET_VERIFIED: ${{ inputs.storage_budget_verified }}
       GH_TOKEN: ${{ github.token }}
-      EXPECTED_SOURCE_SHA: ${{ inputs.source_sha }}
+      EXPECTED_SOURCE_SHA: ${{ github.sha }}
       PLAY_PACKAGE_ID: com.yastai.disposabl
-      PLAY_UPLOAD_CERT_SHA256: ${{ inputs.upload_cert_sha256 }}
-      PLAY_PREVIOUS_VERSION_CODE: ${{ inputs.previous_version_code }}
-      DISPOSABL_ANDROID_VERSION_CODE: ${{ inputs.next_version_code }}
-      EXPO_PUBLIC_CONVEX_URL: ${{ inputs.convex_url }}
-      EXPO_PUBLIC_CONVEX_SITE_URL: ${{ inputs.convex_site_url }}
-      EXPO_PUBLIC_DISPOSABL_ANALYTICS_ENABLED: ${{ inputs.analytics_enabled }}
-      UPDATE_POLICY: ${{ inputs.update_policy }}
-      EXPO_PROJECT_ID: ${{ inputs.expo_project_id }}
+      EXPO_PUBLIC_CONVEX_URL: https://vivid-caterpillar-633.convex.cloud
+      EXPO_PUBLIC_CONVEX_SITE_URL: https://vivid-caterpillar-633.convex.site
+      EXPO_PUBLIC_DISPOSABL_ANALYTICS_ENABLED: "true"
+      UPDATE_POLICY: disabled
+      EXPO_PROJECT_ID: ""
       DISPOSABL_MOBILE_CHANNEL: production
       DISPOSABL_ANDROID_CHANNEL: production
       DO_NOT_TRACK: "1"
       BUN_TELEMETRY_DISABLE: "1"
       EXPO_NO_TELEMETRY: "1"
       EXPO_NO_DOTENV: "1"
+      E2E_TELEMETRY_DISABLED: "1"
       CI: "1"
     steps:
       - uses: actions/checkout@v6
@@ -95,18 +53,26 @@ jobs:
             https://github.com/google/bundletool/releases/download/1.18.3/bundletool-all-1.18.3.jar \
             --output "$RUNNER_TEMP/bundletool.jar"
           echo 'a099cfa1543f55593bc2ed16a70a7c67fe54b1747bb7301f37fdfd6d91028e29  '"$RUNNER_TEMP/bundletool.jar" | sha256sum --check --status
-      - name: Build and verify candidate
+      - name: Build signed production bundle
         env:
           DISPOSABL_ANDROID_SIGNING: ${{ secrets.DISPOSABL_ANDROID_SIGNING }}
           BUNDLETOOL_JAR: ${{ runner.temp }}/bundletool.jar
-        run: bash .github/scripts/play-bundle.sh build
-      - name: Recheck current main before retention
-        run: bash .github/scripts/play-bundle.sh verify-source
-      - name: Retain candidate for one day
-        uses: actions/upload-artifact@v4
-        with:
-          name: play-aab-${{ github.sha }}
-          path: apps/mobile/android/app/build/outputs/bundle/release/app-release.aab
-          if-no-files-found: error
-          retention-days: 1
-          compression-level: 0
+        run: |
+          version=$(date -u +%s)
+          [[ "$version" =~ ^[1-9][0-9]*$ && "$version" -le 2100000000 ]] || { echo 'Cannot allocate a valid candidate version code' >&2; exit 1; }
+          echo "Candidate version code: $version; availability on Play remains unchecked."
+          export DISPOSABL_ANDROID_VERSION_CODE="$version"
+          bash .github/scripts/play-bundle.sh build
+      - name: Submit production bundle to Play
+        working-directory: apps/mobile
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EXPO_PROJECT_ID: ${{ secrets.EXPO_PROJECT_ID || vars.EXPO_PROJECT_ID }}
+          EXPO_OWNER: ${{ secrets.EXPO_OWNER || vars.EXPO_OWNER }}
+          EXPO_SLUG: ${{ secrets.EXPO_SLUG || vars.EXPO_SLUG }}
+        run: |
+          : "${EXPO_TOKEN:?Expo token is required for submission}"
+          : "${EXPO_PROJECT_ID:?Verified Expo submission project ID is required}"
+          bash "$GITHUB_WORKSPACE/.github/scripts/play-bundle.sh" verify-source
+          bun x eas-cli@27.2.0 submit --platform android --profile production --path android/app/build/outputs/bundle/release/app-release.aab --non-interactive --wait
+          echo 'Expo reports a completed submission. Play review and rollout are separate.' >> "$GITHUB_STEP_SUMMARY"

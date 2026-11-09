@@ -3,7 +3,6 @@ set -euo pipefail
 set +x
 
 verify_source() {
-  [[ "${STORAGE_BUDGET_VERIFIED:-}" == true ]] || { echo 'Artifact and runner budget must be verified' >&2; return 1; }
   [[ "${GITHUB_REF:-}" == refs/heads/main && "${EXPECTED_SOURCE_SHA:-}" =~ ^[0-9a-f]{40}$ ]] || { echo 'Expected a full main commit SHA' >&2; return 1; }
   [[ "$(git rev-parse HEAD)" == "$EXPECTED_SOURCE_SHA" && "${GITHUB_SHA:-}" == "$EXPECTED_SOURCE_SHA" ]] || { echo 'Checkout does not match requested source' >&2; return 1; }
   [[ "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)" == "$EXPECTED_SOURCE_SHA" ]] || { echo 'Main moved or cannot be verified' >&2; return 1; }
@@ -13,13 +12,8 @@ case "${1:-}" in
   verify-source) verify_source ;;
   build)
     verify_source
-    [[ "${UPDATE_POLICY:-}" == disabled || "${UPDATE_POLICY:-}" == expo ]] || { echo 'Invalid update policy' >&2; exit 1; }
-    if [[ "$UPDATE_POLICY" == disabled ]]; then
-      [[ -z "${EXPO_PROJECT_ID:-}" ]] || { echo 'Disabled updates require an empty Expo project ID' >&2; exit 1; }
-    else
-      [[ "${EXPO_PROJECT_ID:-}" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]] || { echo 'Invalid Expo project ID' >&2; exit 1; }
-    fi
-    [[ "${EXPO_PUBLIC_DISPOSABL_ANALYTICS_ENABLED:-}" == true || "${EXPO_PUBLIC_DISPOSABL_ANALYTICS_ENABLED:-}" == false ]] || exit 1
+    [[ "${UPDATE_POLICY:-}" == disabled && -z "${EXPO_PROJECT_ID:-}" ]] || { echo 'Production updates must remain disabled' >&2; exit 1; }
+    [[ "${EXPO_PUBLIC_DISPOSABL_ANALYTICS_ENABLED:-}" == true ]] || { echo 'Production analytics must be enabled' >&2; exit 1; }
     [[ -z "${EXPO_PUBLIC_E2E:-}" ]] || { echo 'E2E is not permitted' >&2; exit 1; }
     : "${DISPOSABL_ANDROID_SIGNING:?Missing signing bundle}"
     values=$(jq -er '[.keystoreBase64, .storePassword, .keyAlias, .keyPassword] | if all(.[]; type == "string" and length > 0 and (contains("\n") | not) and (contains("\r") | not)) then .[] else error("Invalid signing bundle") end' <<< "$DISPOSABL_ANDROID_SIGNING")
