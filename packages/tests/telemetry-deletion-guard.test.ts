@@ -1,6 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { claimIdentity as product, page } from "../backend/convex/telemetry";
+import {
+  claimIdentity as product,
+  page,
+  bootstrap,
+} from "../backend/convex/telemetry";
 import { claimIdentity as generic } from "../disposabl-kit/server/lib/telemetry";
 
 function context(user: object | null, valid = true) {
@@ -110,5 +114,39 @@ test("page ingestion rejects a deletion racing the session check without emittin
       if (!(key in originalEnv)) delete process.env[key];
     }
     Object.assign(process.env, originalEnv);
+  }
+});
+
+test("bootstrap rejects deletion racing the session check without issuing a lease", async () => {
+  const oldEnv = { ...process.env };
+  const { ctx: mutationCtx, writes } = context({ deletionRequestedAt: 1 });
+  try {
+    process.env.DISPOSABL_ENVIRONMENT = "production";
+    process.env.POSTHOG_PROJECT_TOKEN = "phc_fixture_public";
+    process.env.POSTHOG_HOST = "https://us.i.posthog.com";
+    delete process.env.E2E_TELEMETRY_DISABLED;
+    delete process.env.POSTHOG_ENABLED;
+    const ctx = {
+      auth: { getUserIdentity: async () => ({ subject: "session" }) },
+      runQuery: async (_ref: unknown, args: any) =>
+        "sessionId" in args ? { userId: "owner" } : false,
+      runMutation: async (_ref: unknown, args: any) =>
+        (product as any)._handler(mutationCtx, args),
+    };
+    const response = await (bootstrap as any)._handler(
+      ctx,
+      new Request("https://local/telemetry/bootstrap", {
+        method: "POST",
+        headers: { Authorization: "Bearer synthetic" },
+        body: "{}",
+      }),
+    );
+    assert.equal(response.status, 401);
+    assert.equal(await response.text(), "");
+    assert.deepEqual(writes, []);
+  } finally {
+    for (const key of Object.keys(process.env))
+      if (!(key in oldEnv)) delete process.env[key];
+    Object.assign(process.env, oldEnv);
   }
 });

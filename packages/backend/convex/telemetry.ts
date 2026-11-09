@@ -11,6 +11,7 @@ import {
   captureTelemetry,
   hashTelemetryIdentity,
   telemetryEnabled,
+  bootstrapTelemetry,
 } from "@disposabl/disposabl-kit/server/lib/telemetry";
 
 export { expireIdentity } from "@disposabl/disposabl-kit/server/lib/telemetry";
@@ -80,6 +81,9 @@ const headers = {
 };
 export const options = httpAction(
   async () => new Response(null, { status: 204, headers }),
+);
+export const bootstrap = httpAction((ctx, request) =>
+  bootstrapTelemetry(ctx, request, getSessionUserId),
 );
 const anonymousIdPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;

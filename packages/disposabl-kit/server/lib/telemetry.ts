@@ -3,6 +3,7 @@ import { makeFunctionReference } from "convex/server";
 import { v } from "convex/values";
 import {
   internalMutation,
+  type ActionCtx,
   type MutationCtx,
 } from "../../../backend/convex/_generated/server";
 
@@ -93,9 +94,10 @@ export const createClaimIdentity = (
       hash: v.optional(v.string()),
       newHash: v.string(),
       userId: v.optional(v.string()),
+      reportLink: v.optional(v.boolean()),
     },
-    returns: v.union(v.boolean(), v.null()),
-    handler: async (ctx, { hash, newHash, userId }) => {
+    returns: v.union(v.boolean(), v.null(), v.literal("linked")),
+    handler: async (ctx, { hash, newHash, userId, reportLink }) => {
       if (userId !== undefined) await checkUser?.(ctx, userId);
       const row = hash
         ? await ctx.db
@@ -108,8 +110,10 @@ export const createClaimIdentity = (
         row.expiresAt > Date.now() &&
         (!row.userId || row.userId === userId)
       ) {
-        if (userId && !row.userId)
+        if (userId && !row.userId) {
           await ctx.db.patch("telemetryIdentities", row._id, { userId });
+          if (reportLink) return "linked";
+        }
         return true;
       }
       const now = Date.now();
@@ -172,6 +176,117 @@ async function opaqueId(value: string) {
     ),
     (b) => b.toString(16).padStart(2, "0"),
   ).join("");
+}
+
+const bootstrapClaim = makeFunctionReference<
+  "mutation",
+  { hash?: string; newHash: string; userId?: string; reportLink: boolean },
+  boolean | null | "linked"
+>("telemetry:claimIdentity");
+const uuidPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const bootstrapHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "Authorization, Content-Type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Cache-Control": "no-store",
+};
+
+/** The expiry governs client refresh; it cannot revoke the public project token. */
+export async function bootstrapTelemetry(
+  ctx: ActionCtx,
+  request: Request,
+  getUser: (ctx: ActionCtx) => Promise<string | null>,
+) {
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return new Response(null, { status: 400, headers: bootstrapHeaders });
+  }
+  if (
+    !body ||
+    typeof body !== "object" ||
+    Array.isArray(body) ||
+    ("anonymousId" in body &&
+      (typeof body.anonymousId !== "string" ||
+        !uuidPattern.test(body.anonymousId)))
+  )
+    return new Response(null, { status: 400, headers: bootstrapHeaders });
+  if (!telemetryEnabled())
+    return new Response(null, { status: 204, headers: bootstrapHeaders });
+  const projectToken =
+    settings.analytics?.projectToken ?? process.env.POSTHOG_PROJECT_TOKEN!;
+  const host = settings.analytics?.host ?? process.env.POSTHOG_HOST!;
+  if (!/^phc_[A-Za-z0-9_-]+$/.test(projectToken))
+    return new Response(null, { status: 204, headers: bootstrapHeaders });
+  let userId: string | null;
+  try {
+    userId = await getUser(ctx);
+  } catch {
+    return new Response(null, { status: 401, headers: bootstrapHeaders });
+  }
+  if (request.headers.has("Authorization") && !userId)
+    return new Response(null, { status: 401, headers: bootstrapHeaders });
+  const existing =
+    "anonymousId" in body ? (body.anonymousId as string) : undefined;
+  const issued = crypto.randomUUID();
+  let claim: boolean | null | "linked";
+  try {
+    claim = await ctx.runMutation(bootstrapClaim, {
+      ...(existing ? { hash: await hashTelemetryIdentity(existing) } : {}),
+      newHash: await hashTelemetryIdentity(issued),
+      ...(userId ? { userId } : {}),
+      reportLink: true,
+    });
+  } catch {
+    return new Response(null, {
+      status: userId ? 401 : 503,
+      headers: bootstrapHeaders,
+    });
+  }
+  if (claim === null)
+    return new Response(null, { status: 429, headers: bootstrapHeaders });
+  const anonymousId = claim && existing ? existing : issued;
+  const anonymousDistinct = await opaqueId(
+    `disposabl:${projectToken}:anonymous:${anonymousId}`,
+  );
+  const distinctId = userId
+    ? await opaqueId(`disposabl:${projectToken}:${userId}`)
+    : anonymousDistinct;
+  if (claim === "linked") {
+    try {
+      await fetch(`${host}/capture/`, {
+        method: "POST",
+        signal: AbortSignal.timeout(2000),
+        redirect: "error",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          api_key: projectToken,
+          event: "$identify",
+          properties: {
+            distinct_id: distinctId,
+            $anon_distinct_id: anonymousDistinct,
+            $ip: "0.0.0.0",
+          },
+        }),
+      });
+    } catch {
+      /* The identity link is best effort; no page event is captured. */
+    }
+  }
+  return Response.json(
+    {
+      enabled: true,
+      projectToken,
+      host,
+      anonymousId,
+      distinctId,
+      identified: !!userId,
+      expiresAt: Date.now() + 30_000,
+    },
+    { headers: bootstrapHeaders },
+  );
 }
 
 /** Only trusted server callers can supply a user or app ID. */

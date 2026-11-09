@@ -2,6 +2,7 @@ import { webhook as revenueCatWebhook } from "@disposabl/disposabl-kit/server/re
 import {
   page as telemetryPage,
   options as telemetryOptions,
+  bootstrap as telemetryBootstrap,
 } from "./telemetry";
 import { download } from "./downloads/http";
 import { token, report } from "./github/actions/http";
@@ -17,6 +18,16 @@ http.route({
   handler: revenueCatWebhook,
 });
 http.route({ path: "/telemetry/page", method: "POST", handler: telemetryPage });
+http.route({
+  path: "/telemetry/bootstrap",
+  method: "POST",
+  handler: telemetryBootstrap,
+});
+http.route({
+  path: "/telemetry/bootstrap",
+  method: "OPTIONS",
+  handler: telemetryOptions,
+});
 http.route({
   path: "/telemetry/page",
   method: "OPTIONS",

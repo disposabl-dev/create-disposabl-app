@@ -299,6 +299,154 @@ test("page ingestion issues and binds an anonymous identity only to the verified
   }
 });
 
+test("bootstrap issues opaque identities, links once, rotates accounts, and fails closed", async () => {
+  const { bootstrap, claimIdentity } =
+    await import("../backend/convex/telemetry");
+  const { default: app } = await import("../../disposabl.json");
+  const originalFeatures = [...app.features];
+  if (!app.features.includes("analytics" as never))
+    (app.features as string[]).push("analytics");
+  process.env.DISPOSABL_ENVIRONMENT = "production";
+  process.env.POSTHOG_PROJECT_TOKEN = "phc_fixture_public";
+  process.env.POSTHOG_HOST = "https://us.i.posthog.com";
+  delete process.env.E2E_TELEMETRY_DISABLED;
+  delete process.env.POSTHOG_ENABLED;
+  const events: any[] = [];
+  globalThis.fetch = (async (_url, init) => {
+    events.push(JSON.parse(String(init?.body)));
+    return new Response(null, { status: 200 });
+  }) as typeof fetch;
+  const fixture = identityContext();
+  let user: string | null = null;
+  let deleting = false;
+  const ctx = {
+    auth: {
+      getUserIdentity: async () => (user ? { subject: "session" } : null),
+    },
+    runQuery: async (_ref: unknown, args: any) =>
+      "sessionId" in args ? { userId: user } : deleting,
+    runMutation: async (_ref: unknown, args: any) =>
+      (claimIdentity as any)._handler(fixture.ctx, args),
+  };
+  const request = (id?: string, auth = false) =>
+    new Request("https://local/telemetry/bootstrap", {
+      method: "POST",
+      headers: auth ? { Authorization: "Bearer private" } : {},
+      body: JSON.stringify(id ? { anonymousId: id } : {}),
+    });
+  try {
+    const first = await (bootstrap as any)._handler(ctx, request());
+    assert.equal(first.status, 200);
+    assert.equal(first.headers.get("cache-control"), "no-store");
+    const anonymous = await first.json();
+    assert.deepEqual(
+      Object.keys(anonymous).sort(),
+      [
+        "anonymousId",
+        "distinctId",
+        "enabled",
+        "expiresAt",
+        "host",
+        "identified",
+        "projectToken",
+      ].sort(),
+    );
+    assert.equal(anonymous.identified, false);
+    assert.equal(anonymous.projectToken, "phc_fixture_public");
+    assert.ok(
+      anonymous.expiresAt > Date.now() &&
+        anonymous.expiresAt <= Date.now() + 30_000,
+    );
+    assert.equal(events.length, 0);
+    const repeat = await (
+      await (bootstrap as any)._handler(ctx, request(anonymous.anonymousId))
+    ).json();
+    assert.equal(repeat.distinctId, anonymous.distinctId);
+    user = "verified-user";
+    const linked = await (
+      await (bootstrap as any)._handler(
+        ctx,
+        request(anonymous.anonymousId, true),
+      )
+    ).json();
+    assert.equal(linked.identified, true);
+    assert.notEqual(linked.distinctId, anonymous.distinctId);
+    assert.equal(linked.anonymousId, anonymous.anonymousId);
+    assert.equal(events.length, 1);
+    assert.equal(events[0].event, "$identify");
+    assert.equal(events[0].properties.$anon_distinct_id, anonymous.distinctId);
+    assert.equal(events[0].properties.distinct_id, linked.distinctId);
+    await (bootstrap as any)._handler(
+      ctx,
+      request(anonymous.anonymousId, true),
+    );
+    assert.equal(events.length, 1);
+    user = "different-user";
+    const switched = await (
+      await (bootstrap as any)._handler(
+        ctx,
+        request(anonymous.anonymousId, true),
+      )
+    ).json();
+    assert.notEqual(switched.anonymousId, anonymous.anonymousId);
+    assert.notEqual(switched.distinctId, linked.distinctId);
+    assert.equal(events.length, 1);
+    deleting = true;
+    assert.equal(
+      (
+        await (bootstrap as any)._handler(
+          ctx,
+          request(switched.anonymousId, true),
+        )
+      ).status,
+      401,
+    );
+    deleting = false;
+    user = null;
+    assert.equal(
+      (await (bootstrap as any)._handler(ctx, request(undefined, true))).status,
+      401,
+    );
+    assert.equal(
+      (await (bootstrap as any)._handler(ctx, request("bad"))).status,
+      400,
+    );
+    const failClaim = {
+      ...ctx,
+      runMutation: async () => {
+        throw new Error("private");
+      },
+    };
+    assert.equal(
+      (await (bootstrap as any)._handler(failClaim, request())).status,
+      503,
+    );
+    process.env.POSTHOG_PROJECT_TOKEN = "personal_secret";
+    assert.equal(
+      (await (bootstrap as any)._handler(ctx, request())).status,
+      204,
+    );
+    process.env.POSTHOG_PROJECT_TOKEN = "phc_fixture_public";
+    fixture.exhaust();
+    assert.equal(
+      (await (bootstrap as any)._handler(ctx, request())).status,
+      429,
+    );
+    process.env.E2E_TELEMETRY_DISABLED = "1";
+    assert.equal(
+      (await (bootstrap as any)._handler(ctx, request())).status,
+      204,
+    );
+    assert.equal(events.length, 1);
+    assert.doesNotMatch(
+      JSON.stringify(events),
+      /verified-user|different-user|private/,
+    );
+  } finally {
+    app.features.splice(0, app.features.length, ...originalFeatures);
+  }
+});
+
 test("capabilities expire, cannot be reused by another account, and schedule bounded cleanup", async () => {
   const { claimIdentity, expireIdentity } =
     await import("../backend/convex/telemetry");
