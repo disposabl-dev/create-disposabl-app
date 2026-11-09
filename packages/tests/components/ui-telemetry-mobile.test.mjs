@@ -10,6 +10,13 @@ process.env.EXPO_PUBLIC_E2E = "true";
 const events = [];
 let initialized = 0;
 let saved = null;
+let finishRead;
+const readPreference = mock(
+  () =>
+    new Promise((resolve) => {
+      finishRead = resolve;
+    }),
+);
 const stops = mock();
 const requests = mock(
   async () =>
@@ -28,7 +35,7 @@ const requests = mock(
 );
 globalThis.fetch = requests;
 mock.module("expo-secure-store", () => ({
-  getItemAsync: async () => saved,
+  getItemAsync: readPreference,
   setItemAsync: async (_key, value) => {
     saved = value;
   },
@@ -71,18 +78,39 @@ afterEach(async () => {
   await act(async () => renderer?.unmount());
 });
 
-test("E2E cannot initialize SDK or bootstrap even when configured", async () => {
+test("concurrent preference consumers share one read and opt-out cannot be overwritten", async () => {
   await act(async () => {
     renderer = create(
-      createElement(ProductTelemetry, {
-        pathname: "/",
-        token: null,
-        ready: true,
-      }),
+      createElement(
+        "Root",
+        null,
+        createElement(ProductTelemetry, {
+          pathname: "/",
+          token: null,
+          ready: true,
+        }),
+        createElement(AnalyticsPreference),
+      ),
     );
   });
+  expect(readPreference).toHaveBeenCalledTimes(1);
   expect(initialized).toBe(0);
   expect(requests).toHaveBeenCalledTimes(0);
+  await act(async () => finishRead(null));
+  await act(async () => {
+    renderer.root.findByType("PreferenceRow").props.onPress();
+    await Promise.resolve();
+  });
+  expect(saved).toBe("1");
+  expect(renderer.root.findByType("PreferenceRow").props.value).toBe("No");
+  expect(readPreference).toHaveBeenCalledTimes(1);
+  expect(initialized).toBe(0);
+  expect(requests).toHaveBeenCalledTimes(0);
+  // Restore the preference for the later independent SDK behavior checks.
+  await act(async () => {
+    renderer.root.findByType("PreferenceRow").props.onPress();
+    await Promise.resolve();
+  });
 });
 
 test("development cannot initialize SDK or bootstrap", async () => {

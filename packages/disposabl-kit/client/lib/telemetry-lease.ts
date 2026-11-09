@@ -53,6 +53,8 @@ export function createTelemetryLeaseController(options: {
 }) {
   const now = options.now ?? Date.now;
   let generation = 0;
+  let enabled = false;
+  let failures = 0;
   let token: string | null = null;
   let anonymousId: string | undefined;
   let controller: AbortController | undefined;
@@ -61,7 +63,7 @@ export function createTelemetryLeaseController(options: {
   let active = false;
   let activeLease: TelemetryLease | undefined;
 
-  function stop() {
+  function halt() {
     generation++;
     controller?.abort();
     clearTimeout(refresh);
@@ -78,8 +80,26 @@ export function createTelemetryLeaseController(options: {
     }
   }
 
+  function stop() {
+    enabled = false;
+    halt();
+  }
+
+  function recover(retryable: boolean) {
+    halt();
+    if (!enabled || !retryable) return;
+    const epoch = generation;
+    const delay = Math.min(1_000 * 2 ** Math.min(failures++, 5), 30_000);
+    refresh = setTimeout(() => void acquire(epoch), delay);
+  }
+
   async function acquire(epoch: number) {
+    if (!enabled || epoch !== generation) return;
     controller = new AbortController();
+    let retryable = true;
+    const timeout = setTimeout(() => {
+      if (epoch === generation) recover(true);
+    }, 10_000);
     try {
       const response = await options.transport(
         `${options.origin}/telemetry/bootstrap`,
@@ -93,6 +113,7 @@ export function createTelemetryLeaseController(options: {
           signal: controller.signal,
         },
       );
+      retryable = response.status === 429 || response.status >= 500;
       if (!response.ok || response.status !== 200)
         throw new Error("bootstrap unavailable");
       const lease: unknown = await response.json();
@@ -123,22 +144,26 @@ export function createTelemetryLeaseController(options: {
         active = true;
         options.adapter.start(bounded);
       }
+      failures = 0;
       activeLease = bounded;
       anonymousId = lease.anonymousId;
       clearTimeout(refresh);
       clearTimeout(expiry);
-      expiry = setTimeout(stop, remaining);
+      expiry = setTimeout(() => recover(true), remaining);
       refresh = setTimeout(
         () => void acquire(epoch),
         Math.max(0, remaining - 5_000),
       );
     } catch {
-      if (epoch === generation) stop();
+      if (epoch === generation) recover(retryable);
+    } finally {
+      clearTimeout(timeout);
     }
   }
 
   return {
     update(input: { enabled: boolean; token: string | null }) {
+      enabled = input.enabled && (!input.token || !!sessionId(input.token));
       const changed = token !== input.token;
       const sameSession =
         token === input.token ||
@@ -152,7 +177,7 @@ export function createTelemetryLeaseController(options: {
         controller?.abort();
         clearTimeout(refresh);
         refresh = undefined;
-      } else stop();
+      } else halt();
       if (
         !input.enabled ||
         (changed &&
@@ -161,8 +186,7 @@ export function createTelemetryLeaseController(options: {
       )
         anonymousId = undefined;
       token = input.token;
-      if (input.enabled && (!token || sessionId(token)))
-        void acquire(generation);
+      if (enabled) void acquire(generation);
     },
     stop,
   };

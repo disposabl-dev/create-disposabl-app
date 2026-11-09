@@ -11,6 +11,7 @@ import { createTelemetryLeaseController } from "../../../../packages/disposabl-k
 const key = "disposabl.product.analytics.optout.v1";
 let allowed: boolean | null = null;
 let preferencePending = false;
+let preferenceLoad: Promise<void> | undefined;
 const listeners = new Set<() => void>();
 let stopActive: (() => void) | undefined;
 let sendAction:
@@ -23,14 +24,18 @@ export function captureProductAction(
 function notify() {
   for (const listener of listeners) listener();
 }
-async function loadPreference() {
-  if (allowed !== null) return;
-  try {
-    allowed = (await SecureStore.getItemAsync(key)) !== "1";
-  } catch {
-    allowed = false;
-  }
-  notify();
+function loadPreference() {
+  if (allowed !== null) return Promise.resolve();
+  // The provider and settings row may mount together. Only one storage read
+  // may initialize the preference, so a stale second read cannot undo opt-out.
+  return (preferenceLoad ??= (async () => {
+    try {
+      allowed = (await SecureStore.getItemAsync(key)) !== "1";
+    } catch {
+      allowed = false;
+    }
+    notify();
+  })());
 }
 function usePreference() {
   const [value, setValue] = useState(allowed);

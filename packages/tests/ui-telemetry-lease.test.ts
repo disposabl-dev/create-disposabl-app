@@ -243,3 +243,71 @@ test("a changed server identity restarts even during a same-session refresh", as
   assert.deepEqual(events, ["identity-1", "stop", "identity-2"]);
   control.stop();
 });
+
+test("transient bootstrap failure retries with capture off until a valid lease", async () => {
+  let calls = 0;
+  const events: string[] = [];
+  const control = createTelemetryLeaseController({
+    origin: "http://local",
+    transport: async () =>
+      ++calls === 1 ? new Response(null, { status: 429 }) : reply(),
+    adapter: {
+      start: () => events.push("start"),
+      stop: () => events.push("stop"),
+    },
+  });
+  control.update({ enabled: true, token: null });
+  await tick();
+  assert.deepEqual(events, []);
+  await new Promise<void>((resolve) => setTimeout(resolve, 1_100));
+  assert.equal(calls, 2);
+  assert.deepEqual(events, ["start"]);
+  control.stop();
+});
+
+test("opt-out cancels pending retry after a transport failure", async () => {
+  let calls = 0;
+  const events: string[] = [];
+  const control = createTelemetryLeaseController({
+    origin: "http://local",
+    transport: async () => {
+      calls++;
+      throw new Error("offline");
+    },
+    adapter: {
+      start: () => events.push("start"),
+      stop: () => events.push("stop"),
+    },
+  });
+  control.update({ enabled: true, token: null });
+  await tick();
+  control.update({ enabled: false, token: null });
+  await new Promise<void>((resolve) => setTimeout(resolve, 1_100));
+  assert.equal(calls, 1);
+  assert.deepEqual(events, []);
+});
+
+test("a failed renewal stops the SDK and recovers only after fresh authorization", async () => {
+  let calls = 0;
+  const events: string[] = [];
+  const control = createTelemetryLeaseController({
+    origin: "http://local",
+    transport: async () => {
+      calls++;
+      return calls === 2
+        ? new Response(null, { status: 503 })
+        : reply({ expiresAt: Date.now() + (calls === 1 ? 5_100 : 30_000) });
+    },
+    adapter: {
+      start: () => events.push("start"),
+      stop: () => events.push("stop"),
+    },
+  });
+  control.update({ enabled: true, token: null });
+  await new Promise<void>((resolve) => setTimeout(resolve, 250));
+  assert.deepEqual(events, ["start", "stop"]);
+  await new Promise<void>((resolve) => setTimeout(resolve, 1_100));
+  assert.equal(calls, 3);
+  assert.deepEqual(events, ["start", "stop", "start"]);
+  control.stop();
+});
