@@ -22,7 +22,13 @@ function fixture() {
     db: {
       insert: async (table: string, row: any) => {
         const id = `${table}-${++sequence}`;
-        rows.set(id, { ...row, _id: id, _creationTime: sequence, table });
+        rows.set(id, {
+          ...row,
+          _id: id,
+          _creationTime: Date.now(),
+          sequence,
+          table,
+        });
         return id;
       },
       get: async (_table: string, id: string) => rows.get(id) ?? null,
@@ -43,9 +49,7 @@ function fixture() {
                 ),
             )
             .sort((a, b) =>
-              reverse
-                ? b._creationTime - a._creationTime
-                : a._creationTime - b._creationTime,
+              reverse ? b.sequence - a.sequence : a.sequence - b.sequence,
             );
         const chain = {
           withIndex: (_name: string, select: any) => {
@@ -96,6 +100,7 @@ function fixture() {
 
 async function running() {
   const f = fixture();
+  f.rows.set("owner", { _id: "owner", table: "users" });
   const sessionId = (await admitSession(f.ctx, "owner", true))!;
   const appId = await f.ctx.db.insert("apps", {
     userId: "owner",
@@ -104,6 +109,103 @@ async function running() {
   const debit = (await claimWindow(f.ctx, { sessionId }, true))!;
   return { ...f, sessionId, appId, debit };
 }
+
+test("initial window starts at confirmed settlement and duplicate confirmation cannot extend it", async () => {
+  const originalNow = Date.now;
+  let now = 1_000_000;
+  Date.now = () => now;
+  try {
+    const f = await running();
+    assert.equal(f.debit.paidUntil, 0);
+    now += 50_000;
+    await (settle as any)._handler(f.ctx, {
+      debitId: f.debit._id,
+      outcome: "confirmed",
+      responseBalance: 20,
+    });
+    const deadline = now + 600_000;
+    assert.equal(f.rows.get(f.sessionId).paidUntil, deadline);
+    assert.equal(f.rows.get(f.debit._id).paidUntil, deadline);
+    assert.ok(
+      f.scheduled.some(
+        (job) => job.name === "agent/compute:boundary" && job.when === deadline,
+      ),
+    );
+    now += 20_000;
+    const count = f.scheduled.length;
+    await (settle as any)._handler(f.ctx, {
+      debitId: f.debit._id,
+      outcome: "confirmed",
+      responseBalance: 1,
+    });
+    assert.equal(f.rows.get(f.sessionId).paidUntil, deadline);
+    assert.equal(f.rows.get(f.debit._id).responseBalance, 20);
+    assert.equal(f.scheduled.length, count);
+  } finally {
+    Date.now = originalNow;
+  }
+});
+
+test("confirmed initial debit cannot activate an ineligible owner or superseded session", async () => {
+  for (const state of [
+    "missing",
+    "deleting",
+    "stopped",
+    "superseded",
+    "newer",
+    "conflict",
+  ] as const) {
+    const f = await running();
+    if (state === "missing") f.rows.delete("owner");
+    if (state === "deleting") f.rows.get("owner").deletionRequestedAt = 1;
+    if (state === "stopped") f.rows.get(f.sessionId).state = "stopped";
+    if (state === "superseded") f.rows.get(f.sessionId).debitId = "other";
+    if (state === "conflict")
+      f.rows.get(f.sessionId).reconciliationConflict = true;
+    if (state === "newer")
+      await f.ctx.db.insert("computeSessions", {
+        userId: "owner",
+        state: "starting",
+        paidUntil: 0,
+      });
+    await (settle as any)._handler(f.ctx, {
+      debitId: f.debit._id,
+      outcome: "confirmed",
+      responseBalance: 3,
+    });
+    assert.notEqual(f.rows.get(f.sessionId).state, "active", state);
+    assert.equal(f.rows.get(f.sessionId).paidUntil, 0, state);
+    assert.equal(f.rows.get(f.debit._id).paidUntil, 0, state);
+    assert.ok(
+      !f.scheduled.some((job) => job.name === "agent/compute:boundary"),
+      state,
+    );
+  }
+});
+
+test("confirmation at the timeout boundary stays held even if the watchdog is delayed", async () => {
+  const originalNow = Date.now;
+  let now = 1_000_000;
+  Date.now = () => now;
+  try {
+    const f = await running();
+    now += 60_000;
+    await (settle as any)._handler(f.ctx, {
+      debitId: f.debit._id,
+      outcome: "confirmed",
+      responseBalance: 3,
+    });
+    assert.equal(f.rows.get(f.sessionId).state, "hold");
+    assert.equal(f.rows.get(f.sessionId).paidUntil, 0);
+    assert.equal(f.rows.get(f.debit._id).state, "confirmed");
+    assert.equal(f.rows.get(f.debit._id).responseBalance, 3);
+    assert.ok(
+      !f.scheduled.some((job) => job.name === "agent/compute:boundary"),
+    );
+  } finally {
+    Date.now = originalNow;
+  }
+});
 
 test("two apps share a session; duplicate dispatch and renewal claims cannot charge twice", async () => {
   const f = await running();

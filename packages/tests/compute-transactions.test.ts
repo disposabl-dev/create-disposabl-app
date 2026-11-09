@@ -48,12 +48,9 @@ test(
     const first = claims.filter(Boolean);
     assert.equal(first.length, 1);
     await call("settleDebit", { debitId: first[0]._id, outcome: "confirmed" });
+    const paidUntil = (await call("get", { sessionId }, true)).paidUntil;
     assert.equal(
-      await call(
-        "allowed",
-        { sessionId, userId, now: first[0].paidUntil },
-        true,
-      ),
+      await call("allowed", { sessionId, userId, now: paidUntil }, true),
       false,
     );
     const secondDebit = await call("inFlightRenewal", { sessionId });

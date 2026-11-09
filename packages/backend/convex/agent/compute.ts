@@ -8,6 +8,7 @@ import { internal } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import schema from "../schema";
+import { deletionPending } from "../users/deletion";
 import { computeSessionArgs } from "./computeValidator";
 
 export const WINDOW_MS = 600_000;
@@ -123,7 +124,7 @@ export async function claimWindow(
   const debitId = await ctx.db.insert("computeDebits", {
     sessionId,
     state: "dispatching",
-    paidUntil: Date.now() + WINDOW_MS,
+    paidUntil: 0,
   });
   await ctx.db.patch("computeSessions", sessionId, { debitId });
   await ctx.scheduler.runAfter(60_000, internal.agent.compute.uncertain, {
@@ -215,25 +216,47 @@ export const settle = internalMutation({
       return null;
     }
     if (!session || session.debitId !== debitId) return null;
+    const now = Date.now();
+    const initial = session.state === "starting";
+    const current = initial
+      ? await ctx.db
+          .query("computeSessions")
+          .withIndex("by_userId", (q) => q.eq("userId", session.userId))
+          .order("desc")
+          .first()
+      : null;
+    const activateInitial =
+      outcome === "confirmed" &&
+      initial &&
+      session.paidUntil === 0 &&
+      !session.reconciliationConflict &&
+      !session.untrackedConflicts &&
+      !session.stopConfirmed &&
+      !session.stopLease &&
+      now < debit._creationTime + 60_000 &&
+      current?._id === session._id &&
+      !(await deletionPending(ctx, session.userId));
+    const paidUntil = activateInitial ? now + WINDOW_MS : debit.paidUntil;
     await ctx.db.patch("computeDebits", debitId, {
       state: outcome,
+      ...(activateInitial ? { paidUntil } : {}),
       ...(responseBalance !== undefined ? { responseBalance } : {}),
     });
     if (
       outcome === "confirmed" &&
-      ["starting", "active"].includes(session.state) &&
-      (session.state === "starting" || session.paidUntil > Date.now()) &&
-      debit.paidUntil > Date.now()
+      (activateInitial ||
+        (session.state === "active" &&
+          session.paidUntil > now &&
+          paidUntil > now))
     ) {
       await ctx.db.patch("computeSessions", session._id, {
         state: "active",
-        paidUntil: debit.paidUntil,
+        paidUntil,
       });
-      await ctx.scheduler.runAt(
-        debit.paidUntil,
-        internal.agent.compute.boundary,
-        { sessionId: session._id, expectedDebit: debitId },
-      );
+      await ctx.scheduler.runAt(paidUntil, internal.agent.compute.boundary, {
+        sessionId: session._id,
+        expectedDebit: debitId,
+      });
       await ctx.scheduler.runAfter(0, internal.agent.actions.compute.notice, {
         debitId,
         attempt: 0,
