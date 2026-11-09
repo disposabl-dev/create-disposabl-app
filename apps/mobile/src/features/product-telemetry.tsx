@@ -123,6 +123,7 @@ export function ProductTelemetry({
       return;
     let sdk: PostHog | undefined;
     let live = false;
+    let activeToken: string | null = null;
     let deadline = 0;
     let lastView = "";
     const controller = createTelemetryLeaseController({
@@ -130,11 +131,12 @@ export function ProductTelemetry({
       transport: fetch,
       adapter: {
         renew(lease) {
+          activeToken = identity.current.token;
           deadline = lease.expiresAt;
         },
         start(lease) {
           live = true;
-          const activeToken = identity.current.token;
+          activeToken = identity.current.token;
           deadline = Math.min(lease.expiresAt, Date.now() + 30_000);
           sdk = new PostHog(lease.projectToken, {
             host: lease.host,

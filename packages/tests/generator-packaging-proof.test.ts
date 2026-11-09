@@ -39,6 +39,8 @@ const excluded = [
   "packages/tests/cli-first-execution.test.ts",
   "packages/tests/cli-version-lifecycle.test.ts",
   "packages/tests/web-action-policy.test.ts",
+  "packages/tests/mobile-product-actions.test.ts",
+  "packages/tests/components/mobile-action-navigation.test.mjs",
   "packages/tests/sdk-source-attribution.test.ts",
   "packages/tests/fixtures/posthog-replay-browser",
   "packages/tests/fixtures/telemetry-guard-convex",
