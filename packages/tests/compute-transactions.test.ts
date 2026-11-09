@@ -31,6 +31,37 @@ async function call(name: string, args: object, query = false) {
 }
 
 test(
+  "a starting session with an existing confirmed debit cannot claim again",
+  { skip: !url },
+  async () => {
+    const userId = await call("seedUser", {});
+    const sessionId = await call("admit", { userId });
+    await call("app", { userId, sessionId, threadId: randomUUID() });
+    const debit = await call("claim", { sessionId });
+    await call("settleDebit", {
+      debitId: debit._id,
+      outcome: "confirmed",
+      responseBalance: 7,
+    });
+    await call("setStartingWithDebit", { sessionId });
+    const before = await call("debits", { sessionId }, true);
+    const sessionBefore = await call("get", { sessionId }, true);
+    const claims = await Promise.all([
+      call("claim", { sessionId }),
+      ...Array.from({ length: 5 }, () =>
+        call("claim", { sessionId, expectedDebit: debit._id }),
+      ),
+    ]);
+    assert.ok(claims.every((value) => value === null));
+    assert.deepEqual(await call("debits", { sessionId }, true), before);
+    assert.deepEqual(await call("get", { sessionId }, true), sessionBefore);
+    assert.equal(before.length, 1);
+    assert.equal(before[0].state, "confirmed");
+    assert.equal(before[0].responseBalance, 7);
+  },
+);
+
+test(
   "a displaced in-flight confirmation fences the newer session and preserves evidence",
   { skip: !url },
   async () => {

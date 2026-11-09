@@ -96,6 +96,17 @@ export const claim = mutation({
   },
   handler: (ctx, a) => claimWindow(ctx as any, a, true),
 });
+// Model an inconsistent starting session while preserving the confirmed debit.
+export const setStartingWithDebit = mutation({
+  args: { sessionId: v.id("computeSessions") },
+  handler: async (ctx, { sessionId }) => {
+    const session = await ctx.db.get(sessionId);
+    const debit = session?.debitId && (await ctx.db.get(session.debitId));
+    if (!session || session.state !== "active" || debit?.state !== "confirmed")
+      throw new Error("Expected a confirmed active session");
+    await ctx.db.patch(sessionId, { state: "starting", paidUntil: 0 });
+  },
+});
 // Models a renewal already dispatched by the previous implementation.
 export const inFlightRenewal = mutation({
   args: { sessionId: v.id("computeSessions") },
