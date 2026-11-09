@@ -4,6 +4,7 @@ import { makeFunctionReference } from "convex/server";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState, Linking, Platform } from "react-native";
 import { billingSession } from "./session";
+import { observeStorefront } from "./storefront-observer";
 import {
   guardedWebHandoff,
   paymentOptions,
@@ -43,13 +44,14 @@ export function useWebCheckout(
   const [topupAvailable, setTopupAvailable] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const lifecycle = useRef({ sequence: 0 });
+  const lifecycle = useRef({ sequence: 0, observing: false, eligible: false });
   const refresh = useCallback(
     async (generation: number) => {
       const seq = ++lifecycle.current.sequence;
+      lifecycle.current.eligible = false;
       setAvailable(false);
       setTopupAvailable(false);
-      if (Platform.OS !== "ios" || !key) return;
+      if (Platform.OS !== "ios" || !key || !lifecycle.current.observing) return;
       try {
         const latest = await snapshot();
         if (latest.customerId !== customerId) return;
@@ -96,6 +98,7 @@ export function useWebCheckout(
           seq === lifecycle.current.sequence &&
           billingSession.current(customerId, generation)
         ) {
+          lifecycle.current.eligible = true;
           setAvailable(value.monthly && latest.hasMonthlyPlan === false);
           setTopupAvailable(value.topup);
         }
@@ -107,18 +110,41 @@ export function useWebCheckout(
   );
   useEffect(() => {
     const state = lifecycle.current;
+    let active = true;
+    state.observing = false;
+    state.eligible = false;
     const update = () => void refresh(version.current);
-    update();
-    const listener = AppState.addEventListener("change", (state) => {
-      if (state === "active") update();
+    const observer =
+      Platform.OS === "ios"
+        ? observeStorefront(() => {
+            state.sequence++;
+            state.eligible = false;
+            setAvailable(false);
+            setTopupAvailable(false);
+            if (state.observing) update();
+          })
+        : null;
+    void observer?.ready.then((ready) => {
+      if (!active || !ready) return;
+      state.observing = true;
+      update();
+    });
+    const listener = AppState.addEventListener("change", (next) => {
+      if (next === "active") update();
     });
     return () => {
+      active = false;
       state.sequence++;
+      state.observing = false;
+      state.eligible = false;
+      observer?.remove();
       listener.remove();
     };
   }, [refresh, version]);
   async function open(purchase: "monthly" | "topup" = "monthly") {
     if (
+      !lifecycle.current.observing ||
+      !lifecycle.current.eligible ||
       !(purchase === "monthly" ? available && productId : topupAvailable) ||
       !key ||
       !billingSession.beginTransaction()

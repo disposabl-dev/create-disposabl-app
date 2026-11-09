@@ -1,0 +1,7 @@
+{
+  "name": "storefront-observer",
+  "version": "1.0.0",
+  "private": true,
+  "description": "StoreKit storefront change signal",
+  "license": "MIT"
+}
