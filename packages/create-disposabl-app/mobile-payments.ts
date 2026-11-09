@@ -7,7 +7,12 @@ export const nativeBillingPath =
 export const nativeBillingTests = [
   join("packages", "tests", "native-billing.test.ts"),
   join("packages", "tests", "mobile-storefront-observer.test.ts"),
-  join("packages", "tests", "components", "mobile-storefront-observer.test.mjs"),
+  join(
+    "packages",
+    "tests",
+    "components",
+    "mobile-storefront-observer.test.mjs",
+  ),
 ];
 export const purchasesPackage = "react-native-purchases";
 const purchasesPackages = [purchasesPackage, "react-native-purchases-ui"];
