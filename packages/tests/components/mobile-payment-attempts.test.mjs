@@ -13,6 +13,8 @@ process.env.EXPO_PUBLIC_E2E = "false";
 const events = [];
 let current = true;
 let transaction = true;
+let captureThrows = false;
+let releasedTransactions = 0;
 let webBusy = false;
 let topupBusy = false;
 let available = true;
@@ -35,7 +37,9 @@ mock.module("../../../packages/disposabl-kit/mobile/billing/session", () => ({
     release() {},
     current: () => current,
     beginTransaction: () => transaction,
-    endTransaction() {},
+    endTransaction() {
+      releasedTransactions++;
+    },
     run: async () => {},
   },
 }));
@@ -80,6 +84,7 @@ mock.module("posthog-react-native", () => ({
     }
     screen() {}
     capture(event, properties) {
+      if (captureThrows) throw new Error("synthetic SDK failure");
       const result = this.options.before_send({ event, properties });
       if (result) events.push(result);
     }
@@ -150,6 +155,8 @@ afterEach(async () => {
   calls.length = 0;
   current = true;
   transaction = true;
+  captureThrows = false;
+  releasedTransactions = 0;
   webBusy = false;
   topupBusy = false;
   available = true;
@@ -227,4 +234,15 @@ test("E2E never initializes telemetry for payment attempts", async () => {
   expect(events).toHaveLength(0);
   expect(globalThis.fetch.mock.calls.length).toBe(count);
   process.env.EXPO_PUBLIC_E2E = "false";
+});
+
+test("SDK failure cannot interrupt billing or strand its transaction lock", async () => {
+  await mount();
+  captureThrows = true;
+  await press("View subscription");
+  await press("Buy monthly on website");
+  await press("Buy 5");
+  await press("Buy top-up on website");
+  expect(releasedTransactions).toBe(1);
+  expect(calls).toEqual(["monthly", "topup", "topup"]);
 });

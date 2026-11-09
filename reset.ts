@@ -52,6 +52,10 @@ const productProofTests = [
   "packages/tests/cli-first-execution.test.ts",
   "packages/tests/cli-version-lifecycle.test.ts",
   "packages/tests/web-action-policy.test.ts",
+  "packages/tests/components/mobile-payment-attempts.test.mjs",
+  "packages/tests/mobile-payment-attempts.test.ts",
+  "packages/tests/components/web-key-actions.test.mjs",
+  "packages/tests/web-key-actions.test.ts",
   "packages/tests/mobile-product-actions.test.ts",
   "packages/tests/components/mobile-action-navigation.test.mjs",
   "packages/tests/components/mobile-agent-composer.test.mjs",
@@ -313,6 +317,21 @@ const starterCopies = [
   ["starter/mobile/mobile.e2e.ts", "packages/tests/flows/mobile.e2e.ts"],
 ] as const;
 for (const [source] of starterCopies) await readFile(join(root, source));
+// Keep the shared API-key page, without the product-only analytics dependency.
+const apiKeysPath = "apps/web/src/router/_authenticated/dashboard.api-keys.tsx";
+const apiKeysSource = await readFile(join(root, apiKeysPath), "utf8");
+const productActionImport =
+  /^import \{ captureProductAction \} from "\.\.\/\.\.\/telemetry";\n/m;
+const productActionCalls =
+  /^[ \t]*captureProductAction\("api_key_(?:create|copy|revoke)_attempt"\);\n/gm;
+if (
+  !productActionImport.test(apiKeysSource) ||
+  [...apiKeysSource.matchAll(productActionCalls)].length !== 3
+)
+  throw new Error("Starter API-key instrumentation boundary changed.");
+const starterApiKeys = apiKeysSource
+  .replace(productActionImport, "")
+  .replace(productActionCalls, "");
 const testsReadmePath = join(root, "packages/tests/README.md");
 const testsReadme = await readFile(testsReadmePath, "utf8");
 const agentFixtureParagraph =
@@ -351,6 +370,7 @@ await Bun.write(
     2,
   ) + "\n",
 );
+await Bun.write(join(root, apiKeysPath), starterApiKeys);
 await rm(join(root, "apps/web/public/og"), { recursive: true, force: true });
 
 for (const entry of await readdir(convex)) {
