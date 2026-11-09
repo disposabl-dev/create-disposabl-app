@@ -23,7 +23,7 @@ For an isolated preview or CI deployment, set `E2E_CONVEX_URL` and `E2E_CONVEX_S
 
 The initial flows check the public web page, the dashboard's authentication boundary, an anonymous backend auth query, the API contract when enabled, and the mobile home screen. They do not create users or modify data. Add product-specific flows here as behavior changes, including login and saved-state checks using dedicated test users. Keep required flows deterministic; an agent can write and debug tests without adding model calls to their execution.
 
-The provider-inert agent fixture in `fixtures/agent-inert-convex/` exercises queued messages, ownership, history, access-token rotation, and CLI status using real product handlers without Boat credentials. Its isolated adapter substitutes the scheduled worker with a no-op; see its README. It does not test real provider dispatch or remote stop.
+The provider-inert agent fixture in `fixtures/agent-inert-convex/` exercises queued messages, ownership, history, access-token rotation, and CLI status using real product handlers without Boat credentials. Its isolated adapter substitutes the scheduled worker with a no-op; see its README. The flow accepts matched 3530/3531 or 3540/3541 loopback pairs with the required provider and telemetry preflight. It does not test real provider dispatch or remote stop.
 
 The opt-in `flows/account-deletion-receipt.e2e.ts` downloads a request receipt and then erases authentication for its newly created synthetic account. Run it only against a fresh disposable product backend on 3540/3541 with backend telemetry disabled, no provider credentials, a local admin key, `E2E_RECEIPT_CLEANUP=1`, and an artifact directory under `/tmp/disposabl-receipt-e2e-`. It does not prove whole-account deletion.
 

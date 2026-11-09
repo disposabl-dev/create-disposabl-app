@@ -77,11 +77,13 @@ test(
       "Requires the disposable provider-inert agent fixture",
     );
     if (
-      url.origin !== "http://127.0.0.1:3540" ||
-      siteUrl() !== "http://127.0.0.1:3541"
+      ![
+        ["http://127.0.0.1:3530", "http://127.0.0.1:3531"],
+        ["http://127.0.0.1:3540", "http://127.0.0.1:3541"],
+      ].some(([backend, site]) => url.origin === backend && siteUrl() === site)
     )
       throw new Error(
-        "Agent inert fixture requires the isolated ports 3540/3541.",
+        "Agent inert fixture requires matched isolated ports 3530/3531 or 3540/3541.",
       );
     for (const name of [
       "BOAT_API_KEY",
@@ -89,6 +91,11 @@ test(
       "R2_BUCKET_NAME",
       "R2_ACCESS_KEY_ID",
       "R2_SECRET_ACCESS_KEY",
+      "AUTUMN_SECRET_KEY",
+      "POSTHOG_PROJECT_TOKEN",
+      "RESEND_API_KEY",
+      "AUTH_GOOGLE_CLIENT_SECRET",
+      "REVENUECAT_WEBHOOK_AUTH",
       "E2E_TELEMETRY_DISABLED",
     ]) {
       const response = await fetch(`${url.origin}/api/query`, {
@@ -114,7 +121,7 @@ test(
           : configured !== ""
       )
         throw new Error(
-          "Agent fixture requires disabled telemetry and no Boat or R2 configuration.",
+          "Agent fixture requires disabled telemetry and empty provider configuration.",
         );
     }
     async function user() {
@@ -299,6 +306,26 @@ test(
           },
           { admin: true },
         );
+      for (const mismatch of [
+        { userId: other.id, appId },
+        { userId: owner.id, appId: randomUUID() },
+      ]) {
+        expect(
+          (
+            await call(
+              "agent/access:issue",
+              {
+                id,
+                token,
+                hash: createHash("sha256").update(agentBearer).digest("hex"),
+                ...mismatch,
+              },
+              { admin: true },
+            )
+          ).status,
+        ).toBe("error");
+      }
+      expect((await rest("apps/get", { appId })).status).not.toBe(200);
       await grant();
       expect((await rest("apps/get", { appId })).status).toBe(200);
       function cliStatus(bearer: string, expiresAt = Date.now() + 14_400_000) {
