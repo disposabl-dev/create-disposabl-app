@@ -180,6 +180,7 @@ export default defineSchema({
     androidArchitectures: v.optional(v.array(androidArchitecture)),
     features: v.optional(v.array(feature)),
     agent: v.optional(execution),
+    agentRemoteUnresolved: v.optional(v.boolean()),
     posthogProject: v.optional(posthogProject),
     githubOwner: v.optional(v.string()),
     githubRepo: v.optional(v.string()),
@@ -205,6 +206,10 @@ export default defineSchema({
       "agent.status",
     ])
     .index("by_userId_stopUnconfirmed", ["userId", "agent.stopUnconfirmed"])
+    .index("by_userId_agentRemoteUnresolved", [
+      "userId",
+      "agentRemoteUnresolved",
+    ])
     .index("by_threadId", ["agent.threadId"])
     .index("by_agentAccessHash", ["agent.access.hash"])
     .index("by_userId_agentUpdatedAt", ["userId", "agent.updatedAt"]),

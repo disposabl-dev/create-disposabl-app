@@ -7,6 +7,60 @@ import type { execution, thread } from "./validator";
 
 type Thread = Infer<typeof thread>;
 
+export function legacyCompleted(current: Infer<typeof execution>) {
+  return Boolean(
+    current.turnCompleted === undefined &&
+    current.status === "idle" &&
+    current.promptId &&
+    current.startedAt &&
+    current.finishedAt &&
+    current.finishedAt >= current.startedAt &&
+    !current.lease &&
+    !current.pending.length &&
+    !current.delivery &&
+    !current.error &&
+    !current.stopUnconfirmed,
+  );
+}
+
+export function remoteUnresolved(agent: Infer<typeof execution> | undefined) {
+  if (!agent) return false;
+  const completed = legacyCompleted(agent);
+  return Boolean(
+    agent.delivery ||
+    agent.stopUnconfirmed ||
+    (agent.promptId && !completed) ||
+    (agent.conversationId && !agent.turnCompleted && !completed),
+  );
+}
+
+/** Call again when pending is true; never throw after writing a batch. */
+export async function normalizeRemoteWork(ctx: MutationCtx, userId: string) {
+  const missing = await ctx.db
+    .query("apps")
+    .withIndex("by_userId_agentRemoteUnresolved", (q) =>
+      q.eq("userId", userId).eq("agentRemoteUnresolved", undefined),
+    )
+    .take(50);
+  for (const app of missing)
+    await ctx.db.patch("apps", app._id, {
+      agentRemoteUnresolved: remoteUnresolved(app.agent),
+    });
+  const pending = await ctx.db
+    .query("apps")
+    .withIndex("by_userId_agentRemoteUnresolved", (q) =>
+      q.eq("userId", userId).eq("agentRemoteUnresolved", undefined),
+    )
+    .first();
+  const unresolved = await ctx.db
+    .query("apps")
+    .withIndex("by_userId_agentRemoteUnresolved", (q) =>
+      q.eq("userId", userId).eq("agentRemoteUnresolved", true),
+    )
+    .first();
+  return { pending: Boolean(pending), unresolved: Boolean(unresolved) };
+}
+
 /** Every app shares this user's machine, including any suspended remote work. */
 export async function hasUnconfirmedRuns(ctx: QueryCtx, userId: string) {
   const unresolved = await ctx.db
@@ -52,7 +106,11 @@ export async function patchThread(
     .unique();
   if (!app) throw new Error("Agent app no longer exists.");
   const { appId: _appId, userId: _userId, ...state } = current;
-  await ctx.db.patch("apps", app._id, { agent: { ...state, ...patch } });
+  const agent = { ...state, ...patch };
+  await ctx.db.patch("apps", app._id, {
+    agent,
+    agentRemoteUnresolved: remoteUnresolved(agent),
+  });
 }
 
 /** Old workers and queued messages must finish before a different paid session binds. */
