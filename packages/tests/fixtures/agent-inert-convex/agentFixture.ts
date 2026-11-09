@@ -599,3 +599,79 @@ export const paidWorkerClaim = internalMutationGeneric({
     return { result, scheduled };
   },
 });
+
+import { finish as manualWorkerFinish } from "../../../../backend/convex/agent/state";
+import { workBlocked } from "../../../../backend/convex/agent/compute";
+export const manualFinish = internalMutationGeneric({
+  args: {
+    id: v.string(),
+    token: v.string(),
+    suspended: v.optional(v.boolean()),
+    stopped: v.optional(v.boolean()),
+    delay: v.optional(v.number()),
+    error: v.optional(v.string()),
+  },
+  returns: v.any(),
+  handler: (ctx, args) =>
+    (manualWorkerFinish as any)._handler(paidScheduler(ctx), args),
+});
+export const manualRemote = internalMutationGeneric({
+  args: { appId: v.string(), userId: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const app = await ctx.db
+      .query("apps")
+      .withIndex("by_appId", (q: any) => q.eq("appId", args.appId))
+      .unique();
+    const thread = readThread(app as any);
+    if (!thread?.lease || thread.userId !== args.userId)
+      throw Error("Expected owned worker");
+    await patchThread(ctx as any, thread, {
+      conversationId: "synthetic-conversation",
+      promptId: "synthetic-prompt",
+      cursor: "synthetic-cursor",
+    });
+    return null;
+  },
+});
+export const manualExpireWindow = internalMutationGeneric({
+  args: { debitId: v.id("computeDebits") },
+  returns: v.null(),
+  handler: async (ctx, { debitId }) => {
+    const debit = await ctx.db.get(debitId);
+    if (!debit || debit.state !== "confirmed")
+      throw Error("Expected confirmed debit");
+    const session = await ctx.db.get(debit.sessionId);
+    if (!session || session.state !== "active" || session.debitId !== debitId)
+      throw Error("Expected active window");
+    const paidUntil = Date.now() - 1;
+    await ctx.db.patch(debitId, { paidUntil });
+    await ctx.db.patch(session._id, { paidUntil });
+    return null;
+  },
+});
+export const manualDeny = internalMutationGeneric({
+  args: { debitId: v.id("computeDebits") },
+  returns: v.any(),
+  handler: (ctx, args) =>
+    (settle as any)._handler(paidScheduler(ctx), {
+      ...args,
+      outcome: "denied",
+    }),
+});
+export const manualSession = internalMutationGeneric({
+  args: { sessionId: v.id("computeSessions") },
+  returns: v.any(),
+  handler: async (ctx, { sessionId }) => ({
+    session: await ctx.db.get(sessionId),
+    debits: await ctx.db
+      .query("computeDebits")
+      .withIndex("by_sessionId", (q: any) => q.eq("sessionId", sessionId))
+      .take(20),
+  }),
+});
+export const manualWorkBlocked = internalMutationGeneric({
+  args: { userId: v.string() },
+  returns: v.boolean(),
+  handler: (ctx, args) => (workBlocked as any)._handler(ctx, args),
+});

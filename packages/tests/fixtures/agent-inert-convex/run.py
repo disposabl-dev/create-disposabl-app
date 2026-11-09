@@ -14,7 +14,7 @@ def load(path, name):
 
 def main():
     binary = os.environ.get('CONVEX_LOCAL_BINARY', str(pathlib.Path.home()/'.cache/convex/binaries/precompiled-2026-10-22-1447815/convex-local-backend'))
-    env = {'PATH': os.environ['PATH'], 'CONVEX_LOCAL_BINARY': binary, 'AGENT_CACHED_MODULES': os.environ.get('AGENT_CACHED_MODULES', '/Users/vivekbezawada/Startups/create-disposabl-app/node_modules'), 'AGENT_SOURCE_REVISION': os.environ.get('AGENT_SOURCE_REVISION', ''), 'AGENT_LEGACY_ACTION': os.environ.get('AGENT_LEGACY_ACTION', '')}
+    env = {'PATH': os.environ['PATH'], 'CONVEX_LOCAL_BINARY': binary, 'AGENT_CACHED_MODULES': os.environ.get('AGENT_CACHED_MODULES', '/Users/vivekbezawada/Startups/create-disposabl-app/node_modules'), 'AGENT_SOURCE_REVISION': os.environ.get('AGENT_SOURCE_REVISION', ''), 'AGENT_LEGACY_ACTION': os.environ.get('AGENT_LEGACY_ACTION', ''), 'AGENT_MANUAL_ACTION': os.environ.get('AGENT_MANUAL_ACTION', '')}
     entry = 'import runpy,sys; runpy.run_path(sys.argv[1])["guarded"]()'
     os.execve('/usr/bin/sandbox-exec', ['sandbox-exec','-p',PROFILE,sys.executable,'-c',entry,__file__], env)
 
@@ -41,15 +41,12 @@ def run(runner, owner):
     sha = runner.command(owner,['git','rev-parse','HEAD'],cwd=ROOT).strip()
     if len(os.environ['AGENT_SOURCE_REVISION']) != 40 or sha != os.environ['AGENT_SOURCE_REVISION']: raise RuntimeError('Set AGENT_SOURCE_REVISION to the exact checked-out commit')
     changed=runner.command(owner,['git','status','--porcelain'],cwd=ROOT).splitlines()
-    allowed={'packages/tests/fixtures/agent-inert-convex/'+name for name in ('agentFixture.ts','paid-test.py','run.py','README.md','legacy-action.test.mjs')}
-    if any(line[3:] not in allowed for line in changed): raise RuntimeError('Unexpected checkout changes')
+    if changed: raise RuntimeError('Commit checkout changes before exact-revision qualification')
     work = pathlib.Path(tempfile.mkdtemp(prefix='disposabl-agent-owned-',dir='/tmp')).resolve(); work.chmod(0o700)
     source = work/'source'; source.mkdir()
     print(f'source {sha}; auth {auth["sha256"]} ({auth["files"]} files); artifacts {work}',flush=True)
     runner.command(owner,['git','archive','--format=tar','--output',str(work/'source.tar'),sha],cwd=ROOT)
     runner.command(owner,['tar','-xf',str(work/'source.tar'),'-C',str(source)])
-    for name in ('agentFixture.ts','paid-test.py','run.py','README.md','legacy-action.test.mjs'):
-        shutil.copyfile(HERE/name,source/'packages/tests/fixtures/agent-inert-convex'/name)
     modules=source/'node_modules'; modules.mkdir()
     for dep in deps.iterdir():
         if dep.name == '@disposabl' and dep.is_dir():
@@ -89,6 +86,10 @@ export const legacyClaim = internalMutationGeneric({ args: { id: v.string(), tok
 export const legacyFinish = internalMutationGeneric({ args: { id: v.string(), token: v.string(), delay: v.optional(v.number()), suspended: v.optional(v.boolean()), error: v.optional(v.string()) }, returns: v.any(), handler: (ctx, args) => (currentFinish as any)._handler(paidScheduler(ctx), args) });
 """)
         config=source/'disposabl.json'; data=json.loads(config.read_text()); data['features'].append('payments'); config.write_text(json.dumps(data))
+    manual = os.environ['AGENT_MANUAL_ACTION'] == '1'
+    if manual and legacy: raise RuntimeError('Choose one fixture mode')
+    if manual:
+        config=source/'disposabl.json'; data=json.loads(config.read_text()); data['features'].append('payments'); config.write_text(json.dumps(data))
     name='agent-owned'; secret=secrets.token_hex(32)
     key=runner.command(owner,[str(binary),'keygen','admin-key','--instance-name',name,'--instance-secret',secret],env=env).strip()
     marker=work/'ownership.json'; marker.write_text('{}'); marker.chmod(0o600)
@@ -120,6 +121,10 @@ export const legacyFinish = internalMutationGeneric({ args: { id: v.string(), to
         def command(argv,cwd,log,childenv):
             check_owner(); runner.command(owner,argv,cwd=cwd,env=childenv,log=work/log)
         command(['node',cli,'dev','--once','--typecheck','disable','--codegen','disable'],backend,'sync.log',admin)
+        if manual:
+            command(['bun','test',str(source/'packages/tests/fixtures/agent-inert-convex/manual-action.test.mjs')],source,'manual-action.log',testenv|{'AGENT_FIXTURE_SOURCE':str(source)})
+            print('Retained worker manual-resume regression passed',flush=True)
+            return
         if legacy:
             command(['bun','test',str(source/'packages/tests/fixtures/agent-inert-convex/legacy-action.test.mjs')],source,'legacy-action.log',testenv|{'AGENT_FIXTURE_SOURCE':str(source)})
             print('Legacy action regression passed',flush=True)
