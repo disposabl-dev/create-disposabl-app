@@ -12,6 +12,8 @@ import {
 } from "../create-disposabl-app/options";
 
 const excluded = [
+  "packages/tests/flows/sdk-auth.e2e.ts",
+  "packages/tests/helpers/sdk-auth",
   "packages/tests/fixtures/starter-payment-reconfigure",
   "packages/tests/starter-payment-reconfigure.test.ts",
   "packages/tests/flows/support-contact.e2e.ts",
