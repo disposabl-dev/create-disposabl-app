@@ -10,7 +10,11 @@ import {
   deliverNotice,
   fund,
 } from "../../../../backend/convex/agent/actions/compute";
-import { settle, notice } from "../../../../backend/convex/agent/compute";
+import {
+  settle,
+  notice,
+  sessionAllows,
+} from "../../../../backend/convex/agent/compute";
 import { debitCompute } from "../../../../backend/convex/agent/computeDebit";
 import { observeNoticeBalance } from "../../../../backend/convex/agent/noticeBalance";
 import { billingRequest } from "../../../../disposabl-kit/server/billing";
@@ -293,32 +297,52 @@ export const session = query({
   args: { sessionId: v.id("computeSessions") },
   handler: (ctx, args) => ctx.db.get(args.sessionId),
 });
-export const fundFixture = action({
-  args: { sessionId: v.id("computeSessions"), responseBalance: v.number() },
+export const allowed = query({
+  args: { sessionId: v.id("computeSessions"), userId: v.string() },
   handler: (ctx, args) =>
-    fund(ctx as any, args.sessionId as any, undefined, async (userId) =>
-      debitCompute(userId, true, "fixture", (key, method, body) =>
-        billingRequest(
-          key,
-          method,
-          body,
-          async () =>
-            new Response(
-              JSON.stringify({
-                customer_id: userId,
-                required_balance: 10,
-                allowed: true,
-                balance: {
-                  feature_id: "credits",
-                  unlimited: false,
-                  overage_allowed: false,
-                  remaining: args.responseBalance,
-                },
-              }),
-              { status: 200 },
-            ),
+    sessionAllows(
+      ctx as any,
+      args.sessionId as any,
+      args.userId,
+      Date.now(),
+      true,
+    ),
+});
+export const fundFixture = action({
+  args: {
+    sessionId: v.id("computeSessions"),
+    responseBalance: v.number(),
+    expectedDebit: v.optional(v.id("computeDebits")),
+    allowed: v.optional(v.boolean()),
+  },
+  handler: (ctx, args) =>
+    fund(
+      ctx as any,
+      args.sessionId as any,
+      args.expectedDebit as any,
+      async (userId) =>
+        debitCompute(userId, true, "fixture", (key, method, body) =>
+          billingRequest(
+            key,
+            method,
+            body,
+            async () =>
+              new Response(
+                JSON.stringify({
+                  customer_id: userId,
+                  required_balance: 10,
+                  allowed: args.allowed ?? true,
+                  balance: {
+                    feature_id: "credits",
+                    unlimited: false,
+                    overage_allowed: false,
+                    remaining: args.responseBalance,
+                  },
+                }),
+                { status: 200 },
+              ),
+          ),
         ),
-      ),
     ),
 });
 

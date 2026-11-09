@@ -72,6 +72,70 @@ test(
 );
 
 test(
+  "renewed low balance remains funded, queues once, then denial stops the next window",
+  { skip },
+  async () => {
+    const initialMarkers = (await emails()).length;
+    const { userId, sessionId } = await call("seedUnclaimed");
+    await call("fundFixture", { sessionId, responseBalance: 20 }, false, true);
+    const first = await call("session", { sessionId }, true);
+    await call("shortenWindow", {
+      debitId: first.debitId,
+      paidUntil: Date.now() - 1,
+    });
+    await call(
+      "fundFixture",
+      { sessionId, expectedDebit: first.debitId, responseBalance: 4 },
+      false,
+      true,
+    );
+    const renewed = await call("session", { sessionId }, true);
+    const renewalDebit = await debit(renewed.debitId);
+    assert.equal(renewed.state, "active");
+    assert.notEqual(renewed.debitId, first.debitId);
+    assert.equal(renewalDebit.state, "confirmed");
+    assert.equal(renewalDebit.responseBalance, 4);
+    assert.equal(renewed.paidUntil, renewalDebit.paidUntil);
+    assert.equal(await call("allowed", { sessionId, userId }, true), true);
+    await Promise.all(
+      Array.from({ length: 5 }, () => deliver(renewed.debitId, 4)),
+    );
+    assert.equal((await debit(renewed.debitId)).noticeOutcome, "queued");
+    assert.equal((await emails()).length, initialMarkers + 1);
+    await deliver(renewed.debitId, 4);
+    assert.equal((await emails()).length, initialMarkers + 1);
+    assert.equal(await call("allowed", { sessionId, userId }, true), true);
+    const actual = await call("actualProductQueue", {
+      userId,
+      windowId: renewed.debitId,
+      paidUntil: renewed.paidUntil,
+      balance: 4,
+    });
+    assert.equal(actual, "disabled");
+    await call("shortenWindow", {
+      debitId: renewed.debitId,
+      paidUntil: Date.now() - 1,
+    });
+    await call(
+      "fundFixture",
+      {
+        sessionId,
+        expectedDebit: renewed.debitId,
+        responseBalance: 4,
+        allowed: false,
+      },
+      false,
+      true,
+    );
+    const stopped = await call("session", { sessionId }, true);
+    assert.equal((await debit(stopped.debitId)).state, "denied");
+    assert.ok(["stopping", "stopped"].includes(stopped.state));
+    assert.equal(await call("allowed", { sessionId, userId }, true), false);
+    assert.equal((await emails()).length, initialMarkers + 1);
+  },
+);
+
+test(
   "fresh observation controls inert decisions and duplicates never add a second marker",
   { skip },
   async () => {
