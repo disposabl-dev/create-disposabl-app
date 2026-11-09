@@ -281,6 +281,7 @@ test(
       email: "verified@example.invalid",
     });
     await settle(record.debitId, 10);
+    await call("shortenWindow", { debitId: record.debitId, paidUntil });
     await deliver(record.debitId, 0, "http-error", 5);
     assert.equal((await debit(record.debitId)).noticeOutcome, undefined);
     const finalizers = (jobs: any[]) =>

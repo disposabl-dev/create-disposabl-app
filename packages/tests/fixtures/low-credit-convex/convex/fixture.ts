@@ -102,6 +102,21 @@ export const expire = mutation({
     ctx.db.patch(args.debitId, { paidUntil: Date.now() - 1 }),
 });
 
+// Shorten a confirmed synthetic window to exercise its scheduled expiry promptly.
+export const shortenWindow = mutation({
+  args: { debitId: v.id("computeDebits"), paidUntil: v.number() },
+  handler: async (ctx, { debitId, paidUntil }) => {
+    const debit = await ctx.db.get(debitId);
+    if (!debit || debit.state !== "confirmed" || paidUntil >= debit.paidUntil)
+      throw new Error("Expected a confirmed window and earlier deadline");
+    const session = await ctx.db.get(debit.sessionId);
+    if (!session || session.state !== "active" || session.debitId !== debitId)
+      throw new Error("Expected the current active session");
+    await ctx.db.patch(debitId, { paidUntil });
+    await ctx.db.patch(session._id, { paidUntil });
+  },
+});
+
 export const actualProductQueue = mutation({
   args: {
     userId: v.id("users"),
