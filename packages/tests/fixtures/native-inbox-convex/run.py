@@ -48,12 +48,12 @@ try:
     env['NATIVE_INBOX_RECOVERY_FILE']=str(work/'recovery.json')
     config['features']=[feature for feature in config['features'] if feature != 'payments']
     (source/'disposabl.json').write_text(json.dumps(config))
-    subprocess.run([cli,'dev','--once','--typecheck','disable','--codegen','disable'],cwd=workfixture,env=env,check=True)
+    subprocess.run([cli,'dev','--once','--typecheck','enable','--codegen','disable'],cwd=workfixture,env=env,check=True)
     env['NATIVE_INBOX_RECOVERY_PHASE']='off'
     subprocess.run(['bun','test','packages/tests/native-inbox-transactions.test.ts','-t','payments toggle recovery'],cwd=source,env=env,check=True)
     config['features'].append('payments')
     (source/'disposabl.json').write_text(json.dumps(config))
-    subprocess.run([cli,'dev','--once','--typecheck','disable','--codegen','disable'],cwd=workfixture,env=env,check=True)
+    subprocess.run([cli,'dev','--once','--typecheck','enable','--codegen','disable'],cwd=workfixture,env=env,check=True)
     env['NATIVE_INBOX_RECOVERY_PHASE']='on'
     subprocess.run(['bun','test','packages/tests/native-inbox-transactions.test.ts','-t','payments toggle recovery'],cwd=source,env=env,check=True)
 finally:
