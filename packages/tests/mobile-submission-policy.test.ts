@@ -26,3 +26,18 @@ test("credit refresh preserves the conversation draft until an explicit send", (
   );
   assert.equal(result.status, 0, result.stdout + result.stderr);
 });
+
+test("account changes fence billing and attachment cleanup", () => {
+  const result = spawnSync(
+    process.execPath,
+    [
+      "test",
+      join(
+        import.meta.dirname,
+        "fixtures/compute-convex/mobile-account-transition.test.mjs",
+      ),
+    ],
+    { encoding: "utf8" },
+  );
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+});

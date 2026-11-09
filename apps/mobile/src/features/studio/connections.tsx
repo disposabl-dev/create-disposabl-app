@@ -1,5 +1,12 @@
 import { router } from "expo-router";
-import { createContext, useContext, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { useAuthToken } from "@convex-dev/auth/react";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { openURL } from "expo-linking";
@@ -8,6 +15,7 @@ import { authenticationEnabled } from "@disposabl/disposabl-kit/features";
 import { sessionId } from "../../../../../packages/disposabl-kit/lib/auth-session";
 import { api } from "../../../../../packages/backend/convex/_generated/api";
 import { Label, Screen } from "./ui";
+import { SessionCurrentContext } from "./session-current";
 import { ConnectionPanel } from "./connection-panel";
 
 type Connections = typeof api.connections.index.status._returnType;
@@ -27,7 +35,17 @@ export function ConnectionProvider({ children }: { children: ReactNode }) {
 
 function SessionConnections({ children }: { children: ReactNode }) {
   const session = sessionId(useAuthToken());
-  return <SessionState key={session ?? "anonymous"}>{children}</SessionState>;
+  const current = useRef(session);
+  useLayoutEffect(() => {
+    current.current = session;
+  }, [session]);
+  return (
+    <SessionCurrentContext.Provider
+      value={() => !!session && current.current === session}
+    >
+      <SessionState key={session ?? "anonymous"}>{children}</SessionState>
+    </SessionCurrentContext.Provider>
+  );
 }
 
 function SessionState({ children }: { children: ReactNode }) {
