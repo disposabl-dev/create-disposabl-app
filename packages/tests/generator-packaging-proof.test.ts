@@ -19,6 +19,9 @@ import {
 } from "../create-disposabl-app/options";
 
 const excluded = [
+  ".github/workflows/play-bundle.yml",
+  ".github/scripts/play-bundle.sh",
+  ".github/scripts/play-bundle.test.py",
   "packages/tests/ui-telemetry-policy.test.ts",
   "packages/tests/components/ui-telemetry-mobile.test.mjs",
   "packages/tests/components/mobile-posthog-sdk.test.mjs",
