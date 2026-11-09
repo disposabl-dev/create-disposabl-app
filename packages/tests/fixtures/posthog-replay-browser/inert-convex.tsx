@@ -26,8 +26,11 @@ export function Unauthenticated({ children }: { children: ReactNode }) {
 export function AuthLoading() {
   return null;
 }
-export function useAction() {
-  return async () => ({});
+export function useAction(reference: Parameters<typeof getFunctionName>[0]) {
+  return async () =>
+    getFunctionName(reference) === "mcp:createApiKey"
+      ? { apiKey: "SECRET_KEY_MATERIAL_91" }
+      : {};
 }
 export function useMutation() {
   return async () => ({});
@@ -63,7 +66,7 @@ export function useQuery(
     return [
       {
         kind: "apiKey",
-        id: "fixture",
+        id: "SECRET_KEY_ID_91",
         name: `SECRET_API_KEY_LABEL_${session}`,
       },
     ];
