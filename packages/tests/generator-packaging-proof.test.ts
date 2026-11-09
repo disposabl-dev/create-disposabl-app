@@ -2,7 +2,14 @@ import { test } from "node:test";
 import { spawnSync } from "node:child_process";
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
-import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
+import {
+  cp,
+  mkdtemp,
+  readFile,
+  readdir,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createApp } from "../create-disposabl-app/scaffold";
@@ -114,6 +121,15 @@ test("packaged starter and generated profiles exclude product proof fixtures", a
   const temp = await mkdtemp(join(tmpdir(), "disposabl-packaging-proof-"));
   try {
     const roots = [template];
+    const input = join(temp, "template");
+    await cp(template, input, { recursive: true });
+    const readmePath = join(input, "packages/tests/README.md");
+    const customDocs =
+      "\nUnrelated user documentation.\n\n#### Custom checks\nKeep these instructions.\n";
+    await writeFile(
+      readmePath,
+      (await readFile(readmePath, "utf8")) + customDocs,
+    );
     for (const [name, platforms, features] of [
       ["web-minimal", "web", "none"],
       ["web-payments", "web", "authentication,payments"],
@@ -124,7 +140,7 @@ test("packaged starter and generated profiles exclude product proof fixtures", a
       ],
     ]) {
       const destination = join(temp, name);
-      await createApp(template, destination, name, {
+      await createApp(input, destination, name, {
         version: "test",
         platforms: selectPlatforms(platforms),
         features: selectFeatures(features),
@@ -141,8 +157,18 @@ test("packaged starter and generated profiles exclude product proof fixtures", a
           `${name}: ${path} must match mobile selection`,
         );
       }
-      const readme = await readFile(join(destination, "packages/tests/README.md"), "utf8");
-      assert.equal(readme.includes("### Isolated iOS simulator acceptance preflight"), platforms.includes("ios") || platforms.includes("android"));
+      const readme = await readFile(
+        join(destination, "packages/tests/README.md"),
+        "utf8",
+      );
+      assert.ok(
+        readme.endsWith(customDocs),
+        `${name}: preserve unrelated README content`,
+      );
+      assert.equal(
+        readme.includes("### Isolated iOS simulator acceptance preflight"),
+        platforms.includes("ios") || platforms.includes("android"),
+      );
       for (const path of [
         "packages/tests/consent-identity.test.ts",
         "packages/tests/components/consent-identity.test.mjs",

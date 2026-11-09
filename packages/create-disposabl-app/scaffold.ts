@@ -121,7 +121,10 @@ export async function createApp(
       const text = await readFile(readme, "utf8");
       await writeFile(
         readme,
-        text.replace(/\n### Isolated iOS simulator acceptance preflight\n[\s\S]*?(?=\n#{1,3} |$)/, "\n"),
+        text.replace(
+          /<!-- mobile-simulator-preflight:start -->[\s\S]*?<!-- mobile-simulator-preflight:end -->\n?/,
+          "",
+        ),
       );
     }
     if (!config.features.includes("authentication")) {

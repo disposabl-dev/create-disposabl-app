@@ -76,6 +76,8 @@ Upstream telemetry otherwise sends command/engine/runtime versions, environment 
 
 AI is optional. To add it later, read `bun run e2e guide setup` and configure a provider or the upstream Codex/Claude Code ACP adapter. Keep model-backed flows separate from the required deterministic suite; an AI key appearing in the environment must not silently change the build gate or start spending.
 
+<!-- mobile-simulator-preflight:start -->
+
 ### Isolated iOS simulator acceptance preflight
 
 For a disposable E2E-only simulator build, select a unique preview bundle ID and URL scheme, set `EXPO_NO_DOTENV=1`, `EXPO_PUBLIC_E2E=true`, `E2E_TELEMETRY_DISABLED=1`, and the two `EXPO_PUBLIC_CONVEX_*` URLs to the assigned `http://127.0.0.1:<port>` backend. Disable updates and payments in the fixture. Use an allowlisted environment with Expo telemetry disabled and no provider credentials. Keep the original app and its data. On macOS, create a disposable simulator-only entitlements plist with `application-identifier` and the sole `keychain-access-groups` entry both set to `local.<unique-preview-bundle-id>`. After Expo prebuild and pod installation, from `apps/mobile` the tested Xcode invocation is:
@@ -94,7 +96,9 @@ This is a local simulator fixture, not a production signing recipe. Capture a bu
 python3 packages/tests/helpers/mobile-simulator/preflight.py \
   --app "$SIMULATOR_APP" --record "$BUILD_RECORD" --source "$SOURCE_CHECKOUT" \
   --app-id "$PREVIEW_APP_ID" --group "local.$PREVIEW_APP_ID" \
-  --backend "$EXPO_PUBLIC_CONVEX_URL" --site "$EXPO_PUBLIC_CONVEX_SITE_URL"
+  --backend "$EXPO_PUBLIC_CONVEX_URL" --site "$EXPO_PUBLIC_CONVEX_SITE_URL" \
+  --hermesc "$SOURCE_CHECKOUT/apps/mobile/ios/Pods/hermes-engine/destroot/bin/hermesc"
 ```
 
 Preflight checks ARM64 simulator platform, linked simulator entitlement sections and identities, embedded URLs, disabled updates, JS hash and matching record. A record is an operator attestation: it cannot independently prove source provenance, E2E flags, payments or telemetry behavior. Retain the build logs and confirm the checkout and build inputs separately. A passing preflight does not establish installation or behavior. Xcode's separate codesign entitlement dictionary is not a substitute for inspecting the simulated Mach-O entitlement sections.
+<!-- mobile-simulator-preflight:end -->
