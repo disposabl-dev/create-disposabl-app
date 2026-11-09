@@ -63,9 +63,11 @@ export default defineSchema({
   })
     .index("by_hash", ["hash"])
     .index("by_userId", ["userId"]),
-  computeSessions: defineTable(computeSessionFields).index("by_userId", [
-    "userId",
-  ]),
+  computeSessions: defineTable(computeSessionFields)
+    // Latest-session queries require creation order rather than lease-deadline order.
+    // eslint-disable-next-line @convex-dev/no-duplicate-indexes
+    .index("by_userId", ["userId"])
+    .index("by_userId_activationUntil", ["userId", "activationLease.until"]),
   computeDebits: defineTable(computeDebitFields).index("by_sessionId", [
     "sessionId",
   ]),

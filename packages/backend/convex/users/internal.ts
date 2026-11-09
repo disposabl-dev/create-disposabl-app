@@ -1,4 +1,7 @@
-import { deletionPending as isDeletionPending } from "./deletion";
+import {
+  deletionPending as isDeletionPending,
+  hasLiveActivation,
+} from "./deletion";
 import {
   authDeletionProgress,
   fileDeletionProgress,
@@ -197,6 +200,7 @@ export const claimDeletionStop = internalMutation({
     const stop = user.deletionStop;
     if (stop?.state === "running" && (stop.leaseUntil ?? 0) > Date.now())
       return false;
+    if (await hasLiveActivation(ctx, userId, Date.now())) return false;
     await ctx.db.patch("users", userId, {
       deletionStop: {
         state: "running",
@@ -230,6 +234,7 @@ export const finishDeletionStop = internalMutation({
       (stop.leaseUntil ?? 0) <= Date.now()
     )
       return false;
+    if (await hasLiveActivation(ctx, userId, Date.now())) return false;
     await ctx.db.patch("users", userId, {
       deletionStop: {
         state: outcome,

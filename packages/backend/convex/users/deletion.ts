@@ -3,6 +3,22 @@ import type { QueryCtx, MutationCtx, ActionCtx } from "../_generated/server";
 import { getSessionUserId } from "@disposabl/disposabl-kit/server/lib/functions";
 import { internal } from "../_generated/api";
 
+/** A displaced session can still have an activation action in flight. */
+export async function hasLiveActivation(
+  ctx: Pick<QueryCtx, "db">,
+  userId: string,
+  now: number,
+) {
+  return Boolean(
+    await ctx.db
+      .query("computeSessions")
+      .withIndex("by_userId_activationUntil", (q) =>
+        q.eq("userId", userId).gt("activationLease.until", now),
+      )
+      .first(),
+  );
+}
+
 export async function deletionPending(
   ctx: Pick<QueryCtx, "db">,
   userId: string,
