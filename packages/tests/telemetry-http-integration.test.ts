@@ -71,7 +71,10 @@ test(
     assert.equal((await post("/production/page", page)).status, 204);
     assert.equal((await post("/production/bootstrap", {})).status, 204);
     const anonymous = (await (
-      await post("/fixture/page", { ...page, extra: "private-marker" })
+      await post("/fixture/page?private=private-marker", {
+        ...page,
+        extra: "private-marker",
+      })
     ).json()) as any;
     const before = await identity(anonymous.anonymousId);
     assert.equal(before.userId, undefined);

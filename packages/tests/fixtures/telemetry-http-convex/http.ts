@@ -15,7 +15,13 @@ http.route({
   handler: httpAction(
     createTelemetryPageHandler(
       () => true,
-      async () => {},
+      async (event, properties) => {
+        if (
+          event !== "page_view" ||
+          JSON.stringify(properties) !== '{"page":"home"}'
+        )
+          throw new Error("Unexpected page capture properties");
+      },
     ),
   ),
 });
