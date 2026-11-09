@@ -27,6 +27,7 @@ def command(args, *, cwd, env, log, timeout=180):
 
 
 def main():
+    telemetry_mount = os.environ.get('REPLAY_TELEMETRY_MOUNT') == '1'
     executable = Path(os.environ['REPLAY_CHROMIUM'])
     if not executable.is_file():
         raise RuntimeError('REPLAY_CHROMIUM must name cached Chromium')
@@ -60,11 +61,12 @@ def main():
         raise RuntimeError('Cached docs build is missing')
     (source/'apps/docs/dist').symlink_to(docs, target_is_directory=True)
     app = source/'apps/web'
-    command(['bun', 'run', 'build'], cwd=app, env=env, log=work/'production-build.log')
+    if not telemetry_mount:
+        command(['bun', 'run', 'build'], cwd=app, env=env, log=work/'production-build.log')
     dist = app/'dist/client'
     body = re.compile(r'<body[^>]*>')
     paths_to_check = ['index.html', '_shell.html', 'login/index.html', 'signup/index.html', 'consent/index.html', 'legal/delete-account/index.html']
-    for name in paths_to_check:
+    for name in ([] if telemetry_mount else paths_to_check):
         match = body.search((dist/name).read_text())
         if not match or 'data-replay-public' in match.group():
             raise RuntimeError(f'Initial HTML is not replay-blocked: {name}')
@@ -82,15 +84,28 @@ def main():
              '{ find: /^@convex-dev\\/auth\\/react$/, replacement: '+auth+' },'
              '{ find: /^@convex-dev\\/auth\\/methods\\/(username-password|email-password|google)\\/react$/, replacement: '+auth+' }] },')
     text = text.replace(needle, alias).replace('crawlLinks: true,', 'crawlLinks: false,')
+    if telemetry_mount:
+        # Only this isolated build forces the production analytics gate on;
+        # every transport is intercepted and the enclosing OS sandbox denies outbound.
+        for original, replacement in [
+            ('const indexable = isProductionSite(mode, url.origin, site);', 'const indexable = true;'),
+            ('process.env.E2E_TELEMETRY_DISABLED !== "1" &&', 'true &&'),
+            ('!!productionBackend &&', 'true &&'),
+            ('url.origin === productionBackend &&', 'true &&'),
+        ]:
+            if text.count(original) != 1:
+                raise RuntimeError(f'Fixture telemetry gate changed: {original}')
+            text = text.replace(original, replacement)
     config.write_text(text)
     command(['bun', 'run', 'build'], cwd=app, env=env, log=work/'inert-auth-build.log')
     env['REPLAY_APP_DIST'] = str(dist)
-    command(['bun', 'packages/tests/fixtures/posthog-replay-browser/actual-app.mjs'], cwd=source, env=env, log=work/'actual-app.log', timeout=120)
+    script = 'mount-telemetry.mjs' if telemetry_mount else 'actual-app.mjs'
+    command(['bun', f'packages/tests/fixtures/posthog-replay-browser/{script}'], cwd=source, env=env, log=work/'actual-app.log', timeout=120)
     print(f'source={sha} artifacts={work}', flush=True)
     print((work/'actual-app.log').read_text(), end='', flush=True)
 
 
 if __name__ == '__main__':
-    allowed = {'PATH': os.environ.get('PATH', '/usr/bin:/bin'), 'REPLAY_CHROMIUM': os.environ.get('REPLAY_CHROMIUM', '')}
+    allowed = {'PATH': os.environ.get('PATH', '/usr/bin:/bin'), 'REPLAY_CHROMIUM': os.environ.get('REPLAY_CHROMIUM', ''), 'REPLAY_TELEMETRY_MOUNT': os.environ.get('REPLAY_TELEMETRY_MOUNT', '')}
     entry = 'import runpy,sys; runpy.run_path(sys.argv[1])["main"]()'
     os.execve('/usr/bin/sandbox-exec', ['sandbox-exec', '-p', PROFILE, sys.executable, '-c', entry, __file__], allowed)

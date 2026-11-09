@@ -197,7 +197,7 @@ export function ProductTelemetry({
       return;
     const adapter = createWebTelemetryAdapter({
       origin,
-      transport: fetch,
+      transport: fetch.bind(window) as typeof fetch,
       page: () => page.current,
       allowed,
       source: productTelemetrySource(),
