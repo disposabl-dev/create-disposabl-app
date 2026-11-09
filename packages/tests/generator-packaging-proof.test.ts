@@ -161,8 +161,9 @@ test("packaged starter and generated profiles exclude product proof fixtures", a
         join(destination, "packages/tests/README.md"),
         "utf8",
       );
-      assert.ok(
-        readme.endsWith(customDocs),
+      assert.match(
+        readme,
+        /Unrelated user documentation\.\s+#### Custom checks\s+Keep these instructions\./,
         `${name}: preserve unrelated README content`,
       );
       assert.equal(
