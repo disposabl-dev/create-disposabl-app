@@ -6,6 +6,7 @@ import { useTheme } from "../../../../../packages/disposabl-kit/mobile/design/us
 import { guides, guideSections, type Guide } from "./data";
 import { GuideCover } from "./guide-art";
 import { Screen, Label, Touch, Icon, Action, GlassSurface } from "./ui";
+import { captureProductAction } from "../product-telemetry";
 
 const coverTitles: Record<string, string> = {
   api: "API",
@@ -59,12 +60,13 @@ function Shelf({
             <Touch
               key={guide.id}
               label={`Read ${guide.title}`}
-              onPress={() =>
+              onPress={() => {
+                captureProductAction("open_guide");
                 router.push({
                   pathname: "/guide-detail",
                   params: { id: guide.id },
-                })
-              }
+                });
+              }}
               className="w-[var(--layout-width)] gap-[12px]"
             >
               <GuideCover
@@ -93,9 +95,10 @@ export default function GuidesScreen() {
     <Screen title="Guides" contentClassName="gap-[34px]">
       <Touch
         label="Read Meet Disposabl"
-        onPress={() =>
-          router.push({ pathname: "/guide-detail", params: { id: "welcome" } })
-        }
+        onPress={() => {
+          captureProductAction("open_guide");
+          router.push({ pathname: "/guide-detail", params: { id: "welcome" } });
+        }}
         className="gap-[16px]"
       >
         <View>
@@ -134,12 +137,13 @@ export default function GuidesScreen() {
               <Touch
                 key={section}
                 label={`Explore ${section.replace("Mastery · ", "")}`}
-                onPress={() =>
+                onPress={() => {
+                  captureProductAction("open_guide");
                   router.push({
                     pathname: "/guide-detail",
                     params: { id: lessons[0]!.id },
-                  })
-                }
+                  });
+                }}
                 className="flex-row gap-[18px] items-center py-[8px]"
               >
                 <View className="w-[100px]">
@@ -178,6 +182,7 @@ export function GuideDetailScreen() {
   const c = useTheme();
   function move(next: number) {
     if (next < 0 || next >= guides.length) return;
+    captureProductAction("open_guide");
     list.current?.scrollToIndex({ index: next });
     setIndex(next);
   }

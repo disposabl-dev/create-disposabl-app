@@ -3,6 +3,7 @@ export const mobileActions = [
   "open_connections",
   "open_app",
   "open_settings",
+  "open_guide",
   "agent_send_attempt",
   "agent_stop_attempt",
   "billing_native_subscription_attempt",

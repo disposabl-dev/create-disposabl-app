@@ -50,6 +50,10 @@ const excluded = [
   "packages/tests/web-action-policy.test.ts",
   "packages/tests/components/mobile-payment-attempts.test.mjs",
   "packages/tests/mobile-payment-attempts.test.ts",
+  "packages/tests/components/mobile-guide-actions.test.mjs",
+  "packages/tests/mobile-guide-actions.test.ts",
+  "packages/tests/components/web-billing-attempts.test.mjs",
+  "packages/tests/web-billing-attempts.test.ts",
   "packages/tests/components/web-key-actions.test.mjs",
   "packages/tests/web-key-actions.test.ts",
   "packages/tests/mobile-product-actions.test.ts",
@@ -188,6 +192,19 @@ test("packaged starter and generated profiles exclude product proof fixtures", a
       }
     }
     for (const root of roots) {
+      assert.equal(
+        existsSync(join(root, "apps/web/src/router/pricing.tsx")),
+        false,
+        "Product pricing wrapper must not enter generated starters",
+      );
+      const sharedPricing = await readFile(
+        join(root, "packages/disposabl-kit/client/routes/pricing.tsx"),
+        "utf8",
+      );
+      assert.doesNotMatch(
+        sharedPricing,
+        /captureProductAction|from ["'][^"']*(?:posthog|telemetry)/,
+      );
       const webRoot = await readFile(
         join(root, "apps/web/src/router/__root.tsx"),
         "utf8",

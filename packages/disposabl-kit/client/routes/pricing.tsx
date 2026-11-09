@@ -60,7 +60,14 @@ const portal = makeFunctionReference<
   { url: string }
 >("billing:portal");
 
-export function Pricing() {
+export type BillingAttempt =
+  | "billing_monthly_checkout_attempt"
+  | "billing_topup_checkout_attempt"
+  | "billing_portal_attempt";
+
+export function Pricing({
+  onAttempt,
+}: { onAttempt?: (attempt: BillingAttempt) => void } = {}) {
   if (!paymentsEnabled)
     return (
       <section className="mx-auto max-w-5xl p-8">
@@ -68,13 +75,23 @@ export function Pricing() {
         <SubscriptionHelp />
       </section>
     );
-  return <SessionPricing />;
+  return <SessionPricing onAttempt={onAttempt} />;
 }
-function SessionPricing() {
+function SessionPricing({
+  onAttempt,
+}: {
+  onAttempt?: (attempt: BillingAttempt) => void;
+}) {
   const token = useAuthToken();
   const { isAuthenticated, isLoading } = useConvexAuth();
   const session = !isLoading && isAuthenticated ? sessionId(token) : null;
-  return <PurchasePage key={session ?? "signed-out"} session={session} />;
+  return (
+    <PurchasePage
+      key={session ?? "signed-out"}
+      session={session}
+      onAttempt={onAttempt}
+    />
+  );
 }
 function SubscriptionHelp() {
   return (
@@ -99,7 +116,13 @@ function SubscriptionHelp() {
     </p>
   );
 }
-function PurchasePage({ session }: { session: string | null }) {
+function PurchasePage({
+  session,
+  onAttempt,
+}: {
+  session: string | null;
+  onAttempt?: (attempt: BillingAttempt) => void;
+}) {
   const identity = useConsentIdentity();
   const [{ handoff, fromIos }] = useState(() =>
     typeof window === "undefined"
@@ -172,12 +195,22 @@ function PurchasePage({ session }: { session: string | null }) {
       !session ||
       !customerId ||
       busy ||
+      (kind === "monthly" && hasMonthlyPlan !== false) ||
       !handoffAllows(fromIos, handoff, customerId, kind)
     )
       return;
     const version = generation.current;
     setBusy(true);
     setMessage("");
+    try {
+      onAttempt?.(
+        kind === "monthly"
+          ? "billing_monthly_checkout_attempt"
+          : "billing_topup_checkout_attempt",
+      );
+    } catch {
+      /* Reporting must not interrupt checkout. */
+    }
     try {
       const result = await requestCheckout(
         localStorage,
@@ -212,6 +245,11 @@ function PurchasePage({ session }: { session: string | null }) {
     if (!session || busy) return;
     const version = generation.current;
     setBusy(true);
+    try {
+      onAttempt?.("billing_portal_attempt");
+    } catch {
+      /* Reporting must not interrupt billing. */
+    }
     try {
       const result = await openPortal({});
       if (version === generation.current) window.location.assign(result.url);

@@ -10,6 +10,7 @@ import {
 } from "../../../../packages/disposabl-kit/payments/config";
 import { MarketingShell, TextLink } from "../components/landing/shell";
 import { marketingHead } from "../components/landing/metadata";
+import { captureProductAction } from "../telemetry";
 import "../components/landing/home.css";
 
 export const Route = createFileRoute("/_providers/pricing")({
@@ -81,7 +82,7 @@ function PricingPage() {
               ))}
             </div>
             {paymentsEnabled ? (
-              <Checkout />
+              <Checkout onAttempt={captureProductAction} />
             ) : (
               <p className="pricing-availability">
                 Agent Mode purchases are not available on this website yet.
