@@ -57,6 +57,13 @@ export const revenueCatTransfers = defineTable({
   deliveryId: v.string(),
   from: v.array(v.string()),
   to: v.array(v.string()),
+  review: v.optional(
+    v.object({
+      decision: v.literal("retain_hold"),
+      evidence: v.string(),
+      reviewedAt: v.number(),
+    }),
+  ),
 }).index("by_delivery", ["project", "app", "environment", "deliveryId"]);
 export const revenueCatTransferHolds = defineTable({
   project: v.string(),

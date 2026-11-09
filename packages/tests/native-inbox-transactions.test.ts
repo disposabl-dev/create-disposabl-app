@@ -50,6 +50,125 @@ const scope = (e: PurchaseEvent, id: string) => ({
 const state = (id: string) => call("state", { balanceId: id }, true);
 const evidence = "fixture provider record";
 
+async function awaitControl(
+  balanceId: string,
+  predicate: (row: any) => boolean,
+) {
+  for (let i = 0; i < 200; i++) {
+    const row = await call("controlState", { balanceId }, true);
+    if (predicate(row)) return row;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  throw new Error("Timed out waiting for fixture worker");
+}
+
+for (const scenario of ["new hold", "deleted customer", "success"] as const) {
+  test(
+    `scheduled production worker: ${scenario} before claim`,
+    { skip: !url },
+    async () => {
+      const [alice, bob] = await Promise.all([user(), user()]);
+      const purchase = event(alice),
+        id = await balanceId(purchase);
+      await call("controlCreate", { balanceId: id });
+      await deliver(purchase);
+      await awaitControl(id, (row) => row.finished === 1);
+      assert.equal((await state(id)).purchase.state, "queued");
+      await call("controlSet", {
+        balanceId: id,
+        enabled: true,
+        released: false,
+      });
+      assert.equal(
+        await call("retryQueued", { ...scope(purchase, id), customer: alice }),
+        true,
+      );
+      await awaitControl(id, (row) => row.arrived === 1);
+      if (scenario === "new hold") {
+        await call("transfer", {
+          project: purchase.project,
+          app: purchase.app,
+          environment: purchase.environment,
+          deliveryId: randomUUID(),
+          from: [alice],
+          to: [bob],
+        });
+      } else if (scenario === "deleted customer") {
+        await call("deleteUser", { id: alice });
+      }
+      await call("controlSet", {
+        balanceId: id,
+        enabled: true,
+        released: true,
+      });
+      const done = await awaitControl(id, (row) => row.finished === 2);
+      assert.equal(done.claimAttempts, 1);
+      assert.equal(done.providerCalls, scenario === "success" ? 1 : 0);
+      assert.equal(
+        done.providerCustomer,
+        scenario === "success" ? alice : undefined,
+      );
+      assert.equal(
+        (await state(id)).purchase.state,
+        scenario === "success" ? "granted" : "queued",
+      );
+    },
+  );
+}
+
+test(
+  "concurrent transfer reviews retain all holds and reject stale decisions",
+  { skip: !url },
+  async () => {
+    const [alice, bob] = await Promise.all([user(), user()]);
+    const purchase = event(alice),
+      id = await balanceId(purchase);
+    await deliver(purchase);
+    const transfer = {
+      project: purchase.project,
+      app: purchase.app,
+      environment: purchase.environment,
+      deliveryId: randomUUID(),
+      from: [alice],
+      to: [bob],
+    };
+    const second = { ...transfer, deliveryId: randomUUID() };
+    await Promise.all([call("transfer", transfer), call("transfer", second)]);
+    const review = { ...transfer, evidence };
+    const results = await Promise.all(
+      Array.from({ length: 12 }, () => call("reviewTransfer", review)),
+    );
+    assert.ok(results.every(Boolean));
+    assert.equal(
+      await call("reviewTransfer", { ...review, evidence: "different" }),
+      false,
+    );
+    assert.equal(
+      await call("reviewTransfer", { ...review, to: [alice] }),
+      false,
+    );
+    const lookup = {
+      project: transfer.project,
+      app: transfer.app,
+      environment: transfer.environment,
+      deliveryId: transfer.deliveryId,
+      customer: alice,
+    };
+    const saved = await call("transferState", lookup, true);
+    assert.equal(saved.transfer.review.evidence, evidence);
+    assert.equal(saved.transfer.review.decision, "retain_hold");
+    assert.equal(saved.holds.length, 2);
+    assert.equal(
+      await call("retryQueued", { ...scope(purchase, id), customer: alice }),
+      false,
+    );
+    assert.equal(await call("take", scope(purchase, id)), null);
+    await call("transfer", transfer);
+    assert.equal((await call("transferState", lookup, true)).holds.length, 2);
+    assert.equal((await state(id)).purchase.state, "queued");
+  },
+);
+
 test(
   "real Convex serializes duplicate Apple deliveries and preserves ownership",
   { skip: !url },

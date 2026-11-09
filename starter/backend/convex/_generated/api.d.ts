@@ -16,6 +16,7 @@ import type * as files_index from "../files/index.js";
 import type * as files_internal from "../files/internal.js";
 import type * as http from "../http.js";
 import type * as mcp from "../mcp.js";
+import type * as revenuecat from "../revenuecat.js";
 import type * as telemetry from "../telemetry.js";
 import type * as users_index from "../users/index.js";
 import type * as users_internal from "../users/internal.js";
@@ -35,6 +36,7 @@ declare const fullApi: ApiFromModules<{
   "files/internal": typeof files_internal;
   http: typeof http;
   mcp: typeof mcp;
+  revenuecat: typeof revenuecat;
   telemetry: typeof telemetry;
   "users/index": typeof users_index;
   "users/internal": typeof users_internal;

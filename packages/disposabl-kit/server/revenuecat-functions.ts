@@ -182,6 +182,53 @@ export const inspectTransfers = internalQuery({
     ctx.db.query("revenueCatTransfers").order("desc").take(100),
 });
 
+// Recording a review does not decide whether affected credits may be granted.
+export const recordTransferReview = internalMutation({
+  args: {
+    project: v.string(),
+    app: v.string(),
+    environment: v.string(),
+    deliveryId: v.string(),
+    from: v.array(v.string()),
+    to: v.array(v.string()),
+    evidence: v.string(),
+  },
+  returns: v.boolean(),
+  handler: async (
+    ctx,
+    { project, app, environment, deliveryId, from, to, evidence },
+  ) => {
+    if (!evidence.trim() || evidence.length > 1000)
+      throw new Error("Provider evidence is required");
+    if (from.length > 20 || to.length > 20) return false;
+    const row = await ctx.db
+      .query("revenueCatTransfers")
+      .withIndex("by_delivery", (q) =>
+        q
+          .eq("project", project)
+          .eq("app", app)
+          .eq("environment", environment)
+          .eq("deliveryId", deliveryId),
+      )
+      .unique();
+    if (
+      !row ||
+      JSON.stringify(row.from) !== JSON.stringify(from) ||
+      JSON.stringify(row.to) !== JSON.stringify(to)
+    )
+      return false;
+    if (row.review) return row.review.evidence === evidence.trim();
+    await ctx.db.patch("revenueCatTransfers", row._id, {
+      review: {
+        decision: "retain_hold",
+        evidence: evidence.trim(),
+        reviewedAt: Date.now(),
+      },
+    });
+    return true;
+  },
+});
+
 export const inspectConflicts = internalQuery({
   args: {},
   returns: v.array(v.any()),
@@ -347,12 +394,64 @@ export const claim = internalMutation({
       )
       .take(1);
     if (holds.length) return null;
+    if (row.state === "queued") {
+      const customerId = ctx.db.normalizeId("users", row.customer);
+      if (!customerId || !(await ctx.db.get("users", customerId))) return null;
+    }
     const kind: "grant" | "refund" =
       row.state === "queued" ? "grant" : "refund";
     await ctx.db.patch("revenueCatPurchases", row._id, {
       state: kind === "grant" ? "grant_unknown" : "refund_unknown",
     });
     return { customer: row.customer, kind };
+  },
+});
+
+/** Schedule only a specifically identified queued grant; dispatch rechecks its route and claim. */
+export const redispatchQueued = internalMutation({
+  args: {
+    balanceId: v.string(),
+    project: v.string(),
+    app: v.string(),
+    environment: v.string(),
+    store: v.string(),
+    product: v.string(),
+    customer: v.string(),
+  },
+  returns: v.boolean(),
+  handler: async (ctx, args) => {
+    const row = await ctx.db
+      .query("revenueCatPurchases")
+      .withIndex("by_balanceId", (q) => q.eq("balanceId", args.balanceId))
+      .unique();
+    if (
+      !row ||
+      row.project !== args.project ||
+      row.app !== args.app ||
+      row.environment !== args.environment ||
+      row.store !== args.store ||
+      row.product !== args.product ||
+      row.customer !== args.customer ||
+      row.state !== "queued" ||
+      row.refundPending ||
+      row.reviewPending
+    )
+      return false;
+    const customerId = ctx.db.normalizeId("users", row.customer);
+    if (!customerId || !(await ctx.db.get("users", customerId))) return false;
+    const holds = await ctx.db
+      .query("revenueCatTransferHolds")
+      .withIndex("by_customer_active", (q) =>
+        q
+          .eq("project", row.project)
+          .eq("environment", row.environment)
+          .eq("customer", row.customer)
+          .eq("active", true),
+      )
+      .take(1);
+    if (holds.length) return false;
+    await ctx.scheduler.runAfter(0, dispatchRef, { balanceId: args.balanceId });
+    return true;
   },
 });
 
