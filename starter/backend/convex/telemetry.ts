@@ -12,6 +12,10 @@ import {
 export {
   claimIdentity,
   expireIdentity,
+  getLink,
+  deliverLink,
+  finishLink,
+  beginLink,
 } from "@disposabl/disposabl-kit/server/lib/telemetry";
 
 const claimIdentityRef = makeFunctionReference<

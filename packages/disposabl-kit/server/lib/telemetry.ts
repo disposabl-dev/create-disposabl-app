@@ -3,8 +3,11 @@ import { makeFunctionReference } from "convex/server";
 import { v } from "convex/values";
 import {
   internalMutation,
+  internalAction,
+  internalQuery,
   type ActionCtx,
   type MutationCtx,
+  type QueryCtx,
 } from "../../../backend/convex/_generated/server";
 
 export type TelemetryEvent =
@@ -85,6 +88,9 @@ const expireIdentityRef = makeFunctionReference<
   { id: string },
   null
 >("telemetry:expireIdentity");
+const deliverLinkRef = makeFunctionReference<"action", { id: string }, null>(
+  "telemetry:deliverLink",
+);
 
 export const createClaimIdentity = (
   checkUser?: (ctx: MutationCtx, userId: string) => Promise<void>,
@@ -94,10 +100,16 @@ export const createClaimIdentity = (
       hash: v.optional(v.string()),
       newHash: v.string(),
       userId: v.optional(v.string()),
-      reportLink: v.optional(v.boolean()),
+      link: v.optional(
+        v.object({
+          anonymous: v.string(),
+          distinct: v.string(),
+          eventId: v.string(),
+        }),
+      ),
     },
     returns: v.union(v.boolean(), v.null(), v.literal("linked")),
-    handler: async (ctx, { hash, newHash, userId, reportLink }) => {
+    handler: async (ctx, { hash, newHash, userId, link }) => {
       if (userId !== undefined) await checkUser?.(ctx, userId);
       const row = hash
         ? await ctx.db
@@ -111,8 +123,20 @@ export const createClaimIdentity = (
         (!row.userId || row.userId === userId)
       ) {
         if (userId && !row.userId) {
-          await ctx.db.patch("telemetryIdentities", row._id, { userId });
-          if (reportLink) return "linked";
+          await ctx.db.patch("telemetryIdentities", row._id, {
+            userId,
+            ...(link
+              ? { link: { ...link, createdAt: Date.now(), attempts: 0 } }
+              : {}),
+          });
+          if (link) {
+            await ctx.scheduler.runAfter(0, deliverLinkRef, { id: row._id });
+            // A scheduled action can fail before it reserves its own retry.
+            await ctx.scheduler.runAfter(30_000, deliverLinkRef, {
+              id: row._id,
+            });
+            return "linked";
+          }
         }
         return true;
       }
@@ -153,6 +177,147 @@ export const createClaimIdentity = (
 
 export const claimIdentity = createClaimIdentity();
 
+const linkValue = v.object({
+  anonymous: v.string(),
+  distinct: v.string(),
+  eventId: v.string(),
+  createdAt: v.number(),
+  attempts: v.number(),
+});
+export const createLinkLookup = (
+  checkUser?: (ctx: QueryCtx, userId: string) => Promise<void>,
+) =>
+  internalQuery({
+    args: { id: v.id("telemetryIdentities") },
+    returns: v.union(linkValue, v.null()),
+    handler: async (ctx, { id }) => {
+      const row = await ctx.db.get("telemetryIdentities", id);
+      if (!row?.link || !row.userId) return null;
+      try {
+        await checkUser?.(ctx, row.userId);
+      } catch {
+        return null;
+      }
+      return row.link;
+    },
+  });
+export const getLink = createLinkLookup();
+export const finishLink = internalMutation({
+  args: {
+    id: v.id("telemetryIdentities"),
+    eventId: v.string(),
+    success: v.boolean(),
+  },
+  returns: v.null(),
+  handler: async (ctx, { id, eventId, success }) => {
+    const row = await ctx.db.get("telemetryIdentities", id);
+    if (!row?.link || row.link.eventId !== eventId) return null;
+    if (success)
+      await ctx.db.patch("telemetryIdentities", id, { link: undefined });
+    return null;
+  },
+});
+export const beginLink = internalMutation({
+  args: {
+    id: v.id("telemetryIdentities"),
+    eventId: v.string(),
+    attempts: v.number(),
+  },
+  returns: v.boolean(),
+  handler: async (ctx, { id, eventId, attempts }) => {
+    const row = await ctx.db.get("telemetryIdentities", id);
+    if (
+      !row?.link ||
+      row.link.eventId !== eventId ||
+      row.link.attempts !== attempts ||
+      attempts >= 5
+    )
+      return false;
+    await ctx.db.patch("telemetryIdentities", id, {
+      link: { ...row.link, attempts: attempts + 1 },
+    });
+    if (attempts + 1 < 5)
+      await ctx.scheduler.runAfter(2 ** (attempts + 1) * 1000, deliverLinkRef, {
+        id,
+      });
+    return true;
+  },
+});
+const getLinkRef = makeFunctionReference<
+  "query",
+  { id: string },
+  {
+    anonymous: string;
+    distinct: string;
+    eventId: string;
+    createdAt: number;
+    attempts: number;
+  } | null
+>("telemetry:getLink");
+const finishLinkRef = makeFunctionReference<
+  "mutation",
+  { id: string; eventId: string; success: boolean },
+  null
+>("telemetry:finishLink");
+const beginLinkRef = makeFunctionReference<
+  "mutation",
+  { id: string; eventId: string; attempts: number },
+  boolean
+>("telemetry:beginLink");
+export const deliverLink = internalAction({
+  args: { id: v.id("telemetryIdentities") },
+  returns: v.null(),
+  handler: async (ctx, { id }) => {
+    const link = await ctx.runQuery(getLinkRef, { id });
+    if (!link || link.attempts >= 5) return null;
+    if (
+      !(await ctx.runMutation(beginLinkRef, {
+        id,
+        eventId: link.eventId,
+        attempts: link.attempts,
+      }))
+    )
+      return null;
+    if (!(await ctx.runQuery(getLinkRef, { id }))) return null;
+    let success = false;
+    if (telemetryEnabled()) {
+      const token =
+        settings.analytics?.projectToken ?? process.env.POSTHOG_PROJECT_TOKEN!;
+      const host = settings.analytics?.host ?? process.env.POSTHOG_HOST!;
+      if (/^phc_[A-Za-z0-9_-]+$/.test(token)) {
+        try {
+          const response = await fetch(`${host}/capture/`, {
+            method: "POST",
+            redirect: "error",
+            signal: AbortSignal.timeout(2000),
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              api_key: token,
+              event: "$identify",
+              uuid: link.eventId,
+              timestamp: new Date(link.createdAt).toISOString(),
+              properties: {
+                distinct_id: link.distinct,
+                $anon_distinct_id: link.anonymous,
+                $ip: "0.0.0.0",
+              },
+            }),
+          });
+          success = response.ok;
+        } catch {
+          /* Retry only this idempotent event. */
+        }
+      }
+    }
+    await ctx.runMutation(finishLinkRef, {
+      id,
+      eventId: link.eventId,
+      success,
+    });
+    return null;
+  },
+});
+
 export const expireIdentity = internalMutation({
   args: { id: v.id("telemetryIdentities") },
   returns: v.null(),
@@ -180,7 +345,12 @@ async function opaqueId(value: string) {
 
 const bootstrapClaim = makeFunctionReference<
   "mutation",
-  { hash?: string; newHash: string; userId?: string; reportLink: boolean },
+  {
+    hash?: string;
+    newHash: string;
+    userId?: string;
+    link?: { anonymous: string; distinct: string; eventId: string };
+  },
   boolean | null | "linked"
 >("telemetry:claimIdentity");
 const uuidPattern =
@@ -208,6 +378,7 @@ export async function bootstrapTelemetry(
     !body ||
     typeof body !== "object" ||
     Array.isArray(body) ||
+    Object.keys(body).some((key) => key !== "anonymousId") ||
     ("anonymousId" in body &&
       (typeof body.anonymousId !== "string" ||
         !uuidPattern.test(body.anonymousId)))
@@ -231,13 +402,27 @@ export async function bootstrapTelemetry(
   const existing =
     "anonymousId" in body ? (body.anonymousId as string) : undefined;
   const issued = crypto.randomUUID();
+  const anonymousDistinct = existing
+    ? await opaqueId(`disposabl:${projectToken}:anonymous:${existing}`)
+    : undefined;
+  const userDistinct = userId
+    ? await opaqueId(`disposabl:${projectToken}:${userId}`)
+    : undefined;
   let claim: boolean | null | "linked";
   try {
     claim = await ctx.runMutation(bootstrapClaim, {
       ...(existing ? { hash: await hashTelemetryIdentity(existing) } : {}),
       newHash: await hashTelemetryIdentity(issued),
       ...(userId ? { userId } : {}),
-      reportLink: true,
+      ...(anonymousDistinct && userDistinct
+        ? {
+            link: {
+              anonymous: anonymousDistinct,
+              distinct: userDistinct,
+              eventId: crypto.randomUUID(),
+            },
+          }
+        : {}),
     });
   } catch {
     return new Response(null, {
@@ -248,33 +433,12 @@ export async function bootstrapTelemetry(
   if (claim === null)
     return new Response(null, { status: 429, headers: bootstrapHeaders });
   const anonymousId = claim && existing ? existing : issued;
-  const anonymousDistinct = await opaqueId(
+  const chosenAnonymousDistinct = await opaqueId(
     `disposabl:${projectToken}:anonymous:${anonymousId}`,
   );
   const distinctId = userId
     ? await opaqueId(`disposabl:${projectToken}:${userId}`)
-    : anonymousDistinct;
-  if (claim === "linked") {
-    try {
-      await fetch(`${host}/capture/`, {
-        method: "POST",
-        signal: AbortSignal.timeout(2000),
-        redirect: "error",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          api_key: projectToken,
-          event: "$identify",
-          properties: {
-            distinct_id: distinctId,
-            $anon_distinct_id: anonymousDistinct,
-            $ip: "0.0.0.0",
-          },
-        }),
-      });
-    } catch {
-      /* The identity link is best effort; no page event is captured. */
-    }
-  }
+    : chosenAnonymousDistinct;
   return Response.json(
     {
       enabled: true,

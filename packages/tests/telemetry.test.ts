@@ -372,15 +372,23 @@ test("bootstrap issues opaque identities, links once, rotates accounts, and fail
     assert.equal(linked.identified, true);
     assert.notEqual(linked.distinctId, anonymous.distinctId);
     assert.equal(linked.anonymousId, anonymous.anonymousId);
-    assert.equal(events.length, 1);
-    assert.equal(events[0].event, "$identify");
-    assert.equal(events[0].properties.$anon_distinct_id, anonymous.distinctId);
-    assert.equal(events[0].properties.distinct_id, linked.distinctId);
+    assert.equal(events.length, 0);
+    const pending = [...fixture.rows.values()].find(
+      (row) => row.userId === "verified-user",
+    ) as any;
+    assert.equal(pending.link.anonymous, anonymous.distinctId);
+    assert.equal(pending.link.distinct, linked.distinctId);
+    const jobCount = fixture.jobs.length;
     await (bootstrap as any)._handler(
       ctx,
       request(anonymous.anonymousId, true),
     );
-    assert.equal(events.length, 1);
+    await Promise.all([
+      (bootstrap as any)._handler(ctx, request(anonymous.anonymousId, true)),
+      (bootstrap as any)._handler(ctx, request(anonymous.anonymousId, true)),
+    ]);
+    assert.equal(events.length, 0);
+    assert.equal(fixture.jobs.length, jobCount);
     user = "different-user";
     const switched = await (
       await (bootstrap as any)._handler(
@@ -390,7 +398,7 @@ test("bootstrap issues opaque identities, links once, rotates accounts, and fail
     ).json();
     assert.notEqual(switched.anonymousId, anonymous.anonymousId);
     assert.notEqual(switched.distinctId, linked.distinctId);
-    assert.equal(events.length, 1);
+    assert.equal(events.length, 0);
     deleting = true;
     assert.equal(
       (
@@ -411,6 +419,16 @@ test("bootstrap issues opaque identities, links once, rotates accounts, and fail
       (await (bootstrap as any)._handler(ctx, request("bad"))).status,
       400,
     );
+    for (const extra of [{ userId: "spoof" }, { distinctId: "spoof" }]) {
+      const response = await (bootstrap as any)._handler(
+        ctx,
+        new Request("https://local/telemetry/bootstrap", {
+          method: "POST",
+          body: JSON.stringify(extra),
+        }),
+      );
+      assert.equal(response.status, 400);
+    }
     const failClaim = {
       ...ctx,
       runMutation: async () => {
@@ -437,7 +455,7 @@ test("bootstrap issues opaque identities, links once, rotates accounts, and fail
       (await (bootstrap as any)._handler(ctx, request())).status,
       204,
     );
-    assert.equal(events.length, 1);
+    assert.equal(events.length, 0);
     assert.doesNotMatch(
       JSON.stringify(events),
       /verified-user|different-user|private/,
@@ -464,6 +482,148 @@ test("capabilities expire, cannot be reused by another account, and schedule bou
   assert.equal(await claim("issued", "fourth", "a"), false);
   await (expireIdentity as any)._handler(ctx, { id: original._id });
   assert.equal(rows.has(original._id), false);
+});
+
+test("link delivery retries one stable event and acknowledges only successful transport", async () => {
+  const { claimIdentity, getLink, beginLink, finishLink, deliverLink } =
+    await import("../backend/convex/telemetry");
+  process.env.DISPOSABL_ENVIRONMENT = "production";
+  process.env.POSTHOG_PROJECT_TOKEN = "phc_fixture_public";
+  process.env.POSTHOG_HOST = "https://us.i.posthog.com";
+  delete process.env.E2E_TELEMETRY_DISABLED;
+  delete process.env.POSTHOG_ENABLED;
+  const fixture = identityContext();
+  await (claimIdentity as any)._handler(fixture.ctx, { newHash: "issued" });
+  const row = [...fixture.rows.values()][0] as any;
+  const link = {
+    anonymous: "anon-hash",
+    distinct: "user-hash",
+    eventId: "12345678-1234-4123-8123-123456789abc",
+  };
+  assert.equal(
+    await (claimIdentity as any)._handler(fixture.ctx, {
+      hash: "issued",
+      newHash: "unused",
+      userId: "verified-user",
+      link,
+    }),
+    "linked",
+  );
+  const bodies: any[] = [];
+  globalThis.fetch = (async (_url, init) => {
+    bodies.push(JSON.parse(String(init?.body)));
+    return new Response(null, { status: bodies.length === 1 ? 503 : 200 });
+  }) as typeof fetch;
+  const actionCtx = {
+    runQuery: async (_ref: unknown, args: any) =>
+      (getLink as any)._handler(fixture.ctx, args),
+    runMutation: async (_ref: unknown, args: any) =>
+      ("attempts" in args ? beginLink : (finishLink as any))._handler(
+        fixture.ctx,
+        args,
+      ),
+  };
+  await (deliverLink as any)._handler(actionCtx, { id: row._id });
+  assert.equal(row.link.attempts, 1);
+  assert.equal(bodies.length, 1);
+  assert.equal(fixture.jobs.length, 4); // expiry, first delivery, watchdog, reserved retry
+  await (deliverLink as any)._handler(actionCtx, { id: row._id });
+  assert.equal(row.link, undefined);
+  assert.equal(bodies.length, 2);
+  assert.equal(bodies[0].uuid, link.eventId);
+  assert.equal(bodies[1].uuid, link.eventId);
+  assert.equal(bodies[0].timestamp, bodies[1].timestamp);
+  assert.equal(bodies[0].properties.$anon_distinct_id, link.anonymous);
+  await (deliverLink as any)._handler(actionCtx, { id: row._id });
+  assert.equal(bodies.length, 2);
+});
+
+test("link delivery makes no request while disabled or when the owner is deleting", async () => {
+  const { claimIdentity, getLink, beginLink, finishLink, deliverLink } =
+    await import("../backend/convex/telemetry");
+  process.env.DISPOSABL_ENVIRONMENT = "production";
+  process.env.POSTHOG_PROJECT_TOKEN = "phc_fixture_public";
+  process.env.POSTHOG_HOST = "https://us.i.posthog.com";
+  process.env.E2E_TELEMETRY_DISABLED = "1";
+  const fixture = identityContext();
+  await (claimIdentity as any)._handler(fixture.ctx, { newHash: "issued" });
+  const row = [...fixture.rows.values()][0] as any;
+  await (claimIdentity as any)._handler(fixture.ctx, {
+    hash: "issued",
+    newHash: "new",
+    userId: "verified-user",
+    link: { anonymous: "a", distinct: "b", eventId: "id" },
+  });
+  let calls = 0;
+  globalThis.fetch = (async () => {
+    calls++;
+    return new Response(null, { status: 200 });
+  }) as typeof fetch;
+  let deleting = false;
+  const queryCtx = {
+    ...fixture.ctx,
+    db: {
+      ...fixture.ctx.db,
+      get: async (table: string, id: string) =>
+        table === "users" && deleting
+          ? { deletionRequestedAt: 1 }
+          : fixture.ctx.db.get(table, id),
+    },
+  };
+  const actionCtx = {
+    runQuery: async (_ref: unknown, args: any) =>
+      (getLink as any)._handler(queryCtx, args),
+    runMutation: async (_ref: unknown, args: any) =>
+      ("attempts" in args ? beginLink : (finishLink as any))._handler(
+        fixture.ctx,
+        args,
+      ),
+  };
+  await (deliverLink as any)._handler(actionCtx, { id: row._id });
+  assert.equal(calls, 0);
+  assert.equal(row.link.attempts, 1);
+  delete process.env.E2E_TELEMETRY_DISABLED;
+  deleting = true;
+  await (deliverLink as any)._handler(actionCtx, { id: row._id });
+  assert.equal(calls, 0);
+  assert.equal(row.link.attempts, 1);
+});
+
+test("link delivery stops after five failed attempts and leaves its pending record", async () => {
+  const { claimIdentity, getLink, beginLink, finishLink, deliverLink } =
+    await import("../backend/convex/telemetry");
+  process.env.DISPOSABL_ENVIRONMENT = "production";
+  process.env.POSTHOG_PROJECT_TOKEN = "phc_fixture_public";
+  process.env.POSTHOG_HOST = "https://us.i.posthog.com";
+  delete process.env.E2E_TELEMETRY_DISABLED;
+  delete process.env.POSTHOG_ENABLED;
+  const fixture = identityContext();
+  await (claimIdentity as any)._handler(fixture.ctx, { newHash: "issued" });
+  const row = [...fixture.rows.values()][0] as any;
+  await (claimIdentity as any)._handler(fixture.ctx, {
+    hash: "issued",
+    newHash: "new",
+    userId: "verified-user",
+    link: { anonymous: "a", distinct: "b", eventId: "id" },
+  });
+  let calls = 0;
+  globalThis.fetch = (async () => {
+    calls++;
+    return new Response(null, { status: 503 });
+  }) as typeof fetch;
+  const actionCtx = {
+    runQuery: async (_ref: unknown, args: any) =>
+      (getLink as any)._handler(fixture.ctx, args),
+    runMutation: async (_ref: unknown, args: any) =>
+      ("attempts" in args ? beginLink : (finishLink as any))._handler(
+        fixture.ctx,
+        args,
+      ),
+  };
+  for (let attempt = 0; attempt < 7; attempt++)
+    await (deliverLink as any)._handler(actionCtx, { id: row._id });
+  assert.equal(calls, 5);
+  assert.equal(row.link.attempts, 5);
 });
 
 test("issuance budget refills at one identity per minute", async () => {

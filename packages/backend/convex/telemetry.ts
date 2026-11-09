@@ -12,10 +12,17 @@ import {
   hashTelemetryIdentity,
   telemetryEnabled,
   bootstrapTelemetry,
+  createLinkLookup,
 } from "@disposabl/disposabl-kit/server/lib/telemetry";
 
-export { expireIdentity } from "@disposabl/disposabl-kit/server/lib/telemetry";
+export {
+  expireIdentity,
+  deliverLink,
+  beginLink,
+  finishLink,
+} from "@disposabl/disposabl-kit/server/lib/telemetry";
 export const claimIdentity = createClaimIdentity(requireNotDeleting);
+export const getLink = createLinkLookup(requireNotDeleting);
 
 const claimIdentityRef = makeFunctionReference<
   "mutation",
