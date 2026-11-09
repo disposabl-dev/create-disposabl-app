@@ -19,6 +19,22 @@ export async function hasLiveActivation(
   );
 }
 
+/** Workers predating activation claims can still be executing provider calls. */
+export async function hasLiveAgentWorker(
+  ctx: Pick<QueryCtx, "db">,
+  userId: string,
+  now: number,
+) {
+  return Boolean(
+    await ctx.db
+      .query("apps")
+      .withIndex("by_userId_agentLeaseUntil", (q) =>
+        q.eq("userId", userId).gt("agent.lease.expiresAt", now),
+      )
+      .first(),
+  );
+}
+
 export async function deletionPending(
   ctx: Pick<QueryCtx, "db">,
   userId: string,
