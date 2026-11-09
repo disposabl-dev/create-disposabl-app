@@ -1,5 +1,17 @@
 import { pageCategory } from "../../../packages/disposabl-kit/lib/telemetry";
 
+const productActions = [
+  "open_connections",
+  "open_api_keys",
+  "copy_setup",
+  "open_setup",
+] as const;
+export function isProductAction(
+  value: unknown,
+): value is (typeof productActions)[number] {
+  return productActions.some((action) => action === value);
+}
+
 // Only server-provided IDs and fixed categories leave the browser.
 export function safeTelemetryEvent(
   event: string,
@@ -48,10 +60,7 @@ export function safeTelemetryEvent(
         : {}),
     };
   }
-  if (
-    event === "product_action" &&
-    (input.action === "open_connections" || input.action === "open_api_keys")
-  )
+  if (event === "product_action" && isProductAction(input.action))
     return { ...common, action: input.action };
   if (event === "$exception")
     return {
