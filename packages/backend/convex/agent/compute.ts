@@ -63,6 +63,7 @@ export async function admitSession(
     userId,
     state: "starting",
     paidUntil: 0,
+    activation: "fresh",
   });
 }
 
@@ -377,6 +378,14 @@ export const stopping = internalMutation({
     )
       return false;
     if (session.stopLease && session.stopLease.until > Date.now()) return false;
+    if (session.activationLease && session.activationLease.until > Date.now()) {
+      await ctx.scheduler.runAt(
+        session.activationLease.until,
+        internal.agent.actions.compute.stop,
+        { sessionId },
+      );
+      return false;
+    }
     // Longer than Convex's ten-minute action limit: an old action cannot outlive this lease.
     const until = Date.now() + 11 * 60_000;
     await ctx.db.patch("computeSessions", sessionId, {
