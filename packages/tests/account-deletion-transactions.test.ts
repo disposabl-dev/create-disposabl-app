@@ -204,42 +204,45 @@ test(
 );
 
 test(
-  "receipts backfill legacy requests and survive synthetic user removal",
+  "current request receipts are idempotent and survive synthetic user removal",
   { skip: !url },
   async () => {
     const owner = await call("create", { label: randomUUID() });
     const other = await call("create", { label: randomUUID() });
-    await assert.rejects(call("ensureReceipt", { userId: null }), /Sign in/);
-    await assert.rejects(call("ensureReceipt", { userId: other }), /not found/);
-    await call("legacyRequest", { userId: owner, requestedAt: 123456 });
-    assert.deepEqual(await call("status", { userId: owner }, true), {
-      status: "requested",
-      requestedAt: 123456,
-      reference: null,
-    });
+    await assert.rejects(
+      call("request", { userId: null, confirmation: "DELETE" }),
+      /Sign in/,
+    );
     const receipts = await Promise.all(
-      Array.from({ length: 5 }, () => call("ensureReceipt", { userId: owner })),
+      Array.from({ length: 5 }, () =>
+        call("request", { userId: owner, confirmation: "DELETE" }),
+      ),
     );
     assert.ok(
       receipts.every(
         (receipt) =>
           receipt.reference === receipts[0].reference &&
-          receipt.requestedAt === 123456,
+          receipt.requestedAt === receipts[0].requestedAt,
       ),
     );
     const ref = receipts[0].reference;
+    const requestedAt = receipts[0].requestedAt;
+    assert.deepEqual(
+      await call("status", { userId: owner }, true),
+      receipts[0],
+    );
     assert.equal(await call("status", { userId: other }, true), null);
     assert.deepEqual(await call("lookupReceipt", { reference: ref }, true), {
       reference: ref,
       ownerId: owner,
-      requestedAt: 123456,
+      requestedAt,
     });
     await call("removeUser", { userId: owner });
     assert.equal(await call("status", { userId: owner }, true), null);
     assert.deepEqual(await call("lookupReceipt", { reference: ref }, true), {
       reference: ref,
       ownerId: owner,
-      requestedAt: 123456,
+      requestedAt,
     });
     assert.ok(
       (await call("receiptQueue", {}, true)).page.some(

@@ -59,7 +59,6 @@ type Requested = {
 function DeletionRequest() {
   const status = useQuery(api.users.index.deletionStatus, {});
   const requestDeletion = useMutation(api.users.index.requestDeletion);
-  const ensureReceipt = useMutation(api.users.index.ensureDeletionReceipt);
   const [submitted, setSubmitted] = useState<Requested | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [confirmation, setConfirmation] = useState("");
@@ -81,20 +80,6 @@ function DeletionRequest() {
     }
   };
   const requested = status?.reference ? status : submitted || status;
-  const backfill = async () => {
-    if (inFlight.current) return;
-    inFlight.current = true;
-    setSending(true);
-    setFailed(false);
-    try {
-      setSubmitted(await ensureReceipt({}));
-    } catch {
-      setFailed(true);
-    } finally {
-      inFlight.current = false;
-      setSending(false);
-    }
-  };
   if (requested)
     return (
       <section className="mt-8" role="status">
@@ -120,18 +105,8 @@ function DeletionRequest() {
             </a>
           </>
         ) : (
-          <button
-            type="button"
-            className="underline"
-            disabled={sending}
-            onClick={() => void backfill()}
-          >
-            {sending ? "Preparing receipt..." : "Create request receipt"}
-          </button>
-        )}
-        {failed && (
           <p role="alert">
-            We could not prepare your receipt. Please try again.
+            Your request receipt is unavailable. Contact support for help.
           </p>
         )}
       </section>

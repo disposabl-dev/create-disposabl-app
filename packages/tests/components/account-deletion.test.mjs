@@ -172,13 +172,13 @@ test("query failure does not offer a request", async () => {
   expect(buttons()).toHaveLength(0);
 });
 
-test("legacy request can create a receipt without a new request", async () => {
+test("a missing receipt directs the owner to support without inventing one", async () => {
   if (!authEnabled) return;
   authenticated = true;
   status = { status: "requested", requestedAt: 1700000000000, reference: null };
   await render();
-  expect(text()).toContain("Create request receipt");
-  await act(async () => buttons()[0].props.onClick());
-  expect(mutation).toHaveBeenCalledWith({});
-  expect(text()).toContain("fixture-reference");
+  expect(text()).toContain("request receipt is unavailable");
+  expect(text()).toContain("Contact support");
+  expect(buttons()).toHaveLength(0);
+  expect(mutation).not.toHaveBeenCalled();
 });
