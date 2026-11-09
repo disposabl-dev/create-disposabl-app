@@ -44,6 +44,7 @@ test(
   { skip },
   async () => {
     const record = await call("seedUnclaimed");
+    const beforeFunding = Date.now();
     await call(
       "fundFixture",
       { sessionId: record.sessionId, responseBalance: 4 },
@@ -57,6 +58,10 @@ test(
     );
     const before = await debit(session.debitId);
     assert.equal(before.state, "confirmed");
+    assert.equal(session.state, "active");
+    assert.equal(session.paidUntil, before.paidUntil);
+    assert.ok(before.paidUntil >= beforeFunding + 600_000);
+    assert.ok(before.paidUntil <= Date.now() + 600_000);
     assert.equal(before.responseBalance, 4);
     await deliver(session.debitId, 20);
     const after = await debit(session.debitId);
