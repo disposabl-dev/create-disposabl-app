@@ -41,6 +41,7 @@ function setup() {
       _id: "session",
       userId: "owner",
       state: "active",
+      activation: "active",
       paidUntil: now + 60000,
     },
     app: {
