@@ -6,8 +6,27 @@ const require = createRequire(import.meta.url);
 const configure = require("../../apps/mobile/app.config.js");
 const mobile = require("../../apps/mobile/package.json");
 
+function isolatedConfig(config: object) {
+  const keys = [
+    "CONVEX_URL",
+    "CONVEX_SITE_URL",
+    "EXPO_PUBLIC_CONVEX_URL",
+    "EXPO_PUBLIC_CONVEX_SITE_URL",
+  ];
+  const saved = keys.map((key) => process.env[key]);
+  try {
+    for (const key of keys) delete process.env[key];
+    return configure(config);
+  } finally {
+    for (const [index, key] of keys.entries()) {
+      if (saved[index] === undefined) delete process.env[key];
+      else process.env[key] = saved[index];
+    }
+  }
+}
+
 test("iOS build properties constrain the Expo Updates reachability pod", () => {
-  const config = configure({ config: { plugins: ["existing-plugin"] } });
+  const config = isolatedConfig({ config: { plugins: ["existing-plugin"] } });
   const properties = config.plugins.filter(
     (plugin: unknown) =>
       Array.isArray(plugin) && plugin[0] === "expo-build-properties",
@@ -27,7 +46,7 @@ test("iOS build properties constrain the Expo Updates reachability pod", () => {
 });
 
 test("iOS pod pin preserves existing build properties in one plugin", () => {
-  const config = configure({
+  const config = isolatedConfig({
     config: {
       plugins: [
         "expo-build-properties",

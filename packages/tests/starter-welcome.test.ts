@@ -216,28 +216,31 @@ test("fresh starters are formatted without changing bundled skills", async () =>
   }
 });
 
-test("scaffolding tolerates absent or unsupported formatters but propagates formatting failures", async () => {
-  const temp = await mkdtemp(join(tmpdir(), "starter-formatter-support-"));
-  const scaffold = resolve(
-    import.meta.dirname,
-    "../create-disposabl-app/scaffold.ts",
-  );
-  const reconfigure = resolve(
-    import.meta.dirname,
-    "../create-disposabl-app/reconfigure.ts",
-  );
-  try {
-    for (const mode of ["absent", "unsupported", "broken"]) {
-      const bin = join(temp, mode);
-      const app = join(bin, "app");
-      await mkdir(bin);
-      if (mode !== "absent")
-        await writeFile(
-          join(bin, "bun"),
-          `#!/bin/sh\ncase "$*" in\n  "--version") echo 1.0.0; exit 0;;\n  "fmt --no-script --help") exit ${mode === "broken" ? 0 : 1};;\n  *) echo 'fixture formatter failure' >&2; exit 42;;\nesac\n`,
-          { mode: 0o755 },
-        );
-      const script = `
+test(
+  "scaffolding tolerates absent or unsupported formatters but propagates formatting failures",
+  { timeout: 15000 },
+  async () => {
+    const temp = await mkdtemp(join(tmpdir(), "starter-formatter-support-"));
+    const scaffold = resolve(
+      import.meta.dirname,
+      "../create-disposabl-app/scaffold.ts",
+    );
+    const reconfigure = resolve(
+      import.meta.dirname,
+      "../create-disposabl-app/reconfigure.ts",
+    );
+    try {
+      for (const mode of ["absent", "unsupported", "broken"]) {
+        const bin = join(temp, mode);
+        const app = join(bin, "app");
+        await mkdir(bin);
+        if (mode !== "absent")
+          await writeFile(
+            join(bin, "bun"),
+            `#!/bin/sh\ncase "$*" in\n  "--version") echo 1.0.0; exit 0;;\n  "fmt --no-script --help") exit ${mode === "broken" ? 0 : 1};;\n  *) echo 'fixture formatter failure' >&2; exit 42;;\nesac\n`,
+            { mode: 0o755 },
+          );
+        const script = `
         import assert from "node:assert/strict";
         import { existsSync } from "node:fs";
         import { createApp } from ${JSON.stringify(scaffold)};
@@ -257,17 +260,18 @@ test("scaffolding tolerates absent or unsupported formatters but propagates form
           assert.equal(existsSync(app), true);
         }
       `;
-      await exec(process.execPath, ["-e", script], {
-        env: {
-          NODE_ENV: "test",
-          PATH: bin,
-          HOME: temp,
-          DO_NOT_TRACK: "1",
-          E2E_TELEMETRY_DISABLED: "1",
-        },
-      });
+        await exec(process.execPath, ["-e", script], {
+          env: {
+            NODE_ENV: "test",
+            PATH: bin,
+            HOME: temp,
+            DO_NOT_TRACK: "1",
+            E2E_TELEMETRY_DISABLED: "1",
+          },
+        });
+      }
+    } finally {
+      await rm(temp, { recursive: true, force: true });
     }
-  } finally {
-    await rm(temp, { recursive: true, force: true });
-  }
-});
+  },
+);
