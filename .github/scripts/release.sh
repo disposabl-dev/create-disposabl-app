@@ -8,15 +8,21 @@ platform=$PACKAGE
 bun run generate
 bun run --cwd "packages/$PACKAGE" typecheck
 name=$(node -p "require('./packages/$PACKAGE/package.json').name")
-if ! previous=$(npm view "$name" version 2>/dev/null); then
-  node .github/scripts/disposabl.mjs report "$platform" blocked 'Publish the package once and configure npm trusted publishing.'
-  exit 0
-fi
 node .github/scripts/disposabl.mjs report "$platform" building
 if GITHUB_TOKEN="$GH_TOKEN" npm_config_workspaces_update=false bun run --cwd "packages/$PACKAGE" release; then
   version=$(node -p "require('./packages/$PACKAGE/package.json').version")
-  [[ "$version" != *development* ]] || version=$previous
-  PUBLISHED_VERSION=$(npm view "$name@$version" version)
+  # semantic-release may succeed without a new release. Verify latest in that
+  # case, but never require a public version before attempting OIDC publication.
+  published="$name@$version"
+  [[ "$version" != *development* ]] || published=$name
+  if ! PUBLISHED_VERSION=$(npm view "$published" version); then
+    node .github/scripts/disposabl.mjs report "$platform" failed 'Release finished, but npm availability could not be verified; check the registry lookup error.'
+    exit 1
+  fi
+  if [[ -z "$PUBLISHED_VERSION" || ( "$published" != "$name" && "$PUBLISHED_VERSION" != "$version" ) ]]; then
+    node .github/scripts/disposabl.mjs report "$platform" failed 'npm returned no matching published version.'
+    exit 1
+  fi
   export PUBLISHED_VERSION
   node .github/scripts/disposabl.mjs report "$platform" ready
 else
