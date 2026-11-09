@@ -4,6 +4,7 @@ import {
   actionGeneric as action,
   getFunctionName,
   makeFunctionReference,
+  componentsGeneric,
 } from "convex/server";
 import { v } from "convex/values";
 import {
@@ -425,4 +426,105 @@ export const requestDeletion = mutation({
 export const removeSyntheticUser = mutation({
   args: { userId: v.id("users") },
   handler: (ctx, { userId }) => ctx.db.delete(userId),
+});
+
+// This uses the same paid enqueue boundary as the provider-inert agent fixture.
+import { enqueueMessageHandler } from "../../../../backend/convex/agent/internal";
+import {
+  readThread,
+  patchThread,
+} from "../../../../backend/convex/agent/threads";
+import { stopping, stopped } from "../../../../backend/convex/agent/compute";
+
+export const manualSeed = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await ctx.db.insert("users", {
+      profile: { email: "verified@example.invalid" },
+    });
+    const appId = crypto.randomUUID();
+    const thread = await ctx.runMutation(
+      componentsGeneric().agent.threads.createThread,
+      { userId, title: "Synthetic manual resume" },
+    );
+    await ctx.db.insert("apps", {
+      appId,
+      userId,
+      name: "fixture",
+      platforms: ["web"],
+      features: [],
+      agent: {
+        threadId: thread._id,
+        status: "idle",
+        pending: [],
+        updatedAt: Date.now(),
+      },
+    });
+    return { userId, appId, threadId: thread._id };
+  },
+});
+export const manualEnqueue = mutation({
+  args: { userId: v.string(), appId: v.string(), prompt: v.string() },
+  handler: (ctx, args) =>
+    enqueueMessageHandler(ctx as any, args, () => true, true),
+});
+export const manualApp = query({
+  args: { appId: v.string() },
+  handler: (ctx, args) =>
+    ctx.db
+      .query("apps")
+      .withIndex("by_appId", (q) => q.eq("appId", args.appId))
+      .unique(),
+});
+export const manualThreadState = mutation({
+  args: { appId: v.string(), userId: v.string(), drain: v.boolean() },
+  handler: async (ctx, args) => {
+    const app = await ctx.db
+      .query("apps")
+      .withIndex("by_appId", (q) => q.eq("appId", args.appId))
+      .unique();
+    const thread = readThread(app as any);
+    if (!thread || thread.userId !== args.userId)
+      throw new Error("Fixture ownership mismatch");
+    const watchdog = args.drain
+      ? undefined
+      : await ctx.scheduler.runAfter(
+          600_000,
+          makeFunctionReference("agent/actions/run:tick") as any,
+          { id: thread.threadId },
+        );
+    await patchThread(
+      ctx as any,
+      thread,
+      args.drain
+        ? {
+            status: "idle",
+            pending: [],
+            lease: undefined,
+            promptId: undefined,
+            delivery: undefined,
+            turnCompleted: true,
+          }
+        : {
+            conversationId: "synthetic-conversation",
+            promptId: "synthetic-prompt",
+            cursor: "synthetic-cursor",
+            lease: {
+              token: "synthetic-worker",
+              watchdog: watchdog!,
+              expiresAt: Date.now() + 600_000,
+              activationProtocol: 1,
+            },
+          },
+    );
+  },
+});
+export const manualStopClaim = mutation({
+  args: { sessionId: v.id("computeSessions"), token: v.string() },
+  handler: (ctx, args) => (stopping as any)._handler(ctx, args),
+});
+export const manualStopComplete = mutation({
+  args: { sessionId: v.id("computeSessions"), token: v.string() },
+  handler: (ctx, args) =>
+    (stopped as any)._handler(ctx, { ...args, archived: true }),
 });
