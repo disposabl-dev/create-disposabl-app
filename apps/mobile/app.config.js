@@ -50,7 +50,12 @@ module.exports = ({ config }) => {
     ...config,
     scheme:
       process.env.EXPO_PUBLIC_E2E === "true" && process.env.E2E_ANDROID_SCHEME
-        ? [process.env.E2E_ANDROID_SCHEME]
+        ? [
+            ...new Set([
+              process.env.E2E_ANDROID_SCHEME,
+              ...(paymentsEnabled ? [billingScheme] : []),
+            ]),
+          ]
         : [
             ...new Set([
               ...[config.scheme || []].flat(),
