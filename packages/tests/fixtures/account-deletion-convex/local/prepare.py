@@ -2,6 +2,7 @@
 import hashlib
 import json
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import tarfile
@@ -17,6 +18,33 @@ def files(directory):
             if p.is_file() and 'node_modules' not in p.relative_to(directory).parts}
 
 
+def verify_mcp(source, installed_hashes):
+    record_path = source / 'packages/tests/fixtures/account-deletion-convex/local/mcp-provenance.json'
+    record = json.loads(record_path.read_text())
+    package = json.loads((source / 'package.json').read_text())
+    selected = package['catalog']['@convex-dev/mcp']
+    dependency = '@convex-dev/mcp@' + selected
+    patch = package['patchedDependencies'][dependency]
+    match = re.search(r'^\s*"@convex-dev/mcp": (\[.*\]),?$',
+                      (source / 'bun.lock').read_text(), re.MULTILINE)
+    locked = json.loads(match.group(1)) if match else None
+    if (record['name'] != '@convex-dev/mcp' or record['version'] != selected
+            or not locked or locked[0] != dependency
+            or locked[-1] != record['upstreamIntegrity']
+            or patch != record['patch']
+            or digest((source / patch).read_bytes()) != record['patchSha256']):
+        raise RuntimeError('MCP provenance does not match the selected dependency and patch')
+    # Bun installation tags are not package code. Retain their hashes in the
+    # run manifest, but compare all other files, including unexpected additions.
+    actual = {name: value for name, value in installed_hashes.items()
+              if not re.fullmatch(r'\.bun-tag(?:-[0-9a-f]+)?', name)}
+    if actual != record['files']:
+        raise RuntimeError('Installed MCP bytes differ from the verified patched dependency')
+    return {'recordSha256': digest(record_path.read_bytes()),
+            'upstreamIntegrity': record['upstreamIntegrity'],
+            'patchSha256': record['patchSha256'], 'files': len(actual)}
+
+
 def prepare(checkout, work):
     sha = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=checkout, text=True).strip()
     archive = work / 'source.tar'
@@ -24,8 +52,9 @@ def prepare(checkout, work):
                    cwd=checkout, check=True)
     source = work / 'source'
     source.mkdir()
-    with tarfile.open(archive) as bundle:
-        bundle.extractall(source, filter='data')
+    # This archive was generated above from the selected Git commit, not supplied
+    # externally. Use the system tar so the runner also works with macOS Python.
+    subprocess.run(['/usr/bin/tar', '-xf', str(archive), '-C', str(source)], check=True)
     manifest = {'commit': sha, 'sourceArchiveSha256': digest(archive.read_bytes()), 'components': {}}
     catalog = json.loads((source / 'package.json').read_text())['catalog']
     modules = source / 'node_modules'
@@ -70,6 +99,7 @@ def prepare(checkout, work):
     manifest['authArchiveSha256'] = digest(auth_archive.read_bytes())
     patch = source / 'patches/convex-mcp-account-erasure-alpha7.patch'
     manifest['mcpPatchSha256'] = digest(patch.read_bytes())
+    manifest['mcpVerification'] = verify_mcp(source, manifest['components']['@convex-dev/mcp'])
     # Record this isolated instrumentation separately from installed component bytes.
     probe = source / 'packages/tests/fixtures/account-deletion-convex/local/mcp-probe.js'
     shutil.copy2(probe, modules / '@convex-dev/mcp/dist/component/fixtureProbe.js')
