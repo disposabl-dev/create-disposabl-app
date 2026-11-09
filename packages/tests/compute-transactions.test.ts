@@ -31,6 +31,126 @@ async function call(name: string, args: object, query = false) {
 }
 
 test(
+  "newly unconfirmed work fences already admitted sessions without affecting other owners",
+  { skip: !url },
+  async () => {
+    const userId = await call("seedUser", {});
+    const other = await call("seedUser", {});
+    const starting = await call("admit", { userId });
+    await call("app", { userId, sessionId: starting, threadId: randomUUID() });
+    const blockedApp = await call("app", {
+      userId,
+      sessionId: starting,
+      threadId: randomUUID(),
+    });
+    const otherSession = await call("admit", { userId: other });
+    await call("app", {
+      userId: other,
+      sessionId: otherSession,
+      threadId: randomUUID(),
+    });
+    assert.equal(await call("blocked", { userId }, true), false);
+    assert.equal(
+      await call(
+        "allowed",
+        { sessionId: starting, userId, now: Date.now(), enabled: false },
+        true,
+      ),
+      true,
+    );
+    await call("setStopUnconfirmed", { appId: blockedApp, value: true });
+    assert.equal(await call("blocked", { userId }, true), true);
+    assert.equal(await call("blocked", { userId: other }, true), false);
+    assert.equal(
+      await call(
+        "allowed",
+        { sessionId: starting, userId, now: Date.now(), enabled: false },
+        true,
+      ),
+      false,
+    );
+    assert.equal(await call("claim", { sessionId: starting }), null);
+    assert.equal(
+      (await call("get", { sessionId: starting }, true)).state,
+      "stopping",
+    );
+    assert.deepEqual(await call("debits", { sessionId: starting }, true), []);
+    const otherDebit = await call("claim", { sessionId: otherSession });
+    assert.ok(otherDebit);
+    await call("settleDebit", {
+      debitId: otherDebit._id,
+      outcome: "confirmed",
+    });
+    assert.equal(
+      await call(
+        "allowed",
+        { sessionId: otherSession, userId: other, now: Date.now() },
+        true,
+      ),
+      true,
+    );
+
+    const activeUser = await call("seedUser", {});
+    const active = await call("admit", { userId: activeUser });
+    await call("app", {
+      userId: activeUser,
+      sessionId: active,
+      threadId: randomUUID(),
+    });
+    const activeDebit = await call("claim", { sessionId: active });
+    await call("settleDebit", {
+      debitId: activeDebit._id,
+      outcome: "confirmed",
+    });
+    const anotherApp = await call("app", {
+      userId: activeUser,
+      sessionId: active,
+      threadId: randomUUID(),
+    });
+    assert.equal(
+      await call(
+        "allowed",
+        { sessionId: active, userId: activeUser, now: Date.now() },
+        true,
+      ),
+      true,
+    );
+    await call("setStopUnconfirmed", { appId: anotherApp, value: true });
+    assert.equal(await call("blocked", { userId: activeUser }, true), true);
+    assert.equal(
+      await call(
+        "allowed",
+        { sessionId: active, userId: activeUser, now: Date.now() },
+        true,
+      ),
+      false,
+    );
+    assert.equal(
+      await call(
+        "allowed",
+        { sessionId: otherSession, userId: other, now: Date.now() },
+        true,
+      ),
+      true,
+    );
+    await call("expireFundedWindow", { sessionId: active });
+    const before = await call("debits", { sessionId: active }, true);
+    assert.equal(
+      await call("claim", {
+        sessionId: active,
+        expectedDebit: activeDebit._id,
+      }),
+      null,
+    );
+    assert.equal(
+      (await call("get", { sessionId: active }, true)).state,
+      "stopping",
+    );
+    assert.deepEqual(await call("debits", { sessionId: active }, true), before);
+  },
+);
+
+test(
   "an unresolved run in another app fences all admissions for its owner only",
   { skip: !url },
   async () => {

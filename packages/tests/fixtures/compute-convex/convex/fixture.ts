@@ -47,6 +47,7 @@ import {
   stopping,
   stopped,
   sessionAllows,
+  workBlocked,
 } from "../../../../backend/convex/agent/compute";
 export const admit = mutation({
   args: { userId: v.string(), enabled: v.optional(v.boolean()) },
@@ -234,9 +235,15 @@ export const allowed = query({
     sessionId: v.id("computeSessions"),
     userId: v.string(),
     now: v.number(),
+    enabled: v.optional(v.boolean()),
   },
   handler: (ctx, a) =>
-    sessionAllows(ctx as any, a.sessionId, a.userId, a.now, true),
+    sessionAllows(ctx as any, a.sessionId, a.userId, a.now, a.enabled ?? true),
+});
+export const blocked = query({
+  args: { userId: v.string() },
+  returns: v.boolean(),
+  handler: (ctx, args) => (workBlocked as any)._handler(ctx, args),
 });
 
 import { append } from "../../../../backend/convex/agent/state";
