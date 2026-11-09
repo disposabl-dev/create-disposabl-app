@@ -198,11 +198,18 @@ test(
     for (const width of [320, 375, 390, 640, 768, 1024, 1440, 1920]) {
       await browser.setViewport({ width, height: 900 });
       await app.open("/");
+      console.log(
+        `LANDING_LAYOUT kind=context page=/ theme=system width=${width}`,
+      );
       await expect(browser.locator("#hero-title")).toBeVisible();
       const size = await browser.evaluate(() => ({
         viewport: innerWidth,
         body: document.documentElement.scrollWidth,
       }));
+      if (size.body !== size.viewport)
+        console.log(
+          `LANDING_LAYOUT kind=overflow page=/ theme=system width=${width} viewport=${size.viewport} scrollwidth=${size.body}`,
+        );
       expect(size.body).toBe(size.viewport);
       const clippedText = await browser.evaluate(() =>
         [
@@ -215,29 +222,53 @@ test(
             const r = e.getBoundingClientRect();
             return r.left < -1 || r.right > innerWidth + 1;
           })
-          .map((e) => e.textContent),
+          .map((e) => {
+            const rect = e.getBoundingClientRect();
+            return {
+              left: Math.round(rect.left),
+              right: Math.round(rect.right),
+            };
+          }),
       );
+      if (clippedText.length)
+        console.log(
+          `LANDING_LAYOUT kind=clipped page=/ theme=system width=${width} count=${clippedText.length} minleft=${Math.min(...clippedText.map((r) => r.left))} maxright=${Math.max(...clippedText.map((r) => r.right))}`,
+        );
       expect(clippedText).toEqual([]);
       if ([320, 390, 768, 1440].includes(width))
         await app.screenshot(`landing-${width}`);
     }
     await browser.setViewport({ width: 844, height: 390 });
     await app.open("/");
+    console.log(
+      "LANDING_LAYOUT kind=context page=/ theme=system width=844 height=390",
+    );
     await expect(browser.locator("#hero-title")).toBeVisible();
-    expect(
-      await browser.evaluate(
-        () => document.documentElement.scrollWidth === innerWidth,
-      ),
-    ).toBe(true);
+    const landscape = await browser.evaluate(() => ({
+      viewport: innerWidth,
+      scrollwidth: document.documentElement.scrollWidth,
+    }));
+    if (landscape.scrollwidth !== landscape.viewport)
+      console.log(
+        `LANDING_LAYOUT kind=overflow page=/ theme=system width=844 height=390 viewport=${landscape.viewport} scrollwidth=${landscape.scrollwidth}`,
+      );
+    expect(landscape.scrollwidth).toBe(landscape.viewport);
     for (const path of ["/stack", "/build", "/why-disposabl", "/pricing"]) {
       await browser.setViewport({ width: 320, height: 800 });
       await app.open(path);
+      console.log(
+        `LANDING_LAYOUT kind=context page=${path} theme=system width=320`,
+      );
       await expect(browser.locator("main h1")).toBeVisible();
-      expect(
-        await browser.evaluate(
-          () => document.documentElement.scrollWidth === innerWidth,
-        ),
-      ).toBe(true);
+      const size = await browser.evaluate(() => ({
+        viewport: innerWidth,
+        scrollwidth: document.documentElement.scrollWidth,
+      }));
+      if (size.scrollwidth !== size.viewport)
+        console.log(
+          `LANDING_LAYOUT kind=overflow page=${path} theme=system width=320 viewport=${size.viewport} scrollwidth=${size.scrollwidth}`,
+        );
+      expect(size.scrollwidth).toBe(size.viewport);
       const html = await (await fetch(new URL(path, app.baseUrl))).text();
       expect(html).toContain(
         'name="twitter:card" content="summary_large_image"',
@@ -366,6 +397,9 @@ test(
           "/pricing",
         ]) {
           await app.open(path);
+          console.log(
+            `LANDING_LAYOUT kind=context page=${path} theme=${theme} width=${width}`,
+          );
           await expect(browser.locator(`html.${theme}`)).toHaveCount(1);
           await expect(browser.locator("main h1")).toBeVisible();
           for (const dialog of path === "/" ? [false, true] : [false]) {
@@ -376,7 +410,7 @@ test(
                 root,
                 NodeFilter.SHOW_TEXT,
               );
-              const failures: string[] = [];
+              const failures: number[] = [];
               let node: Node | null;
               while ((node = walker.nextNode())) {
                 const el = node.parentElement;
@@ -396,20 +430,26 @@ test(
                   style.visibility !== "hidden" &&
                   parseFloat(style.fontSize) < 16
                 )
-                  failures.push(
-                    `${node.textContent.trim()}: ${style.fontSize}`,
-                  );
+                  failures.push(parseFloat(style.fontSize));
               }
               return failures;
             });
+            if (undersized.length)
+              console.log(
+                `LANDING_LAYOUT kind=font page=${path} theme=${theme} width=${width} dialog=${Number(dialog)} count=${undersized.length} minfont=${Math.min(...undersized)}`,
+              );
             expect(undersized).toEqual([]);
             if (dialog) await browser.keyboard.press("Escape");
           }
-          expect(
-            await browser.evaluate(
-              () => document.documentElement.scrollWidth === innerWidth,
-            ),
-          ).toBe(true);
+          const size = await browser.evaluate(() => ({
+            viewport: innerWidth,
+            scrollwidth: document.documentElement.scrollWidth,
+          }));
+          if (size.scrollwidth !== size.viewport)
+            console.log(
+              `LANDING_LAYOUT kind=overflow page=${path} theme=${theme} width=${width} viewport=${size.viewport} scrollwidth=${size.scrollwidth}`,
+            );
+          expect(size.scrollwidth).toBe(size.viewport);
           if (path === "/") await app.screenshot(`landing-${theme}-${width}`);
         }
       }
