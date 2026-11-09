@@ -25,6 +25,8 @@ if (
 // Product-only proof harnesses must not enter generated apps. Keep the same
 // paths in the symlink validation and removal inventories.
 const productProofTests = [
+  "packages/tests/flows/billing-checkout-auth.e2e.ts",
+  "packages/tests/fixtures/billing-checkout-browser",
   "packages/tests/flows/sdk-auth.e2e.ts",
   "packages/tests/helpers/sdk-auth",
   "packages/tests/fixtures/starter-payment-reconfigure",

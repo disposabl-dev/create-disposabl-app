@@ -12,6 +12,8 @@ import {
 } from "../create-disposabl-app/options";
 
 const excluded = [
+  "packages/tests/flows/billing-checkout-auth.e2e.ts",
+  "packages/tests/fixtures/billing-checkout-browser",
   "packages/tests/flows/sdk-auth.e2e.ts",
   "packages/tests/helpers/sdk-auth",
   "packages/tests/fixtures/starter-payment-reconfigure",

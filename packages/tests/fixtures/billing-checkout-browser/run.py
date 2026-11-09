@@ -84,7 +84,7 @@ def main():
     subprocess.run(['bun', str(source / 'packages/tests/fixtures/billing-checkout-browser/prepare.ts'), str(source)], cwd=source, env=env, check=True)
     name = 'billing-checkout-fixture'
     secret = secrets.token_hex(32)
-    key = subprocess.check_output([str(BINARY), 'keygen', 'admin-key', '--instance-name', name, '--instance-secret', secret], env=env, text=True).strip()
+    key = subprocess.check_output([str(BINARY), 'keygen', 'admin-key', '--instance-name', name, '--instance-secret', secret], env=env, text=True, stderr=subprocess.PIPE).strip()
     admin = env | {'CONVEX_SELF_HOSTED_URL': 'http://127.0.0.1:3540', 'CONVEX_SELF_HOSTED_ADMIN_KEY': key}
     helper = importlib.util.spec_from_file_location('sdk_runner', ROOT / 'packages/tests/helpers/sdk-auth/run.py')
     module = importlib.util.module_from_spec(helper)
@@ -131,6 +131,9 @@ def main():
 if __name__ == '__main__':
     try:
         main()
+    except subprocess.SubprocessError:
+        print('Fixture subprocess failed; inspect retained logs.', file=sys.stderr)
+        sys.exit(1)
     except Exception as exc:
         print(f'Fixture failed: {exc}', file=sys.stderr)
         sys.exit(1)
