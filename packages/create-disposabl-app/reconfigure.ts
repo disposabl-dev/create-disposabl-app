@@ -61,6 +61,25 @@ async function safeRead(
   return readFile(target);
 }
 
+// Only ignore JSON whitespace in the managed Turbo configuration. Keep token
+// order and reject comments or invalid JSON so customized files still conflict.
+function sameStarterFile(path: string, left: Buffer, right: Buffer): boolean {
+  if (left.equals(right)) return true;
+  if (path !== "turbo.json") return false;
+  const tokens = (value: Buffer) => {
+    const text = value.toString("utf8");
+    JSON.parse(text);
+    return text.replace(/"(?:\\.|[^"\\])*"|[\x20\t\r\n]+/g, (part) =>
+      part.startsWith('"') ? part : "",
+    );
+  };
+  try {
+    return tokens(left) === tokens(right);
+  } catch {
+    return false;
+  }
+}
+
 /** Restore only scaffold changes introduced by newly selected options. */
 export async function reconfigureApp(
   template: string,
@@ -210,17 +229,18 @@ export async function reconfigureApp(
             throw error;
           },
         );
-      if (prior?.equals(next)) continue;
+      if (prior && sameStarterFile(path, prior, next)) continue;
       if (!current) {
         if (prior)
           throw new Error(
             `Cannot reconfigure: ${path} was removed or customized. Restore the matching starter file and retry.`,
           );
         changes.push({ path, content: next });
-      } else if (current.equals(next)) continue;
+      } else if (sameStarterFile(path, current, next)) continue;
       else if (!prior)
         continue; // Existing user files always win over restored files.
-      else if (current.equals(prior)) changes.push({ path, content: next });
+      else if (sameStarterFile(path, current, prior))
+        changes.push({ path, content: next });
       else {
         const merged =
           basename(path) === "package.json"
