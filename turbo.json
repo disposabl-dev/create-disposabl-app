@@ -24,6 +24,10 @@
     },
     "@disposabl/sdk#typecheck": {
       "dependsOn": ["^typecheck"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/packages/backend/generated/openapi.json"
+      ],
       "cache": false
     },
     "@disposabl/web#typecheck": {
