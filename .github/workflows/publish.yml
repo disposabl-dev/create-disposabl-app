@@ -135,6 +135,11 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.4.4"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ runner.arch }}-1.4.4-${{ hashFiles('bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-${{ runner.arch }}-1.4.4-
       - run: bun install --frozen-lockfile
         working-directory: .
       - name: Verify CLI release and tag
@@ -323,7 +328,10 @@ jobs:
       - run: bun fmt --check
       - run: bun run typecheck
       - run: bun run lint
+      # Normal releases already typecheck the same resolved SHA in the required CLI job.
+      # Generator recovery skips that job and must retain this check here.
       - run: bun run typecheck
+        if: inputs.recovery_version != ''
         working-directory: packages/cli
       - name: Verify fresh generated projects
         if: inputs.recovery_version == ''

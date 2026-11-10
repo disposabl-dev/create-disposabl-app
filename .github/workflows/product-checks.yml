@@ -28,6 +28,8 @@ jobs:
         run: '[[ "$EXPECTED_SOURCE" =~ ^[0-9a-f]{40}$ ]]'
       - uses: actions/checkout@v6
         with: { ref: "${{ inputs.source_sha }}", persist-credentials: false }
+      - name: Check browser isolation harness
+        run: python3 .github/scripts/product-browser-check-test.py
       - uses: actions/setup-node@v6
         with: { node-version: "24", package-manager-cache: false }
       - uses: oven-sh/setup-bun@v2
@@ -60,7 +62,6 @@ jobs:
           unzip -q "$RUNNER_TEMP/product-convex/backend.zip" -d "$RUNNER_TEMP/product-convex"
           chmod +x "$RUNNER_TEMP/product-convex/convex-local-backend"
           bun run --cwd packages/tests setup:browser
-          python3 .github/scripts/product-browser-check-test.py
       - name: Run isolated product web and backend E2E
         shell: bash
         env:
