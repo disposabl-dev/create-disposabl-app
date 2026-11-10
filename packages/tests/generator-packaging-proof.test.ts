@@ -163,7 +163,11 @@ test("product browser gate shares exact-source checks with publication", async (
           secrets?: unknown;
         }>;
       };
-      web: { needs: string[]; if: string };
+      web: {
+        needs: string[];
+        if: string;
+        steps: { name?: string; env?: Record<string, string> }[];
+      };
       publish: { needs: string[] };
       packages: { needs: string[] };
       android: { needs: string[] };
@@ -229,6 +233,11 @@ test("product browser gate shares exact-source checks with publication", async (
     assert.ok(pipeline.jobs[name].needs.includes("web"));
   assert.equal(pipeline.jobs["android-submit"].needs, "android");
   assert.match(pipeline.jobs["android-submit"].if, /ANDROID_PLAY_SUBMIT/);
+  assert.match(
+    pipeline.jobs.web.steps.find((step) => step.name === "Fingerprint")?.env
+      ?.UPDATE_POLICY ?? "",
+    /disposabl-dev\/create-disposabl-app.*disabled/,
+  );
   const checkout = reusable.jobs.check.steps.find((step) =>
     step.uses?.startsWith("actions/checkout@"),
   );
@@ -448,7 +457,15 @@ test("packaged starter and generated profiles exclude product proof fixtures", a
       const parsed = JSON.parse(yaml.stdout) as {
         jobs: Record<
           string,
-          { if?: string; needs?: string; steps?: { run?: string }[] }
+          {
+            if?: string;
+            needs?: string;
+            steps?: {
+              run?: string;
+              name?: string;
+              env?: Record<string, string>;
+            }[];
+          }
         >;
       };
       assert.equal(
@@ -459,6 +476,21 @@ test("packaged starter and generated profiles exclude product proof fixtures", a
       assert.match(
         parsed.jobs["android-submit"].if ?? "",
         /ANDROID_PLAY_SUBMIT == 'true'/,
+      );
+      assert.equal(
+        parsed.jobs.web.steps?.find((step) => step.name === "Fingerprint")?.env
+          ?.UPDATE_POLICY,
+        undefined,
+      );
+      const androidChecks = spawnSync(
+        process.execPath,
+        ["test", "./packages/tests/android-failure-workflow.test.ts"],
+        { cwd: root, encoding: "utf8" },
+      );
+      assert.equal(
+        androidChecks.status,
+        0,
+        `${root}: ${androidChecks.stdout}\n${androidChecks.stderr}`,
       );
       const mobileScript = await readFile(
         join(root, ".github/scripts/mobile.sh"),
