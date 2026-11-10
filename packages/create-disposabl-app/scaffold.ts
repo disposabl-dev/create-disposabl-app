@@ -20,6 +20,30 @@ import {
   type DisposablConfig,
 } from "./options";
 
+export function formatGenerated(directory: string, files: string[] = []) {
+  if (
+    spawnSync("bun", ["fmt", "--no-script", "--help"], {
+      cwd: directory,
+      stdio: "ignore",
+    }).status !== 0
+  )
+    return;
+  try {
+    execFileSync("bun", ["fmt", "--no-script", ...files], {
+      cwd: directory,
+      stdio: "pipe",
+    });
+  } catch (cause) {
+    if (!files.length) throw cause;
+    throw new Error(
+      "Configuration changes were saved, but formatting failed. " +
+        "In the app directory, run bun fmt --no-script disposabl.json, " +
+        "then retry the original generator command to continue.",
+      { cause },
+    );
+  }
+}
+
 export const authStarterPaths = [
   "packages/disposabl-kit/client/routes/_auth-pages",
   "packages/disposabl-kit/client/routes/consent.tsx",
@@ -310,18 +334,7 @@ main().catch((error) => {
       join(destination, "disposabl.json"),
       JSON.stringify(config, null, 2) + "\n",
     );
-    // Formatting is optional without a compatible Bun, including direct calls
-    // and reconfiguration snapshots. A supported formatter's errors still fail.
-    if (
-      spawnSync("bun", ["fmt", "--no-script", "--help"], {
-        cwd: destination,
-        stdio: "ignore",
-      }).status === 0
-    )
-      execFileSync("bun", ["fmt", "--no-script"], {
-        cwd: destination,
-        stdio: "pipe",
-      });
+    formatGenerated(destination);
   } catch (error) {
     // Only remove the directory created by this invocation, never an existing app.
     await rm(destination, { recursive: true, force: true });

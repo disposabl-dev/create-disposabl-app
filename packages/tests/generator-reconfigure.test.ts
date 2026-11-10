@@ -4,8 +4,9 @@ import { existsSync } from "node:fs";
 import assert from "node:assert/strict";
 import { mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { delimiter, join, resolve } from "node:path";
 import { createApp } from "../create-disposabl-app/scaffold";
+import { setupApp } from "../create-disposabl-app/setup";
 import { reconfigureApp } from "../create-disposabl-app/reconfigure";
 import { mergePurchasesManifest } from "../create-disposabl-app/mobile-payments";
 import { version as generatorVersion } from "../create-disposabl-app/package.json";
@@ -783,6 +784,171 @@ test(
         /version/,
       );
       assert.equal(await read(app, "turbo.json"), custom);
+    } finally {
+      process.env.PATH = originalPath;
+      await rm(temp, { recursive: true, force: true });
+    }
+  },
+);
+
+test(
+  "formats final reconfiguration and setup config without touching other files",
+  { timeout: 30000 },
+  async () => {
+    const temp = await mkdtemp(join(tmpdir(), "final-config-"));
+    const app = join(temp, "app");
+    const bun = process.execPath;
+    const originalPath = process.env.PATH;
+    const check = () =>
+      execFileSync(bun, ["fmt", "--no-script", "--check", "disposabl.json"], {
+        cwd: app,
+        stdio: "pipe",
+      });
+    try {
+      await createApp(template, app, "my-app", {
+        version,
+        platforms: ["web"],
+        features: [],
+      });
+      await writeFile(join(app, "sentinel.json"), '{  "untouched": [1,2] }\n');
+      const sentinel = await read(app, "sentinel.json");
+      await reconfigureApp(template, app, version, {
+        features: "authentication",
+      });
+      check();
+      execFileSync("git", ["init", "-q"], { cwd: app });
+      await assert.rejects(
+        setupApp(app, "my-app", async () => {
+          throw new Error("interrupted");
+        }),
+        /interrupted/,
+      );
+      check();
+      const run = async (args: string[]) => {
+        if (args[0] === "login") return { currentUser: {} };
+        if (args[0] === "connections") return { ready: true };
+        if (args[0] === "apps") return { appId: "inert-app" };
+        if (args.includes("create"))
+          return { configured: true, configurationLeaseUntil: 123 };
+        return {};
+      };
+      await setupApp(app, "my-app", run);
+      assert.equal(
+        JSON.parse(await read(app, "disposabl.json")).appId,
+        "inert-app",
+      );
+      check();
+      assert.equal(await read(app, "sentinel.json"), sentinel);
+      const noBun = await mkdtemp(join(temp, "without-bun-"));
+      const gitName = process.platform === "win32" ? "git.exe" : "git";
+      const git = originalPath!
+        .split(delimiter)
+        .map((directory) => join(directory, gitName))
+        .find(existsSync);
+      assert.ok(git, "Git must be installed for setup");
+      await symlink(git, join(noBun, gitName));
+      process.env.PATH = noBun;
+      assert.throws(() => execFileSync("bun", ["--version"]), {
+        code: "ENOENT",
+      });
+      await reconfigureApp(template, app, version, {
+        features: "authentication",
+      });
+      const config = JSON.parse(await read(app, "disposabl.json"));
+      delete config.appId;
+      await writeFile(join(app, "disposabl.json"), JSON.stringify(config));
+      await setupApp(app, "my-app", run);
+      assert.equal(
+        JSON.parse(await read(app, "disposabl.json")).appId,
+        "inert-app",
+      );
+    } finally {
+      process.env.PATH = originalPath;
+      await rm(temp, { recursive: true, force: true });
+    }
+  },
+);
+
+test(
+  "reports saved config and supports retry after formatter failure",
+  { timeout: 30000 },
+  async () => {
+    const temp = await mkdtemp(join(tmpdir(), "config-format-failure-"));
+    const app = join(temp, "app");
+    const originalPath = process.env.PATH;
+    const bun = process.execPath;
+    try {
+      await createApp(template, app, "my-app", {
+        version,
+        platforms: ["web"],
+        features: [],
+      });
+      execFileSync("git", ["init", "-q"], { cwd: app });
+      const bin = await mkdtemp(join(temp, "bin-"));
+      const mode = join(temp, "mode");
+      await writeFile(mode, "all");
+      await writeFile(
+        join(bin, "bun"),
+        `#!${process.execPath}
+import { readFileSync } from "node:fs";
+if (process.argv.includes("--help")) process.exit(0);
+if (process.cwd() === ${JSON.stringify(app)}) {
+  const mode = readFileSync(${JSON.stringify(mode)}, "utf8");
+  const config = JSON.parse(readFileSync("disposabl.json", "utf8"));
+  if (mode === "all" || (mode === "app-id" && config.appId)) process.exit(42);
+}
+const result = Bun.spawnSync([${JSON.stringify(bun)}, ...process.argv.slice(2)], {
+  stdout: "inherit", stderr: "inherit", env: process.env,
+});
+process.exit(result.exitCode);
+`,
+        { mode: 0o755 },
+      );
+      process.env.PATH = bin + ":" + originalPath;
+      const saved =
+        /Configuration changes were saved.*bun fmt.*retry the original/;
+      await assert.rejects(
+        reconfigureApp(template, app, version, { features: "authentication" }),
+        saved,
+      );
+      assert.deepEqual(JSON.parse(await read(app, "disposabl.json")).features, [
+        "authentication",
+      ]);
+      let calls = 0;
+      await assert.rejects(
+        setupApp(app, "my-app", async () => {
+          calls++;
+          return {};
+        }),
+        saved,
+      );
+      assert.equal(calls, 0);
+      let creates = 0;
+      const run = async (args: string[]) => {
+        if (args[0] === "login") return { currentUser: {} };
+        if (args[0] === "connections") return { ready: true };
+        if (args[0] === "apps") {
+          creates++;
+          return { appId: "saved-app" };
+        }
+        if (args.includes("create"))
+          return { configured: true, configurationLeaseUntil: 123 };
+        return {};
+      };
+      await writeFile(mode, "app-id");
+      await assert.rejects(setupApp(app, "my-app", run), saved);
+      assert.equal(
+        JSON.parse(await read(app, "disposabl.json")).appId,
+        "saved-app",
+      );
+      assert.equal(creates, 1);
+      process.env.PATH = originalPath;
+      await setupApp(app, "my-app", run);
+      assert.equal(creates, 1);
+      execFileSync(bun, ["fmt", "--no-script", "--check", "disposabl.json"], {
+        cwd: app,
+        stdio: "pipe",
+      });
     } finally {
       process.env.PATH = originalPath;
       await rm(temp, { recursive: true, force: true });
