@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Exercise registered public admission on a fresh, owned local backend."""
-import hashlib, importlib.util, json, os, pathlib, secrets, shutil, signal, socket, subprocess, sys, tempfile, threading, time, urllib.request, uuid
+import concurrent.futures, fcntl, hashlib, importlib.util, json, os, pathlib, secrets, shutil, signal, socket, subprocess, sys, tempfile, threading, time, urllib.request, uuid
 from contextlib import ExitStack
 ROOT = pathlib.Path(__file__).resolve().parents[4]
 DEPS = pathlib.Path(os.environ.get("PUBLIC_ADMISSION_DEPS", ""))
@@ -9,7 +9,7 @@ BASE = "http://127.0.0.1:3480"
 SHA = os.environ.get("PUBLIC_ADMISSION_SOURCE_REVISION", "")
 PROFILE = '(version 1)(allow default)(deny network-outbound)(allow network-outbound (remote ip "localhost:*"))(allow network-outbound (remote unix-socket))'
 AUTH_SHA = "e4cb80861b88a1a8f8514df7e84628d8397f05592bf5e755f9afa1737cbcf6c8"
-ARTIFACT = None
+OUTPUT_ROOT = pathlib.Path(os.environ.get("PUBLIC_ADMISSION_OUTPUT_ROOT", ""))
 def load(path):
     s = importlib.util.spec_from_file_location("helper", path); m = importlib.util.module_from_spec(s); s.loader.exec_module(m); return m
 def guarded():
@@ -17,19 +17,18 @@ def guarded():
     stopped = threading.Event()
     def check_output():
         while not stopped.wait(.25):
-            if ARTIFACT is None: continue
             total = 0
-            for directory, _, files in os.walk(ARTIFACT):
+            for directory, _, files in os.walk(OUTPUT_ROOT):
                 for name in files:
-                    try: total += os.lstat(os.path.join(directory, name)).st_size
+                    try: total += os.lstat(os.path.join(directory, name)).st_blocks * 512
                     except FileNotFoundError: pass
-            if total >= 140 * 1024**2:
-                print("Output reached 140 MiB; stopping owned fixture", flush=True)
+            if total >= 270 * 1024**2:
+                print("Allocated output reached 270 MiB; stopping owned fixture", flush=True)
                 os.kill(os.getpid(), signal.SIGTERM)
                 return
     watcher = threading.Thread(target=check_output, daemon=True)
     try:
-        runner.MIN_FREE = int(2.6 * 1024**3)
+        runner.MIN_FREE = 4 * 1024**3 + 128 * 1024**2
         with runner.disk_guard():
             watcher.start()
             run(runner)
@@ -39,7 +38,8 @@ def guarded():
         shutil.rmtree(os.environ["HOME"])
 
 def run(runner):
-    if shutil.disk_usage("/tmp").free < runner.MIN_FREE: raise RuntimeError("Less than 2.5 GiB free")
+    if shutil.disk_usage("/tmp").free < int(4.5 * 1024**3): raise RuntimeError("Less than 4.5 GiB free")
+    if not OUTPUT_ROOT.is_absolute() or not OUTPUT_ROOT.is_dir(): raise RuntimeError("Invalid owned output root")
     if not DEPS.is_absolute() or not DEPS.is_dir(): raise RuntimeError("Set PUBLIC_ADMISSION_DEPS to cached node_modules")
     if not BINARY.is_absolute() or not BINARY.is_file(): raise RuntimeError("Set CONVEX_LOCAL_BINARY to cached backend")
     if not __debug__: raise RuntimeError("Python assertions must be enabled")
@@ -54,9 +54,7 @@ def run(runner):
     if subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip() != SHA: raise RuntimeError("wrong source")
     auth=load(ROOT/"packages/tests/helpers/sdk-auth/selected_auth.py").verify_selected_auth(ROOT, DEPS/"@convex-dev/auth")
     if auth["files"] != 1333 or auth["sha256"] != AUTH_SHA: raise RuntimeError("auth mismatch")
-    global ARTIFACT
-    work=pathlib.Path(tempfile.mkdtemp(prefix="public-admission-",dir="/tmp")); work.chmod(0o700)
-    ARTIFACT = work
+    work=pathlib.Path(tempfile.mkdtemp(prefix="run-",dir=OUTPUT_ROOT)); work.chmod(0o700)
     provenance = {"source": SHA, "backend": str(BINARY.resolve()),
                   "backend_sha256": hashlib.sha256(BINARY.read_bytes()).hexdigest(),
                   "lockfile_sha256": hashlib.sha256((ROOT / "bun.lock").read_bytes()).hexdigest(),
@@ -81,6 +79,9 @@ def run(runner):
                 target=source/"packages/disposabl-kit" if package.name=="disposabl-kit" else package.resolve()
                 (scope/package.name).symlink_to(target,target_is_directory=target.is_dir())
         else: (modules/dep.name).symlink_to(dep.resolve(),target_is_directory=dep.is_dir())
+    # Convex resolves its compiler relative to the backend workspace.
+    backend_modules=source/"packages/backend/node_modules"; backend_modules.mkdir()
+    (backend_modules/"typescript").symlink_to((DEPS/"typescript").resolve(), target_is_directory=True)
     config=source/"disposabl.json"; data=json.loads(config.read_text())
     if "payments" not in data["features"]: data["features"].append("payments")
     config.write_text(json.dumps(data))
@@ -89,7 +90,7 @@ def run(runner):
     # Add one isolated adapter control row, never a product table or credential.
     needle="export default defineSchema({"
     if text.count(needle)!=1: raise RuntimeError("schema shape changed")
-    schema.write_text(text.replace(needle,needle+'\n  publicAdmissionTransport: defineTable({ userId: v.string(), mode: v.string(), calls: v.number() }),'))
+    schema.write_text(text.replace(needle,needle+'\n  publicAdmissionTransport: defineTable({ userId: v.string(), mode: v.string(), calls: v.number(), releaseAt: v.optional(v.number()) }),'))
     internal=product/"agent/internal.ts"; text=internal.read_text()
     needle="  check = requireCredits,"
     replacement='''  check = (userId: string) => requireCredits(userId, paymentsEnabled, "synthetic", (_key, method, body) =>
@@ -114,8 +115,8 @@ def run(runner):
         result=call(kind,path,args,authkey)
         if result.get("status") != "success": raise RuntimeError(path+" failed: "+str(result.get("errorMessage")))
         return result["value"]
-    if shutil.disk_usage("/tmp").free < int(3.25 * 1024**3):
-        raise RuntimeError("Less than 3.25 GiB free before backend start")
+    if shutil.disk_usage("/tmp").free < int(4.5 * 1024**3):
+        raise RuntimeError("Less than 4.5 GiB free before backend start")
     with ExitStack() as stack:
         log=stack.enter_context((work/"backend.log").open("w"))
         proc=stack.enter_context(owner.owned_backend([str(BINARY),"--interface","127.0.0.1","--port","3480","--site-proxy-port","3481","--instance-name",name,"--instance-secret",secret,"--disable-beacon","--local-storage",str(work/"storage"),str(work/"db.sqlite3")],env=env,stdout=log,stderr=subprocess.STDOUT))
@@ -134,7 +135,9 @@ def run(runner):
         admin=env|{"CONVEX_SELF_HOSTED_URL":BASE,"CONVEX_SELF_HOSTED_ADMIN_KEY":key}
         cli=str(source/"node_modules/convex/bin/main.js")
         check_owner()
-        runner.command(owner,["node",cli,"dev","--once","--typecheck","disable","--codegen","disable"],cwd=source/"packages/backend",env=admin,log=work/"sync.log")
+        runner.command(owner,["node",cli,"dev","--once","--typecheck","enable","--codegen","disable"],cwd=source/"packages/backend",env=admin,log=work/"sync.log")
+        runner.command(owner,["node",str(source/"node_modules/typescript/bin/tsc"),"--noEmit","-p",str(source/"packages/tests/tsconfig.json")],cwd=source,env=env,log=work/"tests-typecheck.log")
+        print("PASS tests workspace typecheck",flush=True)
         signup=value("mutation","auth:signUpWithUsernamePassword",{"username":"fixture"+secrets.token_hex(8),"password":"Fixture-"+secrets.token_hex(16)+"!"})
         token=signup["tokens"]["accessToken"]; bearer="Bearer "+token
         user=value("query","users/index:current",{},bearer)["id"]
@@ -184,7 +187,7 @@ def run(runner):
         tick.write_text('import { internalActionGeneric } from "convex/server";\nimport { v } from "convex/values";\nexport const tick = internalActionGeneric({args:{id:v.string()},handler:()=>null});\n')
         request("/api/update_environment_variables",{"changes":[{"name":"BOAT_API_KEY","value":"synthetic-config-only"}]},"Convex "+key)
         check_owner()
-        runner.command(owner,["node",cli,"dev","--once","--typecheck","disable","--codegen","disable"],cwd=source/"packages/backend",env=admin,log=work/"positive-sync.log")
+        runner.command(owner,["node",cli,"dev","--once","--typecheck","enable","--codegen","disable"],cwd=source/"packages/backend",env=admin,log=work/"positive-sync.log")
         active=value("function","publicAdmissionFixture:seedActive",{"userId":user},"Convex "+key)
         prior=value("function","publicAdmissionFixture:snapshot",args,"Convex "+key)
         assert len(prior["sessions"])==1 and len(prior["debits"])==1
@@ -202,18 +205,82 @@ def run(runner):
             assert current["sessions"]==prior["sessions"] and current["debits"]==prior["debits"]
             assert current["app"]["agent"]["computeSessionId"]==active["sessionId"]
         print("PASS two public admissions recheck ten credits and reuse one synthetic active session and debit; inert worker",flush=True)
+        def setup_app():
+            new_id=str(uuid.uuid4())
+            info=value("function","publicAdmissionFixture:setupApp",{"userId":user,"appId":new_id},"Convex "+key)
+            return {"userId":user,"appId":new_id,"threadId":info["threadId"]}
+        def pair(mixed):
+            apps=[setup_app(),setup_app()]
+            snapshots=[value("function","publicAdmissionFixture:snapshot",x,"Convex "+key) for x in apps]
+            value("function","publicAdmissionFixture:armPair",{"mixed":mixed},"Convex "+key)
+            client_barrier=threading.Barrier(2, timeout=10)
+            check_owner()
+            def send(app):
+                client_barrier.wait()
+                start=time.monotonic()
+                result=request("/api/action",{"path":"agent/index:sendMessageChecked","args":{"appId":app["appId"],"prompt":"simultaneous admission"},"format":"json"},bearer)
+                return result,start,time.monotonic()
+            with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+                results=list(pool.map(send, apps))
+            assert max(r[1] for r in results) < min(r[2] for r in results), "client requests did not overlap"
+            states=[value("function","publicAdmissionFixture:snapshot",x,"Convex "+key) for x in apps]
+            assert all(x["calls"]==snapshots[0]["calls"]+2 for x in states)
+            assert all(x["sessions"]==prior["sessions"] and x["debits"]==prior["debits"] for x in states)
+            statuses=[result[0].get("status") for result in results]
+            if mixed:
+                assert sorted(statuses)==["error","success"]
+                denied_index=statuses.index("error")
+                assert "credits_required" in json.dumps(results[denied_index][0])
+                assert states[denied_index]["app"]==snapshots[denied_index]["app"] and states[denied_index]["messages"]==[]
+                assert len(states[1-denied_index]["messages"])==1
+                assert states[1-denied_index]["app"]["agent"]["computeSessionId"]==active["sessionId"]
+            else:
+                assert statuses==["success","success"]
+                assert all(len(x["messages"])==1 and x["app"]["agent"]["computeSessionId"]==active["sessionId"] for x in states)
+            print("PASS overlapping public requests", "mixed allow/deny" if mixed else "both admitted", "each checked; shared seeded window, one debit",flush=True)
+        pair(False)
+        pair(True)
+        claim_app=str(uuid.uuid4())
+        claim_fixture=value("function","publicAdmissionFixture:setupApp",{"userId":other,"appId":claim_app},"Convex "+key)
+        claim_args={"userId":other,"appId":claim_app,"threadId":claim_fixture["threadId"]}
+        session_id=value("function","publicAdmissionFixture:seedStartingClaim",{"userId":other,"appId":claim_app},"Convex "+key)
+        barrier=threading.Barrier(2,timeout=10)
+        check_owner()
+        def claim(_):
+            barrier.wait()
+            start=time.monotonic()
+            result=request("/api/function",{"path":"agent/compute:claim","args":{"sessionId":session_id},"format":"json"},"Convex "+key)
+            return result,start,time.monotonic()
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+            claims=list(pool.map(claim,range(2)))
+        assert max(c[1] for c in claims) < min(c[2] for c in claims), "claim requests did not overlap"
+        assert all(c[0].get("status")=="success" for c in claims)
+        claimed=[c[0]["value"] for c in claims if c[0]["value"] is not None]
+        assert len(claimed)==1 and claimed[0]["state"]=="dispatching"
+        claim_state=value("function","publicAdmissionFixture:snapshot",claim_args,"Convex "+key)
+        assert len(claim_state["sessions"])==1 and len(claim_state["debits"])==1
+        assert claim_state["sessions"][0]["debitId"]==claimed[0]["_id"]==claim_state["debits"][0]["_id"]
+        print("PASS overlapping registered claim requests yield one debit claim; no provider call",flush=True)
+
     print("PASS public admission fixture; owned backend stopped",flush=True)
 def main():
     if len(sys.argv) != 1: raise SystemExit("No arguments supported; configure with environment variables")
-    home = tempfile.mkdtemp(prefix="public-admission-home-", dir="/tmp")
+    root = pathlib.Path(os.environ.get("PUBLIC_ADMISSION_OUTPUT_ROOT", ""))
+    if not root.is_absolute() or not root.is_dir() or root.is_symlink() or root.stat().st_uid != os.getuid() or root.stat().st_mode & 0o077:
+        raise RuntimeError("PUBLIC_ADMISSION_OUTPUT_ROOT must be an owned private directory")
+    lock = os.open(root / ".lock", os.O_CREAT | os.O_RDWR, 0o600)
+    fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    os.set_inheritable(lock, True)
+    home = tempfile.mkdtemp(prefix="home-", dir=root)
     os.chmod(home, 0o700)
     env = {"PATH": os.environ["PATH"], "HOME": home,
            "PUBLIC_ADMISSION_DEPS": os.environ.get("PUBLIC_ADMISSION_DEPS", ""),
            "CONVEX_LOCAL_BINARY": os.environ.get("CONVEX_LOCAL_BINARY", ""),
            "PUBLIC_ADMISSION_SOURCE_REVISION": os.environ.get("PUBLIC_ADMISSION_SOURCE_REVISION", ""),
+           "PUBLIC_ADMISSION_OUTPUT_ROOT": str(root),
            "E2E_TELEMETRY_DISABLED": "1", "DO_NOT_TRACK": "1"}
     entry = 'import runpy,sys; runpy.run_path(sys.argv[1])["guarded"]()'
-    evidence = pathlib.Path(tempfile.mkdtemp(prefix="public-admission-output-", dir="/tmp"))
+    evidence = pathlib.Path(tempfile.mkdtemp(prefix="output-", dir=root))
     evidence.chmod(0o700)
     log = evidence / "runner.log"
     print("Private runner output:", log, flush=True)

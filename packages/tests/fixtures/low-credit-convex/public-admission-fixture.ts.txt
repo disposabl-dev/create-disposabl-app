@@ -63,6 +63,22 @@ export const mode = internalMutation({
     await ctx.db.patch(row._id, { mode });
   },
 });
+export const armPair = internalMutation({
+  args: { mixed: v.boolean() },
+  handler: async (ctx, { mixed }) => {
+    const row = await ctx.db.query("publicAdmissionTransport").first();
+    if (!row) throw new Error("missing adapter");
+    await ctx.db.patch(row._id, {
+      mode: mixed ? "pair-mixed" : "pair-ok",
+      releaseAt: row.calls + 2,
+    });
+  },
+});
+export const transportCalls = internalQuery({
+  args: {},
+  handler: async (ctx) =>
+    (await ctx.db.query("publicAdmissionTransport").first())?.calls ?? 0,
+});
 export const observe = internalMutation({
   args: { method: v.string(), body: v.any() },
   handler: async (ctx, { method, body }) => {
@@ -75,16 +91,41 @@ export const observe = internalMutation({
     if (!row) throw new Error("missing adapter");
     if (body.customer_id !== row.userId) throw new Error("unexpected customer");
     await ctx.db.patch(row._id, { calls: row.calls + 1 });
-    return row.mode;
+    return { mode: row.mode, ordinal: row.calls + 1, releaseAt: row.releaseAt };
   },
 });
 export const transport = internalAction({
   args: { method: v.string(), body: v.any() },
   handler: async (ctx, args) => {
-    const mode = await ctx.runMutation(
-      makeFunctionReference("publicAdmissionFixture:observe") as any,
-      args,
-    );
+    const observation: { mode: string; ordinal: number; releaseAt?: number } =
+      await ctx.runMutation(
+        makeFunctionReference("publicAdmissionFixture:observe") as any,
+        args,
+      );
+    const { mode, ordinal, releaseAt } = observation;
+    if (mode.startsWith("pair-")) {
+      if (releaseAt === undefined) throw new Error("missing pair barrier");
+      let released = false;
+      for (let i = 0; i < 200; i++) {
+        const calls: number = await ctx.runQuery(
+          makeFunctionReference("publicAdmissionFixture:transportCalls") as any,
+          {},
+        );
+        if (calls >= releaseAt) {
+          released = true;
+          break;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 25));
+      }
+      if (!released) throw new Error("pair barrier timed out");
+      return {
+        balances: {
+          credits: {
+            remaining: mode === "pair-mixed" && ordinal === releaseAt ? 9 : 10,
+          },
+        },
+      };
+    }
     if (mode === "error") throw new Error("synthetic provider failure");
     return mode === "low"
       ? { balances: { credits: { remaining: 9 } } }
@@ -110,6 +151,31 @@ export const seedActive = internalMutation({
     });
     await ctx.db.patch(sessionId, { debitId });
     return { sessionId, debitId };
+  },
+});
+export const seedStartingClaim = internalMutation({
+  args: { userId: v.string(), appId: v.string() },
+  handler: async (ctx, { userId, appId }) => {
+    const app = await ctx.db
+      .query("apps")
+      .withIndex("by_appId", (q) => q.eq("appId", appId))
+      .unique();
+    if (!app || app.userId !== userId || !app.agent)
+      throw new Error("missing app");
+    const sessionId = await ctx.db.insert("computeSessions", {
+      userId,
+      state: "starting",
+      paidUntil: 0,
+      activation: "fresh",
+    });
+    await ctx.db.patch(app._id, {
+      agent: {
+        ...app.agent,
+        status: "processing",
+        computeSessionId: sessionId,
+      },
+    });
+    return sessionId;
   },
 });
 export const snapshot = internalQuery({
