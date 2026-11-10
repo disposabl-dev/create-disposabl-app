@@ -12,7 +12,13 @@ AUTH_SHA = "e4cb80861b88a1a8f8514df7e84628d8397f05592bf5e755f9afa1737cbcf6c8"
 OUTPUT_ROOT = pathlib.Path(os.environ.get("PUBLIC_ADMISSION_OUTPUT_ROOT", ""))
 def load(path):
     s = importlib.util.spec_from_file_location("helper", path); m = importlib.util.module_from_spec(s); s.loader.exec_module(m); return m
+def validate_output_root(root):
+    if not root.is_absolute() or not root.is_dir() or root.is_symlink() or root.stat().st_uid != os.getuid() or root.stat().st_mode & 0o077:
+        raise RuntimeError("PUBLIC_ADMISSION_OUTPUT_ROOT must be an owned private directory")
+    if root.stat().st_dev != pathlib.Path("/tmp").stat().st_dev:
+        raise RuntimeError("PUBLIC_ADMISSION_OUTPUT_ROOT must be on the same filesystem as /tmp for the disk guard")
 def guarded():
+    validate_output_root(OUTPUT_ROOT)
     runner=load(ROOT/"packages/tests/fixtures/billing-handoff-browser/run.py")
     stopped = threading.Event()
     def check_output():
@@ -266,8 +272,7 @@ def run(runner):
 def main():
     if len(sys.argv) != 1: raise SystemExit("No arguments supported; configure with environment variables")
     root = pathlib.Path(os.environ.get("PUBLIC_ADMISSION_OUTPUT_ROOT", ""))
-    if not root.is_absolute() or not root.is_dir() or root.is_symlink() or root.stat().st_uid != os.getuid() or root.stat().st_mode & 0o077:
-        raise RuntimeError("PUBLIC_ADMISSION_OUTPUT_ROOT must be an owned private directory")
+    validate_output_root(root)
     lock = os.open(root / ".lock", os.O_CREAT | os.O_RDWR, 0o600)
     fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
     os.set_inheritable(lock, True)

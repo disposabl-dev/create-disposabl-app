@@ -17,7 +17,7 @@ Run from a clean checkout committed at the explicitly selected revision, with ca
 ```sh
 PUBLIC_ADMISSION_SOURCE_REVISION="$(git rev-parse HEAD)" \
 PUBLIC_ADMISSION_DEPS=/absolute/path/to/cached/node_modules \
-PUBLIC_ADMISSION_OUTPUT_ROOT=/absolute/path/to/owned-private-output-directory \
+PUBLIC_ADMISSION_OUTPUT_ROOT=/tmp/owned-private-output-directory \
 CONVEX_LOCAL_BINARY=/absolute/path/to/convex-local-backend \
 python3 packages/tests/fixtures/low-credit-convex/public-admission.py
 ```
@@ -31,3 +31,5 @@ The registered public action also rejects a different user attempting the ownerâ
 The output directory must already exist, be private and owned, and be dedicated to this fixture; the runner locks it across attempts and retains each run. Two client requests synchronize at a client barrier and a billing-adapter barrier, verifying overlapping public requests for different apps with both balances sufficient and with one low balance. The admitted requests reuse the seeded confirmed session and debit; the denied app has no new message or app state. This does not establish transaction overlap or OCC retries. Backend sync uses enabled typechecking and the runner checks the tests workspace.
 
 A separate fixture-seeded starting session receives two overlapping calls to the registered production claim mutation; only one dispatching debit claim may be returned. No provider is invoked.
+
+The private output root must be on the same filesystem as `/tmp`, which the free-space guard monitors. The launcher rejects another filesystem before creating logs or starting the guarded run.
