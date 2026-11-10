@@ -6,4 +6,4 @@ Configure either `DISPOSABL_ANDROID_SIGNING` or all four `ANDROID_KEYSTORE_BASE6
 
 Play submission is separate and defaults off. Set `ANDROID_PLAY_SUBMIT` to `true`, select `ANDROID_PLAY_TRACK`, set `ANDROID_PLAY_UPLOAD_CERT_SHA256` to the lowercase SHA-256 of the upload certificate, and provide `ANDROID_PLAY_SERVICE_ACCOUNT` as a service-account JSON secret. Expo project and token are also required. This is an operator assertion that the Play app and access are configured; submission errors remain failures. Play account setup or a manual first upload may still be required, and submission does not mean review or rollout succeeded.
 
-The Disposabl product's separate Android Play job is paused unless its repository variable `DISPOSABL_ANDROID_PLAY_ENABLED` is `true`; this switch does not disable generated apps.
+The Disposabl product uses the same artifact build, with production OTA updates disabled. Its Play submission also checks the product package and known upload certificate. The upload-key reset affects submission, not artifact builds.
