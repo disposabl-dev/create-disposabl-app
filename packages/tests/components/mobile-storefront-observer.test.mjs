@@ -1,8 +1,11 @@
+process.env.EXPO_PUBLIC_REVENUECAT_IOS_APP_ID = "fixture-app";
+process.env.EXPO_PUBLIC_REVENUECAT_IOS_TOPUP_PRODUCT = "coins";
 import { afterEach, expect, mock, test } from "bun:test";
 import { createElement } from "react";
 import { act, create } from "react-test-renderer";
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const listeners = new Set();
+let topupReady = false;
 let starts = 0,
   stops = 0,
   country = "USA",
@@ -75,8 +78,8 @@ mock.module("../../../packages/disposabl-kit/mobile/billing/paywall", () => ({
   selectMonthlyOffering: () => ({}),
 }));
 mock.module("../../../packages/disposabl-kit/mobile/billing/topup", () => ({
-  matchingTopupRoute: () => false,
-  loadTopup: async () => null,
+  matchingTopupRoute: () => topupReady,
+  loadTopup: async () => (topupReady ? { identifier: "coins" } : null),
 }));
 const { useWebCheckout } =
   await import("../../../packages/disposabl-kit/mobile/billing/web-checkout");
@@ -104,6 +107,7 @@ async function change() {
 }
 afterEach(async () => {
   await act(async () => renderer?.unmount());
+  topupReady = false;
   starts = 0;
   stops = 0;
   country = "USA";
@@ -238,4 +242,36 @@ test("a queued callback from a removed subscription is ignored", async () => {
   subscription.remove();
   queued();
   expect(changed).not.toHaveBeenCalled();
+});
+
+test("US top-up uses its own handoff purchase selection", async () => {
+  topupReady = true;
+  await mount();
+  expect(result.topupAvailable).toBe(true);
+  let opened;
+  await act(async () => {
+    opened = await result.open("topup");
+  });
+  expect(opened).toBe(true);
+  expect(handoff).toHaveBeenCalledWith({ purchase: "topup" });
+  expect(openURL).toHaveBeenCalledWith(link.url);
+  expect(result.busy).toBe(false);
+});
+
+test("top-up rejects an unannounced non-US storefront before browser open", async () => {
+  topupReady = true;
+  await mount();
+  handoff.mockImplementationOnce(async () => {
+    country = "CAN";
+    return link;
+  });
+  let opened;
+  await act(async () => {
+    opened = await result.open("topup");
+  });
+  expect(handoff).toHaveBeenCalledTimes(1);
+  expect(opened).toBe(false);
+  expect(openURL).not.toHaveBeenCalled();
+  expect(result.topupAvailable).toBe(false);
+  expect(result.busy).toBe(false);
 });
