@@ -100,6 +100,7 @@ class WorkflowTests(unittest.TestCase):
         root = SCRIPT.parents[2]
         publish = (root / ".github/workflows/publish.yml").read_text()
         checks = (root / ".github/workflows/product-checks.yml").read_text()
+        action = (root / ".github/actions/product-checks/action.yml").read_text()
         pipeline = (root / ".github/workflows/pipeline.yml").read_text()
         self.assertIn("  push:\n    branches: [main]", publish)
         self.assertIn("  workflow_dispatch:", publish)
@@ -112,8 +113,8 @@ class WorkflowTests(unittest.TestCase):
         self.assertIn("    if: " + gen_if, publish)
         self.assertEqual(publish.count("RESOLVED_SHA: ${{ needs.checks.outputs.source_sha }}"), 4)
         self.assertIn("value: ${{ jobs.check.outputs.source_sha }}", checks)
-        self.assertIn("source_sha: ${{ steps.source.outputs.sha }}", checks)
-        self.assertIn("EXPECTED_SOURCE: ${{ steps.source.outputs.sha }}", checks)
+        self.assertIn("source_sha: ${{ steps.checks.outputs.source_sha }}", checks)
+        self.assertIn("${{ steps.source.outputs.sha }}", action)
         self.assertIn("source_sha: ${{ github.event.pull_request.head.sha || github.sha }}", pipeline)
         self.assertIn("source_sha: ${{ github.sha }}", publish)
         self.assertIn("cli_recovery_version: ${{ inputs.cli_recovery_version || '' }}", publish)

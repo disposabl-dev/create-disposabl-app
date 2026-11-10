@@ -40,7 +40,7 @@ jobs:
       pull-requests: read
       actions: read
     runs-on: *linux-runner
-    timeout-minutes: 5
+    timeout-minutes: 30
     outputs:
       linux_runner: ${{ steps.platforms.outputs.linux_runner }}
       android_runner: ${{ steps.platforms.outputs.android_runner }}
@@ -62,11 +62,25 @@ jobs:
           EXPO_CONNECTED: ${{ secrets.EXPO_TOKEN != '' }}
           IOS_BUILDS_ENABLED: ${{ vars.IOS_BUILDS_ENABLED != 'false' }}
         run: bash "$GITHUB_WORKSPACE/.github/scripts/platforms.sh"
+      - name: Product checks
+        if: github.repository == 'disposabl-dev/create-disposabl-app'
+        uses: ./.github/actions/product-checks
+        with:
+          source_sha: ${{ github.event.pull_request.head.sha || github.sha }}
+        env:
+          GH_TOKEN: ""
+          PYTHONDONTWRITEBYTECODE: "1"
+          DO_NOT_TRACK: "1"
+          E2E_TELEMETRY_DISABLED: "1"
+          EXPO_NO_TELEMETRY: "1"
+          DISPOSABL_ANALYTICS_ENABLED: "false"
+          EXPO_PUBLIC_DISPOSABL_ANALYTICS_ENABLED: "false"
+          VITE_DISPOSABL_ANALYTICS_ENABLED: "false"
   web:
     name: Web
-    needs: [changes, product-checks]
+    needs: [changes]
     # Fork code must not run in a job with deployment credentials.
-    if: always() && !cancelled() && needs.changes.result == 'success' && (needs.product-checks.result == 'success' || github.repository != 'disposabl-dev/create-disposabl-app') && (needs.changes.outputs.changed == 'true' || (github.event_name == 'push' && github.repository == 'disposabl-dev/create-disposabl-app'))
+    if: always() && !cancelled() && needs.changes.result == 'success' && (needs.changes.outputs.changed == 'true' || (github.event_name == 'push' && github.repository == 'disposabl-dev/create-disposabl-app'))
     permissions: &release-permissions
       contents: read
       pull-requests: read
@@ -198,15 +212,6 @@ jobs:
           retention-days: 3
           compression-level: 0
           if-no-files-found: error
-  product-checks:
-    name: Product checks
-    needs: changes
-    if: github.repository == 'disposabl-dev/create-disposabl-app'
-    permissions:
-      contents: read
-    uses: ./.github/workflows/product-checks.yml
-    with:
-      source_sha: ${{ github.event.pull_request.head.sha || github.sha }}
   android:
     name: Android
     needs: [changes, web]

@@ -277,6 +277,7 @@ test(
             NODE_ENV: "test",
             PATH: bin,
             HOME: temp,
+            TMPDIR: temp,
             DO_NOT_TRACK: "1",
             E2E_TELEMETRY_DISABLED: "1",
           },

@@ -22,6 +22,8 @@ import {
 const excluded = [
   ".github/workflows/play-bundle.yml",
   ".github/workflows/product-checks.yml",
+  ".github/actions/product-checks",
+  ".github/scripts/ci-graph.test.ts",
   ".github/scripts/play-bundle.sh",
   ".github/scripts/play-bundle.test.py",
   ".github/scripts/android-release.test.py",
@@ -133,7 +135,7 @@ const excluded = [
   "packages/tests/fixtures/low-credit-convex",
 ];
 
-test("product browser gate uses the reusable exact-source workflow", async () => {
+test("product browser gate shares exact-source checks with publication", async () => {
   const parseWorkflow = async (name: string) => {
     const input = await readFile(
       join(import.meta.dirname, "../../.github/workflows", name),
@@ -152,12 +154,20 @@ test("product browser gate uses the reusable exact-source workflow", async () =>
   };
   const pipeline = (await parseWorkflow("pipeline.yml")) as {
     jobs: {
-      "product-checks": {
-        uses: string;
-        with: { source_sha: string };
-        secrets?: unknown;
+      changes: {
+        steps: Array<{
+          name?: string;
+          uses?: string;
+          with?: { source_sha: string };
+          env?: Record<string, string>;
+          secrets?: unknown;
+        }>;
       };
-      web: { needs: string[]; if: string };
+      web: {
+        needs: string[];
+        if: string;
+        steps: { name?: string; env?: Record<string, string> }[];
+      };
       publish: { needs: string[] };
       packages: { needs: string[] };
       android: { needs: string[] };
@@ -179,9 +189,23 @@ test("product browser gate uses the reusable exact-source workflow", async () =>
       };
     };
   };
-  const gate = pipeline.jobs["product-checks"];
-  assert.equal(gate.uses, "./.github/workflows/product-checks.yml");
-  assert.ok(pipeline.jobs.web.needs.includes("product-checks"));
+  const action = (await parseWorkflow(
+    "../actions/product-checks/action.yml",
+  )) as {
+    runs: { steps: typeof reusable.jobs.check.steps };
+  };
+  const gate = pipeline.jobs.changes.steps.find(
+    (step) => step.name === "Product checks",
+  );
+  assert.ok(gate);
+  assert.equal(gate.uses, "./.github/actions/product-checks");
+  assert.equal(gate.env?.GH_TOKEN, "");
+  assert.deepEqual(pipeline.jobs.web.needs, ["changes"]);
+  assert.equal(
+    reusable.jobs.check.steps.find((step) => step.name === "Product checks")
+      ?.uses,
+    gate.uses,
+  );
   const webAllowed = new Function(
     "needs",
     "github",
@@ -193,8 +217,7 @@ test("product browser gate uses the reusable exact-source workflow", async () =>
     assert.equal(
       webAllowed(
         {
-          changes: { result: "success", outputs: { changed: "true" } },
-          "product-checks": { result: status },
+          changes: { result: status, outputs: { changed: "true" } },
         },
         {
           repository: "disposabl-dev/create-disposabl-app",
@@ -210,12 +233,17 @@ test("product browser gate uses the reusable exact-source workflow", async () =>
     assert.ok(pipeline.jobs[name].needs.includes("web"));
   assert.equal(pipeline.jobs["android-submit"].needs, "android");
   assert.match(pipeline.jobs["android-submit"].if, /ANDROID_PLAY_SUBMIT/);
+  assert.match(
+    pipeline.jobs.web.steps.find((step) => step.name === "Fingerprint")?.env
+      ?.UPDATE_POLICY ?? "",
+    /disposabl-dev\/create-disposabl-app.*disabled/,
+  );
   const checkout = reusable.jobs.check.steps.find((step) =>
     step.uses?.startsWith("actions/checkout@"),
   );
   assert.equal(checkout?.with?.ref, "${{ inputs.source_sha }}");
   const runStep = (name: string) =>
-    reusable.jobs.check.steps.find((step) => step.name === name)?.run ?? "";
+    action.runs.steps.find((step) => step.name === name)?.run ?? "";
   assert.equal(
     runStep("Install frozen dependencies"),
     "bun install --frozen-lockfile",
@@ -232,7 +260,7 @@ test("product browser gate uses the reusable exact-source workflow", async () =>
   );
   assert.match(runStep("Run isolated product web and backend E2E"), /env -i/);
   assert.match(
-    gate.with.source_sha,
+    gate.with?.source_sha ?? "",
     /github\.event\.pull_request\.head\.sha \|\| github\.sha/,
   );
   assert.equal(gate.secrets, undefined);
@@ -282,7 +310,7 @@ spec.loader.exec_module(module)
   } finally {
     await rm(cacheFixture, { recursive: true, force: true });
   }
-  const steps = reusable.jobs.check.steps as Array<{
+  const steps = action.runs.steps as Array<{
     name?: string;
     run?: string;
   }>;
@@ -429,7 +457,15 @@ test("packaged starter and generated profiles exclude product proof fixtures", a
       const parsed = JSON.parse(yaml.stdout) as {
         jobs: Record<
           string,
-          { if?: string; needs?: string; steps?: { run?: string }[] }
+          {
+            if?: string;
+            needs?: string;
+            steps?: {
+              run?: string;
+              name?: string;
+              env?: Record<string, string>;
+            }[];
+          }
         >;
       };
       assert.equal(
@@ -440,6 +476,21 @@ test("packaged starter and generated profiles exclude product proof fixtures", a
       assert.match(
         parsed.jobs["android-submit"].if ?? "",
         /ANDROID_PLAY_SUBMIT == 'true'/,
+      );
+      assert.equal(
+        parsed.jobs.web.steps?.find((step) => step.name === "Fingerprint")?.env
+          ?.UPDATE_POLICY,
+        undefined,
+      );
+      const androidChecks = spawnSync(
+        process.execPath,
+        ["test", "./packages/tests/android-failure-workflow.test.ts"],
+        { cwd: root, encoding: "utf8" },
+      );
+      assert.equal(
+        androidChecks.status,
+        0,
+        `${root}: ${androidChecks.stdout}\n${androidChecks.stderr}`,
       );
       const mobileScript = await readFile(
         join(root, ".github/scripts/mobile.sh"),

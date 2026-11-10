@@ -26,6 +26,7 @@ if (
 const productReleaseFiles = [
   ".github/workflows/play-bundle.yml",
   ".github/workflows/product-checks.yml",
+  ".github/actions/product-checks",
   ".github/scripts/play-bundle.sh",
   ".github/scripts/play-bundle.test.py",
   ".github/scripts/android-release.test.py",
@@ -35,6 +36,7 @@ const productReleaseFiles = [
   ".github/scripts/product-browser-check-test.py",
   ".github/scripts/product-check-source.sh",
   ".github/scripts/product-check-source-test.py",
+  ".github/scripts/ci-graph.test.ts",
 ];
 
 // Product-only proof harnesses must not enter generated apps. Keep the same
@@ -285,7 +287,9 @@ const pipeline = Bun.YAML.parse(
   >;
 };
 if (
-  !pipeline.jobs["product-checks"] ||
+  !pipeline.jobs.changes?.steps?.some(
+    (step) => step.name === "Product checks",
+  ) ||
   !pipeline.jobs.android ||
   !pipeline.jobs["android-submit"] ||
   !pipeline.jobs.web?.outputs ||
@@ -297,7 +301,9 @@ if (
   )
 )
   throw new Error("Starter product release boundary changed.");
-delete pipeline.jobs["product-checks"];
+pipeline.jobs.changes.steps = pipeline.jobs.changes.steps?.filter(
+  (step) => step.name !== "Product checks",
+);
 pipeline.jobs.web.needs = "changes";
 pipeline.jobs.web.if = "needs.changes.outputs.changed == 'true'";
 pipeline.jobs.web.outputs.android_build =
