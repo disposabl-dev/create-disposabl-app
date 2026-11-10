@@ -508,6 +508,7 @@ test("packaged starter and generated profiles exclude product proof fixtures", a
       if (existsSync(join(root, "apps/mobile"))) {
         for (const helper of [
           "apps/mobile/scripts/android-release-verify.mjs",
+          "apps/mobile/scripts/production-analytics.mjs",
           "apps/mobile/scripts/verify-play-aab.mjs",
         ])
           assert.ok(existsSync(join(root, helper)), `Missing ${helper}`);
