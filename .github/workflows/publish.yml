@@ -24,63 +24,19 @@ env:
   DISPOSABL_CLI_TELEMETRY_REQUIRED: "1"
 
 jobs:
-  resolve:
-    if: github.repository == 'disposabl-dev/create-disposabl-app' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    outputs:
-      source_sha: ${{ steps.source.outputs.sha }}
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: ${{ github.sha }}
-          fetch-depth: 0
-          persist-credentials: false
-      - name: Resolve release source
-        id: source
-        env:
-          EVENT_SHA: ${{ github.sha }}
-          CLI_RECOVERY: ${{ inputs.cli_recovery_version }}
-          GENERATOR_RECOVERY: ${{ inputs.recovery_version }}
-        run: |
-          set -euo pipefail
-          [[ "$EVENT_SHA" =~ ^[0-9a-f]{40}$ && "$(git rev-parse HEAD)" == "$EVENT_SHA" ]] || { echo 'Invalid event source.'; exit 1; }
-          [[ -z "$CLI_RECOVERY" || -z "$GENERATOR_RECOVERY" ]] || { echo 'Select only one recovery.'; exit 1; }
-          version=${CLI_RECOVERY:-$GENERATOR_RECOVERY}
-          sha=$EVENT_SHA
-          if [[ -n "$version" ]]; then
-            [[ "$version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || { echo 'Invalid recovery version.'; exit 1; }
-            if [[ -n "$CLI_RECOVERY" ]]; then
-              tag="@disposabl/cli@${version}"
-              highest=$(git tag --merged "$EVENT_SHA" --list '@disposabl/cli@*' --sort=-version:refname | grep -E '^@disposabl/cli@(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$' | head -1)
-              [[ "$tag" == "$highest" ]] || { echo 'Recovery must use the highest reachable CLI release tag.'; exit 1; }
-            else
-              tag="v${version}"
-            fi
-            sha=$(git rev-parse --verify "refs/tags/${tag}^{commit}")
-            git merge-base --is-ancestor "$sha" "$EVENT_SHA"
-            # Historical recovery is supported only with the current isolation harness.
-            for path in .github/scripts/product-browser-check.py .github/scripts/product-browser-check-test.py packages/tests/helpers/sdk-auth/run.py packages/tests/helpers/sdk-auth/selected_auth.py; do
-              current=$(git rev-parse --verify "${EVENT_SHA}:${path}")
-              candidate=$(git rev-parse --verify "${sha}:${path}" 2>/dev/null) || { echo "Recovery unsupported: missing current browser harness (${path})."; exit 1; }
-              [[ "$current" == "$candidate" ]] || { echo "Recovery unsupported: browser harness differs (${path})."; exit 1; }
-            done
-          fi
-          echo "sha=$sha" >> "$GITHUB_OUTPUT"
-
   checks:
-    needs: resolve
-    if: needs.resolve.result == 'success'
+    if: github.repository == 'disposabl-dev/create-disposabl-app' && github.ref == 'refs/heads/main'
     uses: ./.github/workflows/product-checks.yml
     permissions:
       contents: read
     with:
-      source_sha: ${{ needs.resolve.outputs.source_sha }}
+      source_sha: ${{ github.sha }}
+      cli_recovery_version: ${{ inputs.cli_recovery_version || '' }}
+      recovery_version: ${{ inputs.recovery_version || '' }}
 
   cli:
-    needs: [resolve, checks]
-    if: needs.resolve.result == 'success' && needs.checks.result == 'success' && github.repository == 'disposabl-dev/create-disposabl-app' && github.ref == 'refs/heads/main' && (inputs.recovery_version == '' || inputs.cli_recovery_version != '')
+    needs: [checks]
+    if: needs.checks.result == 'success' && github.repository == 'disposabl-dev/create-disposabl-app' && github.ref == 'refs/heads/main' && (inputs.recovery_version == '' || inputs.cli_recovery_version != '')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -101,7 +57,7 @@ jobs:
       - name: Verify workflow source
         env:
           EVENT_SHA: ${{ github.sha }}
-          RESOLVED_SHA: ${{ needs.resolve.outputs.source_sha }}
+          RESOLVED_SHA: ${{ needs.checks.outputs.source_sha }}
           RECOVERY: ${{ inputs.cli_recovery_version }}
         run: |
           set -euo pipefail
@@ -115,7 +71,7 @@ jobs:
         env:
           VERSION: ${{ inputs.cli_recovery_version }}
           GENERATOR_RECOVERY: ${{ inputs.recovery_version }}
-          RESOLVED_SHA: ${{ needs.resolve.outputs.source_sha }}
+          RESOLVED_SHA: ${{ needs.checks.outputs.source_sha }}
         run: |
           set -euo pipefail
           [[ -z "$GENERATOR_RECOVERY" ]] || { echo 'Select only one recovery.'; exit 1; }
@@ -263,8 +219,8 @@ jobs:
           fi
 
   publish:
-    needs: [resolve, checks, cli]
-    if: always() && !cancelled() && needs.resolve.result == 'success' && needs.checks.result == 'success' && github.repository == 'disposabl-dev/create-disposabl-app' && github.ref == 'refs/heads/main' && inputs.cli_recovery_version == '' && (inputs.recovery_version != '' || needs.cli.result == 'success')
+    needs: [checks, cli]
+    if: always() && !cancelled() && needs.checks.result == 'success' && github.repository == 'disposabl-dev/create-disposabl-app' && github.ref == 'refs/heads/main' && inputs.cli_recovery_version == '' && (inputs.recovery_version != '' || needs.cli.result == 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     defaults:
@@ -285,7 +241,7 @@ jobs:
       - name: Verify workflow source
         env:
           EVENT_SHA: ${{ github.sha }}
-          RESOLVED_SHA: ${{ needs.resolve.outputs.source_sha }}
+          RESOLVED_SHA: ${{ needs.checks.outputs.source_sha }}
           RECOVERY: ${{ inputs.recovery_version }}
         run: |
           set -euo pipefail
@@ -304,7 +260,7 @@ jobs:
         if: inputs.recovery_version != ''
         env:
           VERSION: ${{ inputs.recovery_version }}
-          RESOLVED_SHA: ${{ needs.resolve.outputs.source_sha }}
+          RESOLVED_SHA: ${{ needs.checks.outputs.source_sha }}
         run: |
           set -euo pipefail
           git rev-parse --verify "refs/tags/v${VERSION}^{commit}" >/dev/null
