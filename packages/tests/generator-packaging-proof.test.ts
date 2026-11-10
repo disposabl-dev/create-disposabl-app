@@ -307,7 +307,6 @@ const template = resolve(
 test("packaged starter and generated profiles exclude product proof fixtures", async () => {
   const temp = await mkdtemp(join(tmpdir(), "disposabl-packaging-proof-"));
   try {
-    const roots = [template];
     const input = join(temp, "template");
     await cp(template, input, { recursive: true });
     const readmePath = join(input, "packages/tests/README.md");
@@ -317,80 +316,99 @@ test("packaged starter and generated profiles exclude product proof fixtures", a
       readmePath,
       (await readFile(readmePath, "utf8")) + customDocs,
     );
-    for (const [name, platforms, features] of [
-      ["web-minimal", "web", "none"],
-      ["web-payments", "web", "authentication,payments"],
-      ["mobile-enabled", "web,android,ios", "authentication,payments"],
-      ["mobile-minimal", "web,android,ios", "none"],
-      [
-        "all-platforms",
-        "web,android,ios,macos,windows,linux,api,mcp,cli,typescript-sdk",
-        "authentication,payments,analytics,docs",
-      ],
-    ]) {
-      const destination = join(temp, name);
-      await createApp(input, destination, name, {
-        version: "test",
-        platforms: selectPlatforms(platforms),
-        features: selectFeatures(features),
-      });
-      roots.push(destination);
-      const module = join(
-        destination,
-        "apps/mobile/modules/storefront-observer",
-      );
-      const mobile = platforms.includes("ios") || platforms.includes("android");
-      assert.equal(
-        existsSync(module),
-        mobile,
-        `${name}: native module selection`,
-      );
-      for (const path of [
-        "packages/tests/mobile-storefront-observer.test.ts",
-        "packages/tests/components/mobile-storefront-observer.test.mjs",
+    async function* profiles() {
+      yield template;
+      for (const [name, platforms, features] of [
+        ["web-minimal", "web", "none"],
+        ["web-payments", "web", "authentication,payments"],
+        ["mobile-enabled", "web,android,ios", "authentication,payments"],
+        ["mobile-minimal", "web,android,ios", "none"],
+        [
+          "all-platforms",
+          "web,android,ios,macos,windows,linux,api,mcp,cli,typescript-sdk",
+          "authentication,payments,analytics,docs",
+        ],
       ]) {
-        assert.equal(
-          existsSync(join(destination, path)),
-          mobile && features.includes("payments"),
-          `${name}: ${path} must match mobile payments selection`,
+        const destination = join(temp, name);
+        await createApp(input, destination, name, {
+          version: "test",
+          platforms: selectPlatforms(platforms),
+          features: selectFeatures(features),
+        });
+        const module = join(
+          destination,
+          "apps/mobile/modules/storefront-observer",
         );
-      }
-      for (const path of [
-        "packages/tests/helpers/mobile-simulator/preflight.py",
-        "packages/tests/helpers/mobile-simulator/test_preflight.py",
-        "packages/tests/mobile-simulator-preflight.test.ts",
-      ]) {
+        const mobile =
+          platforms.includes("ios") || platforms.includes("android");
         assert.equal(
-          existsSync(join(destination, path)),
+          existsSync(module),
+          mobile,
+          `${name}: native module selection`,
+        );
+        for (const path of [
+          "packages/tests/mobile-storefront-observer.test.ts",
+          "packages/tests/components/mobile-storefront-observer.test.mjs",
+        ]) {
+          assert.equal(
+            existsSync(join(destination, path)),
+            mobile && features.includes("payments"),
+            `${name}: ${path} must match mobile payments selection`,
+          );
+        }
+        for (const path of [
+          "packages/tests/helpers/mobile-simulator/preflight.py",
+          "packages/tests/helpers/mobile-simulator/test_preflight.py",
+          "packages/tests/mobile-simulator-preflight.test.ts",
+        ]) {
+          assert.equal(
+            existsSync(join(destination, path)),
+            platforms.includes("ios") || platforms.includes("android"),
+            `${name}: ${path} must match mobile selection`,
+          );
+        }
+        const readme = await readFile(
+          join(destination, "packages/tests/README.md"),
+          "utf8",
+        );
+        assert.match(
+          readme,
+          /Unrelated user documentation\.\s+#### Custom checks\s+Keep these instructions\./,
+          `${name}: preserve unrelated README content`,
+        );
+        assert.equal(
+          readme.includes("### Isolated iOS simulator acceptance preflight"),
           platforms.includes("ios") || platforms.includes("android"),
-          `${name}: ${path} must match mobile selection`,
         );
-      }
-      const readme = await readFile(
-        join(destination, "packages/tests/README.md"),
-        "utf8",
-      );
-      assert.match(
-        readme,
-        /Unrelated user documentation\.\s+#### Custom checks\s+Keep these instructions\./,
-        `${name}: preserve unrelated README content`,
-      );
-      assert.equal(
-        readme.includes("### Isolated iOS simulator acceptance preflight"),
-        platforms.includes("ios") || platforms.includes("android"),
-      );
-      for (const path of [
-        "packages/tests/consent-identity.test.ts",
-        "packages/tests/components/consent-identity.test.mjs",
-      ]) {
-        assert.equal(
-          existsSync(join(destination, path)),
-          features !== "none",
-          `${name}: ${path} must match authentication selection`,
-        );
+        for (const path of [
+          "packages/tests/consent-identity.test.ts",
+          "packages/tests/components/consent-identity.test.mjs",
+        ]) {
+          assert.equal(
+            existsSync(join(destination, path)),
+            features !== "none",
+            `${name}: ${path} must match authentication selection`,
+          );
+        }
+        // Validate and release each owned profile before making the next one.
+        // Keep the mobile reconfiguration assertion on the same profile.
+        yield destination;
+        if (name === "mobile-enabled") {
+          const reconfigured = destination;
+          await reconfigureApp(input, reconfigured, "test", {
+            features: "authentication",
+          });
+          for (const path of [
+            "packages/tests/mobile-storefront-observer.test.ts",
+            "packages/tests/components/mobile-storefront-observer.test.mjs",
+          ]) {
+            assert.equal(existsSync(join(reconfigured, path)), false, path);
+          }
+        }
+        await rm(destination, { recursive: true, force: true });
       }
     }
-    for (const root of roots) {
+    for await (const root of profiles()) {
       const workflow = await readFile(
         join(root, ".github/workflows/pipeline.yml"),
         "utf8",
@@ -659,16 +677,6 @@ test("packaged starter and generated profiles exclude product proof fixtures", a
         "packages/tests/flows/mobile.e2e.ts",
       ])
         assert.equal(existsSync(join(root, path)), true, `${root}: ${path}`);
-    }
-    const reconfigured = join(temp, "mobile-enabled");
-    await reconfigureApp(input, reconfigured, "test", {
-      features: "authentication",
-    });
-    for (const path of [
-      "packages/tests/mobile-storefront-observer.test.ts",
-      "packages/tests/components/mobile-storefront-observer.test.mjs",
-    ]) {
-      assert.equal(existsSync(join(reconfigured, path)), false, path);
     }
   } finally {
     await rm(temp, { recursive: true, force: true });
