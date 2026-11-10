@@ -30,6 +30,75 @@ async function call(name: string, args: object, query = false) {
   return result.value;
 }
 
+async function activate(sessionId: string) {
+  const token = randomUUID();
+  assert.equal(await call("claimActivation", { sessionId, token }), "claimed");
+  assert.equal(await call("completeActivation", { sessionId, token }), true);
+}
+
+test(
+  "activation requires confirmed funding and its matching lease before access",
+  { skip: !url },
+  async () => {
+    for (const outcome of ["denied", "unknown", "confirmed"] as const) {
+      const userId = await call("seedUser", {});
+      const sessionId = await call("admit", { userId });
+      await call("app", { userId, sessionId, threadId: randomUUID() });
+      const args = { sessionId, token: randomUUID() };
+      assert.equal(await call("claimActivation", args), "blocked");
+      const debit = await call("claim", { sessionId });
+      assert.equal(await call("claimActivation", args), "blocked");
+      assert.equal(await call("completeActivation", args), false);
+      await call("settleDebit", { debitId: debit._id, outcome });
+      assert.equal(
+        await call("allowed", { sessionId, userId, now: Date.now() }, true),
+        false,
+      );
+      assert.equal(
+        await call("claimActivation", args),
+        outcome === "confirmed" ? "claimed" : "blocked",
+      );
+      if (outcome === "confirmed") {
+        assert.equal(
+          await call("completeActivation", { ...args, token: "wrong" }),
+          false,
+        );
+        assert.equal(
+          await call("allowed", { sessionId, userId, now: Date.now() }, true),
+          false,
+        );
+      }
+      assert.equal(
+        await call("completeActivation", args),
+        outcome === "confirmed",
+      );
+      assert.equal(
+        await call("allowed", { sessionId, userId, now: Date.now() }, true),
+        outcome === "confirmed",
+      );
+      assert.equal((await call("debits", { sessionId }, true)).length, 1);
+    }
+  },
+);
+
+test(
+  "a stale stop cannot acquire a lease after a newer user session exists",
+  { skip: !url },
+  async () => {
+    const userId = await call("seedUser", {});
+    const sessionId = await call("admit", { userId });
+    await call("beginStop", { sessionId });
+    const replacement = await call("seedNewerSession", { userId });
+    const before = await call("get", { sessionId: replacement }, true);
+    assert.equal(await call("stop", { sessionId, token: "stale-stop" }), false);
+    assert.equal((await call("get", { sessionId }, true)).stopLease, undefined);
+    assert.deepEqual(
+      await call("get", { sessionId: replacement }, true),
+      before,
+    );
+  },
+);
+
 test(
   "newly unconfirmed work fences already admitted sessions without affecting other owners",
   { skip: !url },
@@ -81,6 +150,7 @@ test(
       debitId: otherDebit._id,
       outcome: "confirmed",
     });
+    await activate(otherSession);
     assert.equal(
       await call(
         "allowed",
@@ -102,6 +172,7 @@ test(
       debitId: activeDebit._id,
       outcome: "confirmed",
     });
+    await activate(active);
     const anotherApp = await call("app", {
       userId: activeUser,
       sessionId: active,
@@ -324,6 +395,7 @@ test(
     const first = claims.filter(Boolean);
     assert.equal(first.length, 1);
     await call("settleDebit", { debitId: first[0]._id, outcome: "confirmed" });
+    await activate(sessionId);
     const paidUntil = (await call("get", { sessionId }, true)).paidUntil;
     assert.equal(
       await call("allowed", { sessionId, userId, now: paidUntil }, true),
@@ -652,6 +724,7 @@ test(
     const app = await call("queuedApp", { userId, sessionId });
     const first = await call("claim", { sessionId });
     await call("settleDebit", { debitId: first._id, outcome: "confirmed" });
+    await activate(sessionId);
     await call("expireFundedWindow", { sessionId });
     const late = await call("claim", { sessionId, expectedDebit: first._id });
     assert.equal(late.paidUntil, 0);
@@ -743,6 +816,7 @@ test(
     await call("app", { userId, sessionId, threadId: randomUUID() });
     const first = await call("claim", { sessionId });
     await call("settleDebit", { debitId: first._id, outcome: "confirmed" });
+    await activate(sessionId);
     await call("expireFundedWindow", { sessionId });
     const claims = await Promise.all(
       Array.from({ length: 8 }, () =>
@@ -784,6 +858,7 @@ test(
       await call("app", { userId, sessionId, threadId: randomUUID() });
       const first = await call("claim", { sessionId });
       await call("settleDebit", { debitId: first._id, outcome: "confirmed" });
+      await activate(sessionId);
       await call("expireFundedWindow", { sessionId });
       const renewal = await call("claim", {
         sessionId,
