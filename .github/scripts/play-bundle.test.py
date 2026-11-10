@@ -19,22 +19,34 @@ for command in ['verify-source', 'verify-submission-source']:
 print('source succession PASS')
 workflow=(root/'.github/workflows/pipeline.yml').read_text()
 assert not (root/'.github/workflows/play-bundle.yml').exists()
-assert workflow.count("needs.changes.outputs.android == 'true' && !(github.event_name == 'push' && github.repository == 'disposabl-dev/create-disposabl-app')") == 3
-assert "needs.web.outputs.android_build == 'true' && !(github.event_name == 'push' && github.repository == 'disposabl-dev/create-disposabl-app')" in workflow
-job=workflow.split('  android-play:',1)[1].split('  android-failure:',1)[0]
-assert "needs: [changes, web]" in job and "github.event_name == 'push' && github.repository == 'disposabl-dev/create-disposabl-app'" in job
-assert 'EXPO_PUBLIC_DISPOSABL_ANALYTICS_ENABLED: "true"' in job and 'UPDATE_POLICY: disabled' in job
-assert 'PLAY_UPLOAD_CERT_SHA1: "B5:8D:03:56:8C:BC:03:62:D4:A8:7A:0E:63:EC:83:C9:55:B0:29:A7"' in job
-assert 'eas-cli@27.2.0 submit --platform android --profile production --path' in job
-assert '$((1000 + 100 * GITHUB_RUN_NUMBER + GITHUB_RUN_ATTEMPT))' in job
-allocation=textwrap.dedent(job.split('      - name: Build signed production bundle',1)[1].split('        run: |\n',1)[1].split('          bash .github/scripts/play-bundle.sh build',1)[0])
+assert '  android-play:\n' not in workflow and 'DISPOSABL_ANDROID_PLAY_ENABLED' not in workflow
+assert "if: needs.web.outputs.android_build == 'true'" in workflow
+assert "UPDATE_POLICY: ${{ github.event_name == 'push' && github.repository == 'disposabl-dev/create-disposabl-app' && 'disabled' || '' }}" in workflow
+build=workflow.split('  android:',1)[1].split('  android-submit:',1)[0]
+job=workflow.split('  android-submit:',1)[1].split('  android-failure:',1)[0]
+assert build.count('android-build') == 1 and "vars.ANDROID_PLAY_SUBMIT == 'true'" in job
+assert 'verify-submission-source' in job and 'com.yastai.disposabl' in job
+assert 'B5:8D:03:56:8C:BC:03:62:D4:A8:7A:0E:63:EC:83:C9:55:B0:29:A7' in job
+assert '- *artifacts' in build and job.index('download-artifact') < job.index('Verify product Play identity') < job.index('Submit Android bundle')
+version_step=workflow.split('      - name: Allocate product Android version',1)[1].split('      - name: Expo',1)[0]
+allocation=textwrap.dedent(version_step.split('        run: |\n',1)[1]).replace('echo "DISPOSABL_ANDROID_VERSION_CODE=$version" >> "$GITHUB_ENV"', 'export DISPOSABL_ANDROID_VERSION_CODE=$version').replace('echo "version=$version" >> "$GITHUB_OUTPUT"', '')
 for number,attempt,expected in [('1','1',1101),('1','2',1102),('2','1',1201),('20999989','99',2099999999),('20999990','1',None),('1','100',None)]:
  r=subprocess.run(['/bin/bash','-c',allocation+'\nprintf "allocated=%s" "$DISPOSABL_ANDROID_VERSION_CODE"'],env={**e,'GITHUB_RUN_NUMBER':number,'GITHUB_RUN_ATTEMPT':attempt},capture_output=True,text=True)
  assert (r.returncode==0)==(expected is not None),(number,attempt,r.stderr)
  if expected is not None: assert f'allocated={expected}' in r.stdout
 print('version attempts PASS')
-assert 'actions/upload-artifact' not in job and 'eas-cli@27.2.0 build' not in job
+config_script='const c=require("./apps/mobile/app.config.js")({config:{updates:{url:"https://old",requestHeaders:{old:"value"}}}}); console.log(JSON.stringify(c))'
+for policy in ['disabled', '']:
+ result=subprocess.run(['node','-e',config_script],cwd=root,env={**os.environ,'EXPO_PROJECT_ID':'project-id','DISPOSABL_MOBILE_CHANNEL':'production','UPDATE_POLICY':policy},capture_output=True,text=True,check=True)
+ config=json.loads(result.stdout)
+ assert config['android']['runtimeVersion']=={'policy':'fingerprint'}
+ if policy == 'disabled':
+  assert config['updates']['enabled'] is False and 'url' not in config['updates'] and 'requestHeaders' not in config['updates']
+ else:
+  assert config['updates']['url']=='https://u.expo.dev/project-id' and config['updates']['requestHeaders']['expo-channel-name']=='production'
+print('update policy PASS')
+assert 'eas-cli@27.2.0 build' not in job
 profile=json.loads((root/'apps/mobile/eas.json').read_text())['submit']['production']['android']
-assert profile == {'track':'production','releaseStatus':'completed','applicationId':'com.yastai.disposabl'}
+assert profile == {'track':'production','releaseStatus':'completed'}
 print('workflow/profile PASS')
 print('fixture',tmp)

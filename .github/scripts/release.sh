@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/release-source.sh"
 case "${1:?operation required}" in
   package-release)
 [[ -f "packages/$PACKAGE/package.json" ]] || exit 0
@@ -46,8 +47,7 @@ echo "PR=$pr" >> "$GITHUB_ENV"
     ;;
   release-publish)
 check_source() {
-  if [[ "$CHANNEL" == production ]]; then test "$(gh api "repos/$GH_REPO/git/ref/heads/main" --jq .object.sha)" = "$SOURCE"
-  else test "$(gh api "repos/$GH_REPO/pulls/$PR" --jq 'if .state == "open" then .head.sha else "closed" end')" = "$SOURCE"; fi
+  verify_release_source "$platform" publish
 }
 # Desktop installers publish only from main. Android retains PR previews.
 for platform in android linux windows macos; do
@@ -70,7 +70,7 @@ for platform in android linux windows macos; do
       const wanted = JSON.parse(readFileSync(process.env.ANDROID_MANIFEST, "utf8"));
       const release = JSON.parse(readFileSync(`${process.env.RUNNER_TEMP}/android-source.json`, "utf8"));
       const prior = JSON.parse(/<!-- android (\{[^\n]+\}) -->/.exec(release.body || "")?.[1] || "null");
-      const fields = ["channel", "projectId", "applicationId", "runtimeVersion", "sha256"];
+      const fields = ["channel", "projectId", "applicationId", "runtimeVersion", "signing", "signingId", "sha256"];
       if (release.draft !== false || !prior || wanted.channel !== process.env.CHANNEL
         || !/^[a-f0-9]{40,64}$/.test(wanted.runtimeVersion || "") || !/^[a-f0-9]{64}$/.test(wanted.sha256 || "")
         || !fields.every(k => typeof wanted[k] === "string" && wanted[k].trim() && prior[k] === wanted[k])
@@ -111,12 +111,16 @@ for platform in android linux windows macos; do
 done
     ;;
   verify-artifacts)
-check_source() { test "$(gh api "repos/$GH_REPO/$SOURCE_PATH" --jq 'if has("head") then (if .state == "open" then .head.sha else "closed" end) else .object.sha end')" = "$SOURCE"; }
+check_source() { verify_release_source "$PLATFORM"; }
 check_source
 for file in dist/release/*; do test -f "$file"; test -s "$file"; done
 case "$PLATFORM" in
   android)
     test -s dist/release/android.json
+    if jq -e '.action == "build" and .signing == "release" and .channel == "production"' dist/release/android.json >/dev/null; then
+      test -s dist/release/android.aab
+      printf '%s  %s\n' "$(jq -er '.aabSha256 | select(test("^[a-f0-9]{64}$"))' dist/release/android.json)" dist/release/android.aab | sha256sum -c -
+    fi
     if [[ ! -s dist/release/android.apk ]]; then
       jq -e '(.action == "update") and (.sourceTag | type == "string" and length > 0)' dist/release/android.json > /dev/null
     fi

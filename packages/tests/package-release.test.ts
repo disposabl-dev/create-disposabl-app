@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import {
   copyFileSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -26,10 +27,11 @@ function release(options: {
       join(directory, "packages/sdk/package.json"),
       JSON.stringify({ name: "@fixture/sdk", version: "1.0.0-development" }),
     );
-    copyFileSync(
-      new URL("../../.github/scripts/release.sh", import.meta.url),
-      join(directory, "release.sh"),
-    );
+    for (const file of ["release.sh", "release-source.sh"])
+      copyFileSync(
+        new URL(`../../.github/scripts/${file}`, import.meta.url),
+        join(directory, file),
+      );
     const executable = (name: string, body: string) =>
       writeFileSync(join(bin, name), `#!/bin/bash\nset -eu\n${body}\n`, {
         mode: 0o755,
@@ -73,7 +75,12 @@ fi`,
         FAIL_RELEASE: String(options.failure ?? false),
       },
     });
-    return { ...result, calls: readFileSync(join(directory, "calls"), "utf8") };
+    const calls = join(directory, "calls");
+    assert.ok(
+      existsSync(calls),
+      result.stderr || "Release script did not start",
+    );
+    return { ...result, calls: readFileSync(calls, "utf8") };
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

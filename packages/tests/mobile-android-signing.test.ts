@@ -43,10 +43,28 @@ test("preview keeps Expo signing and plugin application is idempotent", async ()
   const result = await generate("android {}", true);
   assert.match(
     result,
-    /if \(System\.getenv\("DISPOSABL_ANDROID_CHANNEL"\) == "production"\)/,
+    /if \(System\.getenv\("DISPOSABL_ANDROID_CHANNEL"\) == "production" && System\.getenv\("ANDROID_KEYSTORE_PATH"\)\)/,
   );
   assert.equal(
     result.split("// Disposabl production APK signing.").length - 1,
     1,
+  );
+});
+
+test("prebuild migrates the old signing block without deleting later custom content", async () => {
+  const current = await generate();
+  const legacy = current.replace(
+    ' && System.getenv("ANDROID_KEYSTORE_PATH")',
+    "",
+  );
+  assert.equal(
+    await generate(`${legacy}\n// retained customization`),
+    `${current}\n// retained customization`,
+  );
+  await assert.rejects(
+    generate(
+      legacy.replace("Production Android signing inputs", "Custom inputs"),
+    ),
+    /manual migration/,
   );
 });

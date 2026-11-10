@@ -7,8 +7,7 @@
     "production": {
       "android": {
         "track": "production",
-        "releaseStatus": "completed",
-        "applicationId": "com.yastai.disposabl"
+        "releaseStatus": "completed"
       }
     }
   },

@@ -27,6 +27,8 @@ function publish(
     const channel = options.production ? "production" : "pr-1";
     const sourceTag = `app-${channel}-android${options.production ? "-8-1" : ""}`;
     const manifest = {
+      signing: "fallback",
+      signingId: "fallback",
       channel,
       projectId: "project",
       applicationId: "app.fixture",

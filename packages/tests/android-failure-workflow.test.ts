@@ -36,6 +36,37 @@ test("Android uses its selected runner while allowing native build and cache fin
   );
 });
 
+test("product and generated apps share one artifact build and gate submission", () => {
+  const job = workflow.jobs.android;
+  assert.equal(job.if, "needs.web.outputs.android_build == 'true'");
+  assert.equal(workflow.jobs["android-play"], undefined);
+  assert.equal(
+    job.steps.filter((step: { run?: string }) =>
+      step.run?.includes("android-build"),
+    ).length,
+    1,
+  );
+  const submit = workflow.jobs["android-submit"];
+  assert.equal(submit.needs, "android");
+  assert.equal(
+    submit.if,
+    "github.event_name == 'push' && vars.ANDROID_PLAY_SUBMIT == 'true' && needs.android.result == 'success'",
+  );
+  assert.ok(
+    submit.steps.some(
+      (step: { uses?: string }) => step.uses === "actions/download-artifact@v4",
+    ),
+  );
+  const fingerprint = workflow.jobs.web.steps.find(
+    (step: { name?: string }) => step.name === "Fingerprint",
+  );
+  assert.equal(fingerprint.if, "needs.changes.outputs.android == 'true'");
+  assert.match(
+    fingerprint.env.UPDATE_POLICY,
+    /disposabl-dev\/create-disposabl-app.*disabled/,
+  );
+});
+
 test("Android failure reporting handles failed and cancelled builds independently", () => {
   const job = workflow.jobs["android-failure"];
   const hasPlayJob = !!workflow.jobs["android-play"];

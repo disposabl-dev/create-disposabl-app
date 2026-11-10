@@ -162,13 +162,16 @@ module.exports = ({ config }) => {
       // Start from the newest cached bundle while downloading for the next launch.
       checkAutomatically: "ON_LOAD",
       fallbackToCacheTimeout: 0,
-      ...(projectId
+      ...(projectId && process.env.UPDATE_POLICY !== "disabled"
         ? {
             url: `https://u.expo.dev/${projectId}`,
             requestHeaders: { "expo-channel-name": channel },
           }
         : {}),
-      ...(process.env.EXPO_PUBLIC_E2E === "true" ? { enabled: false } : {}),
+      ...(process.env.EXPO_PUBLIC_E2E === "true" ||
+      process.env.UPDATE_POLICY === "disabled"
+        ? { enabled: false, url: undefined, requestHeaders: undefined }
+        : {}),
     },
   };
 };
