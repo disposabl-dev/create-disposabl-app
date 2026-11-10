@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Exercise registered public admission on a fresh, owned local backend."""
-import hashlib, importlib.util, json, os, pathlib, secrets, shutil, socket, subprocess, sys, tempfile, time, urllib.request, uuid
+import hashlib, importlib.util, json, os, pathlib, secrets, shutil, signal, socket, subprocess, sys, tempfile, threading, time, urllib.request, uuid
 from contextlib import ExitStack
 ROOT = pathlib.Path(__file__).resolve().parents[4]
 DEPS = pathlib.Path(os.environ.get("PUBLIC_ADMISSION_DEPS", ""))
@@ -9,13 +9,33 @@ BASE = "http://127.0.0.1:3480"
 SHA = os.environ.get("PUBLIC_ADMISSION_SOURCE_REVISION", "")
 PROFILE = '(version 1)(allow default)(deny network-outbound)(allow network-outbound (remote ip "localhost:*"))(allow network-outbound (remote unix-socket))'
 AUTH_SHA = "e4cb80861b88a1a8f8514df7e84628d8397f05592bf5e755f9afa1737cbcf6c8"
+ARTIFACT = None
 def load(path):
     s = importlib.util.spec_from_file_location("helper", path); m = importlib.util.module_from_spec(s); s.loader.exec_module(m); return m
 def guarded():
     runner=load(ROOT/"packages/tests/fixtures/billing-handoff-browser/run.py")
+    stopped = threading.Event()
+    def check_output():
+        while not stopped.wait(.25):
+            if ARTIFACT is None: continue
+            total = 0
+            for directory, _, files in os.walk(ARTIFACT):
+                for name in files:
+                    try: total += os.lstat(os.path.join(directory, name)).st_size
+                    except FileNotFoundError: pass
+            if total >= 140 * 1024**2:
+                print("Output reached 140 MiB; stopping owned fixture", flush=True)
+                os.kill(os.getpid(), signal.SIGTERM)
+                return
+    watcher = threading.Thread(target=check_output, daemon=True)
     try:
-        with runner.disk_guard(): run(runner)
+        runner.MIN_FREE = int(2.6 * 1024**3)
+        with runner.disk_guard():
+            watcher.start()
+            run(runner)
     finally:
+        stopped.set()
+        if watcher.is_alive(): watcher.join()
         shutil.rmtree(os.environ["HOME"])
 
 def run(runner):
@@ -34,7 +54,9 @@ def run(runner):
     if subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip() != SHA: raise RuntimeError("wrong source")
     auth=load(ROOT/"packages/tests/helpers/sdk-auth/selected_auth.py").verify_selected_auth(ROOT, DEPS/"@convex-dev/auth")
     if auth["files"] != 1333 or auth["sha256"] != AUTH_SHA: raise RuntimeError("auth mismatch")
+    global ARTIFACT
     work=pathlib.Path(tempfile.mkdtemp(prefix="public-admission-",dir="/tmp")); work.chmod(0o700)
+    ARTIFACT = work
     provenance = {"source": SHA, "backend": str(BINARY.resolve()),
                   "backend_sha256": hashlib.sha256(BINARY.read_bytes()).hexdigest(),
                   "lockfile_sha256": hashlib.sha256((ROOT / "bun.lock").read_bytes()).hexdigest(),
@@ -92,6 +114,8 @@ def run(runner):
         result=call(kind,path,args,authkey)
         if result.get("status") != "success": raise RuntimeError(path+" failed: "+str(result.get("errorMessage")))
         return result["value"]
+    if shutil.disk_usage("/tmp").free < int(3.25 * 1024**3):
+        raise RuntimeError("Less than 3.25 GiB free before backend start")
     with ExitStack() as stack:
         log=stack.enter_context((work/"backend.log").open("w"))
         proc=stack.enter_context(owner.owned_backend([str(BINARY),"--interface","127.0.0.1","--port","3480","--site-proxy-port","3481","--instance-name",name,"--instance-secret",secret,"--disable-beacon","--local-storage",str(work/"storage"),str(work/"db.sqlite3")],env=env,stdout=log,stderr=subprocess.STDOUT))
@@ -119,6 +143,34 @@ def run(runner):
         args={"userId":user,"appId":appId,"threadId":fixture["threadId"]}
         before=value("function","publicAdmissionFixture:snapshot",args,"Convex "+key)
         assert len(before["messages"])==0 and len(before["sessions"])==0 and before["calls"]==0
+        def signup_user():
+            result=value("mutation","auth:signUpWithUsernamePassword",{"username":"fixture"+secrets.token_hex(8),"password":"Fixture-"+secrets.token_hex(16)+"!"})
+            authorization="Bearer "+result["tokens"]["accessToken"]
+            return value("query","users/index:current",{},authorization)["id"], authorization
+        other, other_bearer = signup_user()
+        other_args={"userId":other,"appId":appId,"threadId":fixture["threadId"]}
+        other_before=value("function","publicAdmissionFixture:snapshot",other_args,"Convex "+key)
+        result=call("action","agent/index:sendMessageChecked",{"appId":appId,"prompt":"cross-owner"},other_bearer)
+        assert result.get("status")=="error" and "App not found." in json.dumps(result)
+        assert value("function","publicAdmissionFixture:snapshot",args,"Convex "+key)==before
+        assert value("function","publicAdmissionFixture:snapshot",other_args,"Convex "+key)==other_before
+        assert before["calls"]==0 and before["sessions"]==[] and before["debits"]==[] and before["messages"]==[]
+        assert other_before["sessions"]==[] and other_before["debits"]==[]
+        print("PASS cross-user public action denied at ownership before billing; owner and caller state unchanged",flush=True)
+
+        deleting, deleting_bearer = signup_user()
+        deleting_app=str(uuid.uuid4())
+        deleting_fixture=value("function","publicAdmissionFixture:setupApp",{"userId":deleting,"appId":deleting_app},"Convex "+key)
+        deleting_args={"userId":deleting,"appId":deleting_app,"threadId":deleting_fixture["threadId"]}
+        value("function","publicAdmissionFixture:markDeleting",{"userId":deleting},"Convex "+key)
+        deleting_before=value("function","publicAdmissionFixture:snapshot",deleting_args,"Convex "+key)
+        result=call("action","agent/index:sendMessageChecked",{"appId":deleting_app,"prompt":"deleting owner"},deleting_bearer)
+        assert result.get("status")=="error" and "Sign in to use the agent." in json.dumps(result)
+        assert value("function","publicAdmissionFixture:snapshot",deleting_args,"Convex "+key)==deleting_before
+        assert value("function","publicAdmissionFixture:snapshot",args,"Convex "+key)==before
+        assert deleting_before["calls"]==0 and deleting_before["sessions"]==[] and deleting_before["debits"]==[] and deleting_before["messages"]==[]
+        print("PASS deleting account public action denied as signed out before billing; owner state unchanged",flush=True)
+
         for i,mode in enumerate(("low","unknown","error"),1):
             value("function","publicAdmissionFixture:mode",{"mode":mode},"Convex "+key)
             result=call("action","agent/index:sendMessageChecked",{"appId":appId,"prompt":"fixture admission"},bearer)
