@@ -106,11 +106,12 @@ class WorkflowTests(unittest.TestCase):
         self.assertIn("  workflow_dispatch:", publish)
         self.assertNotIn("needs.resolve", publish)
         self.assertIn("needs: [checks]", publish)
-        self.assertIn("needs: [checks, cli]", publish)
-        cli_if = "needs.checks.result == 'success' && github.repository == 'disposabl-dev/create-disposabl-app' && github.ref == 'refs/heads/main' && (inputs.recovery_version == '' || inputs.cli_recovery_version != '')"
-        gen_if = "always() && !cancelled() && needs.checks.result == 'success' && github.repository == 'disposabl-dev/create-disposabl-app' && github.ref == 'refs/heads/main' && inputs.cli_recovery_version == '' && (inputs.recovery_version != '' || needs.cli.result == 'success')"
-        self.assertIn("    if: " + cli_if, publish)
-        self.assertIn("    if: " + gen_if, publish)
+        self.assertNotIn("needs: [checks, cli]", publish)
+        self.assertIn("if: always() && !cancelled() && needs.checks.result == 'success'", publish)
+        self.assertIn("id: cli-checkout", publish)
+        self.assertIn("id: generator-checkout", publish)
+        self.assertIn("path: cli-source", publish)
+        self.assertIn("path: generator-source", publish)
         self.assertEqual(publish.count("RESOLVED_SHA: ${{ needs.checks.outputs.source_sha }}"), 4)
         self.assertIn("value: ${{ jobs.check.outputs.source_sha }}", checks)
         self.assertIn("source_sha: ${{ steps.checks.outputs.source_sha }}", checks)
@@ -119,25 +120,6 @@ class WorkflowTests(unittest.TestCase):
         self.assertIn("source_sha: ${{ github.sha }}", publish)
         self.assertIn("cli_recovery_version: ${{ inputs.cli_recovery_version || '' }}", publish)
         self.assertIn("recovery_version: ${{ inputs.recovery_version || '' }}", publish)
-        # These outcomes mirror the exact expressions asserted above, including the
-        # implicit success gate on the CLI job and explicit always/cancelled gate.
-        for mode, checks_result, cli_result, cancelled, expected in [
-            ("push", "success", "success", False, (True, True)),
-            ("manual", "success", "success", False, (True, True)),
-            ("cli-recovery", "success", "success", False, (True, False)),
-            ("generator-recovery", "success", "skipped", False, (False, True)),
-            ("pr", "skipped", "skipped", False, (False, False)),
-            ("push", "failure", "skipped", False, (False, False)),
-            ("push", "skipped", "skipped", False, (False, False)),
-            ("push", "cancelled", "cancelled", True, (False, False)),
-            ("push", "success", "failure", False, (True, False)),
-            ("push", "success", "skipped", False, (True, False)),
-            ("generator-recovery", "success", "skipped", True, (False, False)),
-        ]:
-            good = checks_result == "success" and mode != "pr"
-            cli = good and not cancelled and mode != "generator-recovery"
-            gen = good and not cancelled and mode != "cli-recovery" and (mode == "generator-recovery" or cli_result == "success")
-            self.assertEqual((cli, gen), expected, mode)
 
 if __name__ == "__main__":
     unittest.main()

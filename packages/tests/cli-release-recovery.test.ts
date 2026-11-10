@@ -44,20 +44,22 @@ const readWorkflow = (name: string) =>
 const workflow = readWorkflow("publish");
 const productChecks = readWorkflow("product-checks");
 const productAction = readWorkflow("../actions/product-checks/action");
-const steps = workflow.jobs.cli.steps;
+const allSteps = workflow.jobs.publish.steps;
+const boundary = allSteps.findIndex(
+  (s: { id?: string }) => s.id === "generator-checkout",
+);
+const phaseSteps = (job: string) =>
+  job === "cli" ? allSteps.slice(0, boundary) : allSteps.slice(boundary);
+const steps = phaseSteps("cli");
 const step = (name: string, job = "cli") =>
-  (job === "product" ? productAction.runs : workflow.jobs[job]).steps.find(
+  (job === "product" ? productAction.runs.steps : phaseSteps(job)).find(
     (s: { name?: string }) => s.name === name,
   ).run as string;
 
 test("verification budget leaves time for release work", () => {
   const maximumVerificationSeconds = 25 * 2 * 10 + 24 * 20;
-  for (const job of ["cli", "publish"]) {
-    expect(workflow.jobs[job]["timeout-minutes"]).toBe(30);
-    expect(
-      workflow.jobs[job]["timeout-minutes"] * 60 - maximumVerificationSeconds,
-    ).toBe(820);
-  }
+  expect(workflow.jobs.publish["timeout-minutes"]).toBe(60);
+  expect(60 * 60 - 2 * maximumVerificationSeconds).toBe(1640);
 });
 
 test("conflicting recovery inputs run validation and fail visibly", () => {
@@ -76,6 +78,8 @@ test("conflicting recovery inputs run validation and fail visibly", () => {
 
 function fixture() {
   const dir = temporaryDirectory("cli-release-test-");
+  symlinkSync(dir, join(dir, "cli-source"));
+  symlinkSync(dir, join(dir, "generator-source"));
   const bin = join(dir, "bin");
   mkdirSync(bin);
   const git = (...args: string[]) =>
@@ -243,7 +247,7 @@ test("shared checks use the resolved SHA and block every failed or skipped gate"
     "${{ steps.checks.outputs.source_sha }}",
   );
   for (const job of ["cli", "publish"]) {
-    const verification = workflow.jobs[job].steps.find(
+    const verification = phaseSteps(job).find(
       (candidate: { name?: string }) =>
         candidate.name === "Verify workflow source",
     );
@@ -257,56 +261,35 @@ test("shared checks use the resolved SHA and block every failed or skipped gate"
     repository: "disposabl-dev/create-disposabl-app",
     ref: "refs/heads/main",
   };
-  const evaluate = (
-    job: string,
-    needs: unknown,
-    inputs: unknown,
-    cancelled = false,
-  ) =>
-    new Function(
-      "github",
-      "needs",
-      "inputs",
-      "always",
-      "cancelled",
-      `return ${workflow.jobs[job].if}`,
-    )(
+  const job = workflow.jobs.publish;
+  const check = (result: string, cancelled = false) =>
+    new Function("github", "needs", "always", "cancelled", `return ${job.if}`)(
       github,
-      needs,
-      inputs,
+      { checks: { result } },
       () => true,
       () => cancelled,
     );
+  const enabled = (phase: string, inputs: unknown) =>
+    new Function("inputs", `return ${phaseSteps(phase)[0].if}`)(inputs);
   const normal = { recovery_version: "", cli_recovery_version: "" };
   const generator = { recovery_version: "1.1.0", cli_recovery_version: "" };
   const cliRecovery = { recovery_version: "", cli_recovery_version: "1.1.0" };
-  const needs = (checks: string, cli: string) => ({
-    checks: { result: checks },
-    cli: { result: cli },
-  });
-  expect(evaluate("cli", needs("success", "skipped"), normal)).toBe(true);
-  expect(evaluate("cli", needs("success", "skipped"), cliRecovery)).toBe(true);
-  expect(evaluate("cli", needs("success", "skipped"), generator)).toBe(false);
-  expect(evaluate("publish", needs("success", "success"), normal)).toBe(true);
-  expect(evaluate("publish", needs("success", "skipped"), generator)).toBe(
+  expect(check("success")).toBe(true);
+  for (const result of ["failure", "cancelled", "skipped"])
+    expect(check(result)).toBe(false);
+  expect(check("success", true)).toBe(false);
+  expect([enabled("cli", normal), enabled("publish", normal)]).toEqual([
     true,
-  );
-  expect(evaluate("publish", needs("success", "success"), cliRecovery)).toBe(
+    true,
+  ]);
+  expect([
+    enabled("cli", cliRecovery),
+    enabled("publish", cliRecovery),
+  ]).toEqual([true, false]);
+  expect([enabled("cli", generator), enabled("publish", generator)]).toEqual([
     false,
-  );
-  for (const result of ["failure", "cancelled", "skipped"]) {
-    expect(evaluate("cli", needs(result, "success"), cliRecovery)).toBe(false);
-    expect(evaluate("publish", needs("success", result), normal)).toBe(false);
-    expect(evaluate("cli", needs(result, "success"), normal)).toBe(false);
-    expect(evaluate("publish", needs(result, "success"), normal)).toBe(false);
-    expect(evaluate("publish", needs(result, "skipped"), generator)).toBe(
-      false,
-    );
-  }
-  expect(evaluate("publish", needs("success", "failure"), normal)).toBe(false);
-  expect(evaluate("publish", needs("success", "success"), normal, true)).toBe(
-    false,
-  );
+    true,
+  ]);
 });
 
 test("release source resolves current push and fenced recovery tags", () => {
@@ -595,9 +578,7 @@ test(
       ["publish", "Recover tagged release", "create-disposabl-app"],
     ]) {
       const f = fixture();
-      const order = workflow.jobs[job].steps.map(
-        (s: { name?: string }) => s.name,
-      );
+      const order = phaseSteps(job).map((s: { name?: string }) => s.name);
       expect(order.indexOf("Preserve recovery metadata guard")).toBeLessThan(
         order.indexOf(
           job === "cli" ? "Verify CLI recovery tag" : "Verify recovery tag",
@@ -738,12 +719,11 @@ test("network, registry, and dist-tag failures do not publish", () => {
       REGISTRY_VERSION: "1.1.0",
     }).status,
   ).not.toBe(0);
-  expect(workflow.jobs.publish.needs).toEqual(["checks", "cli"]);
-  expect(workflow.jobs.publish.if).toContain("needs.cli.result == 'success'");
-  expect(workflow.jobs.publish.if).toContain(
+  expect(workflow.jobs.publish.needs).toEqual(["checks"]);
+  expect(phaseSteps("publish")[0].if).toContain(
     "inputs.cli_recovery_version == ''",
   );
-  expect(workflow.jobs.publish.if).toContain("inputs.recovery_version != ''");
+  expect(phaseSteps("cli")[0].if).toContain("inputs.recovery_version == ''");
   expect(
     steps.filter(
       (s: { name?: string }) => s.name === "Verify CLI release and tag",

@@ -212,6 +212,10 @@ test("generated reset retains root check and removes product-only gate", () => {
   expect(generated.jobs.web.needs).toBe("changes");
   expect(hasRootCheck(generated.jobs.web)).toBe(true);
   expect(
+    (reset.match(/packages\/tests\/publisher-colocation\.test\.ts/g) ?? [])
+      .length,
+  ).toBe(2);
+  expect(
     allowed(generated.jobs.web, context("push"), needs("success", "skipped")),
   ).toBe(true);
   expect(
@@ -257,25 +261,32 @@ test("product and recovery gates remain independent of root and native release j
     "./.github/workflows/product-checks.yml",
   );
   expect(publish.jobs.checks.with.source_sha).toBe("${{ github.sha }}");
-  const n = { checks: { result: "success" }, cli: { result: "skipped" } };
+  const n = { checks: { result: "success" } };
   const cfg = {
     ...context("workflow_dispatch"),
     inputs: { recovery_version: "1.0.0", cli_recovery_version: "" },
   };
   expect(allowed(publish.jobs.publish, cfg, n)).toBe(true);
   expect(
-    allowed(publish.jobs.publish, cfg, { ...n, checks: { result: "failure" } }),
+    allowed(publish.jobs.publish, cfg, { checks: { result: "failure" } }),
   ).toBe(false);
   expect(
-    allowed(publish.jobs.publish, cfg, { ...n, checks: { result: "skipped" } }),
+    allowed(publish.jobs.publish, cfg, { checks: { result: "skipped" } }),
   ).toBe(false);
   expect(allowed(publish.jobs.publish, cfg, n, true)).toBe(false);
+  const releaseSteps = publish.jobs.publish.steps;
+  const cliCheckout = releaseSteps.find((s: any) => s.id === "cli-checkout");
+  const generatorCheckout = releaseSteps.find(
+    (s: any) => s.id === "generator-checkout",
+  );
+  expect(allowed(cliCheckout, cfg, {})).toBe(false);
+  expect(allowed(generatorCheckout, cfg, {})).toBe(true);
   const cli = {
     ...cfg,
     inputs: { recovery_version: "", cli_recovery_version: "1.0.0" },
   };
-  expect(allowed(publish.jobs.cli, cli, n)).toBe(true);
-  expect(allowed(publish.jobs.publish, cli, n)).toBe(false);
+  expect(allowed(cliCheckout, cli, {})).toBe(true);
+  expect(allowed(generatorCheckout, cli, {})).toBe(false);
   const submit = pipeline.jobs["android-submit"];
   expect(submit.needs).toBe("android");
   const androidNeeds = { android: { result: "success" } };

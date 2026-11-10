@@ -17,6 +17,11 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: npm-cli-publish
+  cancel-in-progress: false
+  queue: max
+
 env:
   # Public ingestion configuration, embedded in the published CLI binaries.
   DISPOSABL_CLI_POSTHOG_PROJECT_TOKEN: ${{ vars.DISPOSABL_CLI_POSTHOG_PROJECT_TOKEN }}
@@ -34,27 +39,32 @@ jobs:
       cli_recovery_version: ${{ inputs.cli_recovery_version || '' }}
       recovery_version: ${{ inputs.recovery_version || '' }}
 
-  cli:
+  publish:
     needs: [checks]
-    if: needs.checks.result == 'success' && github.repository == 'disposabl-dev/create-disposabl-app' && github.ref == 'refs/heads/main' && (inputs.recovery_version == '' || inputs.cli_recovery_version != '')
+    if: always() && !cancelled() && needs.checks.result == 'success' && github.repository == 'disposabl-dev/create-disposabl-app' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     permissions:
       contents: write
       id-token: write
     concurrency:
-      group: npm-cli-publish
+      group: npm-publish
       cancel-in-progress: false
+      queue: max
     defaults:
       run:
-        working-directory: packages/cli
+        working-directory: cli-source/packages/cli
     steps:
       - uses: actions/checkout@v6
+        id: cli-checkout
+        if: inputs.recovery_version == ''
         with:
           ref: ${{ github.sha }}
+          path: cli-source
           fetch-depth: 0
           persist-credentials: false
       - name: Verify workflow source
+        if: inputs.recovery_version == ''
         env:
           EVENT_SHA: ${{ github.sha }}
           RESOLVED_SHA: ${{ needs.checks.outputs.source_sha }}
@@ -64,10 +74,10 @@ jobs:
           [[ "$(git rev-parse HEAD)" == "$EVENT_SHA" ]] || { echo 'Workflow source mismatch.'; exit 1; }
           [[ -n "$RECOVERY" || "$EVENT_SHA" == "$RESOLVED_SHA" ]] || { echo 'Checked source mismatch.'; exit 1; }
       - name: Preserve recovery metadata guard
-        if: inputs.cli_recovery_version != ''
-        run: cp "$GITHUB_WORKSPACE/packages/disposabl-kit/server/release/verify-metadata.mjs" "$RUNNER_TEMP/release-metadata-guard.mjs"
+        if: inputs.recovery_version == '' && (inputs.cli_recovery_version != '')
+        run: cp "$GITHUB_WORKSPACE/cli-source/packages/disposabl-kit/server/release/verify-metadata.mjs" "$RUNNER_TEMP/release-metadata-guard.mjs"
       - name: Verify CLI recovery tag
-        if: inputs.cli_recovery_version != ''
+        if: inputs.recovery_version == '' && (inputs.cli_recovery_version != '')
         env:
           VERSION: ${{ inputs.cli_recovery_version }}
           GENERATOR_RECOVERY: ${{ inputs.recovery_version }}
@@ -85,21 +95,25 @@ jobs:
           git checkout --detach "$RESOLVED_SHA"
           [[ "$(git rev-parse HEAD)" == "$RESOLVED_SHA" ]]
       - uses: actions/setup-node@v6
+        if: inputs.recovery_version == ''
         with:
           node-version: "24"
           package-manager-cache: false
       - uses: oven-sh/setup-bun@v2
+        if: inputs.recovery_version == ''
         with:
           bun-version: "1.4.4"
       - uses: actions/cache@v4
+        if: inputs.recovery_version == ''
         with:
-          path: ~/.bun/install/cache
-          key: bun-${{ runner.os }}-${{ runner.arch }}-1.4.4-${{ hashFiles('bun.lock') }}
-          restore-keys: bun-${{ runner.os }}-${{ runner.arch }}-1.4.4-
-      - run: bun install --frozen-lockfile
-        working-directory: .
+          path: ${{ runner.temp }}/bun-cli-cache
+          key: bun-cli-${{ runner.os }}-${{ runner.arch }}-1.4.4-${{ hashFiles('cli-source/bun.lock') }}
+          restore-keys: bun-cli-${{ runner.os }}-${{ runner.arch }}-1.4.4-
+      - run: bun install --frozen-lockfile --cache-dir "$RUNNER_TEMP/bun-cli-cache"
+        if: inputs.recovery_version == ''
+        working-directory: cli-source
       - name: Verify CLI release and tag
-        if: inputs.cli_recovery_version == ''
+        if: inputs.recovery_version == '' && (inputs.cli_recovery_version == '')
         run: |
           set -euo pipefail
           version=$(npm view @disposabl/cli version --prefer-online)
@@ -121,15 +135,15 @@ jobs:
             exit 1
           fi
       - run: bun run typecheck && bun run build
-        if: inputs.cli_recovery_version == ''
+        if: inputs.recovery_version == '' && (inputs.cli_recovery_version == '')
       - name: Publish CLI before generator
-        if: inputs.cli_recovery_version == ''
+        if: inputs.recovery_version == '' && (inputs.cli_recovery_version == '')
         run: bun run release
         env:
           GITHUB_TOKEN: ${{ github.token }}
           npm_config_workspaces_update: "false"
       - name: Verify published CLI release and tag
-        if: inputs.cli_recovery_version == ''
+        if: inputs.recovery_version == '' && (inputs.cli_recovery_version == '')
         run: |
           set -euo pipefail
           highest=$(git tag --merged HEAD --list '@disposabl/cli@*' --sort=-version:refname | grep -E '^@disposabl/cli@(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$' | head -1)
@@ -193,7 +207,7 @@ jobs:
           echo "If npm confirms the version is absent, run publish.yml on main with cli_recovery_version=${expected}; do not move or delete the tag."
           exit 1
       - name: Recover tagged CLI release
-        if: inputs.cli_recovery_version != ''
+        if: inputs.recovery_version == '' && (inputs.cli_recovery_version != '')
         env:
           VERSION: ${{ inputs.cli_recovery_version }}
           npm_config_workspaces_update: "false"
@@ -218,27 +232,17 @@ jobs:
             npm publish "$tarball" --provenance --access public --tag latest
           fi
 
-  publish:
-    needs: [checks, cli]
-    if: always() && !cancelled() && needs.checks.result == 'success' && github.repository == 'disposabl-dev/create-disposabl-app' && github.ref == 'refs/heads/main' && inputs.cli_recovery_version == '' && (inputs.recovery_version != '' || needs.cli.result == 'success')
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    defaults:
-      run:
-        working-directory: packages/create-disposabl-app
-    permissions:
-      contents: write
-      id-token: write
-    concurrency:
-      group: npm-publish
-      cancel-in-progress: false
-    steps:
       - uses: actions/checkout@v6
+        id: generator-checkout
+        if: inputs.cli_recovery_version == ''
         with:
           ref: ${{ github.sha }}
+          path: generator-source
           fetch-depth: 0
           persist-credentials: false
       - name: Verify workflow source
+        working-directory: generator-source/packages/create-disposabl-app
+        if: inputs.cli_recovery_version == ''
         env:
           EVENT_SHA: ${{ github.sha }}
           RESOLVED_SHA: ${{ needs.checks.outputs.source_sha }}
@@ -248,16 +252,19 @@ jobs:
           [[ "$(git rev-parse HEAD)" == "$EVENT_SHA" ]] || { echo 'Workflow source mismatch.'; exit 1; }
           [[ -n "$RECOVERY" || "$EVENT_SHA" == "$RESOLVED_SHA" ]] || { echo 'Checked source mismatch.'; exit 1; }
       - name: Preserve recovery metadata guard
-        if: inputs.recovery_version != ''
-        run: cp "$GITHUB_WORKSPACE/packages/disposabl-kit/server/release/verify-metadata.mjs" "$RUNNER_TEMP/release-metadata-guard.mjs"
+        working-directory: generator-source/packages/create-disposabl-app
+        if: inputs.cli_recovery_version == '' && (inputs.recovery_version != '')
+        run: cp "$GITHUB_WORKSPACE/generator-source/packages/disposabl-kit/server/release/verify-metadata.mjs" "$RUNNER_TEMP/release-metadata-guard.mjs"
       - name: Validate recovery version
-        if: inputs.recovery_version != ''
+        working-directory: generator-source/packages/create-disposabl-app
+        if: inputs.cli_recovery_version == '' && (inputs.recovery_version != '')
         env:
           VERSION: ${{ inputs.recovery_version }}
         run: |
           [[ "$VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || { echo "Invalid recovery version"; exit 1; }
       - name: Verify recovery tag
-        if: inputs.recovery_version != ''
+        working-directory: generator-source/packages/create-disposabl-app
+        if: inputs.cli_recovery_version == '' && (inputs.recovery_version != '')
         env:
           VERSION: ${{ inputs.recovery_version }}
           RESOLVED_SHA: ${{ needs.checks.outputs.source_sha }}
@@ -269,34 +276,47 @@ jobs:
           git checkout --detach "$RESOLVED_SHA"
           [[ "$(git rev-parse HEAD)" == "$RESOLVED_SHA" ]]
       - uses: actions/setup-node@v6
+        if: inputs.cli_recovery_version == ''
         with:
           node-version: "24"
           package-manager-cache: false
       - uses: oven-sh/setup-bun@v2
+        if: inputs.cli_recovery_version == ''
         with:
           bun-version: "1.4.4"
       - uses: actions/cache@v4
+        if: inputs.cli_recovery_version == ''
         with:
-          path: ~/.bun/install/cache
-          key: bun-${{ runner.os }}-${{ runner.arch }}-1.4.4-${{ hashFiles('bun.lock') }}
-          restore-keys: bun-${{ runner.os }}-${{ runner.arch }}-1.4.4-
-      - run: bun install --frozen-lockfile
+          path: ${{ runner.temp }}/bun-generator-cache
+          key: bun-generator-${{ runner.os }}-${{ runner.arch }}-1.4.4-${{ hashFiles('generator-source/bun.lock') }}
+          restore-keys: bun-generator-${{ runner.os }}-${{ runner.arch }}-1.4.4-
+      - run: bun install --frozen-lockfile --cache-dir "$RUNNER_TEMP/bun-generator-cache"
+        working-directory: generator-source/packages/create-disposabl-app
+        if: inputs.cli_recovery_version == ''
       - run: bun fmt --check
+        working-directory: generator-source/packages/create-disposabl-app
+        if: inputs.cli_recovery_version == ''
       - run: bun run typecheck
+        working-directory: generator-source/packages/create-disposabl-app
+        if: inputs.cli_recovery_version == ''
       - run: bun run lint
+        working-directory: generator-source/packages/create-disposabl-app
+        if: inputs.cli_recovery_version == ''
       # Normal releases already typecheck the same resolved SHA in the required CLI job.
       # Generator recovery skips that job and must retain this check here.
       - run: bun run typecheck
-        if: inputs.recovery_version != ''
-        working-directory: packages/cli
+        if: inputs.cli_recovery_version == '' && (inputs.recovery_version != '')
+        working-directory: generator-source/packages/cli
       - name: Verify fresh generated projects
-        if: inputs.recovery_version == ''
+        working-directory: generator-source/packages/create-disposabl-app
+        if: inputs.cli_recovery_version == '' && (inputs.recovery_version == '')
         run: bun run build && bun run verify:starter
       # semantic-release sets the package version, builds, tags this commit, and publishes.
       # Recovery after a publish failure: check npm and GitHub for the tagged version first.
       # A tagged version is skipped on rerun; restore missing artifacts from that exact commit/version.
       - name: Recover tagged release
-        if: inputs.recovery_version != ''
+        working-directory: generator-source/packages/create-disposabl-app
+        if: inputs.cli_recovery_version == '' && (inputs.recovery_version != '')
         env:
           VERSION: ${{ inputs.recovery_version }}
           GH_TOKEN: ${{ github.token }}
@@ -332,13 +352,15 @@ jobs:
             cat "$RUNNER_TEMP/release-error" >&2; exit 1
           fi
       - run: bun run semantic-release
-        if: inputs.recovery_version == ''
+        working-directory: generator-source/packages/create-disposabl-app
+        if: inputs.cli_recovery_version == '' && (inputs.recovery_version == '')
         env:
           GITHUB_TOKEN: ${{ github.token }}
           # Bun owns dependency installation; npm only versions and publishes this package.
           npm_config_workspaces_update: "false"
       - name: Verify published generator release and tag
-        if: inputs.recovery_version == ''
+        working-directory: generator-source/packages/create-disposabl-app
+        if: inputs.cli_recovery_version == '' && (inputs.recovery_version == '')
         run: |
           set -euo pipefail
           highest=$(git tag --merged HEAD --list 'v*' --sort=-version:refname | grep -E '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$' | head -1)
