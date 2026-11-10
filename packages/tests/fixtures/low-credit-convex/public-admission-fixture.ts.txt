@@ -2,40 +2,57 @@ import {
   internalAction,
   internalMutation,
   internalQuery,
+  type MutationCtx,
 } from "./_generated/server";
 import { components } from "./_generated/api";
 import { makeFunctionReference } from "convex/server";
 import { listMessages } from "@convex-dev/agent";
 import { v } from "convex/values";
+async function seedApp(ctx: MutationCtx, userId: string, appId: string) {
+  const thread = await ctx.runMutation(components.agent.threads.createThread, {
+    userId,
+    title: "fixture",
+  });
+  await ctx.db.insert("apps", {
+    appId,
+    userId,
+    name: "fixture",
+    platforms: ["web"],
+    features: [],
+    expoAccountId: null,
+    agentRemoteUnresolved: false,
+    agentResumeBusy: false,
+    agent: {
+      threadId: thread._id,
+      status: "idle",
+      pending: [],
+      updatedAt: Date.now(),
+    },
+  });
+  return { threadId: thread._id };
+}
 export const setup = internalMutation({
   args: { userId: v.string(), appId: v.string() },
   handler: async (ctx, { userId, appId }) => {
-    const thread = await ctx.runMutation(
-      components.agent.threads.createThread,
-      { userId, title: "fixture" },
-    );
-    await ctx.db.insert("apps", {
-      appId,
-      userId,
-      name: "fixture",
-      platforms: ["web"],
-      features: [],
-      expoAccountId: null,
-      agentRemoteUnresolved: false,
-      agentResumeBusy: false,
-      agent: {
-        threadId: thread._id,
-        status: "idle",
-        pending: [],
-        updatedAt: Date.now(),
-      },
-    });
+    const app = await seedApp(ctx, userId, appId);
     await ctx.db.insert("publicAdmissionTransport", {
       userId,
       mode: "low",
       calls: 0,
     });
-    return { threadId: thread._id };
+    return app;
+  },
+});
+export const setupApp = internalMutation({
+  args: { userId: v.string(), appId: v.string() },
+  handler: (ctx, { userId, appId }) => seedApp(ctx, userId, appId),
+});
+export const markDeleting = internalMutation({
+  args: { userId: v.id("users") },
+  returns: v.null(),
+  handler: async (ctx, { userId }) => {
+    await ctx.db.patch(userId, { deletionRequestedAt: Date.now() });
+    return null;
   },
 });
 export const mode = internalMutation({
