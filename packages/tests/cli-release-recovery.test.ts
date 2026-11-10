@@ -934,3 +934,49 @@ test("recovery rejects absent or outdated browser harness before testing or publ
     expect(existsSync(join(f.dir, "published"))).toBe(false);
   }
 });
+
+test("unit step runs historical recovery suites and propagates failures", () => {
+  const unit = productChecks.jobs.check.steps.find(
+    (s: { name?: string }) => s.name === "Run standard unit suite",
+  );
+  expect(unit["working-directory"]).toBe("packages/tests");
+  expect(unit.env).toEqual({
+    CLI_RECOVERY: "${{ inputs.cli_recovery_version }}",
+    GENERATOR_RECOVERY: "${{ inputs.recovery_version }}",
+  });
+  for (const mode of ["current", "cli", "generator"]) {
+    const dir = temporaryDirectory("cli-release-test-");
+    const bin = join(dir, "bin");
+    mkdirSync(bin);
+    symlinkSync(process.execPath, join(bin, "bun"));
+    writeFileSync(
+      join(dir, "package.json"),
+      JSON.stringify({
+        scripts:
+          mode === "current" ? { "test:unit": "bun test *.test.ts" } : {},
+      }),
+    );
+    for (const fail of [false, true]) {
+      writeFileSync(
+        join(dir, "sample.test.ts"),
+        `import { test, expect } from "bun:test"; test("selected suite", () => expect(${fail}).toBe(false));`,
+      );
+      const result = spawnSync(
+        "bash",
+        ["-e", "-c", step("Run standard unit suite", "product")],
+        {
+          cwd: dir,
+          encoding: "utf8",
+          env: {
+            ...process.env,
+            PATH: `${bin}:${process.env.PATH}`,
+            CLI_RECOVERY: mode === "cli" ? "1.2.3" : "",
+            GENERATOR_RECOVERY: mode === "generator" ? "0.20.3" : "",
+          },
+        },
+      );
+      expect(result.status === 0).toBe(!fail);
+      expect(result.stderr).toContain(fail ? "1 fail" : "1 pass");
+    }
+  }
+});

@@ -73,7 +73,16 @@ jobs:
         run: bun run --cwd packages/create-disposabl-app build
       - name: Run standard unit suite
         working-directory: packages/tests
-        run: bun run test:unit
+        env:
+          CLI_RECOVERY: ${{ inputs.cli_recovery_version }}
+          GENERATOR_RECOVERY: ${{ inputs.recovery_version }}
+        run: |
+          if [[ -n "$CLI_RECOVERY$GENERATOR_RECOVERY" ]]; then
+            # Historical tags predate the shared test:unit script.
+            bun test *.test.ts
+          else
+            bun run test:unit
+          fi
       - name: Prepare isolated browser test dependencies
         shell: bash
         env:
