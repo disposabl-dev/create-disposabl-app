@@ -706,3 +706,86 @@ test(
     }
   },
 );
+
+test(
+  "reconfigures Turbo across formatter availability without overwriting edits",
+  { timeout: 30000 },
+  async () => {
+    const temp = await mkdtemp(join(tmpdir(), "reconfigure-formatter-"));
+    const originalPath = process.env.PATH;
+    const bun = process.execPath;
+    const bin = join(temp, "bin");
+    const { mkdir } = await import("node:fs/promises");
+    await mkdir(bin);
+    await symlink(bun, join(bin, "bun"));
+    const withFormatter = `${bin}:/usr/bin:/bin`;
+    const withoutFormatter = "/usr/bin:/bin";
+    try {
+      const baselines: string[] = [];
+      for (const [initial, later] of [
+        [withFormatter, withoutFormatter],
+        [withoutFormatter, withFormatter],
+      ]) {
+        const app = join(
+          temp,
+          initial === withFormatter ? "formatted" : "unformatted",
+        );
+        process.env.PATH = initial;
+        await createApp(template, app, "example", {
+          version,
+          platforms: ["web"],
+          features: ["authentication"],
+        });
+        const before = await read(app, "turbo.json");
+        baselines.push(before);
+        process.env.PATH = later;
+        await reconfigureApp(template, app, version, {
+          platforms: "web,api,typescript-sdk",
+          features: "none",
+        });
+        const turbo = JSON.parse(await read(app, "turbo.json"));
+        assert.ok(turbo.tasks["example-sdk#typecheck"]);
+        assert.ok(
+          turbo.tasks["@disposabl/tests#typecheck"].dependsOn.includes(
+            "example-sdk#typecheck",
+          ),
+        );
+        assert.notEqual(await read(app, "turbo.json"), before);
+      }
+      assert.notEqual(baselines[0], baselines[1]);
+      assert.deepEqual(JSON.parse(baselines[0]!), JSON.parse(baselines[1]!));
+      const app = join(temp, "custom");
+      process.env.PATH = withFormatter;
+      await createApp(template, app, "custom", {
+        version,
+        platforms: ["web"],
+        features: [],
+      });
+      const turbo = JSON.parse(await read(app, "turbo.json"));
+      turbo.tasks.typecheck.dependsOn.push("custom-task");
+      const custom = JSON.stringify(turbo, null, 2) + "\n";
+      await writeFile(join(app, "turbo.json"), custom);
+      const config = await read(app, "disposabl.json");
+      process.env.PATH = withoutFormatter;
+      await assert.rejects(
+        reconfigureApp(template, app, version, {
+          platforms: "web,api,typescript-sdk",
+        }),
+        /turbo.json conflicts/,
+      );
+      assert.equal(await read(app, "turbo.json"), custom);
+      assert.equal(await read(app, "disposabl.json"), config);
+      assert.equal(existsSync(join(app, "packages/sdk")), false);
+      await assert.rejects(
+        reconfigureApp(template, app, "different-version", {
+          platforms: "web,api,typescript-sdk",
+        }),
+        /version/,
+      );
+      assert.equal(await read(app, "turbo.json"), custom);
+    } finally {
+      process.env.PATH = originalPath;
+      await rm(temp, { recursive: true, force: true });
+    }
+  },
+);
