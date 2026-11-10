@@ -275,3 +275,39 @@ test("top-up rejects an unannounced non-US storefront before browser open", asyn
   expect(result.topupAvailable).toBe(false);
   expect(result.busy).toBe(false);
 });
+
+test.each([null, "error"])(
+  "top-up rejects an in-flight unknown storefront: %s",
+  async (next) => {
+    topupReady = true;
+    await mount();
+    handoff.mockImplementationOnce(async () => {
+      country = next;
+      return link;
+    });
+    let opened;
+    await act(async () => {
+      opened = await result.open("topup");
+    });
+    expect(handoff).toHaveBeenCalledTimes(1);
+    expect(opened).toBe(false);
+    expect(openURL).not.toHaveBeenCalled();
+    expect(result.busy).toBe(false);
+  },
+);
+
+test("top-up rejects an in-flight session change", async () => {
+  topupReady = true;
+  await mount();
+  handoff.mockImplementationOnce(async () => {
+    current = false;
+    return link;
+  });
+  let opened;
+  await act(async () => {
+    opened = await result.open("topup");
+  });
+  expect(handoff).toHaveBeenCalledTimes(1);
+  expect(opened).toBe(false);
+  expect(openURL).not.toHaveBeenCalled();
+});

@@ -491,6 +491,85 @@ test("an unconfirmed stop stays fenced and schedules a retry for denied or unkno
   }
 });
 
+test("denied renewal fences admission through failed stop and gates a replacement session", async () => {
+  const f = await running();
+  await (settle as any)._handler(f.ctx, {
+    debitId: f.debit._id,
+    outcome: "confirmed",
+  });
+  await activate(f);
+  f.rows.get(f.sessionId).paidUntil = f.debit.paidUntil = 1;
+  const renewal = (await claimWindow(
+    f.ctx,
+    { sessionId: f.sessionId, expectedDebit: f.debit._id },
+    true,
+  ))!;
+  await (settle as any)._handler(f.ctx, {
+    debitId: renewal._id,
+    outcome: "denied",
+  });
+  const appBefore = structuredClone(f.rows.get(f.appId));
+  const unfunded = { sessionId: f.sessionId, token: "unfunded" };
+  assert.equal(await claimActivation(f.ctx, unfunded), "blocked");
+  assert.equal(await completeActivation(f.ctx, unfunded), false);
+  const stop = (token: string, archived: boolean) =>
+    (stopped as any)._handler(f.ctx, {
+      sessionId: f.sessionId,
+      token,
+      archived,
+    });
+  assert.equal(
+    await (stopping as any)._handler(f.ctx, {
+      sessionId: f.sessionId,
+      token: "first",
+    }),
+    true,
+  );
+  await assert.rejects(admitSession(f.ctx, "owner", true));
+  await stop("first", false);
+  await assert.rejects(admitSession(f.ctx, "owner", true));
+  assert.deepEqual(f.rows.get(f.appId), appBefore);
+  assert.equal(
+    await (stopping as any)._handler(f.ctx, {
+      sessionId: f.sessionId,
+      token: "retry",
+    }),
+    true,
+  );
+  await stop("retry", true);
+  await assert.rejects(admitSession(f.ctx, "owner", true), /still stopping/);
+  f.rows.get(f.appId).agent.status = "idle";
+  const next = await admitSession(f.ctx, "owner", true);
+  assert.ok(next);
+  assert.notEqual(next, f.sessionId);
+  const activation = { sessionId: next, token: "resume" };
+  assert.equal(await claimActivation(f.ctx, activation), "blocked");
+  assert.equal(await completeActivation(f.ctx, activation), false);
+  assert.equal(
+    await sessionAllows(f.ctx, next, "owner", Date.now(), true),
+    false,
+  );
+  f.rows.get(f.appId).agent = { computeSessionId: next, status: "processing" };
+  const debit = (await claimWindow(f.ctx, { sessionId: next }, true))!;
+  assert.equal(await claimActivation(f.ctx, activation), "blocked");
+  assert.equal(await completeActivation(f.ctx, activation), false);
+  await (settle as any)._handler(f.ctx, {
+    debitId: debit._id,
+    outcome: "confirmed",
+  });
+  assert.equal(
+    await sessionAllows(f.ctx, next, "owner", Date.now(), true),
+    false,
+  );
+  assert.equal(f.rows.get(debit._id).state, "confirmed");
+  assert.equal(await claimActivation(f.ctx, activation), "claimed");
+  assert.equal(await completeActivation(f.ctx, activation), true);
+  assert.equal(
+    await sessionAllows(f.ctx, next, "owner", Date.now(), true),
+    true,
+  );
+});
+
 test("boundary recovery is armed before renewal; notices cannot replay after completion", async () => {
   const f = await running();
   await (settle as any)._handler(f.ctx, {
