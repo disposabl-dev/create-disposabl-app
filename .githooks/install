@@ -1,0 +1,13 @@
+#!/bin/sh
+set -eu
+
+current=$(git config --get core.hooksPath) || {
+  status=$?
+  [ "$status" -eq 1 ] || exit "$status"
+}
+if [ -n "$current" ] && [ "$current" != .githooks ]; then
+  echo "Git already uses hooks from $current; configure hooks manually to preserve them." >&2
+  exit 1
+fi
+git config --local core.hooksPath .githooks
+echo "Installed hooks from .githooks (shared by this repository's worktrees)."

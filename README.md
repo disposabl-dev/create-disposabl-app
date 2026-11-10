@@ -107,6 +107,20 @@ Web and the backend are always included. Other apps and features follow your sel
 
 The root `AGENTS.md` explains how agents should work in the project. In this repository, `packages/create-disposabl-app` contains the generator that creates new apps.
 
+## Local Git checks
+
+Run `bun run hooks:install` once after cloning to enable the tracked pre-commit
+hook. Git shares this setting across worktrees of the same repository. If you
+already use a different hook directory, the installer stops so you can combine
+the hooks without losing yours.
+
+The hook checks staged whitespace and formatting without changing the index or
+working files, including partially staged files. It needs Bun 1.4.4. Before
+pushing, run `bun run check` for generation, workspace typechecking, linting,
+and formatting; Turbo reuses its local cache when inputs are unchanged. This
+uses the working tree and may update generated files. Run the relevant
+`bun run test` targets as well; the hook does not replace CI or E2E checks.
+
 ## Build and test locally
 
 Use your own machine for development and testing whenever it has the tools you need. You do not need to push a commit or wait for GitHub Actions to check a change.
