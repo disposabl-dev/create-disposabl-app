@@ -2,6 +2,7 @@ import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { readFile, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { formatGenerated } from "./scaffold";
 import { detectReference } from "../cli/preview";
 import { resolveFeatures } from "../disposabl-kit/feature-options";
 import { validateAndroidArchitectures } from "../disposabl-kit/android-architectures";
@@ -82,6 +83,7 @@ export async function setupApp(
   );
   // Persist dependencies before leaving the terminal for any connection flow.
   await writeFile(path, JSON.stringify(config, null, 2) + "\n");
+  formatGenerated(directory, ["disposabl.json"]);
   const status = (await run(["login", "status"])) as { currentUser: unknown };
   if (!status.currentUser) {
     await run(["login"], true);
@@ -126,10 +128,7 @@ export async function setupApp(
     ])) as { appId: string };
     config.appId = app.appId;
     await writeFile(path, JSON.stringify(config, null, 2) + "\n");
-    execFileSync("bun", ["fmt", "disposabl.json"], {
-      cwd: directory,
-      stdio: "pipe",
-    });
+    formatGenerated(directory, ["disposabl.json"]);
   }
   const configured = (await run([
     "previews",

@@ -16,7 +16,7 @@ import {
   selectPlatforms,
   type DisposablConfig,
 } from "./options";
-import { authStarterPaths, createApp } from "./scaffold";
+import { authStarterPaths, createApp, formatGenerated } from "./scaffold";
 import {
   mergePurchasesManifest,
   nativeBillingPath,
@@ -287,6 +287,7 @@ export async function reconfigureApp(
       join(directory, configPath),
       JSON.stringify(config, null, 2) + "\n",
     );
+    formatGenerated(directory, [configPath]);
     return config;
   } finally {
     await rm(temp, { recursive: true, force: true });
