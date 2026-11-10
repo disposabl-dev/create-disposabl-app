@@ -30,6 +30,8 @@ const productReleaseFiles = [
   ".github/scripts/play-bundle.test.py",
   ".github/scripts/product-browser-check.py",
   ".github/scripts/product-browser-check-test.py",
+  ".github/scripts/product-check-source.sh",
+  ".github/scripts/product-check-source-test.py",
 ];
 
 // Product-only proof harnesses must not enter generated apps. Keep the same
