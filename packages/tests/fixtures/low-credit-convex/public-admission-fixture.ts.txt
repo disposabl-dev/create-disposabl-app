@@ -1,0 +1,128 @@
+import {
+  internalAction,
+  internalMutation,
+  internalQuery,
+} from "./_generated/server";
+import { components } from "./_generated/api";
+import { makeFunctionReference } from "convex/server";
+import { listMessages } from "@convex-dev/agent";
+import { v } from "convex/values";
+export const setup = internalMutation({
+  args: { userId: v.string(), appId: v.string() },
+  handler: async (ctx, { userId, appId }) => {
+    const thread = await ctx.runMutation(
+      components.agent.threads.createThread,
+      { userId, title: "fixture" },
+    );
+    await ctx.db.insert("apps", {
+      appId,
+      userId,
+      name: "fixture",
+      platforms: ["web"],
+      features: [],
+      expoAccountId: null,
+      agentRemoteUnresolved: false,
+      agentResumeBusy: false,
+      agent: {
+        threadId: thread._id,
+        status: "idle",
+        pending: [],
+        updatedAt: Date.now(),
+      },
+    });
+    await ctx.db.insert("publicAdmissionTransport", {
+      userId,
+      mode: "low",
+      calls: 0,
+    });
+    return { threadId: thread._id };
+  },
+});
+export const mode = internalMutation({
+  args: { mode: v.string() },
+  handler: async (ctx, { mode }) => {
+    const row = await ctx.db.query("publicAdmissionTransport").first();
+    if (!row) throw new Error("missing adapter");
+    await ctx.db.patch(row._id, { mode });
+  },
+});
+export const observe = internalMutation({
+  args: { method: v.string(), body: v.any() },
+  handler: async (ctx, { method, body }) => {
+    if (
+      method !== "customers.get_or_create" ||
+      typeof body.customer_id !== "string"
+    )
+      throw new Error("unexpected request");
+    const row = await ctx.db.query("publicAdmissionTransport").first();
+    if (!row) throw new Error("missing adapter");
+    if (body.customer_id !== row.userId) throw new Error("unexpected customer");
+    await ctx.db.patch(row._id, { calls: row.calls + 1 });
+    return row.mode;
+  },
+});
+export const transport = internalAction({
+  args: { method: v.string(), body: v.any() },
+  handler: async (ctx, args) => {
+    const mode = await ctx.runMutation(
+      makeFunctionReference("publicAdmissionFixture:observe") as any,
+      args,
+    );
+    if (mode === "error") throw new Error("synthetic provider failure");
+    return mode === "low"
+      ? { balances: { credits: { remaining: 9 } } }
+      : mode === "ok"
+        ? { balances: { credits: { remaining: 10 } } }
+        : {};
+  },
+});
+export const seedActive = internalMutation({
+  args: { userId: v.string() },
+  handler: async (ctx, { userId }) => {
+    const paidUntil = Date.now() + 600000;
+    const sessionId = await ctx.db.insert("computeSessions", {
+      userId,
+      state: "active",
+      paidUntil,
+      activation: "active",
+    });
+    const debitId = await ctx.db.insert("computeDebits", {
+      sessionId,
+      state: "confirmed",
+      paidUntil,
+    });
+    await ctx.db.patch(sessionId, { debitId });
+    return { sessionId, debitId };
+  },
+});
+export const snapshot = internalQuery({
+  args: { userId: v.string(), appId: v.string(), threadId: v.string() },
+  handler: async (ctx, { userId, appId, threadId }) => {
+    const app = await ctx.db
+      .query("apps")
+      .withIndex("by_appId", (q) => q.eq("appId", appId))
+      .unique();
+    const sessions = await ctx.db
+      .query("computeSessions")
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
+      .take(10);
+    const messages = await listMessages(ctx, components.agent, {
+      threadId,
+      paginationOpts: { numItems: 10, cursor: null },
+    });
+    const row = await ctx.db.query("publicAdmissionTransport").first();
+    const debits = sessions[0]
+      ? await ctx.db
+          .query("computeDebits")
+          .withIndex("by_sessionId", (q) => q.eq("sessionId", sessions[0]._id))
+          .take(10)
+      : [];
+    return {
+      app,
+      sessions,
+      debits,
+      messages: messages.page,
+      calls: row?.calls,
+    };
+  },
+});
