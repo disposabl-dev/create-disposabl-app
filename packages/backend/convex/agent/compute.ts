@@ -386,6 +386,13 @@ export const stopping = internalMutation({
       session.stopConfirmed
     )
       return false;
+    const latest = await ctx.db
+      .query("computeSessions")
+      .withIndex("by_userId", (q) => q.eq("userId", session.userId))
+      .order("desc")
+      .first();
+    // A stale stop must never interrupt this user's replacement sandbox work.
+    if (latest?._id !== sessionId) return false;
     if (session.stopLease && session.stopLease.until > Date.now()) return false;
     // Legacy actions may have started create/resume before activation claims existed.
     if (session.activation !== "active") {

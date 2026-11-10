@@ -136,7 +136,16 @@ export const delivered = internalMutation({
   returns: v.boolean(),
   handler: async (ctx, args) => {
     const current = await locked(ctx, args);
+    const stopping =
+      current.status === "stopping" ||
+      !(await sessionAllows(
+        ctx,
+        current.computeSessionId,
+        current.userId,
+        Date.now(),
+      ));
     await patchThread(ctx, current, {
+      ...(stopping ? { status: "stopping" as const } : {}),
       promptId: args.promptId,
       conversationId: args.conversationId,
       turnCompleted: false,
@@ -144,7 +153,7 @@ export const delivered = internalMutation({
       pending: current.pending.filter((id) => id !== args.messageId),
       updatedAt: Date.now(),
     });
-    return current.status === "stopping";
+    return stopping;
   },
 });
 
@@ -273,11 +282,12 @@ export const finish = internalMutation({
     );
     const error = args.suspended
       ? unresolved
-        ? "Sandbox access ended before the remote run was confirmed stopped. Contact support to reconcile it before starting more work."
+        ? "Sandbox access ended. Stopping remote work before another message can run."
         : "Sandbox access ended. Add credits if needed, then send a new message after the sandbox stops."
       : (args.error ?? current.error);
     if (args.suspended) {
-      status = "failed";
+      // Route remote work through the existing interrupt/reconciliation worker.
+      status = unresolved ? "stopping" : "failed";
       for (const messageId of pending)
         await ctx.runMutation(components.agent.messages.updateMessage, {
           messageId,
