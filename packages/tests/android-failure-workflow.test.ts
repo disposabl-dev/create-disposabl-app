@@ -61,7 +61,10 @@ test("product and generated apps share one artifact build and gate submission", 
     (step: { name?: string }) => step.name === "Fingerprint",
   );
   assert.equal(fingerprint.if, "needs.changes.outputs.android == 'true'");
-  assert.match(fingerprint.env.UPDATE_POLICY, /disposabl-dev\/create-disposabl-app.*disabled/);
+  assert.match(
+    fingerprint.env.UPDATE_POLICY,
+    /disposabl-dev\/create-disposabl-app.*disabled/,
+  );
 });
 
 test("Android failure reporting handles failed and cancelled builds independently", () => {
