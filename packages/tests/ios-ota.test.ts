@@ -27,7 +27,16 @@ async function run(
   const dir = await mkdtemp(join(tmpdir(), "ios-ota-"));
   try {
     await mkdir(join(dir, "bin"));
-    await mkdir(join(dir, "apps/mobile"), { recursive: true });
+    await mkdir(join(dir, "apps/mobile/scripts"), { recursive: true });
+    await writeFile(
+      join(dir, "apps/mobile/scripts/production-analytics.mjs"),
+      await readFile(
+        resolve(
+          import.meta.dirname,
+          "../../apps/mobile/scripts/production-analytics.mjs",
+        ),
+      ),
+    );
     await mkdir(join(dir, "apps/web"), { recursive: true });
     await writeFile(
       join(dir, "apps/mobile/eas.json"),
