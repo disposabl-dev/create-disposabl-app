@@ -71,7 +71,12 @@ with tempfile.TemporaryDirectory() as temp:
     # Use a disposable real JKS with distinct store/key passwords. Nothing here
     # reads or changes a developer's signing credentials.
     keytool.unlink()
-    real_env = dict(os.environ, HOME=temp, RUNNER_TEMP=temp)
+    # Keep the actual tools, but never inherit release credentials or flags.
+    # Main-push jobs contain signing secrets that must not enter these probes.
+    real_env = {'PATH': os.environ['PATH'], 'HOME': temp,
+                'TMPDIR': temp, 'RUNNER_TEMP': temp}
+    if os.environ.get('JAVA_HOME'):
+        real_env['JAVA_HOME'] = os.environ['JAVA_HOME']
     real_env['STORE_PASSWORD'] = 'fixture-store-password'
     real_env['KEY_PASSWORD'] = 'fixture-key-password'
     keystore = path / 'fixture.jks'
