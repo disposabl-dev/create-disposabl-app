@@ -1,4 +1,4 @@
-import { test } from "node:test";
+import { afterEach, test } from "node:test";
 // @ts-expect-error bun:test is not included in this workspace's Node type set.
 import { expect } from "bun:test";
 import { execFileSync, spawnSync } from "node:child_process";
@@ -7,31 +7,48 @@ import {
   mkdtempSync,
   mkdirSync,
   readFileSync,
+  rmSync,
   symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-const workflow = JSON.parse(
-  execFileSync(
-    process.execPath,
-    [
-      "-e",
-      "console.log(JSON.stringify(Bun.YAML.parse(await Bun.stdin.text())))",
-    ],
-    {
-      input: readFileSync(
-        resolve(import.meta.dirname, "../../.github/workflows/publish.yml"),
-      ),
-      encoding: "utf8",
-    },
-  ),
-);
+const temporaryDirectories: string[] = [];
+const temporaryDirectory = (prefix: string) => {
+  const dir = mkdtempSync(join(tmpdir(), prefix));
+  temporaryDirectories.push(dir);
+  return dir;
+};
+afterEach(() => {
+  for (const dir of temporaryDirectories.splice(0))
+    rmSync(dir, { recursive: true, force: true });
+});
+
+const readWorkflow = (name: string) =>
+  JSON.parse(
+    execFileSync(
+      process.execPath,
+      [
+        "-e",
+        "console.log(JSON.stringify(Bun.YAML.parse(await Bun.stdin.text())))",
+      ],
+      {
+        input: readFileSync(
+          resolve(import.meta.dirname, `../../.github/workflows/${name}.yml`),
+        ),
+        encoding: "utf8",
+      },
+    ),
+  );
+const workflow = readWorkflow("publish");
+const productChecks = readWorkflow("product-checks");
 const steps = workflow.jobs.cli.steps;
 const step = (name: string, job = "cli") =>
-  workflow.jobs[job].steps.find((s: { name?: string }) => s.name === name)
-    .run as string;
+  (job === "product"
+    ? productChecks.jobs.check
+    : workflow.jobs[job]
+  ).steps.find((s: { name?: string }) => s.name === name).run as string;
 
 test("verification budget leaves time for release work", () => {
   const maximumVerificationSeconds = 25 * 2 * 10 + 24 * 20;
@@ -46,19 +63,19 @@ test("verification budget leaves time for release work", () => {
 test("conflicting recovery inputs run validation and fail visibly", () => {
   const f = fixture();
   const result = f.run(
-    "Resolve release source",
+    "Resolve and verify source",
     {
       CLI_RECOVERY: "1.1.0",
       GENERATOR_RECOVERY: "0.15.0",
     },
-    "resolve",
+    "product",
   );
   expect(result.status).not.toBe(0);
-  expect(result.stdout).toContain("Select only one recovery.");
+  expect(result.stderr).toContain("Select only one recovery.");
 });
 
 function fixture() {
-  const dir = mkdtempSync(join(tmpdir(), "cli-release-test-"));
+  const dir = temporaryDirectory("cli-release-test-");
   const bin = join(dir, "bin");
   mkdirSync(bin);
   const git = (...args: string[]) =>
@@ -109,6 +126,15 @@ function fixture() {
     "--allow-empty",
     "-qm",
     "next",
+  );
+  writeFileSync(
+    join(dir, ".github/scripts/product-check-source.sh"),
+    readFileSync(
+      resolve(
+        import.meta.dirname,
+        "../../.github/scripts/product-check-source.sh",
+      ),
+    ),
   );
   const script = (name: string, content: string) =>
     writeFileSync(join(bin, name), `#!/bin/bash\n${content}\n`, {
@@ -164,8 +190,9 @@ function fixture() {
     name: string,
     env: Record<string, string | undefined> = {},
     job = "cli",
-  ) =>
-    spawnSync("bash", ["-c", step(name, job)], {
+  ) => {
+    const head = git("rev-parse", "HEAD").toString().trim();
+    const result = spawnSync("bash", ["-c", step(name, job)], {
       cwd: dir,
       encoding: "utf8",
       env: {
@@ -178,12 +205,28 @@ function fixture() {
         VERSION: "1.1.0",
         GENERATOR_RECOVERY: "",
         CLI_RECOVERY: "",
-        EVENT_SHA: git("rev-parse", "HEAD").toString().trim(),
+        EVENT_SHA: head,
+        EXPECTED_SOURCE: head,
+        GITHUB_REPOSITORY: "disposabl-dev/create-disposabl-app",
+        GITHUB_REF: "refs/heads/main",
+        GITHUB_WORKFLOW_REF:
+          "disposabl-dev/create-disposabl-app/.github/workflows/publish.yml@refs/heads/main",
+        GITHUB_EVENT_NAME: "workflow_dispatch",
         RESOLVED_SHA: git("rev-parse", "HEAD").toString().trim(),
         GITHUB_OUTPUT: join(dir, "output"),
         ...env,
       },
     });
+    if (job === "product" && result.status === 0) {
+      const checked = readFileSync(join(dir, "output"), "utf8")
+        .trim()
+        .split("\n")
+        .at(-1);
+      expect(`sha=${git("rev-parse", "HEAD").toString().trim()}`).toBe(checked);
+      git("checkout", "--detach", head);
+    }
+    return result;
+  };
   expect(run("Preserve recovery metadata guard").status).toBe(0);
   return { dir, git, run };
 }
@@ -192,9 +235,22 @@ test("shared checks use the resolved SHA and block every failed or skipped gate"
   expect(workflow.jobs.checks.uses).toBe(
     "./.github/workflows/product-checks.yml",
   );
-  expect(workflow.jobs.checks.with.source_sha).toBe(
-    "${{ needs.resolve.outputs.source_sha }}",
+  expect(workflow.jobs.checks.with.source_sha).toBe("${{ github.sha }}");
+  expect(productChecks.on.workflow_call.outputs.source_sha.value).toBe(
+    "${{ jobs.check.outputs.source_sha }}",
   );
+  expect(productChecks.jobs.check.outputs.source_sha).toBe(
+    "${{ steps.source.outputs.sha }}",
+  );
+  for (const job of ["cli", "publish"]) {
+    const verification = workflow.jobs[job].steps.find(
+      (candidate: { name?: string }) =>
+        candidate.name === "Verify workflow source",
+    );
+    expect(verification.env.RESOLVED_SHA).toBe(
+      "${{ needs.checks.outputs.source_sha }}",
+    );
+  }
   expect(workflow.jobs.checks.permissions).toEqual({ contents: "read" });
   expect(workflow.jobs.checks.secrets).toBeUndefined();
   const github = {
@@ -224,61 +280,39 @@ test("shared checks use the resolved SHA and block every failed or skipped gate"
   const normal = { recovery_version: "", cli_recovery_version: "" };
   const generator = { recovery_version: "1.1.0", cli_recovery_version: "" };
   const cliRecovery = { recovery_version: "", cli_recovery_version: "1.1.0" };
-  const needs = (resolve: string, checks: string, cli: string) => ({
-    resolve: { result: resolve },
+  const needs = (checks: string, cli: string) => ({
     checks: { result: checks },
     cli: { result: cli },
   });
-  expect(evaluate("cli", needs("success", "success", "skipped"), normal)).toBe(
+  expect(evaluate("cli", needs("success", "skipped"), normal)).toBe(true);
+  expect(evaluate("cli", needs("success", "skipped"), cliRecovery)).toBe(true);
+  expect(evaluate("cli", needs("success", "skipped"), generator)).toBe(false);
+  expect(evaluate("publish", needs("success", "success"), normal)).toBe(true);
+  expect(evaluate("publish", needs("success", "skipped"), generator)).toBe(
     true,
   );
-  expect(
-    evaluate("cli", needs("success", "success", "skipped"), cliRecovery),
-  ).toBe(true);
-  expect(
-    evaluate("cli", needs("success", "success", "skipped"), generator),
-  ).toBe(false);
-  expect(
-    evaluate("publish", needs("success", "success", "success"), normal),
-  ).toBe(true);
-  expect(
-    evaluate("publish", needs("success", "success", "skipped"), generator),
-  ).toBe(true);
-  expect(
-    evaluate("publish", needs("success", "success", "success"), cliRecovery),
-  ).toBe(false);
+  expect(evaluate("publish", needs("success", "success"), cliRecovery)).toBe(
+    false,
+  );
   for (const result of ["failure", "cancelled", "skipped"]) {
-    expect(
-      evaluate("cli", needs("success", result, "success"), cliRecovery),
-    ).toBe(false);
-    expect(
-      evaluate("publish", needs("success", "success", result), normal),
-    ).toBe(false);
-    expect(evaluate("cli", needs("success", result, "success"), normal)).toBe(
+    expect(evaluate("cli", needs(result, "success"), cliRecovery)).toBe(false);
+    expect(evaluate("publish", needs("success", result), normal)).toBe(false);
+    expect(evaluate("cli", needs(result, "success"), normal)).toBe(false);
+    expect(evaluate("publish", needs(result, "success"), normal)).toBe(false);
+    expect(evaluate("publish", needs(result, "skipped"), generator)).toBe(
       false,
     );
-    expect(
-      evaluate("publish", needs("success", result, "success"), normal),
-    ).toBe(false);
-    expect(
-      evaluate("publish", needs("success", result, "skipped"), generator),
-    ).toBe(false);
-    expect(
-      evaluate("publish", needs(result, "success", "success"), normal),
-    ).toBe(false);
   }
-  expect(
-    evaluate("publish", needs("success", "success", "failure"), normal),
-  ).toBe(false);
-  expect(
-    evaluate("publish", needs("success", "success", "success"), normal, true),
-  ).toBe(false);
+  expect(evaluate("publish", needs("success", "failure"), normal)).toBe(false);
+  expect(evaluate("publish", needs("success", "success"), normal, true)).toBe(
+    false,
+  );
 });
 
 test("release source resolves current push and fenced recovery tags", () => {
   const f = fixture();
   const head = f.git("rev-parse", "HEAD").toString().trim();
-  expect(f.run("Resolve release source", {}, "resolve").status).toBe(0);
+  expect(f.run("Resolve and verify source", {}, "product").status).toBe(0);
   expect(readFileSync(join(f.dir, "output"), "utf8")).toContain(`sha=${head}`);
   f.git("tag", "@disposabl/cli@1.1.0");
   f.git("tag", "v1.1.0");
@@ -286,16 +320,16 @@ test("release source resolves current push and fenced recovery tags", () => {
     { CLI_RECOVERY: "1.1.0" },
     { GENERATOR_RECOVERY: "1.1.0" },
   ])
-    expect(f.run("Resolve release source", input, "resolve").status).toBe(0);
+    expect(f.run("Resolve and verify source", input, "product").status).toBe(0);
   for (const input of [
     { CLI_RECOVERY: "1.0.0" },
     { CLI_RECOVERY: "bad" },
     { GENERATOR_RECOVERY: "2.0.0" },
     { EVENT_SHA: "0".repeat(40) },
   ])
-    expect(f.run("Resolve release source", input, "resolve").status).not.toBe(
-      0,
-    );
+    expect(
+      f.run("Resolve and verify source", input, "product").status,
+    ).not.toBe(0);
   expect(
     f.run("Verify CLI recovery tag", { RESOLVED_SHA: "0".repeat(40) }).status,
   ).not.toBe(0);
@@ -325,7 +359,7 @@ test("recovery checks the actual historical tag commit and rejects detached or c
     { CLI_RECOVERY: "1.0.0" },
     { GENERATOR_RECOVERY: "1.0.0" },
   ]) {
-    expect(f.run("Resolve release source", input, "resolve").status).toBe(0);
+    expect(f.run("Resolve and verify source", input, "product").status).toBe(0);
     expect(
       readFileSync(join(f.dir, "output"), "utf8").trim().split("\n").at(-1),
     ).toBe(`sha=${old}`);
@@ -379,8 +413,11 @@ test("recovery checks the actual historical tag commit and rejects detached or c
   f.git("tag", "v2.0.0");
   f.git("checkout", "--detach", head);
   expect(
-    f.run("Resolve release source", { GENERATOR_RECOVERY: "2.0.0" }, "resolve")
-      .status,
+    f.run(
+      "Resolve and verify source",
+      { GENERATOR_RECOVERY: "2.0.0" },
+      "product",
+    ).status,
   ).not.toBe(0);
 });
 
@@ -633,7 +670,7 @@ test("generator recovery retains registry and version gates", () => {
 });
 
 test("metadata guard runs through symlinks and redacts malformed JSON", () => {
-  const dir = mkdtempSync(join(tmpdir(), "metadata-guard-link-"));
+  const dir = temporaryDirectory("metadata-guard-link-");
   const original = resolve(
     import.meta.dirname,
     "../disposabl-kit/server/release/verify-metadata.mjs",
@@ -701,7 +738,7 @@ test("network, registry, and dist-tag failures do not publish", () => {
       REGISTRY_VERSION: "1.1.0",
     }).status,
   ).not.toBe(0);
-  expect(workflow.jobs.publish.needs).toEqual(["resolve", "checks", "cli"]);
+  expect(workflow.jobs.publish.needs).toEqual(["checks", "cli"]);
   expect(workflow.jobs.publish.if).toContain("needs.cli.result == 'success'");
   expect(workflow.jobs.publish.if).toContain(
     "inputs.cli_recovery_version == ''",
@@ -746,7 +783,7 @@ test(
       expect(String(error)).toBe("Error: Invalid repository URL");
       expect(JSON.stringify(error)).not.toContain("synthetic-secret");
     }
-    const dir = mkdtempSync(join(tmpdir(), "release-metadata-"));
+    const dir = temporaryDirectory("release-metadata-");
     const root = resolve(import.meta.dirname, "../..");
     for (const name of ["cli", "sdk", "create-disposabl-app"]) {
       const folder = join(dir, "packages", name);
@@ -888,12 +925,58 @@ test("recovery rejects absent or outdated browser harness before testing or publ
       "current harness",
     );
     const result = f.run(
-      "Resolve release source",
+      "Resolve and verify source",
       { GENERATOR_RECOVERY: "1.2.0" },
-      "resolve",
+      "product",
     );
     expect(result.status).not.toBe(0);
-    expect(result.stdout).toContain("Recovery unsupported:");
+    expect(result.stderr).toContain("Recovery unsupported:");
     expect(existsSync(join(f.dir, "published"))).toBe(false);
+  }
+});
+
+test("unit step runs historical recovery suites and propagates failures", () => {
+  const unit = productChecks.jobs.check.steps.find(
+    (s: { name?: string }) => s.name === "Run standard unit suite",
+  );
+  expect(unit["working-directory"]).toBe("packages/tests");
+  expect(unit.env).toEqual({
+    CLI_RECOVERY: "${{ inputs.cli_recovery_version }}",
+    GENERATOR_RECOVERY: "${{ inputs.recovery_version }}",
+  });
+  for (const mode of ["current", "cli", "generator"]) {
+    const dir = temporaryDirectory("cli-release-test-");
+    const bin = join(dir, "bin");
+    mkdirSync(bin);
+    symlinkSync(process.execPath, join(bin, "bun"));
+    writeFileSync(
+      join(dir, "package.json"),
+      JSON.stringify({
+        scripts:
+          mode === "current" ? { "test:unit": "bun test *.test.ts" } : {},
+      }),
+    );
+    for (const fail of [false, true]) {
+      writeFileSync(
+        join(dir, "sample.test.ts"),
+        `import { test, expect } from "bun:test"; test("selected suite", () => expect(${fail}).toBe(false));`,
+      );
+      const result = spawnSync(
+        "bash",
+        ["-e", "-c", step("Run standard unit suite", "product")],
+        {
+          cwd: dir,
+          encoding: "utf8",
+          env: {
+            ...process.env,
+            PATH: `${bin}:${process.env.PATH}`,
+            CLI_RECOVERY: mode === "cli" ? "1.2.3" : "",
+            GENERATOR_RECOVERY: mode === "generator" ? "0.20.3" : "",
+          },
+        },
+      );
+      expect(result.status === 0).toBe(!fail);
+      expect(result.stderr).toContain(fail ? "1 fail" : "1 pass");
+    }
   }
 });

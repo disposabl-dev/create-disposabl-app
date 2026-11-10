@@ -5,6 +5,15 @@ on:
       source_sha:
         required: true
         type: string
+      cli_recovery_version:
+        type: string
+        default: ""
+      recovery_version:
+        type: string
+        default: ""
+    outputs:
+      source_sha:
+        value: ${{ jobs.check.outputs.source_sha }}
 permissions:
   contents: read
 jobs:
@@ -12,6 +21,8 @@ jobs:
     name: Product unit and browser tests
     runs-on: ubuntu-24.04
     timeout-minutes: 25
+    outputs:
+      source_sha: ${{ steps.source.outputs.sha }}
     env:
       GH_TOKEN: ""
       PYTHONDONTWRITEBYTECODE: "1"
@@ -27,7 +38,22 @@ jobs:
           EXPECTED_SOURCE: ${{ inputs.source_sha }}
         run: '[[ "$EXPECTED_SOURCE" =~ ^[0-9a-f]{40}$ ]]'
       - uses: actions/checkout@v6
-        with: { ref: "${{ inputs.source_sha }}", persist-credentials: false }
+        with:
+          ref: ${{ inputs.source_sha }}
+          fetch-depth: ${{ github.workflow_ref == format('{0}/.github/workflows/publish.yml@refs/heads/main', github.repository) && '0' || '1' }}
+          persist-credentials: false
+      - name: Test source resolution
+        run: python3 .github/scripts/product-check-source-test.py
+      - name: Resolve and verify source
+        id: source
+        env:
+          EXPECTED_SOURCE: ${{ inputs.source_sha }}
+          EVENT_SHA: ${{ github.sha }}
+          CLI_RECOVERY: ${{ inputs.cli_recovery_version }}
+          GENERATOR_RECOVERY: ${{ inputs.recovery_version }}
+        run: bash .github/scripts/product-check-source.sh
+      - name: Check browser isolation harness
+        run: python3 .github/scripts/product-browser-check-test.py
       - uses: actions/setup-node@v6
         with: { node-version: "24", package-manager-cache: false }
       - uses: oven-sh/setup-bun@v2
@@ -41,13 +67,22 @@ jobs:
         run: bun install --frozen-lockfile
       - name: Verify requested source
         env:
-          EXPECTED_SOURCE: ${{ inputs.source_sha }}
+          EXPECTED_SOURCE: ${{ steps.source.outputs.sha }}
         run: test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE"
       - name: Build current generator template
         run: bun run --cwd packages/create-disposabl-app build
       - name: Run standard unit suite
         working-directory: packages/tests
-        run: bun test *.test.ts
+        env:
+          CLI_RECOVERY: ${{ inputs.cli_recovery_version }}
+          GENERATOR_RECOVERY: ${{ inputs.recovery_version }}
+        run: |
+          if [[ -n "$CLI_RECOVERY$GENERATOR_RECOVERY" ]]; then
+            # Historical tags predate the shared test:unit script.
+            bun test *.test.ts
+          else
+            bun run test:unit
+          fi
       - name: Prepare isolated browser test dependencies
         shell: bash
         env:
@@ -60,7 +95,6 @@ jobs:
           unzip -q "$RUNNER_TEMP/product-convex/backend.zip" -d "$RUNNER_TEMP/product-convex"
           chmod +x "$RUNNER_TEMP/product-convex/convex-local-backend"
           bun run --cwd packages/tests setup:browser
-          python3 .github/scripts/product-browser-check-test.py
       - name: Run isolated product web and backend E2E
         shell: bash
         env:

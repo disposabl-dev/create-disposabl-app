@@ -92,6 +92,10 @@ jobs:
       EXPO_NO_DOTENV: "1"
     steps:
       - *checkout
+      - name: Check product release guards
+        if: github.repository == 'disposabl-dev/create-disposabl-app'
+        run: |
+          python3 .github/scripts/play-bundle.test.py
       - &node
         uses: actions/setup-node@v6
         with: { node-version: *node-version, package-manager-cache: false }
@@ -113,10 +117,6 @@ jobs:
           if [[ '${{ github.event_name }}' == pull_request ]]; then node .github/scripts/disposabl.mjs report cli,typescript-sdk blocked 'Packages publish after merge to main.'; fi
       - name: Check
         run: bun run check
-      - name: Check product release guards
-        if: github.repository == 'disposabl-dev/create-disposabl-app'
-        run: |
-          python3 .github/scripts/play-bundle.test.py
       - name: Build selected clients
         run: |
           for package in cli sdk; do

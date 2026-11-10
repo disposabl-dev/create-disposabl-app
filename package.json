@@ -3,7 +3,9 @@
   "private": true,
   "scripts": {
     "check": "bun run generate && turbo run typecheck lint && bun fmt --check",
+    "hooks:install": ".githooks/install",
     "test": "bun run --cwd packages/tests test",
+    "test:unit": "bun run --cwd packages/tests test:unit",
     "e2e": "bun run --cwd packages/tests e2e",
     "build": "turbo build",
     "dev": "turbo dev",
