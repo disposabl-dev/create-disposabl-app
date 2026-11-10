@@ -12,7 +12,7 @@ import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 
 function verifyOtaSelection() {
-  for (const [channel, tag, reusable, architectures] of [
+  for (const [channel, tag, reusable, architectures, signing, submit] of [
     ["pr-1", "app-pr-1-android", true],
     ["production", "app-production-android", true],
     ["production", "app-production-android-8-1", true],
@@ -24,6 +24,15 @@ function verifyOtaSelection() {
     ["pr-1", "app-pr-1-windows", false],
     ["production", "app-production-android-8-1", false, ["arm64-v8a"]],
     ["production", "app-production-android-8-1", false, null],
+    ["production", "app-production-android-8-1", false, undefined, "release"],
+    [
+      "production",
+      "app-production-android-8-1",
+      false,
+      undefined,
+      "fallback",
+      "true",
+    ],
   ] as const) {
     const cwd = mkdtempSync(join(tmpdir(), "android-ota-selection-"));
     try {
@@ -31,6 +40,8 @@ function verifyOtaSelection() {
       const runtime = "b".repeat(40);
       const hash = "a".repeat(64);
       const manifest = {
+        signing: signing ?? "fallback",
+        signingId: signing === "release" ? "c".repeat(64) : "fallback",
         channel,
         projectId: "project",
         applicationId: "app.fixture",
@@ -92,6 +103,7 @@ else process.exit(1);
             RELEASE_PREFIX: "app",
             GITHUB_OUTPUT: output,
             ANDROID_SIGNING_READY: "true",
+            ANDROID_PLAY_SUBMIT: submit ?? "false",
           },
         },
       );

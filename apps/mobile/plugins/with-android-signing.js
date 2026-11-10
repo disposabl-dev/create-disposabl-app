@@ -5,11 +5,7 @@ module.exports = (config) =>
   withAppBuildGradle(config, (mod) => {
     if (mod.modResults.language !== "groovy")
       throw new Error("Expected a Groovy Android build");
-    if (
-      mod.modResults.contents.includes("// Disposabl production APK signing.")
-    )
-      return mod;
-    mod.modResults.contents += `
+    const block = `
 // Disposabl production APK signing. Preview APKs retain Expo's debug signing.
 if (System.getenv("DISPOSABL_ANDROID_CHANNEL") == "production" && System.getenv("ANDROID_KEYSTORE_PATH")) {
     android {
@@ -47,5 +43,21 @@ if (System.getenv("DISPOSABL_ANDROID_CHANNEL") == "production" && System.getenv(
     }
 }
 `;
+    const legacy = block.replace(
+      ' && System.getenv("ANDROID_KEYSTORE_PATH")',
+      "",
+    );
+    if (mod.modResults.contents.includes(block)) return mod;
+    if (mod.modResults.contents.includes(legacy)) {
+      mod.modResults.contents = mod.modResults.contents.replace(legacy, block);
+    } else {
+      if (
+        mod.modResults.contents.includes("// Disposabl production APK signing.")
+      )
+        throw new Error(
+          "Customized Android signing block requires manual migration",
+        );
+      mod.modResults.contents += block;
+    }
     return mod;
   });
