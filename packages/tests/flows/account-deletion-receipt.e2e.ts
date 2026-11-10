@@ -17,9 +17,13 @@ test(
     );
     const admin = process.env.E2E_CONVEX_ADMIN_KEY;
     const artifactPath = process.env.E2E_RECEIPT_ARTIFACT_DIR;
+    const ports = [3530, 3310].find(
+      (port) =>
+        backendUrl() === `http://127.0.0.1:${port}` &&
+        siteUrl() === `http://127.0.0.1:${port + 1}`,
+    );
     if (
-      backendUrl() !== "http://127.0.0.1:3530" ||
-      siteUrl() !== "http://127.0.0.1:3531" ||
+      ports === undefined ||
       process.env.E2E_TELEMETRY_DISABLED !== "1" ||
       !admin ||
       !artifactPath
@@ -29,7 +33,7 @@ test(
       );
     assertOwnedSdkBackend({
       markerVariable: "E2E_RECEIPT_OWNERSHIP_FILE",
-      ports: [3530, 3531],
+      ports: [ports, ports + 1],
       claimDirectory: ".receipt-claimed",
     });
     const artifactDir = reserveSdkArtifacts(artifactPath);
@@ -129,17 +133,18 @@ test(
     expect(download.suggestedFilename).toBe(
       `deletion-request-${reference}.txt`,
     );
-    const text = await readFile(download.absolutePath, "utf8");
+    const bytes = await readFile(download.absolutePath);
+    const text = bytes.toString("utf8");
     expect(text).toContain(`Reference: ${reference}`);
     expect(text).toContain(
       `Requested at: ${new Date(receipt.requestedAt).toISOString()}`,
     );
     expect(text).toContain("Publisher: Yast AI");
     expect(text).toContain("Support: vivek@yast.ai");
-    expect(text).toContain("Status: requested");
-    expect(text).toContain("Deletion is not confirmed.");
+    expect(text.split("\n")).toContain("Status: requested");
+    expect(text.split("\n")).toContain("Deletion is not confirmed.");
     const saved = join(artifactDir, "request-receipt.txt");
-    await writeFile(saved, text);
+    await writeFile(saved, bytes);
     await app.screenshot("receipt-before-auth-cleanup");
     let progress;
     for (let i = 0; i < 10; i++) {
@@ -159,7 +164,10 @@ test(
     await screen.getByLabel("Password", { exact: true }).fill(password);
     await screen.getByRole("button", "Log in", { exact: true }).tap();
     await expect(screen.getByRole("alert")).toBeVisible();
-    expect(await readFile(saved, "utf8")).toBe(text);
+    await expect(screen.getByRole("alert")).toHaveText(
+      "Incorrect login or password.",
+    );
+    expect((await readFile(saved)).equals(bytes)).toBe(true);
     expect(await call("users/receipts:lookup", { reference })).toEqual(receipt);
     await app.screenshot("receipt-after-auth-cleanup");
   },
