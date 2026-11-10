@@ -24,6 +24,8 @@ const excluded = [
   ".github/workflows/product-checks.yml",
   ".github/scripts/play-bundle.sh",
   ".github/scripts/play-bundle.test.py",
+  ".github/scripts/android-release.test.py",
+  ".github/ANDROID-RELEASE.md",
   ".github/scripts/product-browser-check.py",
   ".github/scripts/product-browser-check-test.py",
   "packages/tests/ui-telemetry-policy.test.ts",
@@ -157,7 +159,8 @@ test("product browser gate uses the reusable exact-source workflow", async () =>
       web: { needs: string[]; if: string };
       publish: { needs: string[] };
       packages: { needs: string[] };
-      "android-play": { needs: string[] };
+      android: { needs: string[] };
+      "android-submit": { needs: string; if: string };
     };
   };
   const reusable = (await parseWorkflow("product-checks.yml")) as {
@@ -202,8 +205,10 @@ test("product browser gate uses the reusable exact-source workflow", async () =>
       status === "success",
     );
   }
-  for (const name of ["publish", "packages", "android-play"] as const)
+  for (const name of ["publish", "packages", "android"] as const)
     assert.ok(pipeline.jobs[name].needs.includes("web"));
+  assert.equal(pipeline.jobs["android-submit"].needs, "android");
+  assert.match(pipeline.jobs["android-submit"].if, /ANDROID_PLAY_SUBMIT/);
   const checkout = reusable.jobs.check.steps.find((step) =>
     step.uses?.startsWith("actions/checkout@"),
   );
@@ -391,8 +396,35 @@ test("packaged starter and generated profiles exclude product proof fixtures", a
       );
       assert.doesNotMatch(
         workflow,
-        /android-play|play-bundle\.sh|product-checks/,
+        /android-play|play-bundle\.sh|product-checks|DISPOSABL_ANDROID_PLAY_ENABLED|Verify product Play identity|Allocate product Android version/,
       );
+      const parsed = Bun.YAML.parse(workflow) as {
+        jobs: Record<
+          string,
+          { if?: string; needs?: string; steps?: { run?: string }[] }
+        >;
+      };
+      assert.equal(
+        parsed.jobs.android.if,
+        "needs.web.outputs.android_build == 'true'",
+      );
+      assert.equal(parsed.jobs["android-submit"].needs, "android");
+      assert.match(
+        parsed.jobs["android-submit"].if ?? "",
+        /ANDROID_PLAY_SUBMIT == 'true'/,
+      );
+      const mobileScript = await readFile(
+        join(root, ".github/scripts/mobile.sh"),
+        "utf8",
+      );
+      for (const helper of mobileScript.matchAll(
+        /\.github\/scripts\/([\w-]+\.(?:mjs|sh))/g,
+      )) {
+        assert.ok(
+          existsSync(join(root, ".github/scripts", helper[1])),
+          `Missing Android helper ${helper[1]}`,
+        );
+      }
       const easPath = join(root, "apps/mobile/eas.json");
       if (existsSync(easPath)) {
         const eas = JSON.parse(await readFile(easPath, "utf8"));
