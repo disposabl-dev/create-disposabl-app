@@ -3,10 +3,12 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 
 const base = process.env.BILLING_HANDOFF_LOCAL_URL;
-if (base && base !== "http://127.0.0.1:3540")
-  throw new Error("The billing handoff fixture requires loopback port 3540.");
+if (base && !["http://127.0.0.1:3540", "http://127.0.0.1:3530"].includes(base))
+  throw new Error(
+    "The billing handoff fixture requires loopback port 3530 or 3540.",
+  );
 async function call(
-  kind: "query" | "mutation",
+  kind: "query" | "mutation" | "action",
   path: string,
   args: object,
   token?: string,
@@ -32,6 +34,10 @@ async function call(
       )
     )
       throw new Error("billing ineligible");
+    if (result.errorMessage?.includes("Source session is no longer active."))
+      throw new Error("source session inactive");
+    if (result.errorMessage?.includes("Please sign in to use payments."))
+      throw new Error("billing authentication required");
     throw new Error(`${path} rejected`);
   }
   return result.value;
@@ -152,7 +158,7 @@ test(
       owner.tokens.accessToken,
     );
     assert.equal(await inspect(pending.code), null);
-    await assert.rejects(redeem(pending.code));
+    await assert.rejects(redeem(pending.code), /source session inactive/);
   },
 );
 
@@ -249,5 +255,133 @@ test(
       /billing ineligible/,
     );
     assert.equal(await hasAttempt(handoff.userId, blocked), false);
+  },
+);
+
+test(
+  "redeemed browser remains A after source logout and B sign-in, then revokes",
+  { skip: !base },
+  async () => {
+    await preflight();
+    const sourceA = await signup();
+    const pending = await create(sourceA.tokens.accessToken);
+    assert.equal(
+      await call("query", "fixtureBillingHandoff:sessionCount", {
+        userId: pending.userId,
+      }),
+      1,
+    );
+    await call(
+      "mutation",
+      "auth:signOut",
+      { refreshToken: sourceA.tokens.refreshToken },
+      sourceA.tokens.accessToken,
+    );
+    assert.equal(
+      await call("query", "fixtureBillingHandoff:sessionCount", {
+        userId: pending.userId,
+      }),
+      0,
+    );
+    await assert.rejects(redeem(pending.code), /source session inactive/);
+    assert.equal(
+      await call("query", "fixtureBillingHandoff:sessionCount", {
+        userId: pending.userId,
+      }),
+      0,
+    );
+
+    const source = await signup();
+    const handoff = await create(source.tokens.accessToken);
+    const browser = await redeem(handoff.code);
+    assert.equal(browser.userId, handoff.userId);
+    await call(
+      "mutation",
+      "auth:signOut",
+      { refreshToken: source.tokens.refreshToken },
+      source.tokens.accessToken,
+    );
+    const other = await signup();
+    const current = await call(
+      "query",
+      "users/index:current",
+      {},
+      browser.accessToken,
+    );
+    const otherCurrent = await call(
+      "query",
+      "users/index:current",
+      {},
+      other.tokens.accessToken,
+    );
+    assert.equal(current.username, source.username);
+    assert.equal(otherCurrent.username, other.username);
+    assert.notEqual(current.id, otherCurrent.id);
+    const checkout = await call(
+      "action",
+      "billing:checkout",
+      { purchase: "topup", requestId: randomUUID() },
+      browser.accessToken,
+    );
+    assert.equal(checkout.url, "http://127.0.0.1:3549/local-test-checkout");
+    const evidence = await call(
+      "query",
+      "fixtureBillingCheckout:evidence",
+      {},
+      browser.accessToken,
+    );
+    assert.equal(evidence.userId, handoff.userId);
+    assert.equal(evidence.calls.length, 1);
+    assert.equal(evidence.calls[0].userId, handoff.userId);
+    assert.notEqual(evidence.calls[0].userId, otherCurrent.id);
+    assert.equal(
+      await call("query", "fixtureBillingHandoff:sessionCount", {
+        userId: handoff.userId,
+      }),
+      1,
+    );
+    const allBefore = await call(
+      "query",
+      "fixtureBillingHandoff:checkoutRows",
+      {},
+    );
+    await call(
+      "mutation",
+      "auth:signOut",
+      { refreshToken: browser.refreshToken },
+      browser.accessToken,
+    );
+    assert.equal(
+      await call("query", "fixtureBillingHandoff:sessionCount", {
+        userId: handoff.userId,
+      }),
+      0,
+    );
+    await assert.rejects(
+      call(
+        "action",
+        "billing:checkout",
+        { purchase: "topup", requestId: randomUUID() },
+        browser.accessToken,
+      ),
+      /billing authentication required/,
+    );
+    assert.deepEqual(
+      await call("query", "fixtureBillingHandoff:checkoutRows", {}),
+      allBefore,
+    );
+    const freshA = await call("mutation", "auth:signInWithUsernamePassword", {
+      username: source.username,
+      password: source.password,
+    });
+    assert.equal(freshA.status, "complete");
+    const after = await call(
+      "query",
+      "fixtureBillingCheckout:evidence",
+      {},
+      freshA.tokens.accessToken,
+    );
+    assert.equal(after.calls.length, 1);
+    assert.equal(after.attempts.length, evidence.attempts.length);
   },
 );
