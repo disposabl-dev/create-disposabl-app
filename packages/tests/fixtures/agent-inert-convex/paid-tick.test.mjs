@@ -48,12 +48,15 @@ mock.module(paths("boat.ts"), () => ({
       if (state.changeAt === "resume") state.change();
       return { sandboxId: "synthetic", state: "ready" };
     },
-    stop: async () => {
+    stop: async (_ctx, ref) => {
+      expect(ref).toEqual({ ownerId: "owner", key: "workspace" });
+      state.remotePaths.push("/stop");
       state.calls.stop++;
       return { sandboxId: "synthetic", state: "ready" };
     },
     prompt: async () => {
       state.calls.prompt++;
+      if (state.changeAt === "prompt") state.change();
       return { promptId: "prompt", conversationId: "conversation" };
     },
     promptStatus: async () => {
@@ -68,7 +71,10 @@ mock.module(paths("boat.ts"), () => ({
     state.calls.request++;
     if (!state.stopRequests) throw new Error("unexpected provider request");
     state.remotePaths.push(path);
-    if (path.startsWith("/interrupt?")) return {};
+    if (path === "/interrupt" || path.startsWith("/interrupt?")) {
+      if (state.interruptError) throw state.interruptError;
+      return {};
+    }
     if (path === "/conversations")
       return {
         conversations: [
@@ -103,7 +109,11 @@ mock.module(paths("attachments.ts"), () => ({
 }));
 const { tick } = await import(paths("actions/run.ts"));
 const { enqueueMessageHandler } = await import(paths("internal.ts"));
-const { finish, claim: claimWorker } = await import(paths("state.ts"));
+const {
+  finish,
+  delivered,
+  claim: claimWorker,
+} = await import(paths("state.ts"));
 const { settle, stopping, stopped, workBlocked } = await import(
   paths("compute.ts")
 );
@@ -317,7 +327,8 @@ function make({
         return state.queued
           ? { prompt: "synthetic", messageId: "message", fileIds: [] }
           : null;
-      if (name === "agent/state:delivered") return false;
+      if (name === "agent/state:delivered")
+        return delivered._handler(ctx, args);
       if (name === "agent/state:finish") {
         state.finishes.push(args);
         return finish._handler(ctx, args);
@@ -370,6 +381,7 @@ test("denied and uncertain renewal preserve sandbox stop without claiming it suc
       sessionState: "renewing",
       paidUntil: Date.now() - 1,
       status: "processing",
+      stopRequests: true,
       agent: { delivery: "uncertain-delivery" },
     });
     await f.run();
@@ -413,7 +425,7 @@ test("denied and uncertain renewal preserve sandbox stop without claiming it suc
     expect(f.state.calls.prompt).toBe(0);
     expect(f.state.calls.network).toBe(0);
     expect(f.state.calls.debit).toBe(0);
-    expect(f.state.remotePaths).toEqual([]);
+    expect(f.state.remotePaths).toEqual(["/interrupt", "/stop"]);
   }
 });
 
@@ -770,4 +782,90 @@ test("pre-deployment paid action cannot acquire a new worker lease", async () =>
   });
   expect(current?.lease?.token).toBe("current-code");
   expect(current?.lease?.activationProtocol).toBe(1);
+});
+
+test("late prompt acknowledgement after expiry interrupts before the access gate", async () => {
+  const f = make({
+    changeAt: "prompt",
+    changeKind: "expiry",
+    stopRequests: true,
+    agent: { delivery: undefined, pending: ["message"] },
+  });
+  await f.run();
+  expect(f.state.calls.prompt).toBe(1);
+  expect(f.state.remotePaths).toEqual(["/interrupt?conversation=conversation"]);
+  expect(f.state.app.agent.status).toBe("stopping");
+  expect(f.state.app.agent.promptId).toBe("prompt");
+  expect(f.state.finishes.some((x) => x.suspended)).toBe(false);
+  await f.run();
+  expect(f.state.finishes.at(-1).stopped).toBe(true);
+  expect(f.state.app.agent.promptId).toBeUndefined();
+  expect(f.state.calls.debit).toBe(0);
+  expect(f.state.calls.network).toBe(0);
+});
+
+test("failed renewal routes existing work into interruption without fresh admission", async () => {
+  for (const outcome of ["denied", "unknown"]) {
+    const f = make({
+      sessionState: "renewing",
+      paidUntil: Date.now() - 1,
+      stopRequests: true,
+      queued: false,
+      agent: {
+        promptId: "prompt",
+        conversationId: "conversation",
+        delivery: undefined,
+      },
+    });
+    await f.settle({ debitId: "debit", outcome });
+    await f.run();
+    expect(f.state.app.agent.status).toBe("stopping");
+    expect(f.state.app.agent.stopUnconfirmed).toBe(true);
+    await f.run();
+    expect(f.state.remotePaths).toEqual([
+      "/interrupt?conversation=conversation",
+      "/conversations",
+    ]);
+    expect(f.state.finishes.at(-1).stopped).toBe(true);
+    expect(f.state.calls.prompt).toBe(0);
+    expect(f.state.calls.debit).toBe(0);
+    expect(f.state.calls.network).toBe(0);
+  }
+});
+
+test("failed funding interrupts the shared sandbox then stops even when interruption fails", async () => {
+  for (const failure of [
+    undefined,
+    new DOMException("timeout", "TimeoutError"),
+  ]) {
+    const f = make({
+      sessionState: "renewing",
+      paidUntil: Date.now() - 1,
+      stopRequests: true,
+      agent: { delivery: undefined },
+    });
+    f.state.otherApps.push({
+      _id: "peer",
+      userId: "owner",
+      agent: {
+        threadId: "peer-thread",
+        computeSessionId: "session",
+        status: "processing",
+        pending: [],
+        promptId: "peer-prompt",
+        conversationId: "peer-conversation",
+      },
+    });
+    const peer = structuredClone(f.state.otherApps[0]);
+    f.state.interruptError = failure;
+    await f.settle({ debitId: "debit", outcome: "denied" });
+    await f.stop();
+    expect(f.state.remotePaths).toEqual(["/interrupt", "/stop"]);
+    expect(f.state.calls.stop).toBe(1);
+    expect(f.state.session.state).toBe("stopping");
+    expect(f.state.session.stopConfirmed).not.toBe(true);
+    expect(f.state.otherApps[0]).toEqual(peer);
+    expect(f.state.calls.debit).toBe(0);
+    expect(f.state.calls.network).toBe(0);
+  }
 });

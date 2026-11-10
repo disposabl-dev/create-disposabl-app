@@ -417,7 +417,6 @@ export const tick = internalAction({
           promptId,
           conversationId,
         });
-        if (!(await canWork())) return null;
         if (stopping) {
           await request(
             sandbox.sandboxId,
@@ -429,6 +428,7 @@ export const tick = internalAction({
           });
           return null;
         }
+        if (!(await canWork())) return null;
         run = object(await boat.promptStatus(ctx, { ...ref, promptId }));
       }
       phase = "sync-responses";

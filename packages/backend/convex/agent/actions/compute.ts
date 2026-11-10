@@ -4,7 +4,7 @@ import { v } from "convex/values";
 import { components, internal } from "../../_generated/api";
 import { env, type ActionCtx } from "../../_generated/server";
 import type { Doc, Id } from "../../_generated/dataModel";
-import { boat, sandboxRef } from "../boat";
+import { boat, request, sandboxRef } from "../boat";
 import { debitCompute } from "../computeDebit";
 import { observeNoticeBalance } from "../noticeBalance";
 import { computeSessionArgs } from "../computeValidator";
@@ -74,43 +74,59 @@ export async function computeAccess(
 export const stop = internalAction({
   args: computeSessionArgs,
   returns: v.null(),
-  handler: async (ctx, { sessionId }) => {
-    const token = crypto.randomUUID();
-    if (
-      !(await ctx.runMutation(internal.agent.compute.stopping, {
-        sessionId,
-        token,
-      }))
-    )
-      return null;
-    const session = await ctx.runQuery(internal.agent.compute.get, {
-      sessionId,
-    });
-    if (!session) return null;
-    const ref = sandboxRef(session.userId);
-    let archived = false;
-    try {
-      let sandbox = await ctx.runQuery(components.boat.sandboxes.get, ref);
-      // A missing local reference cannot rule out a remote sandbox.
-      if (sandbox?.sandboxId) {
-        sandbox = await boat.refresh(ctx, ref);
-        if (sandbox.state !== "archived") sandbox = await boat.stop(ctx, ref);
-        if (sandbox.state !== "archived") return null;
-        archived = true;
-      }
-    } catch {
-      // Recovery was scheduled before the call. Never infer a successful snapshot.
-      console.error("compute_stop_unconfirmed");
-    } finally {
-      await ctx.runMutation(internal.agent.compute.stopped, {
-        sessionId,
-        token,
-        archived,
-      });
-    }
-    return null;
-  },
+  handler: (ctx, { sessionId }) => stopSandbox(ctx, sessionId),
 });
+
+export async function stopSandbox(
+  ctx: ActionCtx,
+  sessionId: Id<"computeSessions">,
+  interrupt = (sandboxId: string) => request(sandboxId, "/interrupt"),
+) {
+  const token = crypto.randomUUID();
+  if (
+    !(await ctx.runMutation(internal.agent.compute.stopping, {
+      sessionId,
+      token,
+    }))
+  )
+    return null;
+  const session = await ctx.runQuery(internal.agent.compute.get, {
+    sessionId,
+  });
+  if (!session) return null;
+  const ref = sandboxRef(session.userId);
+  let archived = false;
+  try {
+    let sandbox = await ctx.runQuery(components.boat.sandboxes.get, ref);
+    // A missing local reference cannot rule out a remote sandbox.
+    if (sandbox?.sandboxId) {
+      sandbox = await boat.refresh(ctx, ref);
+      if (sandbox.state !== "archived") {
+        try {
+          // All apps share this user's expired sandbox. Interrupt all its
+          // conversations, including deliveries whose response was lost.
+          await interrupt(sandbox.sandboxId!);
+        } catch {
+          // Cancellation is best effort; still request a preserving stop.
+          console.error("compute_interrupt_unconfirmed");
+        }
+        sandbox = await boat.stop(ctx, ref);
+      }
+      if (sandbox.state !== "archived") return null;
+      archived = true;
+    }
+  } catch {
+    // Recovery was scheduled before the call. Never infer a successful snapshot.
+    console.error("compute_stop_unconfirmed");
+  } finally {
+    await ctx.runMutation(internal.agent.compute.stopped, {
+      sessionId,
+      token,
+      archived,
+    });
+  }
+  return null;
+}
 
 /** Retry only the non-consuming observation and queue, never the debit. */
 export async function deliverNotice(

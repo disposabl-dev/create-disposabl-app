@@ -4,6 +4,18 @@ import {
 } from "convex/server";
 import { v } from "convex/values";
 import {
+  claimActivation as claimRealActivation,
+  completeActivation as completeRealActivation,
+} from "../../../../backend/convex/agent/activation";
+export const claimActivation = mutation({
+  args: { sessionId: v.id("computeSessions"), token: v.string() },
+  handler: (ctx, args) => claimRealActivation(ctx as any, args),
+});
+export const completeActivation = mutation({
+  args: { sessionId: v.id("computeSessions"), token: v.string() },
+  handler: (ctx, args) => completeRealActivation(ctx as any, args),
+});
+import {
   resolve,
   resolveConflicts,
 } from "../../../../backend/convex/agent/computeRecovery";

@@ -348,3 +348,17 @@ test("two current workers in the same session make progress through one activati
     "ready",
   );
 });
+
+test("a stale stop cannot interrupt a replacement user session", async () => {
+  const f = fixture();
+  const original = f.rows.find((row: any) => row._id === "s")!;
+  original.state = "stopping";
+  original.activation = "active";
+  f.rows.push({ ...original, _id: "replacement", state: "active" });
+  assert.equal(
+    await (stopping as any)._handler(f.ctx, { sessionId: "s", token: "stale" }),
+    false,
+  );
+  assert.equal(original.stopLease, undefined);
+  assert.equal(f.jobs.length, 0);
+});
