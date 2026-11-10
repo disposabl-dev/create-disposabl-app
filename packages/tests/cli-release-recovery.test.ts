@@ -43,12 +43,12 @@ const readWorkflow = (name: string) =>
   );
 const workflow = readWorkflow("publish");
 const productChecks = readWorkflow("product-checks");
+const productAction = readWorkflow("../actions/product-checks/action");
 const steps = workflow.jobs.cli.steps;
 const step = (name: string, job = "cli") =>
-  (job === "product"
-    ? productChecks.jobs.check
-    : workflow.jobs[job]
-  ).steps.find((s: { name?: string }) => s.name === name).run as string;
+  (job === "product" ? productAction.runs : workflow.jobs[job]).steps.find(
+    (s: { name?: string }) => s.name === name,
+  ).run as string;
 
 test("verification budget leaves time for release work", () => {
   const maximumVerificationSeconds = 25 * 2 * 10 + 24 * 20;
@@ -240,7 +240,7 @@ test("shared checks use the resolved SHA and block every failed or skipped gate"
     "${{ jobs.check.outputs.source_sha }}",
   );
   expect(productChecks.jobs.check.outputs.source_sha).toBe(
-    "${{ steps.source.outputs.sha }}",
+    "${{ steps.checks.outputs.source_sha }}",
   );
   for (const job of ["cli", "publish"]) {
     const verification = workflow.jobs[job].steps.find(
@@ -936,7 +936,7 @@ test("recovery rejects absent or outdated browser harness before testing or publ
 });
 
 test("unit step runs historical recovery suites and propagates failures", () => {
-  const unit = productChecks.jobs.check.steps.find(
+  const unit = productAction.runs.steps.find(
     (s: { name?: string }) => s.name === "Run standard unit suite",
   );
   expect(unit["working-directory"]).toBe("packages/tests");

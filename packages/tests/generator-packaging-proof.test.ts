@@ -22,6 +22,8 @@ import {
 const excluded = [
   ".github/workflows/play-bundle.yml",
   ".github/workflows/product-checks.yml",
+  ".github/actions/product-checks",
+  ".github/scripts/ci-graph.test.ts",
   ".github/scripts/play-bundle.sh",
   ".github/scripts/play-bundle.test.py",
   ".github/scripts/android-release.test.py",
@@ -133,7 +135,7 @@ const excluded = [
   "packages/tests/fixtures/low-credit-convex",
 ];
 
-test("product browser gate uses the reusable exact-source workflow", async () => {
+test("product browser gate shares exact-source checks with publication", async () => {
   const parseWorkflow = async (name: string) => {
     const input = await readFile(
       join(import.meta.dirname, "../../.github/workflows", name),
@@ -152,10 +154,14 @@ test("product browser gate uses the reusable exact-source workflow", async () =>
   };
   const pipeline = (await parseWorkflow("pipeline.yml")) as {
     jobs: {
-      "product-checks": {
-        uses: string;
-        with: { source_sha: string };
-        secrets?: unknown;
+      changes: {
+        steps: Array<{
+          name?: string;
+          uses?: string;
+          with?: { source_sha: string };
+          env?: Record<string, string>;
+          secrets?: unknown;
+        }>;
       };
       web: { needs: string[]; if: string };
       publish: { needs: string[] };
@@ -179,9 +185,23 @@ test("product browser gate uses the reusable exact-source workflow", async () =>
       };
     };
   };
-  const gate = pipeline.jobs["product-checks"];
-  assert.equal(gate.uses, "./.github/workflows/product-checks.yml");
-  assert.ok(pipeline.jobs.web.needs.includes("product-checks"));
+  const action = (await parseWorkflow(
+    "../actions/product-checks/action.yml",
+  )) as {
+    runs: { steps: typeof reusable.jobs.check.steps };
+  };
+  const gate = pipeline.jobs.changes.steps.find(
+    (step) => step.name === "Product checks",
+  );
+  assert.ok(gate);
+  assert.equal(gate.uses, "./.github/actions/product-checks");
+  assert.equal(gate.env?.GH_TOKEN, "");
+  assert.deepEqual(pipeline.jobs.web.needs, ["changes"]);
+  assert.equal(
+    reusable.jobs.check.steps.find((step) => step.name === "Product checks")
+      ?.uses,
+    gate.uses,
+  );
   const webAllowed = new Function(
     "needs",
     "github",
@@ -193,8 +213,7 @@ test("product browser gate uses the reusable exact-source workflow", async () =>
     assert.equal(
       webAllowed(
         {
-          changes: { result: "success", outputs: { changed: "true" } },
-          "product-checks": { result: status },
+          changes: { result: status, outputs: { changed: "true" } },
         },
         {
           repository: "disposabl-dev/create-disposabl-app",
@@ -215,7 +234,7 @@ test("product browser gate uses the reusable exact-source workflow", async () =>
   );
   assert.equal(checkout?.with?.ref, "${{ inputs.source_sha }}");
   const runStep = (name: string) =>
-    reusable.jobs.check.steps.find((step) => step.name === name)?.run ?? "";
+    action.runs.steps.find((step) => step.name === name)?.run ?? "";
   assert.equal(
     runStep("Install frozen dependencies"),
     "bun install --frozen-lockfile",
@@ -232,7 +251,7 @@ test("product browser gate uses the reusable exact-source workflow", async () =>
   );
   assert.match(runStep("Run isolated product web and backend E2E"), /env -i/);
   assert.match(
-    gate.with.source_sha,
+    gate.with?.source_sha ?? "",
     /github\.event\.pull_request\.head\.sha \|\| github\.sha/,
   );
   assert.equal(gate.secrets, undefined);
@@ -282,7 +301,7 @@ spec.loader.exec_module(module)
   } finally {
     await rm(cacheFixture, { recursive: true, force: true });
   }
-  const steps = reusable.jobs.check.steps as Array<{
+  const steps = action.runs.steps as Array<{
     name?: string;
     run?: string;
   }>;
