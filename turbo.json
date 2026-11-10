@@ -19,6 +19,13 @@
     "typecheck": {
       "dependsOn": ["^typecheck"]
     },
+    "@disposabl/tests#typecheck": {
+      "dependsOn": ["^typecheck", "@disposabl/sdk#typecheck"]
+    },
+    "@disposabl/sdk#typecheck": {
+      "dependsOn": ["^typecheck"],
+      "cache": false
+    },
     "@disposabl/web#typecheck": {
       "dependsOn": ["^typecheck"],
       "inputs": ["$TURBO_DEFAULT$", "!src/routeTree.gen.ts"],

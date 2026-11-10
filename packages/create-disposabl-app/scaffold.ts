@@ -179,6 +179,18 @@ export const Route = createFileRoute("/_providers/_authenticated/dashboard")({
       await writeFile(turboPath, JSON.stringify(turbo, null, 2) + "\n");
       await rm(join(destination, "packages/disposabl-kit/server/lib/docs.ts"));
     }
+    const turboPath = join(destination, "turbo.json");
+    const turbo = JSON.parse(await readFile(turboPath, "utf8"));
+    if (folders.includes("packages/sdk")) {
+      turbo.tasks["@disposabl/tests#typecheck"].dependsOn = [
+        "^typecheck",
+        `${name}-sdk#typecheck`,
+      ];
+      turbo.tasks[`${name}-sdk#typecheck`] =
+        turbo.tasks["@disposabl/sdk#typecheck"];
+    } else delete turbo.tasks["@disposabl/tests#typecheck"];
+    delete turbo.tasks["@disposabl/sdk#typecheck"];
+    await writeFile(turboPath, JSON.stringify(turbo, null, 2) + "\n");
     for (const kind of ["cli", "sdk"]) {
       const folder = join(destination, "packages", kind);
       if (!folders.includes(`packages/${kind}`)) {
