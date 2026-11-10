@@ -57,9 +57,24 @@ const step = (name: string, job = "cli") =>
   ).run as string;
 
 test("verification budget leaves time for release work", () => {
-  const maximumVerificationSeconds = 25 * 2 * 10 + 24 * 20;
-  expect(workflow.jobs.publish["timeout-minutes"]).toBe(60);
-  expect(60 * 60 - 2 * maximumVerificationSeconds).toBe(1640);
+  const cli = step("Verify published CLI release and tag");
+  const generator = step(
+    "Verify published generator release and tag",
+    "publish",
+  );
+  const budgets = [cli, generator].map((source) => {
+    const match = source.match(/deadline=\$\(\(SECONDS \+ (\d+)\)\)/);
+    expect(match).not.toBeNull();
+    const seconds = Number(match![1]);
+    expect(source).toContain('--max-time "$remaining"');
+    expect(source).toContain("while (( SECONDS < deadline ))");
+    return seconds;
+  });
+  expect(budgets).toEqual([1200, 1200]);
+  expect(
+    workflow.jobs.publish["timeout-minutes"] * 60 -
+      budgets.reduce((a, b) => a + b, 0),
+  ).toBeGreaterThanOrEqual(1200);
 });
 
 test("conflicting recovery inputs run validation and fail visibly", () => {
@@ -174,7 +189,7 @@ function fixture() {
     if [[ "$url" == */latest ]]; then
       attempt=$(cat "$RUNNER_TEMP/verify-attempt" 2>/dev/null || echo 0)
       version=1.1.0
-      if [[ "$VERIFY_MODE" == persistent || ( "$VERIFY_MODE" == delayed && "$attempt" == 1 ) || ( "$VERIFY_MODE" == late && "$attempt" -lt 23 ) ]]; then version=1.0.0; fi
+      if [[ "$VERIFY_MODE" == persistent || ( "$VERIFY_MODE" == delayed && "$attempt" == 1 ) || ( "$VERIFY_MODE" == late && "$attempt" -lt 27 ) ]]; then version=1.0.0; fi
       integrity=sha512-test; [[ "$VERIFY_MODE" != integrity ]] || integrity=sha512-wrong
       printf '{"name":"%s","version":"%s","dist":{"integrity":"%s"}}' "\${PACKAGE_NAME:-@disposabl/cli}" "$version" "$integrity" > "$output"; printf 200; exit
     fi
@@ -183,11 +198,14 @@ function fixture() {
     if [[ "$VERIFY_MODE" == auth ]]; then printf 401; exit; fi
     if [[ "$VERIFY_MODE" == network && "$attempt" == 1 ]]; then exit 7; fi
     if [[ "$VERIFY_MODE" == malformed ]]; then printf 'private-marker-not-json' > "$output"; printf 200; exit; fi
-    if [[ "$VERIFY_MODE" == persistent || ( "$VERIFY_MODE" == delayed && "$attempt" == 1 ) || ( "$VERIFY_MODE" == late && "$attempt" -lt 23 ) ]]; then printf 404; exit; fi
+    if [[ "$VERIFY_MODE" == persistent || ( "$VERIFY_MODE" == delayed && "$attempt" == 1 ) || ( "$VERIFY_MODE" == late && "$attempt" -lt 27 ) ]]; then printf 404; exit; fi
     name=\${PACKAGE_NAME:-@disposabl/cli}; [[ "$VERIFY_MODE" != contradictory ]] || name=wrong-package
     printf '{"name":"%s","version":"1.1.0","dist":{"integrity":"sha512-test"}}' "$name" > "$output"; printf 200`,
   );
-  script("sleep", 'echo sleep >> "$RUNNER_TEMP/verify-sleeps"');
+  writeFileSync(
+    join(dir, "bash-env"),
+    'unset SECONDS; SECONDS=0\nsleep() { echo sleep >> "$RUNNER_TEMP/verify-sleeps"; SECONDS=$((SECONDS + $1)); }\n',
+  );
   script("gh", "exit 0");
   script("bun", "exit 0");
   const run = (
@@ -203,6 +221,7 @@ function fixture() {
         ...process.env,
         PATH: `${bin}:${process.env.PATH}`,
         RUNNER_TEMP: dir,
+        BASH_ENV: join(dir, "bash-env"),
         GITHUB_WORKSPACE: dir,
         REAL_NPM: execFileSync("which", ["npm"], { encoding: "utf8" }).trim(),
         npm_config_userconfig: join(dir, "empty-npmrc"),
@@ -437,7 +456,7 @@ test(
   { timeout: 30000 },
   () => {
     for (const [mode, attempts, sleeps] of [
-      ["persistent", "25", 24],
+      ["persistent", "60", 60],
       ["contradictory", "1", 0],
       ["malformed", "1", 0],
       ["integrity", "1", 0],
@@ -474,7 +493,7 @@ test(
     for (const [mode, ok, attempts] of [
       ["delayed", true, "2"],
       ["network", true, "2"],
-      ["persistent", false, "25"],
+      ["persistent", false, "60"],
       ["contradictory", false, "1"],
       ["malformed", false, "1"],
       ["integrity", false, "1"],
@@ -533,16 +552,16 @@ test(
       );
       expect(result.status).toBe(0);
       expect(readFileSync(join(f.dir, "verify-attempt"), "utf8").trim()).toBe(
-        "23",
+        "27",
       );
       expect(
         readFileSync(join(f.dir, "verify-sleeps"), "utf8").trim().split("\n")
           .length,
-      ).toBe(22);
-      expect(result.stdout).toContain("attempt 1/25: exact HTTP 404");
-      expect(result.stdout).toContain("attempt 1/25: latest HTTP 200");
+      ).toBe(26);
+      expect(result.stdout).toContain("attempt 1: exact HTTP 404");
+      expect(result.stdout).toContain("attempt 1: latest HTTP 200");
       expect(result.stdout).toContain("latest version 1.0.0; expected 1.1.0");
-      expect(result.stdout).toContain("attempt 23/25: exact HTTP 200");
+      expect(result.stdout).toContain("attempt 27: exact HTTP 200");
       expect(readFileSync(join(f.dir, "published"), "utf8")).toBe("publish\n");
     }
   },
