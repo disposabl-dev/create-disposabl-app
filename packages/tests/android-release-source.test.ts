@@ -44,7 +44,7 @@ test("queued product Android source is accepted only while its event commit rema
       CURRENT: newer,
     };
     const run = (
-      patch: NodeJS.ProcessEnv = {},
+      patch: Record<string, string | undefined> = {},
       platform = "android",
       context = "build",
     ) =>

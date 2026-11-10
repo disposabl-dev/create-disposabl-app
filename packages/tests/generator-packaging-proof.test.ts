@@ -417,7 +417,16 @@ test("packaged starter and generated profiles exclude product proof fixtures", a
         workflow,
         /android-play|play-bundle\.sh|product-checks|DISPOSABL_ANDROID_PLAY_ENABLED|Verify product Play identity|Allocate product Android version/,
       );
-      const parsed = Bun.YAML.parse(workflow) as {
+      const yaml = spawnSync(
+        process.execPath,
+        [
+          "-e",
+          "console.log(JSON.stringify(Bun.YAML.parse(await Bun.stdin.text())))",
+        ],
+        { input: workflow, encoding: "utf8" },
+      );
+      assert.equal(yaml.status, 0, yaml.stderr);
+      const parsed = JSON.parse(yaml.stdout) as {
         jobs: Record<
           string,
           { if?: string; needs?: string; steps?: { run?: string }[] }
