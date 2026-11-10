@@ -137,6 +137,8 @@ rm "../../dist/release/$artifact"
 signing
 bash ../../.github/scripts/android-runner.sh check
 MANIFEST=$(manifest)
+bun x --no-install expo config --json > "$RUNNER_TEMP/android-config.json"
+node scripts/android-release-verify.mjs inputs "$RUNNER_TEMP/android-config.json" "$MANIFEST"
 test "$(gh api "repos/$GH_REPO/$SOURCE_PATH" --jq 'if has("head") then (if .state == "open" then .head.sha else "closed" end) else .object.sha end')" = "$SOURCE"
 bun x --no-install expo prebuild --platform android --no-install
 test "$(bun x --no-install expo-updates runtimeversion:resolve --platform android --workflow managed | jq -er .runtimeVersion)" = "$RUNTIME"
@@ -155,8 +157,10 @@ else
 fi
 node ../../.github/scripts/verify-android-abis.mjs "$binary" "$MANIFEST"
 certificate=$(node ../../.github/scripts/android-signatures.mjs "$binary" "$ANDROID_SIGNING_ID")
+node scripts/android-release-verify.mjs artifact "$RUNNER_TEMP/android-config.json" "$MANIFEST" "$binary" "$certificate"
 if [[ "$CHANNEL" == production && "$ANDROID_SIGNING_MODE" == release ]]; then
   node ../../.github/scripts/android-signatures.mjs ../../dist/release/android.aab "$certificate" >/dev/null
+  node scripts/android-release-verify.mjs artifact "$RUNNER_TEMP/android-config.json" "$MANIFEST" ../../dist/release/android.aab "$certificate"
 fi
 test "$(unzip -p "$binary" "$fingerprint")" = "$RUNTIME"
 test "$(bun x --no-install expo-updates runtimeversion:resolve --platform android --workflow managed | jq -er .runtimeVersion)" = "$RUNTIME"

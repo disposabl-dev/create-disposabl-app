@@ -106,6 +106,7 @@ jobs:
         run: |
           python3 .github/scripts/play-bundle.test.py
           python3 .github/scripts/android-release.test.py
+          node --test .github/scripts/android-bundle-verify.test.mjs
       - &bun
         uses: oven-sh/setup-bun@v2
         with: { bun-version: *bun-version }
@@ -259,10 +260,26 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y ccache
           printf 'CCACHE_DIR=%s\nCCACHE_COMPILERCHECK=content\nCMAKE_C_COMPILER_LAUNCHER=ccache\nCMAKE_CXX_COMPILER_LAUNCHER=ccache\n' "$RUNNER_TEMP/ccache" >> "$GITHUB_ENV"
+      - name: Select Android bundle validation
+        id: bundletool-needed
+        env:
+          SIGNING_BUNDLE: ${{ github.event_name == 'push' && secrets.DISPOSABL_ANDROID_SIGNING || '' }}
+          SIGNING_STORE: ${{ github.event_name == 'push' && secrets.ANDROID_KEYSTORE_BASE64 || '' }}
+          SIGNING_PASSWORD: ${{ github.event_name == 'push' && secrets.ANDROID_KEYSTORE_PASSWORD || '' }}
+          SIGNING_ALIAS: ${{ github.event_name == 'push' && secrets.ANDROID_KEY_ALIAS || '' }}
+          SIGNING_KEY_PASSWORD: ${{ github.event_name == 'push' && secrets.ANDROID_KEY_PASSWORD || '' }}
+        run: |
+          if [[ -n "$SIGNING_BUNDLE$SIGNING_STORE$SIGNING_PASSWORD$SIGNING_ALIAS$SIGNING_KEY_PASSWORD" ]]; then echo 'needed=true' >> "$GITHUB_OUTPUT"; fi
+      - name: Download verified bundletool
+        if: steps.bundletool-needed.outputs.needed == 'true'
+        run: |
+          curl --fail --location --silent --show-error --retry 3 https://github.com/google/bundletool/releases/download/1.18.3/bundletool-all-1.18.3.jar --output "$RUNNER_TEMP/bundletool.jar"
+          echo 'a099cfa1543f55593bc2ed16a70a7c67fe54b1747bb7301f37fdfd6d91028e29  '"$RUNNER_TEMP/bundletool.jar" | sha256sum --check --status
       - name: Build
         working-directory: apps/mobile
         env:
           RUNTIME: ${{ needs.web.outputs.android_runtime }}
+          BUNDLETOOL_JAR: ${{ runner.temp }}/bundletool.jar
           UPDATE_POLICY: ${{ github.event_name == 'push' && github.repository == 'disposabl-dev/create-disposabl-app' && 'disabled' || '' }}
           DISPOSABL_ANDROID_VERSION_CODE: ${{ needs.web.outputs.android_version_code || github.run_number }}
           DISPOSABL_ANDROID_CHANNEL: *channel

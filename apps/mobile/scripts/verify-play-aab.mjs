@@ -17,13 +17,16 @@ export function verifyBundle({
   expectedCert,
   bundletool,
   production = false,
+  execute,
 }) {
-  const run = (command, args) =>
-    execFileSync(command, args, {
-      encoding: "utf8",
-      env: { ...process.env, LANG: "C", LC_ALL: "C" },
-      maxBuffer: 8 * 1024 * 1024,
-    });
+  const run =
+    execute ??
+    ((command, args) =>
+      execFileSync(command, args, {
+        encoding: "utf8",
+        env: { ...process.env, LANG: "C", LC_ALL: "C" },
+        maxBuffer: 8 * 1024 * 1024,
+      }));
   const entries = run("unzip", ["-Z1", bundle]).split("\n");
   const actual = [
     ...new Set(

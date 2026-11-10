@@ -25,6 +25,7 @@ const excluded = [
   ".github/scripts/play-bundle.sh",
   ".github/scripts/play-bundle.test.py",
   ".github/scripts/android-release.test.py",
+  ".github/scripts/android-bundle-verify.test.mjs",
   ".github/ANDROID-RELEASE.md",
   ".github/scripts/product-browser-check.py",
   ".github/scripts/product-browser-check-test.py",
@@ -424,6 +425,13 @@ test("packaged starter and generated profiles exclude product proof fixtures", a
           existsSync(join(root, ".github/scripts", helper[1])),
           `Missing Android helper ${helper[1]}`,
         );
+      }
+      if (existsSync(join(root, "apps/mobile"))) {
+        for (const helper of [
+          "apps/mobile/scripts/android-release-verify.mjs",
+          "apps/mobile/scripts/verify-play-aab.mjs",
+        ])
+          assert.ok(existsSync(join(root, helper)), `Missing ${helper}`);
       }
       const easPath = join(root, "apps/mobile/eas.json");
       if (existsSync(easPath)) {
