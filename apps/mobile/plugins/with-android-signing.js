@@ -11,7 +11,7 @@ module.exports = (config) =>
       return mod;
     mod.modResults.contents += `
 // Disposabl production APK signing. Preview APKs retain Expo's debug signing.
-if (System.getenv("DISPOSABL_ANDROID_CHANNEL") == "production") {
+if (System.getenv("DISPOSABL_ANDROID_CHANNEL") == "production" && System.getenv("ANDROID_KEYSTORE_PATH")) {
     android {
         signingConfigs {
             disposablRelease {

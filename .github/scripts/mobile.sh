@@ -1,9 +1,35 @@
 #!/usr/bin/env bash
 set -euo pipefail
+signing() {
+  ANDROID_SIGNING_MODE=fallback
+  ANDROID_SIGNING_ID=fallback
+  if [[ -n "${DISPOSABL_ANDROID_SIGNING:-}" ]]; then
+    [[ -z "${ANDROID_KEYSTORE_BASE64:-}${ANDROID_KEYSTORE_PASSWORD:-}${ANDROID_KEY_ALIAS:-}${ANDROID_KEY_PASSWORD:-}" ]] || { echo 'Conflicting Android signing inputs' >&2; return 1; }
+    local values
+    values=$(jq -er '[.keystoreBase64, .storePassword, .keyAlias, .keyPassword] | if all(.[]; type == "string" and length > 0 and (contains("\n") | not) and (contains("\r") | not)) then .[] else error("Invalid Android signing bundle") end' <<< "$DISPOSABL_ANDROID_SIGNING")
+    local -a parts
+    mapfile -t parts <<< "$values"
+    export ANDROID_KEYSTORE_BASE64="${parts[0]}" ANDROID_KEYSTORE_PASSWORD="${parts[1]}" ANDROID_KEY_ALIAS="${parts[2]}" ANDROID_KEY_PASSWORD="${parts[3]}"
+    for value in "${parts[@]}"; do printf '::add-mask::%s\n' "${value//%/%25}"; done
+  fi
+  if [[ -n "${ANDROID_KEYSTORE_BASE64:-}${ANDROID_KEYSTORE_PASSWORD:-}${ANDROID_KEY_ALIAS:-}${ANDROID_KEY_PASSWORD:-}" ]]; then
+    : "${ANDROID_KEYSTORE_BASE64:?Incomplete signing}" "${ANDROID_KEYSTORE_PASSWORD:?Incomplete signing}" "${ANDROID_KEY_ALIAS:?Incomplete signing}" "${ANDROID_KEY_PASSWORD:?Incomplete signing}"
+    export ANDROID_KEYSTORE_PATH="$RUNNER_TEMP/android-release.jks"
+    (umask 077; printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$ANDROID_KEYSTORE_PATH")
+    keytool -list -keystore "$ANDROID_KEYSTORE_PATH" -storepass "$ANDROID_KEYSTORE_PASSWORD" -alias "$ANDROID_KEY_ALIAS" >/dev/null
+    local check="$RUNNER_TEMP/android-key-check.p12"
+    rm -f "$check"
+    keytool -importkeystore -noprompt -srckeystore "$ANDROID_KEYSTORE_PATH" -srcstorepass "$ANDROID_KEYSTORE_PASSWORD" -srcalias "$ANDROID_KEY_ALIAS" -srckeypass "$ANDROID_KEY_PASSWORD" -destkeystore "$check" -deststoretype PKCS12 -deststorepass "$ANDROID_KEYSTORE_PASSWORD" >/dev/null 2>&1 || { rm -f "$check"; echo 'Invalid Android key password' >&2; return 1; }
+    rm -f "$check"
+    ANDROID_SIGNING_MODE=release
+    ANDROID_SIGNING_ID=$(keytool -exportcert -keystore "$ANDROID_KEYSTORE_PATH" -storepass "$ANDROID_KEYSTORE_PASSWORD" -alias "$ANDROID_KEY_ALIAS" | sha256sum | cut -d' ' -f1)
+  fi
+  export ANDROID_SIGNING_MODE ANDROID_SIGNING_ID
+}
 manifest() {
-  bun x --no-install expo config --json | jq -ce --arg channel "${CHANNEL:-}" --arg runtime "${RUNTIME:-}" '
+  bun x --no-install expo config --json | jq -ce --arg channel "${CHANNEL:-}" --arg runtime "${RUNTIME:-}" --arg signing "${ANDROID_SIGNING_MODE:-fallback}" --arg signingId "${ANDROID_SIGNING_ID:-fallback}" '
     def required($name): if type == "string" and (test("[^[:space:]]")) then . else error("Missing or invalid " + $name) end;
-    {channel: ($channel | required("channel")), projectId: (.extra.eas.projectId | required("projectId")), applicationId: (.android.package | required("applicationId")), runtimeVersion: ($runtime | required("runtimeVersion") | if test("^[a-f0-9]{40,64}$") then . else error("Invalid runtimeVersion") end), androidArchitectures: (.extra.disposablAndroidArchitectures | if type == "array" and length > 0 then . else error("Missing Android architectures") end)}
+    {signing: $signing, signingId: $signingId, channel: ($channel | required("channel")), projectId: (.extra.eas.projectId | required("projectId")), applicationId: (.android.package | required("applicationId")), runtimeVersion: ($runtime | required("runtimeVersion") | if test("^[a-f0-9]{40,64}$") then . else error("Invalid runtimeVersion") end), androidArchitectures: (.extra.disposablAndroidArchitectures | if type == "array" and length > 0 then . else error("Missing Android architectures") end)}
   '
 }
 case "${1:?operation required}" in
@@ -63,6 +89,8 @@ for ((offset=0; ; offset+=25)); do
 done
     ;;
   expo-fingerprint)
+signing
+trap 'rm -f "${ANDROID_KEYSTORE_PATH:-}"' EXIT
 artifact=android.apk
 export artifact
 for ((page=1; ; page++)); do
@@ -78,20 +106,13 @@ bun -e '
   const wanted = JSON.parse(process.env.MANIFEST);
   const release = await Bun.file(`${process.env.RUNNER_TEMP}/release.json`).json();
   const prior = JSON.parse(/<!-- android (\{[^\n]+\}) -->/.exec(release.body || "")?.[1] || "null");
-  const reusable = prior && Object.keys(wanted).every(k => JSON.stringify(prior[k]) === JSON.stringify(wanted[k])) && /^[a-f0-9]{64}$/.test(prior.sha256 || "") && release.assets.some(a => a.name === process.env.artifact && a.state === "uploaded" && a.size > 0 && a.digest === `sha256:${prior.sha256}`);
-  const blocked = !reusable && process.env.CHANNEL === "production" && process.env.ANDROID_SIGNING_READY !== "true";
-  if (blocked) {
-    const reason = "Configure Android production signing credentials before building a production APK.";
-    console.error(`::notice::${reason}`);
-    const report = Bun.spawnSync(["node", ".github/scripts/disposabl.mjs", "report", "android", "blocked", reason], {
-      cwd: process.env.GITHUB_WORKSPACE, stdout: "inherit", stderr: "inherit",
-    });
-    if (report.exitCode) throw new Error("Cannot report Android prerequisites.");
-  }
-  console.log(`build=${blocked ? "blocked" : !reusable}\nruntime=${wanted.runtimeVersion}\ntag=${reusable ? release.tag_name : ""}\nsha=${reusable ? prior.sha256 : ""}`);
+  const reusable = wanted.signing === "fallback" && process.env.ANDROID_PLAY_SUBMIT !== "true" && prior && Object.keys(wanted).every(k => JSON.stringify(prior[k]) === JSON.stringify(wanted[k])) && /^[a-f0-9]{64}$/.test(prior.sha256 || "") && release.assets.some(a => a.name === process.env.artifact && a.state === "uploaded" && a.size > 0 && a.digest === `sha256:${prior.sha256}`);
+  console.log(`build=${!reusable}\nruntime=${wanted.runtimeVersion}\ntag=${reusable ? release.tag_name : ""}\nsha=${reusable ? prior.sha256 : ""}`);
 ' >> "$GITHUB_OUTPUT"
     ;;
   expo-update)
+signing
+trap 'rm -f "${ANDROID_KEYSTORE_PATH:-}"' EXIT
 artifact=android.apk
 mkdir -p dist/release
 gh release download "$TAG" --pattern "$artifact" --dir dist/release
@@ -108,22 +129,11 @@ jq --arg sha "$SHA" --arg tag "$TAG" '. + {sha256: $sha, action: "update", sourc
 rm "../../dist/release/$artifact"
     ;;
   android-build)
+signing
+trap 'rm -f "${ANDROID_KEYSTORE_PATH:-}"' EXIT
 bash ../../.github/scripts/android-runner.sh check
 MANIFEST=$(manifest)
 test "$(gh api "repos/$GH_REPO/$SOURCE_PATH" --jq 'if has("head") then (if .state == "open" then .head.sha else "closed" end) else .object.sha end')" = "$SOURCE"
-if [[ "$CHANNEL" == production ]]; then
-  if [[ -n "${DISPOSABL_ANDROID_SIGNING:-}" ]]; then
-    signing_values=$(jq -er '[.keystoreBase64, .storePassword, .keyAlias, .keyPassword] | if all(.[]; type == "string" and length > 0 and (contains("\n") | not) and (contains("\r") | not)) then .[] else error("Invalid Android signing bundle") end' <<< "$DISPOSABL_ANDROID_SIGNING")
-    mapfile -t signing <<< "$signing_values"
-    for value in "${signing[@]}"; do printf '::add-mask::%s\n' "${value//%/%25}"; done
-    export ANDROID_KEYSTORE_BASE64="${signing[0]}" ANDROID_KEYSTORE_PASSWORD="${signing[1]}" ANDROID_KEY_ALIAS="${signing[2]}" ANDROID_KEY_PASSWORD="${signing[3]}"
-    unset signing_values signing value DISPOSABL_ANDROID_SIGNING
-  fi
-  : "${ANDROID_KEYSTORE_BASE64:?}" "${ANDROID_KEYSTORE_PASSWORD:?}" "${ANDROID_KEY_ALIAS:?}" "${ANDROID_KEY_PASSWORD:?}"
-  export ANDROID_KEYSTORE_PATH="$RUNNER_TEMP/android-release.jks"
-  trap 'rm -f "$ANDROID_KEYSTORE_PATH"' EXIT
-  (umask 077; printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$ANDROID_KEYSTORE_PATH")
-fi
 bun x --no-install expo prebuild --platform android --no-install
 test "$(bun x --no-install expo-updates runtimeversion:resolve --platform android --workflow managed | jq -er .runtimeVersion)" = "$RUNTIME"
 artifact=android.apk
@@ -131,12 +141,38 @@ binary=android/app/build/outputs/apk/release/app-release.apk
 fingerprint=assets/fingerprint
 
 (cd android && bash ../../../.github/scripts/android-runner.sh build)
+if [[ "$CHANNEL" == production && "$ANDROID_SIGNING_MODE" == release ]]; then
+  (cd android && ./gradlew :app:bundleRelease --no-daemon --build-cache)
+  test -s android/app/build/outputs/bundle/release/app-release.aab
+  mkdir -p ../../dist/release
+  cp android/app/build/outputs/bundle/release/app-release.aab ../../dist/release/android.aab
+else
+  echo 'Fallback-signed APK is not Play-ready.'
+fi
 node ../../.github/scripts/verify-android-abis.mjs "$binary" "$MANIFEST"
 test "$(unzip -p "$binary" "$fingerprint")" = "$RUNTIME"
 test "$(bun x --no-install expo-updates runtimeversion:resolve --platform android --workflow managed | jq -er .runtimeVersion)" = "$RUNTIME"
 mkdir -p ../../dist/release
 cp "$binary" "../../dist/release/$artifact"
-jq --arg sha "$(sha256sum "$binary" | cut -d' ' -f1)" '. + {sha256: $sha, action: "build"}' <<< "$MANIFEST" > ../../dist/release/android.json
+aab_sha=""
+if [[ -f ../../dist/release/android.aab ]]; then aab_sha=$(sha256sum ../../dist/release/android.aab | cut -d' ' -f1); fi
+jq --arg sha "$(sha256sum "$binary" | cut -d' ' -f1)" --arg aab "$aab_sha" '. + {sha256: $sha, aabSha256: $aab, action: "build"}' <<< "$MANIFEST" > ../../dist/release/android.json
+    ;;
+  android-submit)
+: "${EXPO_TOKEN:?Expo token required}" "${EXPO_PROJECT_ID:?Expo project required}" "${ANDROID_PLAY_SERVICE_ACCOUNT:?Play service account required}" "${ANDROID_PLAY_TRACK:?Play track required}" "${ANDROID_PLAY_UPLOAD_CERT_SHA256:?Play upload certificate SHA256 required}"
+[[ "$ANDROID_PLAY_TRACK" =~ ^(internal|alpha|beta|production)$ ]] || { echo 'Invalid Play track' >&2; exit 1; }
+[[ "$ANDROID_PLAY_UPLOAD_CERT_SHA256" =~ ^[a-f0-9]{64}$ ]] || { echo 'Invalid Play upload certificate SHA256' >&2; exit 1; }
+jq -e --arg cert "$ANDROID_PLAY_UPLOAD_CERT_SHA256" '.signing == "release" and .signingId == $cert' ../../dist/release/android.json >/dev/null || { echo 'Android upload certificate mismatch' >&2; exit 1; }
+test -s ../../dist/release/android.aab || { echo 'Signed Android bundle required for submission' >&2; exit 1; }
+printf '%s  %s\n' "$(jq -er '.aabSha256 | select(test("^[a-f0-9]{64}$"))' ../../dist/release/android.json)" ../../dist/release/android.aab | sha256sum -c -
+jq -e '.type == "service_account" and (.client_email | type == "string" and length > 0) and (.private_key | type == "string" and length > 0)' <<< "$ANDROID_PLAY_SERVICE_ACCOUNT" >/dev/null
+key="$RUNNER_TEMP/play-service-account.json"
+(umask 077; printf '%s' "$ANDROID_PLAY_SERVICE_ACCOUNT" > "$key")
+cp eas.json "$RUNNER_TEMP/eas-original.json"
+trap 'mv "$RUNNER_TEMP/eas-original.json" eas.json; rm -f "$key"' EXIT
+jq --arg key "$key" --arg track "$ANDROID_PLAY_TRACK" '.submit.production.android = {serviceAccountKeyPath: $key, track: $track, releaseStatus: "draft"}' "$RUNNER_TEMP/eas-original.json" > eas.json
+test "$(gh api "repos/$GH_REPO/$SOURCE_PATH" --jq 'if has("head") then (if .state == "open" then .head.sha else "closed" end) else .object.sha end')" = "$SOURCE"
+bun x "$EAS_CLI" submit --platform android --profile production --path ../../dist/release/android.aab --non-interactive --wait
     ;;
   *) echo "Unknown operation: $1" >&2; exit 1 ;;
 esac

@@ -84,7 +84,12 @@ jobs:
       convex_site_url: ${{ steps.deploy.outputs.CONVEX_SITE_URL }}
     env:
       PLATFORM: android
-      ANDROID_SIGNING_READY: ${{ secrets.DISPOSABL_ANDROID_SIGNING != '' || (secrets.ANDROID_KEYSTORE_BASE64 != '' && secrets.ANDROID_KEYSTORE_PASSWORD != '' && secrets.ANDROID_KEY_ALIAS != '' && secrets.ANDROID_KEY_PASSWORD != '') }}
+      DISPOSABL_ANDROID_SIGNING: ${{ github.event_name == 'push' && secrets.DISPOSABL_ANDROID_SIGNING || '' }}
+      ANDROID_KEYSTORE_BASE64: ${{ github.event_name == 'push' && secrets.ANDROID_KEYSTORE_BASE64 || '' }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ github.event_name == 'push' && secrets.ANDROID_KEYSTORE_PASSWORD || '' }}
+      ANDROID_KEY_ALIAS: ${{ github.event_name == 'push' && secrets.ANDROID_KEY_ALIAS || '' }}
+      ANDROID_KEY_PASSWORD: ${{ github.event_name == 'push' && secrets.ANDROID_KEY_PASSWORD || '' }}
+      ANDROID_PLAY_SUBMIT: ${{ vars.ANDROID_PLAY_SUBMIT }}
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
       EXPO_PROJECT_ID: ${{ secrets.EXPO_PROJECT_ID || vars.EXPO_PROJECT_ID }}
       EXPO_OWNER: ${{ secrets.EXPO_OWNER || vars.EXPO_OWNER }}
@@ -254,10 +259,18 @@ jobs:
         run: bash "$GITHUB_WORKSPACE/.github/scripts/mobile.sh" android-build
       - *publish
       - *artifacts
+      - name: Submit Android bundle
+        if: github.event_name == 'push' && vars.ANDROID_PLAY_SUBMIT == 'true'
+        working-directory: apps/mobile
+        env:
+          ANDROID_PLAY_SERVICE_ACCOUNT: ${{ secrets.ANDROID_PLAY_SERVICE_ACCOUNT }}
+          ANDROID_PLAY_TRACK: ${{ vars.ANDROID_PLAY_TRACK }}
+          ANDROID_PLAY_UPLOAD_CERT_SHA256: ${{ vars.ANDROID_PLAY_UPLOAD_CERT_SHA256 }}
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/mobile.sh" android-submit
   android-play:
     name: Android Play submission
     needs: [changes, web]
-    if: github.event_name == 'push' && github.repository == 'disposabl-dev/create-disposabl-app'
+    if: github.event_name == 'push' && github.repository == 'disposabl-dev/create-disposabl-app' && vars.DISPOSABL_ANDROID_PLAY_ENABLED == 'true'
     permissions:
       contents: read
     runs-on: ubuntu-24.04

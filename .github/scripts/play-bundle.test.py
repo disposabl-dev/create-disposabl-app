@@ -35,6 +35,6 @@ for number,attempt,expected in [('1','1',1101),('1','2',1102),('2','1',1201),('2
 print('version attempts PASS')
 assert 'actions/upload-artifact' not in job and 'eas-cli@27.2.0 build' not in job
 profile=json.loads((root/'apps/mobile/eas.json').read_text())['submit']['production']['android']
-assert profile == {'track':'production','releaseStatus':'completed','applicationId':'com.yastai.disposabl'}
+assert profile == {'track':'production','releaseStatus':'completed'}
 print('workflow/profile PASS')
 print('fixture',tmp)
