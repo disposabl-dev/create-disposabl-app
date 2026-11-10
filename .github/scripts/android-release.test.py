@@ -12,6 +12,8 @@ import tempfile
 root = pathlib.Path(__file__).resolve().parents[2]
 script = (root / '.github/scripts/mobile.sh').read_text()
 functions = script.split('case "${1:?operation required}" in')[0]
+# The signing function probe does not exercise release source lookup.
+functions = "\n".join(line for line in functions.splitlines() if not line.startswith("source "))
 real_keytool = shutil.which('keytool')
 with tempfile.TemporaryDirectory() as temp:
     path = pathlib.Path(temp)

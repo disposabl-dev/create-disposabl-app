@@ -73,6 +73,58 @@ test("embedded config must match build configuration", () => {
     /payments/,
   );
 });
+test("product policy stays strict while Expo identity supports fingerprinting", () => {
+  const product = {
+    ...config,
+    android: { ...config.android, package: "com.yastai.disposabl" },
+    extra: { ...config.extra, eas: { projectId: "fixture-project" } },
+  };
+  const selected = {
+    ...manifest,
+    applicationId: product.android.package,
+    projectId: "fixture-project",
+  };
+  const productEnv = {
+    ...env,
+    GH_REPO: "disposabl-dev/create-disposabl-app",
+    EXPO_PUBLIC_DISPOSABL_ANALYTICS_ENABLED: "true",
+  };
+  verifyInputs(product, selected, productEnv);
+  for (const patch of [
+    { EXPO_PUBLIC_DISPOSABL_ANALYTICS_ENABLED: "false" },
+    { UPDATE_POLICY: "expo" },
+  ])
+    assert.throws(
+      () => verifyInputs(product, selected, { ...productEnv, ...patch }),
+      /policy/,
+    );
+  for (const patch of [
+    { extra: { ...product.extra, disposablAndroidPayments: true } },
+    { extra: { ...product.extra, eas: { projectId: "other" } } },
+    {
+      updates: {
+        enabled: false,
+        requestHeaders: { "expo-channel-name": "production" },
+      },
+    },
+  ])
+    assert.throws(() =>
+      verifyInputs({ ...product, ...patch }, selected, productEnv),
+    );
+  const oneAbi = ["arm64-v8a"];
+  assert.throws(
+    () =>
+      verifyInputs(
+        {
+          ...product,
+          extra: { ...product.extra, disposablAndroidArchitectures: oneAbi },
+        },
+        { ...selected, androidArchitectures: oneAbi },
+        productEnv,
+      ),
+    /policy/,
+  );
+});
 test("bundletool validation rejects invalid AAB metadata", () => {
   const dir = mkdtempSync(join(tmpdir(), "bundle-validation-"));
   try {

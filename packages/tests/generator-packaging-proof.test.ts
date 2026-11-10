@@ -436,6 +436,7 @@ test("packaged starter and generated profiles exclude product proof fixtures", a
         join(root, ".github/scripts/mobile.sh"),
         "utf8",
       );
+      assert.ok(existsSync(join(root, ".github/scripts/release-source.sh")));
       for (const helper of mobileScript.matchAll(
         /\.github\/scripts\/([\w-]+\.(?:mjs|sh))/g,
       )) {

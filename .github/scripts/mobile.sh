@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 set +x
+source "$(dirname "${BASH_SOURCE[0]}")/release-source.sh"
 signing() {
   # Arm cleanup before decoding or validating any private key material.
   signing_temp=$(mktemp -d "$RUNNER_TEMP/android-signing.XXXXXX")
@@ -126,7 +127,7 @@ cd apps/mobile
 MANIFEST=$(manifest)
 bun x --no-install expo export --platform android --output-dir dist/update
 test "$(bun x --no-install expo-updates runtimeversion:resolve --platform android --workflow managed | jq -er .runtimeVersion)" = "$RUNTIME"
-test "$(gh api "repos/$GH_REPO/$SOURCE_PATH" --jq 'if has("head") then (if .state == "open" then .head.sha else "closed" end) else .object.sha end')" = "$SOURCE"
+verify_release_source android
 bun x "$EAS_CLI" update --platform android --channel "$CHANNEL" --environment "$EAS_ENVIRONMENT" --skip-bundler --input-dir dist/update --message "$SOURCE" --non-interactive
 jq --arg sha "$SHA" --arg tag "$TAG" '. + {sha256: $sha, action: "update", sourceTag: $tag}' <<< "$MANIFEST" > ../../dist/release/android.json
 # The trusted publisher retrieves this verified binary from its existing release.
@@ -139,7 +140,7 @@ bash ../../.github/scripts/android-runner.sh check
 MANIFEST=$(manifest)
 bun x --no-install expo config --json > "$RUNNER_TEMP/android-config.json"
 node scripts/android-release-verify.mjs inputs "$RUNNER_TEMP/android-config.json" "$MANIFEST"
-test "$(gh api "repos/$GH_REPO/$SOURCE_PATH" --jq 'if has("head") then (if .state == "open" then .head.sha else "closed" end) else .object.sha end')" = "$SOURCE"
+verify_release_source android
 bun x --no-install expo prebuild --platform android --no-install
 test "$(bun x --no-install expo-updates runtimeversion:resolve --platform android --workflow managed | jq -er .runtimeVersion)" = "$RUNTIME"
 artifact=android.apk
@@ -187,7 +188,7 @@ trap 'exit 143' TERM
 cp eas.json "$submit_temp/eas-original.json"
 (umask 077; printf '%s' "$ANDROID_PLAY_SERVICE_ACCOUNT" > "$key")
 jq --arg key "$key" --arg track "$ANDROID_PLAY_TRACK" '.submit.production.android = {serviceAccountKeyPath: $key, track: $track, releaseStatus: "draft"}' "$submit_temp/eas-original.json" > eas.json
-test "$(gh api "repos/$GH_REPO/$SOURCE_PATH" --jq 'if has("head") then (if .state == "open" then .head.sha else "closed" end) else .object.sha end')" = "$SOURCE"
+verify_release_source android
 bun x "$EAS_CLI" submit --platform android --profile production --path ../../dist/release/android.aab --non-interactive --wait
     ;;
   *) echo "Unknown operation: $1" >&2; exit 1 ;;

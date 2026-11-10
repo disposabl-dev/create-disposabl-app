@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/release-source.sh"
 case "${1:?operation required}" in
   package-release)
 [[ -f "packages/$PACKAGE/package.json" ]] || exit 0
@@ -46,8 +47,7 @@ echo "PR=$pr" >> "$GITHUB_ENV"
     ;;
   release-publish)
 check_source() {
-  if [[ "$CHANNEL" == production ]]; then test "$(gh api "repos/$GH_REPO/git/ref/heads/main" --jq .object.sha)" = "$SOURCE"
-  else test "$(gh api "repos/$GH_REPO/pulls/$PR" --jq 'if .state == "open" then .head.sha else "closed" end')" = "$SOURCE"; fi
+  verify_release_source "$platform" publish
 }
 # Desktop installers publish only from main. Android retains PR previews.
 for platform in android linux windows macos; do
@@ -111,7 +111,7 @@ for platform in android linux windows macos; do
 done
     ;;
   verify-artifacts)
-check_source() { test "$(gh api "repos/$GH_REPO/$SOURCE_PATH" --jq 'if has("head") then (if .state == "open" then .head.sha else "closed" end) else .object.sha end')" = "$SOURCE"; }
+check_source() { verify_release_source "$PLATFORM"; }
 check_source
 for file in dist/release/*; do test -f "$file"; test -s "$file"; done
 case "$PLATFORM" in

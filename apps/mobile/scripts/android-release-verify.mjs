@@ -25,6 +25,21 @@ export function verifyInputs(config, manifest, env) {
   )
     throw new Error("Invalid Android architectures");
   if (env.CHANNEL === "production") {
+    if (env.GH_REPO === "disposabl-dev/create-disposabl-app") {
+      if (
+        config.android?.package !== "com.yastai.disposabl" ||
+        config.extra?.disposablAndroidPayments !== false ||
+        JSON.stringify(abis) !== JSON.stringify(["arm64-v8a", "x86_64"]) ||
+        env.EXPO_PUBLIC_DISPOSABL_ANALYTICS_ENABLED !== "true" ||
+        env.UPDATE_POLICY !== "disabled" ||
+        config.updates?.requestHeaders != null
+      )
+        throw new Error("Disposabl production configuration policy mismatch");
+      // Shared builds retain the Expo identity for runtime fingerprinting.
+      // That identity never enables OTA: URL, headers and enabled are checked.
+      if (config.extra?.eas?.projectId !== manifest.projectId)
+        throw new Error("Disposabl Expo project identity mismatch");
+    }
     if (env.EXPO_PUBLIC_E2E === "true")
       throw new Error("E2E is not permitted in production");
     for (const key of [
