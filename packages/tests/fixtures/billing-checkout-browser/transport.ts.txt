@@ -7,7 +7,7 @@ export async function fixtureContext(enabled: boolean, getUserId: () => Promise<
   if (!userId) throw new Error("Please sign in to use payments.");
   return { key: "", userId, returnUrl: "http://127.0.0.1:3549/pricing" };
 }
-export async function fixtureRequest(ctx: ActionCtx, _key: string, method: string, body: Record<string, any>) {
+export async function fixtureRequest(ctx: ActionCtx, _key: string, method: string, body: Record<string, any>): Promise<Record<string, unknown>> {
   if (method === "customers.get_or_create" && typeof body.customer_id === "string" && Object.keys(body).length === 1)
     return { balances: { credits: { remaining: 42 } }, subscriptions: [] };
   if (method !== "billing.attach" || typeof body.customer_id !== "string" || !["credits_monthly", "credits_topup"].includes(body.plan_id))

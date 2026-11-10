@@ -19,6 +19,17 @@
     "typecheck": {
       "dependsOn": ["^typecheck"]
     },
+    "@disposabl/tests#typecheck": {
+      "dependsOn": ["^typecheck", "@disposabl/sdk#typecheck"]
+    },
+    "@disposabl/sdk#typecheck": {
+      "dependsOn": ["^typecheck"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/packages/backend/generated/openapi.json"
+      ],
+      "cache": false
+    },
     "@disposabl/web#typecheck": {
       "dependsOn": ["^typecheck"],
       "inputs": ["$TURBO_DEFAULT$", "!src/routeTree.gen.ts"],

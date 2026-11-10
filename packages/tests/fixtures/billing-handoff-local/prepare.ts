@@ -35,3 +35,45 @@ await copyFile(
 console.log(
   "Installed fixture-only configuration and expiry bridge into disposable copy.",
 );
+
+// Reuse the inert checkout adapter in the disposable copy.
+const checkout = resolve(
+  target,
+  "packages/disposabl-kit/server/billing-functions.ts",
+);
+let checkoutSource = await readFile(checkout, "utf8");
+const checkoutReplacements: Record<string, string> = {
+  'import { paymentsEnabled } from "../features";':
+    'import { paymentsEnabled } from "../features";\nimport { fixtureRequest, fixtureCheckoutUrl, fixtureContext } from "./billing-checkout-fixture";',
+  "return billingContext(paymentsEnabled, process.env, () =>\n    getSessionUserId(ctx),\n  );":
+    "return fixtureContext(true, () => getSessionUserId(ctx));",
+  "await billingRequest(": "await fixtureRequest(ctx, ",
+  "const url = checkoutUrl(result);":
+    "const url = fixtureCheckoutUrl(checkoutUrl(result));",
+};
+for (const [before, after] of Object.entries(checkoutReplacements)) {
+  const count = checkoutSource.split(before).length - 1;
+  if (count !== (before === "await billingRequest(" ? 4 : 1))
+    throw new Error(`Unexpected checkout adapter boundary: ${count}`);
+  checkoutSource = checkoutSource.replaceAll(before, after);
+}
+await writeFile(checkout, checkoutSource);
+const checkoutFixture = resolve(import.meta.dir, "../billing-checkout-browser");
+await copyFile(
+  resolve(checkoutFixture, "transport.ts.txt"),
+  resolve(target, "packages/disposabl-kit/server/billing-checkout-fixture.ts"),
+);
+await copyFile(
+  resolve(checkoutFixture, "bridge.ts.txt"),
+  resolve(target, "packages/backend/convex/fixtureBillingCheckout.ts"),
+);
+const schemaPath = resolve(target, "packages/backend/convex/schema.ts");
+let schema = await readFile(schemaPath, "utf8");
+const anchor = "export default defineSchema({";
+if (schema.split(anchor).length !== 2)
+  throw new Error("Unexpected fixture schema");
+schema = schema.replace(
+  anchor,
+  `${anchor}\n  fixtureCheckoutDispatches: defineTable({ userId: v.string(), planId: v.string(), feature: v.optional(v.string()), quantity: v.optional(v.number()) }).index("by_userId", ["userId"]),`,
+);
+await writeFile(schemaPath, schema);

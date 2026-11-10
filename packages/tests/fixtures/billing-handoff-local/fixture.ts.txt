@@ -1,5 +1,5 @@
 import { mutation, query } from "./_generated/server";
-import { internal } from "./_generated/api";
+import { components, internal } from "./_generated/api";
 import { v } from "convex/values";
 import { hashBrowserCode } from "@disposabl/disposabl-kit/server/browser-session";
 
@@ -89,4 +89,34 @@ export const hasAttempt = query({
         q.eq("userId", userId).eq("requestId", requestId),
       )
       .unique()),
+});
+
+// Count Auth component sessions for a synthetic user in the disposable copy.
+export const sessionCount = query({
+  args: { userId: v.id("users") },
+  returns: v.number(),
+  handler: async (ctx, { userId }) =>
+    (await ctx.runQuery(components.auth.public.listSessions, { userId })).length,
+});
+
+// Global fixture-only evidence catches writes under any synthetic identity.
+// Refuse an oversized fixture rather than silently ignoring later rows.
+export const checkoutRows = query({
+  args: {},
+  returns: v.object({
+    attempts: v.array(v.id("billingAttempts")),
+    calls: v.array(v.id("fixtureCheckoutDispatches")),
+  }),
+  handler: async (ctx) => {
+    const [attempts, calls] = await Promise.all([
+      ctx.db.query("billingAttempts").order("asc").take(101),
+      ctx.db.query("fixtureCheckoutDispatches").order("asc").take(101),
+    ]);
+    if (attempts.length > 100 || calls.length > 100)
+      throw new Error("Fixture evidence exceeds its bounded inventory.");
+    return {
+      attempts: attempts.map((row) => row._id),
+      calls: calls.map((row) => row._id),
+    };
+  },
 });
