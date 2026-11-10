@@ -7,10 +7,10 @@ on:
         type: string
       cli_recovery_version:
         type: string
-        default: ''
+        default: ""
       recovery_version:
         type: string
-        default: ''
+        default: ""
     outputs:
       source_sha:
         value: ${{ jobs.check.outputs.source_sha }}
