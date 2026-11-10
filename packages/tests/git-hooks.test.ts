@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import {
+  chmodSync,
   copyFileSync,
   mkdtempSync,
   mkdirSync,
@@ -37,6 +38,13 @@ test("installed hook checks the index without changing partially staged files", 
       "custom-hooks",
     );
     expect(git("config", "--unset", "core.hooksPath").status).toBe(0);
+    const existing = join(dir, ".git/hooks/pre-push");
+    writeFileSync(existing, "#!/bin/sh\nexit 0\n");
+    chmodSync(existing, 0o755);
+    expect(run("bun", "run", "hooks:install").status).not.toBe(0);
+    expect(git("config", "--get", "core.hooksPath").status).toBe(1);
+    expect(readFileSync(existing, "utf8")).toBe("#!/bin/sh\nexit 0\n");
+    rmSync(existing);
     expect(run("bun", "run", "hooks:install").status).toBe(0);
     expect(git("config", "--get", "core.hooksPath").stdout.trim()).toBe(
       ".githooks",

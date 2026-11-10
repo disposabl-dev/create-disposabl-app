@@ -111,7 +111,7 @@ The root `AGENTS.md` explains how agents should work in the project. In this rep
 
 Run `bun run hooks:install` once after cloning to enable the tracked pre-commit
 hook. Git shares this setting across worktrees of the same repository. If you
-already use a different hook directory, the installer stops so you can combine
+already use a different hook directory or active default hooks, the installer stops so you can combine
 the hooks without losing yours.
 
 The hook checks staged whitespace and formatting without changing the index or

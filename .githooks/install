@@ -9,5 +9,15 @@ if [ -n "$current" ] && [ "$current" != .githooks ]; then
   echo "Git already uses hooks from $current; configure hooks manually to preserve them." >&2
   exit 1
 fi
+if [ -z "$current" ]; then
+  hooks=$(git rev-parse --git-path hooks)
+  for hook in "$hooks"/*; do
+    case "$hook" in *.sample) continue ;; esac
+    if [ -f "$hook" ] && [ -x "$hook" ]; then
+      echo "Git already has an active hook at $hook; combine hooks manually to preserve it." >&2
+      exit 1
+    fi
+  done
+fi
 git config --local core.hooksPath .githooks
 echo "Installed hooks from .githooks (shared by this repository's worktrees)."

@@ -100,6 +100,7 @@ try {
       item.isDirectory()
         ? ![
             ".github",
+            ".githooks",
             "apps",
             "packages",
             "patches",
