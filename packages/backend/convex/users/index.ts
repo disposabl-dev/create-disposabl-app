@@ -1,4 +1,5 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { anyApi } from "convex/server";
 import { ConvexError, v } from "convex/values";
 import { internal } from "../_generated/api";
 import { query, mutation } from "../_generated/server";
@@ -101,6 +102,30 @@ export const requestDeletion = mutation({
     if (user.deletionRequestedAt === undefined)
       await ctx.db.patch("users", id, { deletionRequestedAt: requestedAt });
     const receipt = await ensureReceipt(ctx, userId, requestedAt);
+    if (!user.deletionAutomation) {
+      const token = crypto.randomUUID();
+      const nextAt = Date.now() + 3000;
+      await ctx.db.patch("users", id, {
+        deletionAutomation: {
+          state: "scheduled",
+          token,
+          steps: 0,
+          waits: 0,
+          updatedAt: Date.now(),
+          nextAt,
+        },
+      });
+      await ctx.scheduler.runAfter(
+        3000,
+        anyApi.users.actions.fulfillment.automate,
+        {
+          userId: id,
+          expectedRequestedAt: requestedAt,
+          reference: receipt.reference,
+          token,
+        },
+      );
+    }
     return {
       status: "requested" as const,
       requestedAt,

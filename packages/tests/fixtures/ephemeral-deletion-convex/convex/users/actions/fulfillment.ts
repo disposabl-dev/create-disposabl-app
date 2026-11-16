@@ -1,1 +1,4 @@
-export { advance } from "../../../../backend/convex/users/actions/fulfillment";
+export {
+  advance,
+  automate,
+} from "../../../../backend/convex/users/actions/fulfillment";

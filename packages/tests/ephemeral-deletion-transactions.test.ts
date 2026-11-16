@@ -404,29 +404,20 @@ test(
       { confirmation: "DELETE" },
       token,
     );
-    const args = {
-      userId: user.id,
-      expectedRequestedAt: requested.requestedAt,
-      reference: requested.reference,
-    };
-    let result;
-    for (let n = 0; n < 12; n++) {
-      result = await invoke("action", "fixture:advanceDeletion", args);
-      if (result.state !== "advanced") break;
+    let guest;
+    for (let n = 0; n < 100; n++) {
+      guest = await invoke("query", "users/index:receiptStatus", {
+        reference: requested.reference,
+      });
+      if (guest?.status === "completed") break;
+      await new Promise((resolve) => setTimeout(resolve, 100));
     }
-    assert.equal(result.state, "completed");
-    assert.equal(
-      (await invoke("action", "fixture:advanceDeletion", args)).state,
-      "completed",
-    );
+    assert.equal(guest?.status, "completed");
     const receipt = await invoke("query", "fixture:receipt", {
       reference: requested.reference,
     });
     assert.equal(receipt.ownerId, null);
     assert.ok(receipt.completedAt >= requested.requestedAt);
-    const guest = await invoke("query", "users/index:receiptStatus", {
-      reference: requested.reference,
-    });
     assert.equal(guest.status, "completed");
     assert.equal("ownerId" in guest, false);
   },
@@ -495,5 +486,64 @@ test(
     const row = await q("receipt", { reference });
     assert.equal(row.ownerId, owner.userId);
     assert.equal(row.completedAt, null);
+  },
+);
+
+test(
+  "uncertain sandbox stays pending for operator review without retrying",
+  { skip: !base },
+  async () => {
+    const { randomUUID } = await import("node:crypto");
+    async function invoke(
+      kind: string,
+      path: string,
+      args: object,
+      token?: string,
+    ): Promise<any> {
+      const response = await fetch(`${base}/api/${kind}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ path, args, format: "json" }),
+      });
+      const result = (await response.json()) as any;
+      if (result.status !== "success")
+        throw new Error(result.errorMessage ?? "Fixture failed");
+      return result.value;
+    }
+    const username = `uncertain${randomUUID().replaceAll("-", "")}`;
+    const password = `Fixture-${randomUUID()}!`;
+    await invoke("mutation", "auth:signUpWithUsernamePassword", {
+      username,
+      password,
+    });
+    const signed = await invoke("mutation", "auth:signInWithUsernamePassword", {
+      username,
+      password,
+    });
+    const token = signed.tokens.accessToken;
+    const user = await invoke("query", "users/index:current", {}, token);
+    await m("makeSandboxUncertain", { userId: user.id });
+    const requested = await invoke(
+      "mutation",
+      "users/index:requestDeletion",
+      { confirmation: "DELETE" },
+      token,
+    );
+    let state;
+    for (let n = 0; n < 100; n++) {
+      state = await q("automationState", { userId: user.id });
+      if (state?.state === "blocked") break;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    assert.equal(state?.state, "blocked");
+    assert.match(state.detail, /Sandbox identity/);
+    assert.equal(state.nextAt, undefined);
+    const receipt = await invoke("query", "users/index:receiptStatus", {
+      reference: requested.reference,
+    });
+    assert.equal(receipt.status, "requested");
   },
 );

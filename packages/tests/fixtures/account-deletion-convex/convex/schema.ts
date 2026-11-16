@@ -21,6 +21,7 @@ export default defineSchema({
     .index("by_reference", ["reference"]),
   users: defineTable({
     deletionRequestedAt: v.optional(v.number()),
+    deletionAutomation: v.optional(v.any()),
     deletionStop: v.optional(
       v.object({
         state: v.union(

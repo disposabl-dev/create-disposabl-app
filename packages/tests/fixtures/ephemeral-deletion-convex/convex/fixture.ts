@@ -320,3 +320,14 @@ export const completeDeletion = mutation({
   handler: (ctx, args) =>
     ctx.runMutation(anyApi.users.fulfillment.complete, args),
 });
+
+export const makeSandboxUncertain = mutation({
+  args: { userId: v.id("users") },
+  handler: (ctx, { userId }) =>
+    ctx.db.patch("users", userId, { managedSandbox: { state: "uncertain" } }),
+});
+export const automationState = query({
+  args: { userId: v.id("users") },
+  handler: async (ctx, { userId }) =>
+    (await ctx.db.get("users", userId))?.deletionAutomation ?? null,
+});

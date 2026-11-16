@@ -32,6 +32,7 @@ import {
 } from "../../../../backend/convex/users/internal";
 const identity = (ctx: any, userId: string | null) => ({
   ...ctx,
+  scheduler: { runAfter: async () => "fixture" },
   auth: {
     getUserIdentity: async () =>
       userId ? { subject: "fixture-session" } : null,

@@ -145,3 +145,41 @@ export const advance = internalAction({
     return { state: "completed", detail: "Account deletion completed." };
   },
 });
+
+/** Run one bounded stage. Uncertain failures are held for an operator. */
+export const automate = internalAction({
+  args: {
+    userId: v.id("users"),
+    expectedRequestedAt: v.number(),
+    reference: v.string(),
+    token: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args): Promise<null> => {
+    if (!(await ctx.runMutation(anyApi.users.automation.claim, args)))
+      return null;
+    const { token: _token, ...request } = args;
+    try {
+      const result: {
+        state: "advanced" | "blocked" | "completed";
+        detail: string;
+      } = await ctx.runAction(
+        anyApi.users.actions.fulfillment.advance,
+        request,
+      );
+      if (result.state !== "completed")
+        await ctx.runMutation(anyApi.users.automation.finish, {
+          ...args,
+          outcome: result.state,
+          detail: result.detail,
+        });
+    } catch {
+      await ctx.runMutation(anyApi.users.automation.finish, {
+        ...args,
+        outcome: "failed",
+        detail: "",
+      });
+    }
+    return null;
+  },
+});

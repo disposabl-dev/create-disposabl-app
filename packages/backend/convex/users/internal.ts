@@ -8,6 +8,7 @@ import {
   fileDeletionProgress,
   ephemeralDeletionProgress,
   mcpDeletionProgress,
+  deletionAutomation,
 } from "./validator";
 import {
   paginationOptsValidator,
@@ -127,6 +128,7 @@ export const deletionRequests = internalQuery({
       authDeletion: v.optional(authDeletionProgress),
       fileDeletion: v.optional(fileDeletionProgress),
       ephemeralDeletion: v.optional(ephemeralDeletionProgress),
+      automation: v.optional(deletionAutomation),
       stopAttempt: v.optional(v.number()),
       stopUpdatedAt: v.optional(v.number()),
       stopLeaseUntil: v.optional(v.number()),
@@ -152,6 +154,9 @@ export const deletionRequests = internalQuery({
         userId: user._id,
         requestedAt: user.deletionRequestedAt!,
         status: "requested" as const,
+        ...(user.deletionAutomation
+          ? { automation: user.deletionAutomation }
+          : {}),
         ...(user.mcpDeletion ? { mcpDeletion: user.mcpDeletion } : {}),
         ...(user.authDeletion ? { authDeletion: user.authDeletion } : {}),
         ...(user.fileDeletion ? { fileDeletion: user.fileDeletion } : {}),

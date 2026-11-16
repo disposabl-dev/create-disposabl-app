@@ -1,5 +1,19 @@
 import { v } from "convex/values";
 
+export const deletionAutomation = v.object({
+  state: v.union(
+    v.literal("scheduled"),
+    v.literal("running"),
+    v.literal("blocked"),
+  ),
+  token: v.string(),
+  steps: v.number(),
+  waits: v.number(),
+  updatedAt: v.number(),
+  nextAt: v.optional(v.number()),
+  detail: v.optional(v.string()),
+});
+
 export const mcpDeletionProgress = v.object({
   state: v.union(v.literal("in_progress"), v.literal("attributed_complete")),
   batches: v.number(),

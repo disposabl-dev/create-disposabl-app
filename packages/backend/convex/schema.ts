@@ -12,6 +12,7 @@ import {
   fileDeletionProgress,
   ephemeralDeletionProgress,
   mcpDeletionProgress,
+  deletionAutomation,
   profile,
 } from "./users/validator";
 import { eventFields, execution } from "./agent/validator";
@@ -166,6 +167,7 @@ export default defineSchema({
       }),
     ),
     deletionRequestedAt: v.optional(v.number()),
+    deletionAutomation: v.optional(deletionAutomation),
     mcpDeletion: v.optional(mcpDeletionProgress),
     authDeletion: v.optional(authDeletionProgress),
     fileDeletion: v.optional(fileDeletionProgress),
