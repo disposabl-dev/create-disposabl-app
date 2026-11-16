@@ -150,7 +150,9 @@ webTest(
       .getByRole("button", `Continue as @${fixture.username}`, { exact: true })
       .tap();
     await expect(
-      screen.getByText("Your mobile app also needs Expo.", { exact: false }),
+      screen
+        .getByRole("region", "Expo", { exact: true })
+        .getByText("Required for mobile", { exact: true }),
     ).toBeVisible();
     await expect(browser).toHaveURL(
       "/dashboard/connections?origin=mobile&mobile=1",
