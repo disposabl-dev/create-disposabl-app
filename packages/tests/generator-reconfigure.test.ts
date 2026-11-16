@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import { execFileSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 import assert from "node:assert/strict";
 import { mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -890,9 +890,9 @@ test(
       await writeFile(
         join(bin, "bun"),
         `#!${process.execPath}
-import { readFileSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
 if (process.argv.includes("--help")) process.exit(0);
-if (process.cwd() === ${JSON.stringify(app)}) {
+if (realpathSync(process.cwd()) === ${JSON.stringify(realpathSync(app))}) {
   const mode = readFileSync(${JSON.stringify(mode)}, "utf8");
   const config = JSON.parse(readFileSync("disposabl.json", "utf8"));
   if (mode === "all" || (mode === "app-id" && config.appId)) process.exit(42);

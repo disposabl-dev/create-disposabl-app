@@ -1,13 +1,14 @@
 import { test } from "node:test";
 import { execFileSync } from "node:child_process";
 import { join, resolve } from "node:path";
-import { tmpdir } from "node:os";
 import assert from "node:assert/strict";
 import { mkdtemp, realpath, rm, symlink } from "node:fs/promises";
 import { createOutputDirectory } from "./fixtures/starter-payment-reconfigure/output";
 
 test("starter qualification confines new output to the real temporary tree", async () => {
-  const parent = await mkdtemp(join(tmpdir(), "starter-output-boundary-"));
+  const parent = await mkdtemp(
+    join(await realpath("/tmp"), "starter-output-boundary-"),
+  );
   try {
     const output = await createOutputDirectory(`${parent}/accepted`);
     assert.equal(output, `${await realpath(parent)}/accepted`);

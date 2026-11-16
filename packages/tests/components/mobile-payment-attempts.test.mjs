@@ -22,6 +22,7 @@ let topupAvailable = true;
 let product = { priceString: "secret-marker-price" };
 const calls = [];
 mock.module("react-native", () => ({
+  Alert: { alert() {} },
   View: "View",
   Text: "Text",
   Platform: { OS: "ios" },
@@ -67,7 +68,7 @@ mock.module("../../../packages/disposabl-kit/mobile/billing/paywall", () => ({
   selectMonthlyOffering: () => null,
 }));
 mock.module("expo-secure-store", () => ({
-  getItemAsync: async () => null,
+  getItemAsync: async () => "allow",
   setItemAsync: async () => {},
 }));
 mock.module(

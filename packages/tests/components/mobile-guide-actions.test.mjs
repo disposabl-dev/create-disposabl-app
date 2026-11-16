@@ -35,6 +35,7 @@ const FlatList = forwardRef(({ data, renderItem, ...props }, ref) => {
   );
 });
 mock.module("react-native", () => ({
+  Alert: { alert() {} },
   View: "View",
   ScrollView: "ScrollView",
   FlatList,
@@ -65,7 +66,7 @@ mock.module("../../../apps/mobile/src/features/studio/ui", () => ({
   GlassSurface: "GlassSurface",
 }));
 mock.module("expo-secure-store", () => ({
-  getItemAsync: async () => null,
+  getItemAsync: async () => "allow",
   setItemAsync: async () => {},
 }));
 mock.module(
