@@ -32,21 +32,21 @@
   ],
   "catalog": {
     "@convex-dev/auth": "file:vendor/convex-auth-040d8e36-disposabl.2.tgz",
-    "convex": "^1.49.0",
+    "convex": "^1.50.0",
     "lucide-react": "^1.70.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "@convex-dev/mcp": "0.1.0-alpha.7",
     "@convex-dev/static-hosting": "0.2.1",
-    "posthog-js": "1.447.3",
-    "posthog-react-native": "4.85.3",
-    "@posthog/react-native-plugin": "2.13.0"
+    "posthog-js": "1.450.0",
+    "posthog-react-native": "4.87.0",
+    "@posthog/react-native-plugin": "2.13.1"
   },
   "patchedDependencies": {
     "@convex-dev/mcp@0.1.0-alpha.7": "patches/convex-mcp-account-erasure-alpha7.patch",
     "@convex-dev/static-hosting@0.2.1": "patches/@convex-dev%2Fstatic-hosting@0.2.1.patch",
     "react-native-css@3.1.0-rc.1": "patches/react-native-css@3.1.0-rc.1.patch",
-    "expo-modules-core@58.0.30": "patches/expo-modules-core@58.0.30.patch"
+    "expo-modules-core@58.1.0": "patches/expo-modules-core@58.1.0.patch"
   },
   "overrides": {
     "lightningcss": "1.30.1"

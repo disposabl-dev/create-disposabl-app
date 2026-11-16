@@ -1,0 +1,23 @@
+diff --git a/android/src/main/java/expo/modules/kotlin/jni/fabric/NativeStatePropsGetter.kt b/android/src/main/java/expo/modules/kotlin/jni/fabric/NativeStatePropsGetter.kt
+index 1509bddac6ae6ee7e21857b27def28e8454fc33a..ed01ecde2f87404a42ea2899d5ab0016cd3a9df7 100644
+--- a/android/src/main/java/expo/modules/kotlin/jni/fabric/NativeStatePropsGetter.kt
++++ b/android/src/main/java/expo/modules/kotlin/jni/fabric/NativeStatePropsGetter.kt
+@@ -1,10 +1,18 @@
+ package expo.modules.kotlin.jni.fabric
+ 
+ import com.facebook.jni.HybridData
++import com.facebook.soloader.SoLoader
+ import com.facebook.yoga.annotations.DoNotStrip
+ 
+ @DoNotStrip
+ class NativeStatePropsGetter {
++  companion object {
++    init {
++      // Expo UI can be destroyed before the JavaScript runtime installs JNI bindings.
++      SoLoader.loadLibrary("expo-modules-core")
++    }
++  }
++
+   // We can't use StateWrapper directly, as this class is not exposed
+   external fun getStateProps(stateWrapper: Any): Map<String, Any?>?
+ 
