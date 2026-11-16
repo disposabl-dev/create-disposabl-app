@@ -42,6 +42,7 @@ mock.module("react-native", () => ({
     ),
 }));
 mock.module("expo-symbols", () => ({ SymbolView: "Symbol" }));
+mock.module("react-native-svg", () => ({ default: "Svg", Path: "Path" }));
 mock.module("react-native-safe-area-context", () => ({
   useSafeAreaInsets: () => ({ left: 0, right: 0 }),
 }));
@@ -49,14 +50,23 @@ mock.module("../../../packages/disposabl-kit/mobile/design/nativewind", () => ({
   MenuView: "MenuView",
 }));
 mock.module("../../../packages/disposabl-kit/mobile/design/use-theme", () => ({
-  useTheme: () => ({ card: "card", muted: "muted", mutedForeground: "muted" }),
+  useTheme: () => ({
+    card: "card",
+    muted: "muted",
+    mutedForeground: "muted",
+    foreground: "foreground",
+    background: "background",
+  }),
 }));
 mock.module("@disposabl/disposabl-kit/features", () => ({
   authenticationEnabled: true,
   paymentsEnabled: false,
 }));
 mock.module("@disposabl/disposabl-kit/platforms", () => ({
-  platforms: [{ id: "web", label: "Web" }],
+  platforms: [
+    { id: "web", label: "Web" },
+    { id: "mcp", label: "MCP" },
+  ],
   resolvePlatforms: (value) => value,
 }));
 mock.module("convex/react", () => ({
@@ -210,4 +220,14 @@ test("settings, connection controls and conversation navigation emit once per pr
   );
   expect(actions).toEqual(["open_create", "open_settings"]);
   expect(JSON.stringify(actions)).not.toContain("private");
+});
+
+test("MCP choice shows its logo in the selected theme color", async () => {
+  await mount(ManagementHome);
+  const choice = renderer.root
+    .findAllByType("Touch")
+    .find((x) => x.props.label === "MCP");
+  expect(choice.findByType("Path").props.fill).toBe("foreground");
+  await act(async () => choice.props.onPress());
+  expect(choice.findByType("Path").props.fill).toBe("background");
 });

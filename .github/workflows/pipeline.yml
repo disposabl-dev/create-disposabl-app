@@ -328,7 +328,8 @@ jobs:
         run: |
           bash .github/scripts/play-bundle.sh verify-submission-source
           test "$(jq -er .applicationId dist/release/android.json)" = com.yastai.disposabl
-          keytool -printcert -jarfile dist/release/android.aab | grep -F 'SHA1: B5:8D:03:56:8C:BC:03:62:D4:A8:7A:0E:63:EC:83:C9:55:B0:29:A7' >/dev/null
+          keytool -printcert -jarfile dist/release/android.aab | grep -F 'SHA1: 9E:8B:A8:A6:CC:91:07:8A:46:4F:BE:F2:52:86:0B:C8:FE:FB:18:B2' >/dev/null
+          node .github/scripts/android-signatures.mjs dist/release/android.aab 92ad2c5b65aad964b622a4b4fede94b40a31dcae0eb537b9201ea464689a9fb9 >/dev/null
       - name: Submit Android bundle
         working-directory: apps/mobile
         env:
