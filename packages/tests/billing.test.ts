@@ -172,6 +172,25 @@ describe("billing boundary", () => {
       }),
       750,
     );
+    assert.equal(balanceFromCustomer({ balances: {} }), 0);
+    assert.equal(
+      balanceFromCustomer({
+        balances: { credits: { remaining: 900 }, seats: { remaining: 5 } },
+      }),
+      0,
+    );
+    for (const balances of [
+      undefined,
+      null,
+      [],
+      "invalid",
+      { other: null },
+      { [pricing.featureId]: null },
+      { [pricing.featureId]: {} },
+      { [pricing.featureId]: { remaining: "750" } },
+      { [pricing.featureId]: { remaining: Infinity } },
+    ])
+      assert.equal(balanceFromCustomer({ balances }), null);
     assert.equal(balanceFromCustomer({}), null);
     const mock = (() =>
       Promise.resolve(

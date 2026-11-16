@@ -96,6 +96,13 @@ test("credits gate checks the actual owner balance and fails closed", async () =
       error.data.minimum === 10 &&
       error.data.paymentUrl === "https://www.disposabl.dev/pricing",
   );
+  await assert.rejects(
+    requireCredits("owner", true, "test-key", async () => ({
+      balances: { credits: { remaining: 900 } },
+    })),
+    (error: any) =>
+      error.data?.code === "credits_required" && error.data.balance === 0,
+  );
   for (const request of [
     customer(null),
     async () => {

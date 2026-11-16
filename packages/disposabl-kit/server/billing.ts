@@ -120,9 +120,17 @@ export function balanceFromCustomer(
   customer: Record<string, unknown>,
   config: Pricing = pricing,
 ): number | null {
-  const balances = customer.balances as
-    Record<string, { remaining?: unknown }> | undefined;
-  const remaining = balances?.[config.featureId]?.remaining;
+  const plainObject = (value: unknown): value is Record<string, unknown> =>
+    value !== null &&
+    typeof value === "object" &&
+    (Object.getPrototypeOf(value) === Object.prototype ||
+      Object.getPrototypeOf(value) === null);
+  const balances = customer.balances;
+  if (!plainObject(balances) || !Object.values(balances).every(plainObject))
+    return null;
+  if (!Object.hasOwn(balances, config.featureId)) return 0;
+  const remaining = (balances[config.featureId] as Record<string, unknown>)
+    .remaining;
   return typeof remaining === "number" && Number.isFinite(remaining)
     ? remaining
     : null;
