@@ -167,6 +167,7 @@ GitHub Actions, Expo, and hosting providers have usage limits and may charge bey
 
 ## Need more detail?
 
+- [Publishing to Apple and Google Play](docs/publishing/README.md)
 - [Setup options and troubleshooting](packages/create-disposabl-app/README.md)
 - [Instructions for coding agents](packages/skill/SKILL.md)
 - [Mobile development](apps/mobile/README.md) and [desktop development](apps/desktop/README.md)
