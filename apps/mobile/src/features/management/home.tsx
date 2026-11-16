@@ -1,3 +1,4 @@
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useConvexAuth, useAction, useMutation, useQuery } from "convex/react";
 import { ConvexError } from "convex/values";
 import { router, useLocalSearchParams } from "expo-router";
@@ -26,6 +27,22 @@ import { attachmentIds } from "../studio/attachment-policy";
 import { Action, Screen, Label, Touch } from "../studio/ui";
 import { ErrorBoundary } from "./ui";
 import { useAiConsent } from "./ai-safety";
+
+const platformIcons = {
+  web: "web",
+  android: "android",
+  ios: "apple",
+  macos: "apple",
+  windows: "microsoft-windows",
+  linux: "linux",
+  mcp: "connection",
+  api: "api",
+  cli: "console",
+  "typescript-sdk": "language-typescript",
+} as const satisfies Record<
+  Platform,
+  React.ComponentProps<typeof MaterialCommunityIcons>["name"]
+>;
 
 export function ManagementHome() {
   return (
@@ -273,8 +290,15 @@ function Composer() {
                   : [...current, platform.id],
               );
             }}
-            className={`rounded-[24px] px-[18px] py-[14px] ${selected.includes(platform.id) ? "bg-foreground" : "bg-card"}`}
+            className={`flex-row items-center gap-[8px] rounded-[24px] px-[18px] py-[14px] ${selected.includes(platform.id) ? "bg-foreground" : "bg-card"}`}
           >
+            <MaterialCommunityIcons
+              name={platformIcons[platform.id]}
+              size={18}
+              color={
+                selected.includes(platform.id) ? c.background : c.foreground
+              }
+            />
             <Text
               className={`text-[15px] ${selected.includes(platform.id) ? "text-background" : "text-foreground"}`}
             >
