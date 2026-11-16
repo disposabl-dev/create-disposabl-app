@@ -4,7 +4,7 @@ Create a Disposabl app for web, mobile, desktop, and developer tools.
 
 ## Get started
 
-Install [Bun](https://bun.sh), [Git](https://git-scm.com), and [Node.js](https://nodejs.org) 24.8 or newer, then run:
+Install [Bun](https://bun.sh) 1.4.4 or newer, [Git](https://git-scm.com), and [Node.js](https://nodejs.org) 24.8 or newer, then run:
 
 ```sh
 bunx create-disposabl-app@latest
@@ -25,7 +25,7 @@ Use the app name you chose instead of `my-app`. Your website opens automatically
 
 You can also launch setup with npm, pnpm, or Yarn 2+. The generated project still requires Bun. Tests need Node.js 22.22.3 or newer on Node 22, or Node.js 24.8 or newer.
 
-Scaffolding skips automatic formatting when Bun's formatter is unavailable. After installing the project's pinned Bun version, run `bun fmt` to format those files.
+Scaffolding requires Bun's formatter so the initial commit passes formatting checks. `--skip-install` skips dependency installation; Bun is still required.
 
 | Tool | Command                                |
 | ---- | -------------------------------------- |

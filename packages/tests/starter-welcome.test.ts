@@ -191,6 +191,7 @@ test("fresh starters are formatted without changing bundled skills", async () =>
   try {
     for (const [name, platforms, features] of [
       ["minimal", ["web"], []],
+      ["web-auth", ["web"], ["authentication"]],
       [
         "all",
         [
@@ -229,17 +230,13 @@ test("fresh starters are formatted without changing bundled skills", async () =>
 });
 
 test(
-  "scaffolding tolerates absent or unsupported formatters but propagates formatting failures",
+  "scaffolding rejects absent, unsupported, or broken formatters",
   { timeout: 15000 },
   async () => {
     const temp = await mkdtemp(join(tmpdir(), "starter-formatter-support-"));
     const scaffold = resolve(
       import.meta.dirname,
       "../create-disposabl-app/scaffold.ts",
-    );
-    const reconfigure = resolve(
-      import.meta.dirname,
-      "../create-disposabl-app/reconfigure.ts",
     );
     try {
       for (const mode of ["absent", "unsupported", "broken"]) {
@@ -255,21 +252,24 @@ test(
         const script = `
         import assert from "node:assert/strict";
         import { existsSync } from "node:fs";
+        import { mkdir, readFile, writeFile } from "node:fs/promises";
         import { createApp } from ${JSON.stringify(scaffold)};
-        import { reconfigureApp } from ${JSON.stringify(reconfigure)};
         const app = ${JSON.stringify(app)};
         const template = ${JSON.stringify(template)};
         const create = () => createApp(template, app, "formatter-test", {
           version: "test", platforms: ["web"], features: []
         });
-        if (${JSON.stringify(mode)} === "broken") {
-          await assert.rejects(create, /fixture formatter failure/);
-          assert.equal(existsSync(app), false);
-        } else {
-          await create();
-          const result = await reconfigureApp(template, app, "test", { features: "authentication" });
-          assert.ok(result.features.includes("authentication"));
-          assert.equal(existsSync(app), true);
+        await assert.rejects(create, ${JSON.stringify(mode)} === "broken"
+          ? /fixture formatter failure/
+          : /Bun 1.4.4 or newer with fmt support is required/);
+        assert.equal(existsSync(app), false);
+        if (${JSON.stringify(mode)} !== "broken") {
+          await mkdir(app);
+          await writeFile(app + "/keep.txt", "existing project");
+          await assert.rejects(() => createApp(template, app, "formatter-test", {
+            version: "test", platforms: ["web"], features: []
+          }, true), /Bun 1.4.4 or newer with fmt support is required/);
+          assert.equal(await readFile(app + "/keep.txt", "utf8"), "existing project");
         }
       `;
         await exec(process.execPath, ["-e", script], {

@@ -709,7 +709,7 @@ test(
 );
 
 test(
-  "reconfigures Turbo across formatter availability without overwriting edits",
+  "requires a formatter before reconfiguration and preserves custom edits",
   { timeout: 30000 },
   async () => {
     const temp = await mkdtemp(join(tmpdir(), "reconfigure-formatter-"));
@@ -722,39 +722,39 @@ test(
     const withFormatter = `${bin}:/usr/bin:/bin`;
     const withoutFormatter = "/usr/bin:/bin";
     try {
-      const baselines: string[] = [];
-      for (const [initial, later] of [
-        [withFormatter, withoutFormatter],
-        [withoutFormatter, withFormatter],
-      ]) {
-        const app = join(
-          temp,
-          initial === withFormatter ? "formatted" : "unformatted",
-        );
-        process.env.PATH = initial;
-        await createApp(template, app, "example", {
-          version,
-          platforms: ["web"],
-          features: ["authentication"],
-        });
-        const before = await read(app, "turbo.json");
-        baselines.push(before);
-        process.env.PATH = later;
-        await reconfigureApp(template, app, version, {
+      const formatted = join(temp, "formatted");
+      process.env.PATH = withFormatter;
+      await createApp(template, formatted, "example", {
+        version,
+        platforms: ["web"],
+        features: ["authentication"],
+      });
+      const before = await read(formatted, "turbo.json");
+      const originalConfig = await read(formatted, "disposabl.json");
+      process.env.PATH = withoutFormatter;
+      await assert.rejects(
+        reconfigureApp(template, formatted, version, {
           platforms: "web,api,typescript-sdk",
           features: "none",
-        });
-        const turbo = JSON.parse(await read(app, "turbo.json"));
-        assert.ok(turbo.tasks["example-sdk#typecheck"]);
-        assert.ok(
-          turbo.tasks["@disposabl/tests#typecheck"].dependsOn.includes(
-            "example-sdk#typecheck",
-          ),
-        );
-        assert.notEqual(await read(app, "turbo.json"), before);
-      }
-      assert.notEqual(baselines[0], baselines[1]);
-      assert.deepEqual(JSON.parse(baselines[0]!), JSON.parse(baselines[1]!));
+        }),
+        /Bun 1.4.4 or newer with fmt support is required/,
+      );
+      assert.equal(await read(formatted, "turbo.json"), before);
+      assert.equal(await read(formatted, "disposabl.json"), originalConfig);
+      assert.equal(existsSync(join(formatted, "packages/sdk")), false);
+      process.env.PATH = withFormatter;
+      await reconfigureApp(template, formatted, version, {
+        platforms: "web,api,typescript-sdk",
+        features: "none",
+      });
+      const configuredTurbo = JSON.parse(await read(formatted, "turbo.json"));
+      assert.ok(configuredTurbo.tasks["example-sdk#typecheck"]);
+      assert.ok(
+        configuredTurbo.tasks["@disposabl/tests#typecheck"].dependsOn.includes(
+          "example-sdk#typecheck",
+        ),
+      );
+      assert.notEqual(await read(formatted, "turbo.json"), before);
       const app = join(temp, "custom");
       process.env.PATH = withFormatter;
       await createApp(template, app, "custom", {
@@ -767,7 +767,7 @@ test(
       const custom = JSON.stringify(turbo, null, 2) + "\n";
       await writeFile(join(app, "turbo.json"), custom);
       const config = await read(app, "disposabl.json");
-      process.env.PATH = withoutFormatter;
+      process.env.PATH = withFormatter;
       await assert.rejects(
         reconfigureApp(template, app, version, {
           platforms: "web,api,typescript-sdk",
@@ -851,13 +851,34 @@ test(
       assert.throws(() => execFileSync("bun", ["--version"]), {
         code: "ENOENT",
       });
-      await reconfigureApp(template, app, version, {
-        features: "authentication",
-      });
+      const beforeMissingFormatter = await read(app, "disposabl.json");
+      await assert.rejects(
+        reconfigureApp(template, app, version, {
+          features: "authentication",
+        }),
+        /Bun 1.4.4 or newer with fmt support is required/,
+      );
+      assert.equal(await read(app, "disposabl.json"), beforeMissingFormatter);
       const config = JSON.parse(await read(app, "disposabl.json"));
       delete config.appId;
       await writeFile(join(app, "disposabl.json"), JSON.stringify(config));
+      let callsWithoutFormatter = 0;
+      await assert.rejects(
+        setupApp(app, "my-app", async (args) => {
+          callsWithoutFormatter++;
+          return run(args);
+        }),
+        /Bun 1.4.4 or newer with fmt support is required/,
+      );
+      assert.equal(callsWithoutFormatter, 0);
+      assert.equal(
+        JSON.parse(await read(app, "disposabl.json")).appId,
+        undefined,
+      );
+      assert.equal(await read(app, "sentinel.json"), sentinel);
+      process.env.PATH = originalPath;
       await setupApp(app, "my-app", run);
+      check();
       assert.equal(
         JSON.parse(await read(app, "disposabl.json")).appId,
         "inert-app",

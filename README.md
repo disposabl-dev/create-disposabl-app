@@ -27,7 +27,7 @@ Tell your agent your idea. It can guide you through setup and help build your fi
 
 ## Or start in your terminal
 
-Install [Bun](https://bun.sh), [Git](https://git-scm.com), and [Node.js](https://nodejs.org) 24.8 or newer, then run:
+Install [Bun](https://bun.sh) 1.4.4 or newer, [Git](https://git-scm.com), and [Node.js](https://nodejs.org) 24.8 or newer, then run:
 
 ```sh
 bunx create-disposabl-app@latest

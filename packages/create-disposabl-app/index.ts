@@ -301,9 +301,9 @@ async function main() {
       throw new Error("Install Git first to create the app's initial commit.");
     const hasBun =
       spawnSync("bun", ["--version"], { stdio: "ignore" }).status === 0;
-    if (!options.skipInstall && !hasBun)
+    if (!hasBun)
       throw new Error(
-        "Install Bun first, or pass --skip-install to create the files only.",
+        "Install Bun 1.4.4 or newer before creating an app. --skip-install skips dependency installation, not the required formatter.",
       );
     const template = fileURLToPath(
       new URL("./templates/default", import.meta.url),

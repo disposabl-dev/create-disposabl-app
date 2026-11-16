@@ -20,14 +20,19 @@ import {
   type DisposablConfig,
 } from "./options";
 
-export function formatGenerated(directory: string, files: string[] = []) {
+function requireFormatter() {
   if (
     spawnSync("bun", ["fmt", "--no-script", "--help"], {
-      cwd: directory,
       stdio: "ignore",
     }).status !== 0
   )
-    return;
+    throw new Error(
+      "Bun 1.4.4 or newer with fmt support is required. Install or upgrade Bun, then retry.",
+    );
+}
+
+export function formatGenerated(directory: string, files: string[] = []) {
+  requireFormatter();
   try {
     execFileSync("bun", ["fmt", "--no-script", ...files], {
       cwd: directory,
@@ -91,6 +96,7 @@ export async function createApp(
       );
     }
   }
+  requireFormatter();
   // Overwrite is allowed only after explicit confirmation in the CLI.
   if (overwrite) await rm(destination, { recursive: true, force: true });
   // Refuse a destination that appeared after choosing an available name.
