@@ -42,6 +42,8 @@ const excluded = [
   "apps/mobile/src/features/product-telemetry.tsx",
   "apps/mobile/src/features/telemetry-policy.ts",
   "packages/tests/compute-stop.test.ts",
+  "packages/tests/agent-safety.test.ts",
+  "packages/tests/app-thread-deletion.test.ts",
   "packages/tests/auth-deletion-current.test.ts",
   "packages/backend/convex/users/localDeletion.ts",
   "packages/tests/flows/billing-checkout-auth.e2e.ts",

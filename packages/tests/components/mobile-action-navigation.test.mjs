@@ -87,6 +87,9 @@ mock.module(
   "../../../apps/mobile/src/features/management/payment-gate",
   () => ({ PaymentGate: "PaymentGate" }),
 );
+mock.module("../../../apps/mobile/src/features/management/ai-safety", () => ({
+  useAiConsent: () => ({ allowed: true, request: mock() }),
+}));
 mock.module("../../../apps/mobile/src/features/management/ui", () => ({
   ErrorBoundary: "ErrorBoundary",
 }));
