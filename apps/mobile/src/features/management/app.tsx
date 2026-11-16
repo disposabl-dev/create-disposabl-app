@@ -14,6 +14,7 @@ import { ConvexError } from "convex/values";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { useRef, useState } from "react";
 import {
+  Alert,
   FlatList,
   KeyboardAvoidingView,
   ScrollView,
@@ -27,6 +28,7 @@ import { isNearConversationEnd } from "./conversation-scroll";
 import { ResponseProgress } from "./response-progress";
 import { ConversationHeader } from "./conversation-header";
 import { captureProductAction } from "../product-telemetry";
+import { reportRef, useAiConsent } from "./ai-safety";
 
 export function AppScreen() {
   const { appId } = useLocalSearchParams<{ appId: string }>();
@@ -89,6 +91,8 @@ function Chat({ appId }: { appId: string }) {
     paginationOpts: { numItems: 20, cursor },
   });
   const send = useAction(api.agent.index.sendMessageChecked);
+  const consent = useAiConsent();
+  const report = useMutation(reportRef);
   const abort = useMutation(api.agent.index.abortMessage);
   const snapshot = useAction(api.billing.snapshot);
   const user = useQuery(api.users.index.current, {});
@@ -114,6 +118,11 @@ function Chat({ appId }: { appId: string }) {
   async function submit(text: string) {
     const fileIds = attachmentIds(attachments);
     if (!text.trim() || busy || attachmentsBusy || !fileIds) return;
+    if (consent.allowed === undefined) return;
+    if (!consent.allowed) {
+      consent.request();
+      return;
+    }
     setBusy(true);
     setError("");
     let started = false;
@@ -317,6 +326,39 @@ function Chat({ appId }: { appId: string }) {
                   attachments: item.attachments,
                 }}
               />
+              {item.role === "assistant" && (
+                <Button
+                  title="Report response"
+                  onPress={() => {
+                    const submitReport = (
+                      reason: "offensive" | "unsafe" | "other",
+                    ) => {
+                      void report({ appId, messageId: item.id, reason })
+                        .then(() =>
+                          Alert.alert(
+                            "Report received",
+                            "Your report was saved for review.",
+                          ),
+                        )
+                        .catch(() =>
+                          Alert.alert("Report not saved", "Please try again."),
+                        );
+                    };
+                    Alert.alert(
+                      "Report response",
+                      "Choose a reason. The response will be identified for review.",
+                      [
+                        {
+                          text: "Offensive",
+                          onPress: () => submitReport("offensive"),
+                        },
+                        { text: "Other", onPress: () => submitReport("other") },
+                        { text: "Cancel", style: "cancel" },
+                      ],
+                    );
+                  }}
+                />
+              )}
             </View>
           )}
           ListFooterComponent={

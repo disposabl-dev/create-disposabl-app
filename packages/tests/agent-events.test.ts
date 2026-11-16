@@ -57,6 +57,8 @@ test("unavailable attachments finish an empty run but preserve active steering",
         {
           runQuery: async (ref: any) => {
             try {
+              if (getFunctionName(ref) === "agent/safety:hasConsent")
+                return true;
               if (getFunctionName(ref) === "agent/compute:get")
                 return {
                   userId: "owner",

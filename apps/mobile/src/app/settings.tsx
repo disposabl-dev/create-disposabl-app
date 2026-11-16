@@ -1,3 +1,4 @@
+import { AiConsentPreference } from "../features/management/ai-safety";
 import { AccountScreen } from "@disposabl/disposabl-kit/mobile";
 import { router } from "expo-router";
 import { PreferenceRow } from "../../../../packages/disposabl-kit/mobile/design/preferences";
@@ -11,14 +12,17 @@ export default function Settings() {
     <AccountScreen
       sections={<AnalyticsPreference />}
       accountRows={
-        <PreferenceRow
-          icon={{ ios: "link", android: "link" }}
-          label="Manage connections"
-          onPress={() => {
-            captureProductAction("open_connections");
-            router.push("/connections");
-          }}
-        />
+        <>
+          <AiConsentPreference />
+          <PreferenceRow
+            icon={{ ios: "link", android: "link" }}
+            label="Manage connections"
+            onPress={() => {
+              captureProductAction("open_connections");
+              router.push("/connections");
+            }}
+          />
+        </>
       }
     />
   );

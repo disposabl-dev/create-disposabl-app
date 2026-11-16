@@ -25,6 +25,7 @@ import {
 import { resolvePlatforms } from "@disposabl/disposabl-kit/platforms";
 import { resolveFeatures } from "@disposabl/disposabl-kit/feature-options";
 import { ownedAttachments, attachmentReferences } from "./attachments";
+import { requireConsent } from "./safety";
 import { requireCredits } from "./credits";
 import { admitSession } from "./compute";
 
@@ -44,6 +45,7 @@ export async function enqueueMessageHandler(
   paid = paymentsEnabled,
 ): Promise<Infer<typeof result>> {
   await requireNotDeleting(ctx, userId);
+  await requireConsent(ctx, userId);
   prompt = prompt.trim();
   if (!prompt || prompt.length > 32_000)
     throw new ConvexError("Prompt must contain 1–32,000 characters.");

@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { CONSENT_VERSION } from "../backend/convex/agent/disclosure";
 import { enqueueMessage } from "../backend/convex/agent/internal";
 
 const connected = {
@@ -25,6 +26,14 @@ test("agent creation saves structured selections and resolves feature dependenci
           db: {
             normalizeId: () => "user",
             get: async () => ({}),
+            query: () => ({
+              withIndex: () => ({
+                unique: async () => ({
+                  granted: true,
+                  version: CONSENT_VERSION,
+                }),
+              }),
+            }),
             insert: async (_table: string, value: unknown) => {
               saved = value;
               throw new Error("fixture stops before scheduling");
@@ -64,6 +73,14 @@ test("mobile creation without Expo fails before inserting or scheduling work", a
           db: {
             normalizeId: () => "user",
             get: async () => ({}),
+            query: () => ({
+              withIndex: () => ({
+                unique: async () => ({
+                  granted: true,
+                  version: CONSENT_VERSION,
+                }),
+              }),
+            }),
             insert: async () => {
               inserted = true;
             },
@@ -115,6 +132,14 @@ test("production admission rejects an absent Boat configuration before writes", 
           db: {
             normalizeId: () => "owner",
             get: async () => ({}),
+            query: () => ({
+              withIndex: () => ({
+                unique: async () => ({
+                  granted: true,
+                  version: CONSENT_VERSION,
+                }),
+              }),
+            }),
             insert: async () => {
               writes++;
             },

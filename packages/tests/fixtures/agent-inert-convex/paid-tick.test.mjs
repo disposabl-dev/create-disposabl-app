@@ -133,6 +133,7 @@ function make({
   stopRequests = false,
   agent = {},
   queued = true,
+  consent = true,
 } = {}) {
   state = {
     session: {
@@ -213,23 +214,25 @@ function make({
           };
         const matches = () => {
           const rows =
-            table === "computeSessions"
-              ? [state.session]
-              : table === "apps"
-                ? [
-                    state.app,
-                    ...state.otherApps,
-                    ...(state.otherUnconfirmed
-                      ? [
-                          {
-                            _id: "other",
-                            userId: "owner",
-                            agent: { stopUnconfirmed: true },
-                          },
-                        ]
-                      : []),
-                  ]
-                : [];
+            table === "aiConsents"
+              ? [{ userId: "owner", version: "boat-codex-1", granted: true }]
+              : table === "computeSessions"
+                ? [state.session]
+                : table === "apps"
+                  ? [
+                      state.app,
+                      ...state.otherApps,
+                      ...(state.otherUnconfirmed
+                        ? [
+                            {
+                              _id: "other",
+                              userId: "owner",
+                              agent: { stopUnconfirmed: true },
+                            },
+                          ]
+                        : []),
+                    ]
+                  : [];
           return rows.filter((row) =>
             conditions.every(([op, key, value]) => {
               const actual = key
@@ -283,6 +286,7 @@ function make({
         return state.sandbox
           ? { sandboxId: "synthetic", state: "ready" }
           : null;
+      if (name === "agent/safety:hasConsent") return consent;
       if (name === "users/internal:deletionPending") {
         state.checks++;
         return state.pending;
@@ -353,6 +357,15 @@ function verifyNoExternal(s) {
   expect(s.calls.request).toBe(0);
   expect(s.finishes.some((x) => x.error)).toBe(false);
 }
+
+test("missing AI permission fences a queued worker before provider dispatch", async () => {
+  const f = make({ consent: false });
+  await f.run();
+  expect(f.state.calls.create).toBe(0);
+  expect(f.state.calls.resume).toBe(0);
+  expect(f.state.calls.prompt).toBe(0);
+  expect(f.state.finishes.some((finish) => finish.suspended)).toBe(true);
+});
 
 test("blocked, expired, held and deletion-pending work cannot create, resume or prompt", async () => {
   for (const options of [

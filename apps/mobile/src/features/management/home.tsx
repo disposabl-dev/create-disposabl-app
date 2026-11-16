@@ -25,6 +25,7 @@ import { useAttachments } from "../studio/attachments";
 import { attachmentIds } from "../studio/attachment-policy";
 import { Action, Screen, Label, Touch } from "../studio/ui";
 import { ErrorBoundary } from "./ui";
+import { useAiConsent } from "./ai-safety";
 
 export function ManagementHome() {
   return (
@@ -89,6 +90,7 @@ function Composer() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const send = useAction(api.agent.index.sendMessageChecked);
+  const consent = useAiConsent();
   const snapshot = useAction(api.billing.snapshot);
   const user = useQuery(api.users.index.current, {});
   const connections = useQuery(api.connections.index.status, {
@@ -115,6 +117,11 @@ function Composer() {
   async function submit(text: string) {
     const fileIds = attachmentIds(attachments);
     if (!text.trim() || busy || attachmentsBusy || !fileIds) return;
+    if (consent.allowed === undefined) return;
+    if (!consent.allowed) {
+      consent.request();
+      return;
+    }
     setBusy(true);
     setError("");
     let started = false;

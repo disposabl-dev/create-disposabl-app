@@ -34,6 +34,24 @@ import {
 } from "./connections/validator";
 
 export default defineSchema({
+  aiConsents: defineTable({
+    userId: v.string(),
+    version: v.string(),
+    granted: v.boolean(),
+    updatedAt: v.number(),
+  }).index("by_userId", ["userId"]),
+  aiReports: defineTable({
+    userId: v.string(),
+    appId: v.string(),
+    threadId: v.string(),
+    messageId: v.string(),
+    reason: v.string(),
+    status: v.union(v.literal("open"), v.literal("resolved")),
+    resolvedAt: v.optional(v.number()),
+    operator: v.optional(v.string()),
+  })
+    .index("by_status", ["status"])
+    .index("by_userId", ["userId"]),
   deletionReceipts: defineTable({
     reference: v.string(),
     ownerId: v.string(),

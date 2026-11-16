@@ -34,6 +34,20 @@ export const tick = internalAction({
     if (!current) return null;
     const ref = sandboxRef(current.userId);
     const canWork = async (allowActivation = false) => {
+      if (
+        !(await ctx.runQuery(
+          makeFunctionReference<"query", { userId: string }, boolean>(
+            "agent/safety:hasConsent",
+          ),
+          { userId: current.userId },
+        ))
+      ) {
+        await ctx.runMutation(internal.agent.state.finish, {
+          ...lease,
+          suspended: true,
+        });
+        return false;
+      }
       const access = await computeAccess(
         ctx,
         current.userId,
