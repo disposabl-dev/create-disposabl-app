@@ -6,6 +6,8 @@ export const nativeBillingPath =
   join("packages", "disposabl-kit", "mobile", "billing") + sep;
 export const nativeBillingTests = [
   join("packages", "tests", "native-billing.test.ts"),
+  join("packages", "tests", "mobile-account-billing.test.ts"),
+  join("packages", "tests", "components", "mobile-account-billing.test.mjs"),
   join("packages", "tests", "mobile-storefront-observer.test.ts"),
   join(
     "packages",

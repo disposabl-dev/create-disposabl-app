@@ -71,6 +71,9 @@ mock.module("expo-router", () => ({
 }));
 mock.module("expo-linking", () => ({ openURL: mock() }));
 mock.module("react-native-svg", () => ({ default: "Svg", Path: "Path" }));
+mock.module("react-native-keyboard-controller", () => ({
+  KeyboardAvoidingView: "KeyboardAvoidingView",
+}));
 mock.module("react-native", () => ({
   AppState: { addEventListener: () => ({ remove() {} }) },
   Platform: { OS: "ios" },

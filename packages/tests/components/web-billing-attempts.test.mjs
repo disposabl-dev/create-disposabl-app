@@ -89,8 +89,15 @@ mock.module("../../disposabl-kit/client/components/consent-identity", () => ({
   useConsentIdentity: () => ({ state: "ready", label: "synthetic" }),
 }));
 const { Pricing } = await import("../../disposabl-kit/client/routes/pricing");
-const { ProductTelemetry, AnalyticsPreference, captureProductAction } =
-  await import("../../../apps/web/src/telemetry");
+mock.module("../../disposabl-kit/client/components/cookie-consent", () => ({
+  acceptedCookieCategory: () => true,
+}));
+const {
+  ProductTelemetry,
+  setAnalyticsConsent,
+  invalidateAnalyticsConsent,
+  captureProductAction,
+} = await import("../../../apps/web/src/telemetry");
 let renderer;
 const button = (label) =>
   renderer.root
@@ -103,6 +110,7 @@ const actions = () =>
     .map((event) => event.properties.action);
 const mount = async (callback, e2e = false) => {
   process.env.VITE_E2E = e2e ? "true" : "false";
+  setAnalyticsConsent(true);
   await act(async () => {
     renderer = create(
       createElement(
@@ -113,7 +121,6 @@ const mount = async (callback, e2e = false) => {
           token: null,
           ready: true,
         }),
-        createElement(AnalyticsPreference),
         createElement(Pricing, { onAttempt: callback }),
       ),
     );
@@ -122,6 +129,7 @@ const mount = async (callback, e2e = false) => {
 afterEach(async () => {
   await act(async () => renderer?.unmount());
   renderer = undefined;
+  invalidateAnalyticsConsent();
   authenticated = true;
   token = makeToken("user");
   window.location.search = "";
@@ -387,6 +395,7 @@ test("busy, signed-out, active monthly and invalid iOS handoff do not report gua
   await act(async () => finish({ url: null }));
   await act(async () => renderer.unmount());
   renderer = undefined;
+  invalidateAnalyticsConsent();
   authenticated = false;
   events.length = 0;
   await mount(captureProductAction);
@@ -394,6 +403,7 @@ test("busy, signed-out, active monthly and invalid iOS handoff do not report gua
   expect(actions()).toEqual([]);
   await act(async () => renderer.unmount());
   renderer = undefined;
+  invalidateAnalyticsConsent();
   authenticated = true;
   snapshotValue = { ...snapshotValue, hasMonthlyPlan: true };
   await mount(captureProductAction);
@@ -401,6 +411,7 @@ test("busy, signed-out, active monthly and invalid iOS handoff do not report gua
   expect(actions()).toEqual([]);
   await act(async () => renderer.unmount());
   renderer = undefined;
+  invalidateAnalyticsConsent();
   window.location.search = "?source=ios";
   snapshotValue = { ...snapshotValue, hasMonthlyPlan: false };
   await mount(captureProductAction);
@@ -427,6 +438,7 @@ test("observer failure is harmless and absent callback is silent", async () => {
   expect(portal).toHaveBeenCalledTimes(1);
   await act(async () => renderer.unmount());
   renderer = undefined;
+  invalidateAnalyticsConsent();
   await mount(undefined);
   await invoke("Buy top-up");
   expect(checkout).toHaveBeenCalledTimes(3);
@@ -439,6 +451,7 @@ test("E2E, expired lease and local opt-out suppress real handler events", async 
   expect(actions()).toEqual([]);
   await act(async () => renderer.unmount());
   renderer = undefined;
+  invalidateAnalyticsConsent();
   await mount(captureProductAction);
   const now = Date.now;
   try {
@@ -448,12 +461,7 @@ test("E2E, expired lease and local opt-out suppress real handler events", async 
     Date.now = now;
   }
   expect(actions()).toEqual([]);
-  await act(async () =>
-    renderer.root
-      .findAllByType("button")
-      .find((node) => node.children.includes("Allow analytics:"))
-      .props.onClick(),
-  );
+  await act(async () => setAnalyticsConsent(false));
   await invoke("Manage website billing");
   expect(actions()).toEqual([]);
 });

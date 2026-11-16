@@ -573,7 +573,8 @@ jobs:
     name: Package / ${{ matrix.package }}
     needs: [changes, web]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.web.outputs.packages != '[]' && needs.web.outputs.packages != ''
-    runs-on: ${{ needs.changes.outputs.linux_runner }}
+    # npm OIDC trusted publishing requires a GitHub-hosted runner.
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
       contents: write

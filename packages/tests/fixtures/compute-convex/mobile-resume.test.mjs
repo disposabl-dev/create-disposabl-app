@@ -52,6 +52,9 @@ mock.module("expo-router", () => ({
   Stack: { Screen: "Screen" },
   useLocalSearchParams: () => ({ appId: "test-app" }),
 }));
+mock.module("react-native-keyboard-controller", () => ({
+  KeyboardAvoidingView: "KeyboardAvoidingView",
+}));
 mock.module("react-native", () => ({
   Alert: { alert: mock() },
   AppState: {

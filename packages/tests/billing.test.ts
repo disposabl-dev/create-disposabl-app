@@ -175,7 +175,10 @@ describe("billing boundary", () => {
     assert.equal(balanceFromCustomer({ balances: {} }), 0);
     assert.equal(
       balanceFromCustomer({
-        balances: { credits: { remaining: 900 }, seats: { remaining: 5 } },
+        balances: {
+          [`${pricing.featureId}_other`]: { remaining: 900 },
+          [`${pricing.featureId}_seats`]: { remaining: 5 },
+        },
       }),
       0,
     );

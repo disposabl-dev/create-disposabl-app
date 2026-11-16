@@ -10,7 +10,15 @@ import { isAccountPage } from "@disposabl/disposabl-kit/lib/indexing";
 
 import appCss from "../index.css?url";
 import { TelemetryOverrideContext } from "@disposabl/disposabl-kit/client/lib/telemetry";
-import { AnalyticsPreference, ProductTelemetry } from "../telemetry";
+import {
+  ProductTelemetry,
+  setAnalyticsConsent,
+  invalidateAnalyticsConsent,
+} from "../telemetry";
+import {
+  CookieConsentBanner,
+  CookiePreferencesContext,
+} from "../../../../packages/disposabl-kit/client/components/cookie-consent";
 import { publicReplayPath } from "../telemetry-replay";
 import { useSyncExternalStore } from "react";
 
@@ -124,8 +132,13 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         }
       >
         <TelemetryOverrideContext.Provider value={ProductTelemetry}>
-          {children}
-          <AnalyticsPreference />
+          <CookiePreferencesContext.Provider value={true}>
+            {children}
+          </CookiePreferencesContext.Provider>
+          <CookieConsentBanner
+            onAnalyticsChange={setAnalyticsConsent}
+            onInvalidate={invalidateAnalyticsConsent}
+          />
         </TelemetryOverrideContext.Provider>
         <Scripts />
       </body>

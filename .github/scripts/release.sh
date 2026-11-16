@@ -16,7 +16,17 @@ if GITHUB_TOKEN="$GH_TOKEN" npm_config_workspaces_update=false bun run --cwd "pa
   # case, but never require a public version before attempting OIDC publication.
   published="$name@$version"
   [[ "$version" != *development* ]] || published=$name
-  if ! PUBLISHED_VERSION=$(npm view "$published" version); then
+  # npm scans newly published packages before they become visible. Retry a
+  # bounded number of times, but never report ready without registry proof.
+  available=false
+  for attempt in {1..12}; do
+    if PUBLISHED_VERSION=$(npm view "$published" version --fetch-retries=0 --fetch-timeout=10000); then
+      available=true
+      break
+    fi
+    if (( attempt < 12 )); then sleep 10; fi
+  done
+  if [[ "$available" != true ]]; then
     node .github/scripts/disposabl.mjs report "$platform" failed 'Release finished, but npm availability could not be verified; check the registry lookup error.'
     exit 1
   fi

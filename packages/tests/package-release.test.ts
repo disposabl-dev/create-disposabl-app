@@ -17,6 +17,7 @@ function release(options: {
   prepared?: string;
   available?: string;
   failure?: boolean;
+  visibleAfter?: number;
 }) {
   const directory = mkdtempSync(join(tmpdir(), "package-release-"));
   try {
@@ -49,9 +50,12 @@ fi`,
     executable(
       "npm",
       `echo "npm $*" >> calls
+count=$(grep -c "^npm " calls)
+(( count > VISIBLE_AFTER )) || exit 1
 [[ -n "$AVAILABLE" ]] || { echo 'E404 or registry unavailable' >&2; exit 1; }
 printf '%s\\n' "$AVAILABLE"`,
     );
+    executable("sleep", ":");
     executable(
       "node",
       `if [[ "$1" == -p ]]; then
@@ -73,6 +77,7 @@ fi`,
         PREPARED: options.prepared ?? "",
         AVAILABLE: options.available ?? "",
         FAIL_RELEASE: String(options.failure ?? false),
+        VISIBLE_AFTER: String(options.visibleAfter ?? 0),
       },
     });
     const calls = join(directory, "calls");
@@ -125,4 +130,15 @@ test("a mismatched registry version cannot report ready", () => {
   assert.equal(result.status, 1);
   assert.match(result.calls, /no matching published version/);
   assert.doesNotMatch(result.calls, / ready /);
+});
+
+test("new publication waits for delayed registry visibility", () => {
+  const result = release({
+    prepared: "1.0.0",
+    available: "1.0.0",
+    visibleAfter: 2,
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal((result.calls.match(/npm view/g) ?? []).length, 3);
+  assert.match(result.calls, /report typescript-sdk ready version=1\.0\.0/);
 });

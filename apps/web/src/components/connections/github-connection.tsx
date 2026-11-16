@@ -39,7 +39,7 @@ export function GithubConnection({ setup }: { setup: Setup }) {
                 <Check className="size-3" /> Connected
               </span>
             ) : (
-              <span className="text-xs text-muted-foreground">Step 1</span>
+              <span className="text-xs text-muted-foreground">Required</span>
             )}
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -64,78 +64,31 @@ export function GithubConnection({ setup }: { setup: Setup }) {
         )}
       </div>
       {!connected && (
-        <div className="mt-5 space-y-5 border-t pt-5">
-          <p className="text-sm text-muted-foreground">
-            Use your personal GitHub account or an organization you administer.
-            A personal account is enough to get started.
-          </p>
-          <ol className="list-decimal space-y-5 pl-5 text-sm">
-            <li className="pl-1">
-              <p className="font-medium">Have a GitHub account ready</p>
-              <p className="mt-1 text-muted-foreground">
-                Already have one? Go to the next step. New to GitHub?{" "}
-                <a
-                  href="https://github.com/signup"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-medium text-foreground underline underline-offset-4"
-                >
-                  Create a free GitHub account
-                </a>{" "}
-                in a new tab. Finish signup and email verification there, then
-                return to this tab.
-              </p>
-            </li>
-            <li className="pl-1">
-              <p className="font-medium">Install Disposabl on GitHub</p>
-              <p className="mt-1 text-muted-foreground">
-                Sign in if asked, then choose your personal account or
-                organization. Select All repositories so Disposabl can create
-                and build new apps. Click Install on GitHub.
-              </p>
-              <Button
-                className="mt-3 min-h-11"
-                disabled={busy || !available}
-                onClick={() => connect("github")}
-              >
-                Install Disposabl on GitHub
-              </Button>
-              {!available && (
-                <p className="mt-2 text-muted-foreground">
-                  GitHub setup is temporarily unavailable. Please try again
-                  later.
-                </p>
-              )}
-            </li>
-            <li className="pl-1">
-              <p className="font-medium">Finish connecting your account</p>
-              <p className="mt-1 text-muted-foreground">
-                GitHub returns you here to finish authorization. If it leaves
-                you on GitHub, return to this tab and use the button below. This
-                step confirms which account owns your apps.
-              </p>
-              <Button
-                variant="outline"
-                className="mt-3 min-h-11"
-                disabled={busy || !available}
-                onClick={() => connect("github", false)}
-              >
-                Finish connecting GitHub
-              </Button>
-            </li>
-          </ol>
-          {githubPending && !installNeeded && installations.length === 0 && (
-            <p className="text-sm text-muted-foreground">
-              GitHub setup is not complete yet. Finish connecting above if you
-              already installed Disposabl.
-            </p>
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <Button
+            disabled={busy || !available}
+            onClick={() => connect("github")}
+          >
+            Connect GitHub
+          </Button>
+          {(githubPending || installNeeded) && (
+            <Button
+              variant="outline"
+              disabled={busy || !available}
+              onClick={() => connect("github", false)}
+            >
+              Finish connecting
+            </Button>
           )}
           {installNeeded && (
-            <p role="status" className="rounded-lg bg-muted p-3 text-sm">
-              We could not find a usable Disposabl installation for this GitHub
-              login. Install it on your personal account or an organization you
-              administer, with the requested permissions, then finish
+            <p role="status" className="text-sm text-muted-foreground">
+              Install Disposabl with the requested permissions, then finish
               connecting.
+            </p>
+          )}
+          {!available && (
+            <p className="text-sm text-muted-foreground">
+              GitHub setup is temporarily unavailable.
             </p>
           )}
         </div>

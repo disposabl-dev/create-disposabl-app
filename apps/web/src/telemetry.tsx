@@ -1,5 +1,6 @@
+import { acceptedCookieCategory } from "../../../packages/disposabl-kit/client/components/cookie-consent";
 import { PostHog } from "posthog-js";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import { createTelemetryLeaseController } from "../../../packages/disposabl-kit/client/lib/telemetry-lease";
 import {
   isProductAction,
@@ -10,13 +11,16 @@ import {
 const preferenceKey = "disposabl.product.analytics.optout.v1";
 const preferenceEvent = "disposabl-product-analytics-preference";
 let storageFailed = false;
+let consentReady = false;
 function allowed() {
   try {
     return (
+      consentReady &&
+      acceptedCookieCategory("analytics") &&
       !storageFailed &&
       navigator.doNotTrack !== "1" &&
       navigator.doNotTrack !== "yes" &&
-      localStorage.getItem(preferenceKey) !== "1"
+      localStorage.getItem(preferenceKey) === "0"
     );
   } catch {
     return false;
@@ -39,44 +43,22 @@ export function productTelemetrySource(): "web" | "desktop" {
     ? "desktop"
     : "web";
 }
-export function AnalyticsPreference() {
-  const [enabled, setEnabled] = useState(false);
-  const [failed, setFailed] = useState(false);
-  useEffect(() => {
-    const update = () => setEnabled(allowed());
-    update();
-    window.addEventListener("storage", update);
-    window.addEventListener(preferenceEvent, update);
-    return () => {
-      window.removeEventListener("storage", update);
-      window.removeEventListener(preferenceEvent, update);
-    };
-  }, []);
-  return (
-    <div className="mx-auto max-w-5xl px-6 pb-6 text-sm">
-      <button
-        type="button"
-        className="underline"
-        onClick={() => {
-          try {
-            if (enabled) stopActive?.();
-            localStorage.setItem(preferenceKey, failed || enabled ? "1" : "0");
-            storageFailed = false;
-            setFailed(false);
-            window.dispatchEvent(new Event(preferenceEvent));
-          } catch {
-            storageFailed = true;
-            stopActive?.();
-            setEnabled(false);
-            setFailed(true);
-          }
-        }}
-      >
-        Allow analytics:{" "}
-        {failed ? "not saved; select to retry" : enabled ? "yes" : "no"}
-      </button>
-    </div>
-  );
+export function invalidateAnalyticsConsent() {
+  consentReady = false;
+  stopActive?.();
+}
+
+export function setAnalyticsConsent(enabled: boolean) {
+  consentReady = enabled;
+  try {
+    if (!enabled) stopActive?.();
+    localStorage.setItem(preferenceKey, enabled ? "0" : "1");
+    storageFailed = false;
+  } catch {
+    storageFailed = true;
+    stopActive?.();
+  }
+  window.dispatchEvent(new Event(preferenceEvent));
 }
 
 /** Product capture boundary; replay is deliberately disabled in every configuration. */

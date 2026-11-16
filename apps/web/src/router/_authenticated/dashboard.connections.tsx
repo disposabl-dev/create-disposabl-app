@@ -77,6 +77,85 @@ export function Connections({ onContinue }: { onContinue?: () => void } = {}) {
     },
   ] as const;
 
+  const renderProvider = ({
+    id,
+    name,
+    description,
+  }: (typeof providers)[number]) => {
+    if (!status) return null;
+    const connected = status[id];
+    return (
+      <section
+        key={id}
+        aria-label={name}
+        className={`rounded-2xl border bg-card p-5 shadow-sm sm:p-6 ${id === "expo" && !mobile && !connected && !showExpo ? "opacity-80 hover:opacity-100 focus-within:opacity-100" : ""}`}
+      >
+        <div className="flex flex-wrap items-center gap-4 sm:flex-nowrap">
+          <div className="flex size-12 shrink-0 items-center justify-center rounded-xl border bg-background">
+            <ProviderLogo provider={id} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="font-semibold">{name}</h2>
+              {connected ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                  <Check className="size-3" /> Connected
+                </span>
+              ) : (
+                <span className="text-xs text-muted-foreground">
+                  {id === "convex"
+                    ? "Required"
+                    : mobile
+                      ? "Required for mobile"
+                      : "Optional · For mobile"}
+                </span>
+              )}
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {connected ? connected.name : description}
+            </p>
+          </div>
+          {connected ? (
+            <Button
+              variant="outline"
+              className="min-h-11"
+              disabled={busy}
+              onClick={() =>
+                void run(async () => {
+                  await disconnect({ provider: id });
+                })
+              }
+            >
+              Disconnect
+            </Button>
+          ) : (
+            <Button
+              className="min-h-11"
+              disabled={busy || !status.available[id]}
+              onClick={() =>
+                id === "expo" ? setShowExpo(!showExpo) : connect(id)
+              }
+            >
+              {id === "expo" && showExpo ? "Cancel" : `Connect ${name}`}
+            </Button>
+          )}
+        </div>
+        {!status.available[id] && !connected && (
+          <p className="mt-4 text-sm text-muted-foreground">
+            Temporarily unavailable.
+          </p>
+        )}
+        {id === "expo" && !connected && showExpo && (
+          <ExpoConnection
+            busy={busy}
+            run={run}
+            onConnected={() => setShowExpo(false)}
+          />
+        )}
+      </section>
+    );
+  };
+
   return (
     <main className="mx-auto max-w-3xl px-5 py-10 sm:px-8 sm:py-16">
       <header className="mb-8 sm:mb-10">
@@ -87,11 +166,8 @@ export function Connections({ onContinue }: { onContinue?: () => void } = {}) {
           Connect your accounts.
         </h1>
         <p className="mt-4 max-w-xl text-sm leading-6 text-muted-foreground sm:text-base">
-          Start with GitHub for your code, then Convex for your app's data.{" "}
-          {mobile
-            ? "Your mobile app also needs Expo."
-            : "Add Expo if you want a mobile app."}{" "}
-          Your code and data stay in accounts you control.
+          Connect GitHub and Convex to get started. Add other services when you
+          need them.
         </p>
       </header>
       <div className="mb-5 flex items-center justify-between gap-3 text-sm">
@@ -126,6 +202,7 @@ export function Connections({ onContinue }: { onContinue?: () => void } = {}) {
       ) : (
         <div className="space-y-3">
           <GithubConnection setup={setup} />
+          {providers.filter(({ id }) => id === "convex").map(renderProvider)}
           <AutumnConnection
             connected={status.autumn}
             required={paymentsRequired}
@@ -136,6 +213,7 @@ export function Connections({ onContinue }: { onContinue?: () => void } = {}) {
               await disconnect({ provider: "autumn" });
             }}
           />
+          {providers.filter(({ id }) => id === "expo").map(renderProvider)}
           <PosthogConnection
             connected={status.posthog}
             pending={status.posthogPending}
@@ -149,86 +227,6 @@ export function Connections({ onContinue }: { onContinue?: () => void } = {}) {
               })
             }
           />
-          {providers.map(({ id, name, description }) => {
-            const connected = status[id];
-            return (
-              <section
-                key={id}
-                aria-label={name}
-                className={`rounded-2xl border bg-card p-5 shadow-sm sm:p-6 ${id === "expo" && !mobile && !connected && !showExpo ? "opacity-80 hover:opacity-100 focus-within:opacity-100" : ""}`}
-              >
-                <div className="flex flex-wrap items-center gap-4 sm:flex-nowrap">
-                  <div className="flex size-12 shrink-0 items-center justify-center rounded-xl border bg-background">
-                    <ProviderLogo provider={id} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="font-semibold">{name}</h2>
-                      {connected ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-400">
-                          <Check className="size-3" /> Connected
-                        </span>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">
-                          {id === "convex"
-                            ? "Step 2"
-                            : mobile
-                              ? "Step 3 · Required for mobile"
-                              : "Optional · For mobile"}
-                        </span>
-                      )}
-                    </div>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {connected ? connected.name : description}
-                    </p>
-                  </div>
-                  {connected ? (
-                    <Button
-                      variant="outline"
-                      className="min-h-11"
-                      disabled={busy}
-                      onClick={() =>
-                        void run(async () => {
-                          await disconnect({ provider: id });
-                        })
-                      }
-                    >
-                      Disconnect
-                    </Button>
-                  ) : (
-                    <Button
-                      className="min-h-11"
-                      disabled={busy || !status.available[id]}
-                      onClick={() =>
-                        id === "expo" ? setShowExpo(!showExpo) : connect(id)
-                      }
-                    >
-                      {id === "expo" && showExpo ? "Cancel" : `Connect ${name}`}
-                    </Button>
-                  )}
-                </div>
-                {!status.available[id] && !connected && (
-                  <p className="mt-4 text-sm text-muted-foreground">
-                    Temporarily unavailable.
-                  </p>
-                )}
-                {id === "convex" && !connected && (
-                  <p className="mt-4 text-sm text-muted-foreground">
-                    Continue to Convex, sign in or create an account, then
-                    choose a team and approve access in the new tab. This page
-                    updates automatically when it is connected.
-                  </p>
-                )}
-                {id === "expo" && !connected && showExpo && (
-                  <ExpoConnection
-                    busy={busy}
-                    run={run}
-                    onConnected={() => setShowExpo(false)}
-                  />
-                )}
-              </section>
-            );
-          })}
         </div>
       )}
       {busy && (
@@ -273,30 +271,6 @@ export function Connections({ onContinue }: { onContinue?: () => void } = {}) {
           </Button>
         )}
       </div>
-      <aside className="mt-8 space-y-2 border-t pt-6 text-sm leading-6 text-muted-foreground">
-        <p>
-          Accounts are free to create. GitHub Actions runs your builds. Build
-          and hosting services have usage limits; charges may apply beyond
-          included allowances.
-        </p>
-        <p>
-          Your repositories and backend belong to you. Disposabl uses the access
-          you grant to set up and deploy your app, and stores encrypted
-          connection credentials and setup metadata.
-        </p>
-        <p>
-          Open source.{" "}
-          <a
-            href="https://github.com/disposabl-dev/create-disposabl-app"
-            target="_blank"
-            rel="noreferrer"
-            className="font-medium underline underline-offset-4"
-          >
-            Read the code on GitHub
-          </a>
-          . You can revoke access in each provider's settings.
-        </p>
-      </aside>
     </main>
   );
 }

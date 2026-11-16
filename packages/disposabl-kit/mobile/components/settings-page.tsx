@@ -3,7 +3,7 @@ import { router, Stack } from "expo-router";
 import type { ReactNode } from "react";
 import { Pressable, ScrollView } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { usePreferenceColors } from "../design/preferences";
+import { GlassIconButton, usePreferenceColors } from "../design/preferences";
 import { useAccentColor } from "../design/theme-provider";
 import { SymbolView } from "../design/nativewind";
 
@@ -20,36 +20,47 @@ export function ScreenCloseButton({
   const colors = usePreferenceColors();
   const done = purpose === "done";
   return process.env.EXPO_OS === "ios" ? (
-    <Stack.Toolbar placement="right">
-      <Stack.Toolbar.Button
-        accessibilityLabel={label}
-        icon={done ? "checkmark" : "xmark"}
-        tintColor={done ? accent : colors.text}
-        variant={done ? "prominent" : "plain"}
-        onPress={onPress}
-      />
-    </Stack.Toolbar>
+    <>
+      <Stack.Screen options={{ headerBackVisible: false }} />
+      <Stack.Toolbar placement="right">
+        <Stack.Toolbar.Button
+          accessibilityLabel={label}
+          icon={done ? "checkmark" : "xmark"}
+          tintColor={done ? accent : colors.text}
+          variant={done ? "prominent" : "plain"}
+          onPress={onPress}
+        />
+      </Stack.Toolbar>
+    </>
   ) : (
     <Stack.Screen
       options={{
-        headerRight: () => (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={label}
-            hitSlop={12}
-            onPress={onPress}
-            className="min-h-[44px] min-w-[44px] items-center justify-center"
-          >
-            <SymbolView
-              name={{
-                ios: done ? "checkmark" : "xmark",
-                android: done ? "check" : "close",
-              }}
-              size={24}
-              tintColor={done ? accent : colors.text}
+        headerBackVisible: false,
+        headerRight: () =>
+          done ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={label}
+              hitSlop={12}
+              onPress={onPress}
+              className="min-h-[44px] min-w-[44px] items-center justify-center"
+            >
+              <SymbolView
+                name={{
+                  ios: done ? "checkmark" : "xmark",
+                  android: done ? "check" : "close",
+                }}
+                size={24}
+                tintColor={done ? accent : colors.text}
+              />
+            </Pressable>
+          ) : (
+            <GlassIconButton
+              label={label}
+              icon={{ ios: "xmark", android: "close" }}
+              onPress={onPress}
             />
-          </Pressable>
-        ),
+          ),
       }}
     />
   );

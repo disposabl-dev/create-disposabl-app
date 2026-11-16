@@ -94,7 +94,12 @@ mock.module("posthog-js", () => ({
     stopSessionRecording() {}
   },
 }));
-const { ProductTelemetry, AnalyticsPreference } =
+let accepted = false;
+mock.module(
+  "../../../packages/disposabl-kit/client/components/cookie-consent",
+  () => ({ acceptedCookieCategory: () => accepted }),
+);
+const { ProductTelemetry, setAnalyticsConsent, invalidateAnalyticsConsent } =
   await import("../../../apps/web/src/telemetry");
 let renderer;
 afterEach(async () => {
@@ -141,8 +146,28 @@ test("Do Not Track prevents web bootstrap and SDK initialization", async () => {
   navigator.doNotTrack = "0";
 });
 
+test("web denies analytics before explicit consent", async () => {
+  process.env.VITE_E2E = "false";
+  values.clear();
+  values.set("disposabl.product.analytics.optout.v1", "0");
+  accepted = false;
+  await act(async () => {
+    renderer = create(
+      createElement(ProductTelemetry, {
+        pathname: "/",
+        token: null,
+        ready: true,
+      }),
+    );
+  });
+  expect(initialized).toBe(0);
+  expect(requests).toHaveBeenCalledTimes(0);
+});
+
 test("web bootstraps, strips URL and stops immediately on opt-out", async () => {
   process.env.VITE_E2E = "false";
+  accepted = true;
+  setAnalyticsConsent(true);
   await act(async () => {
     renderer = create(
       createElement(
@@ -153,7 +178,6 @@ test("web bootstraps, strips URL and stops immediately on opt-out", async () => 
           token: null,
           ready: true,
         }),
-        createElement(AnalyticsPreference),
       ),
     );
   });
@@ -202,8 +226,14 @@ test("web bootstraps, strips URL and stops immediately on opt-out", async () => 
   window.location.pathname = "/login";
   expect(sdkOptions.before_send(snapshot)).toBeNull();
   window.location.pathname = "/";
+  accepted = false;
+  window.clickTarget(new TestElement(undefined, new TestElement("copy_setup")));
+  expect(
+    events.filter((event) => event.event === "product_action"),
+  ).toHaveLength(2);
   await act(async () => {
-    renderer.root.findByType("button").props.onClick();
+    invalidateAnalyticsConsent();
+    setAnalyticsConsent(false);
   });
   expect(stops).toHaveBeenCalled();
   window.clickTarget(new TestElement(undefined, new TestElement("copy_setup")));

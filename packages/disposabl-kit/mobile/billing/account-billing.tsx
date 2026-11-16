@@ -69,10 +69,19 @@ export function AccountBilling({ customerId }: { customerId: string }) {
       const latest = () =>
         current(version) && sequence === refreshSequence.current;
       if (latest()) setMonthly(null);
+      let result: Snapshot;
       try {
-        const result = await getSnapshot({});
-        if (!latest()) return;
-        setData(result);
+        result = await getSnapshot({});
+      } catch {
+        if (latest()) {
+          setData(null);
+          setRefreshError("Billing could not refresh. Please try again.");
+        }
+        return;
+      }
+      if (!latest()) return;
+      setData(result);
+      try {
         if (key && productId && result.nativeSubscriptionsEnabled) {
           const store = await billingSession.run(
             customerId,
@@ -103,8 +112,8 @@ export function AccountBilling({ customerId }: { customerId: string }) {
         if (latest()) setRefreshError("");
       } catch {
         if (latest()) {
-          setData(null);
-          setRefreshError("Billing could not refresh. Please try again.");
+          setMonthly(null);
+          setRefreshError("Store unavailable. Please try again.");
         }
       }
     },

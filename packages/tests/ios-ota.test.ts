@@ -167,21 +167,24 @@ test("iOS reuses only a matching finished production binary", async () => {
   assert.match(result.trace, /"--build-profile","ios-production"/);
   assert.match(result.trace, /"--channel","production"/);
   assert.match(result.trace, /"--app-identifier","app.test"/);
-  for (const candidate of [
-    null,
-    { ...build, runtime: { version: "different" } },
-    { ...build, isForIosSimulator: true },
-    { ...build, app: { id: "other" } },
-    { ...build, updateChannel: { name: "preview" } },
-    { ...build, artifacts: {} },
-  ]) {
+});
+
+for (const [reason, candidate] of [
+  ["no binary", null],
+  ["different runtime", { ...build, runtime: { version: "different" } }],
+  ["simulator", { ...build, isForIosSimulator: true }],
+  ["different project", { ...build, app: { id: "other" } }],
+  ["preview channel", { ...build, updateChannel: { name: "preview" } }],
+  ["missing archive", { ...build, artifacts: {} }],
+] as const) {
+  test(`iOS requests a build for ${reason}`, async () => {
     const mismatch = await run("ota-plan", {
       BUILDS: JSON.stringify(candidate ? [candidate] : []),
     });
     assert.equal(mismatch.status, 0, mismatch.stderr);
     assert.match(mismatch.output, /action=build/);
-  }
-});
+  });
+}
 
 test("iOS build lookup errors do not trigger a replacement build", async () => {
   for (const values of [

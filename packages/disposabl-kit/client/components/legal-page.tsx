@@ -1,3 +1,8 @@
+import { useContext } from "react";
+import {
+  CookiePreferencesContext,
+  showCookiePreferences,
+} from "./cookie-consent";
 import { legalConfig, legalDocuments, legalIsDraft } from "../../legal";
 import type { ReactNode } from "react";
 
@@ -108,11 +113,21 @@ export function LegalPage({
 }
 
 export function LegalFooter() {
+  const cookiePreferences = useContext(CookiePreferencesContext);
   return (
     <footer
       className="mx-auto flex max-w-5xl flex-wrap justify-center gap-x-6 gap-y-2 px-6 py-8 text-xs text-muted-foreground"
       aria-label="Legal"
     >
+      {cookiePreferences && (
+        <button
+          type="button"
+          onClick={showCookiePreferences}
+          className="underline underline-offset-4"
+        >
+          Cookie preferences
+        </button>
+      )}
       <a href="/legal/privacy" className="hover:underline">
         Privacy
       </a>

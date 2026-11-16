@@ -76,6 +76,14 @@ test(
       screen.getByRole("heading", "Connect your accounts."),
     ).toBeVisible();
     await expect(
+      screen.getByRole("button", "Connect GitHub", { exact: true }),
+    ).toBeVisible();
+    expect(
+      await browser.evaluate(() =>
+        [...document.querySelectorAll("main h2")].map((e) => e.textContent),
+      ),
+    ).toEqual(["GitHub", "Convex", "Autumn", "Expo", "PostHog"]);
+    await expect(
       screen.getByRole("button", "Continue", { exact: true }),
     ).toBeDisabled();
     await screen.getByRole("button", "Logout", { exact: true }).tap();
@@ -89,9 +97,7 @@ test(
     await expect(
       screen.getByRole("heading", "Connect your accounts."),
     ).toBeVisible();
-    await expect(
-      screen.getByText("Step 3 · Required for mobile"),
-    ).toBeVisible();
+    await expect(screen.getByText("Required for mobile")).toBeVisible();
     await expect(screen.getByText(/Required.*analytics/i)).toBeVisible();
     await expect(
       screen.getByText("Required for payments", { exact: true }),
@@ -103,9 +109,7 @@ test(
     await expect(screen.getByRole("alert")).toContainText("cancelled");
     await expect(browser).toHaveURL("/dashboard/connections");
     await browser.reload();
-    await expect(
-      screen.getByText("Step 3 · Required for mobile"),
-    ).toBeVisible();
+    await expect(screen.getByText("Required for mobile")).toBeVisible();
     await expect(screen.getByText(/Required.*analytics/i)).toBeVisible();
     await expect(
       screen.getByText("Required for payments", { exact: true }),

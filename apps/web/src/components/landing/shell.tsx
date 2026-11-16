@@ -1,3 +1,4 @@
+import { showCookiePreferences } from "../../../../../packages/disposabl-kit/client/components/cookie-consent";
 import { StoreDownloads } from "./store-downloads";
 import { useHydrated } from "@tanstack/react-router";
 import { useState, useRef, useEffect, type ReactNode } from "react";
@@ -200,6 +201,13 @@ export function MarketingShell({
             <a href="#main">Back to top ↑</a>
           </div>
         </div>
+        <button
+          type="button"
+          onClick={showCookiePreferences}
+          className="underline"
+        >
+          Cookie preferences
+        </button>
       </footer>
     </div>
   );

@@ -80,13 +80,21 @@ mock.module("@disposabl/disposabl-kit/client/components/ui/button", () => ({
 mock.module("@disposabl/disposabl-kit/client/components/ui/input", () => ({
   Input: (props) => createElement("input", props),
 }));
-const { ProductTelemetry, AnalyticsPreference, captureProductAction } =
-  await import("../../../apps/web/src/telemetry");
+mock.module("../../disposabl-kit/client/components/cookie-consent", () => ({
+  acceptedCookieCategory: () => true,
+}));
+const {
+  ProductTelemetry,
+  setAnalyticsConsent,
+  invalidateAnalyticsConsent,
+  captureProductAction,
+} = await import("../../../apps/web/src/telemetry");
 const { Route } =
   await import("../../../apps/web/src/router/_authenticated/dashboard.api-keys");
 let renderer;
 const mount = async (e2e) => {
   process.env.VITE_E2E = e2e ? "true" : "false";
+  setAnalyticsConsent(true);
   await act(async () => {
     renderer = create(
       createElement(
@@ -97,7 +105,6 @@ const mount = async (e2e) => {
           token: null,
           ready: true,
         }),
-        createElement(AnalyticsPreference),
         createElement(Route.component),
       ),
     );
@@ -118,6 +125,7 @@ const submit = async () =>
 afterEach(async () => {
   await act(async () => renderer?.unmount());
   renderer = undefined;
+  invalidateAnalyticsConsent();
   events.length = 0;
   captureThrows = false;
   values.clear();
@@ -237,6 +245,7 @@ test("E2E and opt-out or expired leases suppress handler events", async () => {
   expect(actions()).toEqual([]);
   await act(async () => renderer.unmount());
   renderer = undefined;
+  invalidateAnalyticsConsent();
   await mount(false);
   const original = Date.now;
   try {
@@ -246,12 +255,7 @@ test("E2E and opt-out or expired leases suppress handler events", async () => {
     Date.now = original;
   }
   expect(actions()).toEqual([]);
-  await act(async () =>
-    renderer.root
-      .findAllByType("button")
-      .find((node) => node.children.includes("Allow analytics:"))
-      .props.onClick(),
-  );
+  await act(async () => setAnalyticsConsent(false));
   await act(async () => button("Revoke").props.onClick());
   expect(actions()).toEqual([]);
 });
