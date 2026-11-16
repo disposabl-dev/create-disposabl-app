@@ -1,4 +1,3 @@
-import { VariableContextProvider } from "nativewind";
 import { MenuView } from "../../../../../packages/disposabl-kit/mobile/design/nativewind";
 import { useState } from "react";
 import {
@@ -10,7 +9,6 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { useTheme } from "../../../../../packages/disposabl-kit/mobile/design/use-theme";
-import { useDictation } from "../../../../../packages/disposabl-kit/mobile/components/use-dictation";
 import type { Attachment, AttachmentSource } from "./attachments";
 import { attachmentIds } from "./attachment-policy";
 import { GlassSurface, Icon, feedback } from "./ui";
@@ -62,12 +60,6 @@ export function MessageComposer({
   const inline = compact && (compactViewport || !expanded || !value);
   const actionsBusy = disabled || sending || attachmentsBusy;
   const blocked = actionsBusy || attachmentIds(attachments) === null;
-  const dictation = useDictation({
-    value,
-    onChange,
-    onSend,
-    disabled: blocked,
-  });
   const canSend = !blocked && !!value.trim();
   const showStop = !!onStop && stopAvailable && (!value.trim() || stopRequired);
   const actionEnabled = showStop ? !stopping && !sending : canSend;
@@ -135,16 +127,6 @@ export function MessageComposer({
   );
   const actions = (
     <>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Dictation"
-        accessibilityState={{ disabled: blocked }}
-        disabled={blocked}
-        onPress={() => void dictation.start()}
-        className={`size-[44px] items-center justify-center ${blocked ? "opacity-40" : ""}`}
-      >
-        <Icon name="mic" />
-      </Pressable>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={
@@ -226,76 +208,16 @@ export function MessageComposer({
             </Pressable>
           </View>
         ))}
-      {!!dictation.error && (
-        <Text accessibilityRole="alert" className="text-destructive">
-          {dictation.error}
-        </Text>
-      )}
       <GlassSurface className="p-[6px] rounded-[28px] gap-[4px]">
-        {dictation.state !== "idle" ? (
-          <View className="flex-row items-center gap-[8px]">
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Cancel dictation"
-              onPress={dictation.cancel}
-              className="w-[44px] h-[44px] items-center justify-center"
-            >
-              <Icon name="close" />
-            </Pressable>
-            <View
-              accessibilityLabel="Recording"
-              className="flex-1 flex-row items-center justify-around"
-            >
-              {Array.from({ length: 20 }, (_, i) => (
-                <VariableContextProvider
-                  key={i}
-                  value={{
-                    "--layout-height":
-                      3 +
-                      Math.max(0, Math.min(1, dictation.level)) *
-                        ((i % 4) + 1) *
-                        4,
-                  }}
-                >
-                  <View
-                    key={i}
-                    className="w-[3px] h-[var(--layout-height)] rounded-[2px] bg-muted-foreground"
-                  />
-                </VariableContextProvider>
-              ))}
-            </View>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Stop dictation"
-              disabled={dictation.state !== "listening"}
-              onPress={dictation.stop}
-              className={`size-[44px] items-center justify-center ${dictation.state === "listening" ? "" : "opacity-40"}`}
-            >
-              <View className="w-[16px] h-[16px] rounded-[3px] bg-foreground" />
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Send dictation"
-              disabled={blocked || dictation.state !== "listening"}
-              onPress={dictation.send}
-              className="w-[44px] h-[44px] rounded-[22px] bg-foreground items-center justify-center"
-            >
-              <Icon name="send" color={c.background} />
-            </Pressable>
-          </View>
-        ) : (
-          <>
-            <View className={inline ? "ml-[44px] mr-[88px]" : ""}>{input}</View>
-            <View
-              pointerEvents="box-none"
-              className={`flex-row items-end ${inline ? "absolute inset-x-[6px] bottom-[6px]" : ""}`}
-            >
-              {plus}
-              <View pointerEvents="none" className="flex-1" />
-              {actions}
-            </View>
-          </>
-        )}
+        <View className={inline ? "ml-[44px] mr-[44px]" : ""}>{input}</View>
+        <View
+          pointerEvents="box-none"
+          className={`flex-row items-end ${inline ? "absolute inset-x-[6px] bottom-[6px]" : ""}`}
+        >
+          {plus}
+          <View pointerEvents="none" className="flex-1" />
+          {actions}
+        </View>
       </GlassSurface>
     </View>
   );

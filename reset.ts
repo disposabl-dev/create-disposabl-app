@@ -172,9 +172,6 @@ const touched = [
   "packages/disposabl-kit/payments/catalog.ts",
   "packages/disposabl-kit/client/components/account-deletion.tsx",
   "packages/tests/components/account-deletion.test.mjs",
-  "packages/disposabl-kit/mobile/components/use-dictation.ts",
-  "packages/tests/mobile-dictation.test.ts",
-  "packages/tests/components/mobile-dictation.test.mjs",
   "packages/tests/mobile-attachments.test.ts",
   "packages/tests/mobile-attachment-lifecycle.test.ts",
   "packages/tests/components/mobile-attachment-lifecycle.test.mjs",
@@ -491,9 +488,6 @@ for (const path of [
   "packages/tests/generator-service-origin.test.ts",
   "packages/tests/mobile-attachment-lifecycle.test.ts",
   "packages/tests/components/mobile-attachment-lifecycle.test.mjs",
-  "packages/disposabl-kit/mobile/components/use-dictation.ts",
-  "packages/tests/mobile-dictation.test.ts",
-  "packages/tests/components/mobile-dictation.test.mjs",
   "packages/tests/mobile-attachments.test.ts",
   "packages/tests/mobile-conversation-scroll.test.ts",
   "packages/tests/mobile-submission-policy.test.ts",
@@ -613,12 +607,9 @@ const chatPackages = [
   "expo-image-picker",
   "expo-document-picker",
   "expo-file-system",
-  "expo-speech-recognition",
   "react-native-enriched-markdown",
 ];
 for (const name of chatPackages) delete mobile.dependencies[name];
-delete kit.peerDependencies["expo-speech-recognition"];
-delete kit.peerDependenciesMeta["expo-speech-recognition"];
 mobileConfig.expo.plugins = mobileConfig.expo.plugins.filter(
   (plugin: string | [string, unknown]) =>
     !chatPackages.includes(typeof plugin === "string" ? plugin : plugin[0]),

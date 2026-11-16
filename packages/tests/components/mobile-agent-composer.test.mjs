@@ -18,17 +18,6 @@ mock.module("../../../packages/disposabl-kit/mobile/design/nativewind", () => ({
 mock.module("../../../packages/disposabl-kit/mobile/design/use-theme", () => ({
   useTheme: () => ({}),
 }));
-mock.module(
-  "../../../packages/disposabl-kit/mobile/components/use-dictation",
-  () => ({
-    useDictation: () => ({
-      state: "idle",
-      start: mock(),
-      stop: mock(),
-      cancel: mock(),
-    }),
-  }),
-);
 mock.module("../../../apps/mobile/src/features/studio/ui", () => ({
   GlassSurface: "GlassSurface",
   Icon: "Icon",
@@ -73,5 +62,43 @@ test("one composer press invokes only its chosen send or stop handler", async ()
   );
   expect(onSend).toHaveBeenCalledTimes(1);
   expect(onStop).toHaveBeenCalledTimes(1);
+  await act(async () => renderer.unmount());
+});
+
+test("attachment menu offers camera, photos and files without dictation", async () => {
+  const onPickAttachment = mock();
+  let renderer;
+  await act(async () => {
+    renderer = create(
+      createElement(MessageComposer, {
+        value: "draft",
+        onChange: mock(),
+        onSend: mock(),
+        attachments: [],
+        onPickAttachment,
+        onRemoveAttachment: mock(),
+        onRetryAttachment: mock(),
+      }),
+    );
+  });
+  expect(
+    renderer.root.findAllByProps({ accessibilityLabel: "Dictation" }),
+  ).toHaveLength(0);
+  const menu = renderer.root.findByType("Menu");
+  expect(menu.props.actions.map((action) => action.id)).toEqual([
+    "camera",
+    "photos",
+    "files",
+  ]);
+  for (const source of ["camera", "photos", "files"]) {
+    await act(async () =>
+      menu.props.onPressAction({ nativeEvent: { event: source } }),
+    );
+  }
+  expect(onPickAttachment.mock.calls.map(([source]) => source)).toEqual([
+    "camera",
+    "photos",
+    "files",
+  ]);
   await act(async () => renderer.unmount());
 });

@@ -58,7 +58,6 @@ const symbols = {
   check: ["checkmark", "check"],
   play: ["play.fill", "play-arrow"],
   settings: ["slider.horizontal.3", "tune"],
-  mic: ["mic", "mic"],
   photo: ["photo", "image"],
   chevron: ["chevron.right", "chevron-right"],
 } as const;

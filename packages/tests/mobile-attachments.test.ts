@@ -40,7 +40,7 @@ test("attachment upload errors stay actionable without exposing backend internal
   );
 });
 
-test("product Expo configuration permits Android dictation and preserves its iOS purpose", () => {
+test("image-only attachments keep camera and photo access without audio permissions", () => {
   const env = { ...process.env };
   for (const key of Object.keys(env))
     if (key.startsWith("CONVEX_") || key.startsWith("EXPO_PUBLIC_CONVEX_"))
@@ -56,16 +56,31 @@ test("product Expo configuration permits Android dictation and preserves its iOS
   );
   assert.equal(result.status, 0, result.stderr);
   const config = JSON.parse(result.stdout);
-  assert.ok(
-    config.android.permissions.includes("android.permission.RECORD_AUDIO"),
-  );
-  assert.ok(
-    !config.android.blockedPermissions?.includes(
-      "android.permission.RECORD_AUDIO",
-    ),
-  );
+  const plugins = config.plugins;
   assert.equal(
-    config.ios.infoPlist.NSMicrophoneUsageDescription,
-    "Allow $(PRODUCT_NAME) to use your microphone for dictation.",
+    plugins.some(
+      (plugin: string | [string, unknown]) =>
+        (Array.isArray(plugin) ? plugin[0] : plugin) ===
+        "expo-speech-recognition",
+    ),
+    false,
+  );
+  const imagePicker = plugins.find(
+    (plugin: string | [string, unknown]) =>
+      Array.isArray(plugin) && plugin[0] === "expo-image-picker",
+  );
+  assert.ok(imagePicker);
+  assert.equal(imagePicker[1].microphonePermission, false);
+  assert.ok(imagePicker[1].cameraPermission);
+  assert.ok(imagePicker[1].photosPermission);
+  assert.equal(
+    config.android.permissions?.includes("android.permission.RECORD_AUDIO") ??
+      false,
+    false,
+  );
+  assert.equal(config.ios.infoPlist?.NSMicrophoneUsageDescription, undefined);
+  assert.equal(
+    config.ios.infoPlist?.NSSpeechRecognitionUsageDescription,
+    undefined,
   );
 });

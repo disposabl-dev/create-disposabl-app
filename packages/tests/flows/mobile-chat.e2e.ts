@@ -427,9 +427,6 @@ test(
           screen.getByRole("button", "Send message", { exact: true }),
         ).toBeVisible();
         await expect(
-          screen.getByRole("button", "Dictation", { exact: true }),
-        ).toBeVisible();
-        await expect(
           screen.getByRole("button", "Add attachment", { exact: true }),
         ).toBeVisible();
         await app.screenshot("chat-multiline");
@@ -438,7 +435,7 @@ test(
           await expect(input).toHaveValue(draft);
           await input.tap();
           await expect(input).toBeFocused();
-          for (const label of ["Send message", "Dictation", "Add attachment"])
+          for (const label of ["Send message", "Add attachment"])
             await expect(
               screen.getByRole("button", label, { exact: true }),
             ).toBeVisible();
