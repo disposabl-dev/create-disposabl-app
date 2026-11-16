@@ -16,3 +16,5 @@ Run `bun run test --target ios` or `bun run test --target android` after install
 The release pipeline can publish compatible JavaScript and asset changes through EAS Update. Changes to native code or the runtime fingerprint require a new binary. Configure the Expo project and matching channel before publishing.
 
 The app downloads compatible updates at startup and after a long inactive period. A downloaded update can load on the next cold launch; the in-app update prompt lets a user restart sooner. Verify this with an installed release build—development builds and E2E builds do not prove OTA behavior.
+
+For store builds, signing, review access, and release steps, see [Publishing](/publishing).

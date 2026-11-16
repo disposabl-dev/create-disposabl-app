@@ -1,0 +1,12 @@
+---
+title: Apple App Store
+description: Build, test, and submit an iOS release.
+---
+
+1. **Use the right app record.** Confirm the Apple team, bundle identifier, app record, version, and a new build number. Use the existing record for an update. Check the EAS production profile, environment, distribution certificate, and provisioning profile. If the lockfile was made with a specific Bun version, pin that version in the EAS profile so a frozen install uses the same toolchain.
+2. **Build and upload.** Build a signed production iOS binary with EAS and upload it to App Store Connect. Upload success is not approval. Wait for [Apple processing](https://developer.apple.com/help/app-store-connect/manage-builds/upload-builds/), resolve export-compliance questions accurately, and select the processed build for the correct version.
+3. **Test the installed build.** Install through TestFlight or an appropriate signed distribution, then exercise login, the main flow, persistence, privacy controls, and account deletion. TestFlight purchases use Apple's sandbox. Verify the real transaction through the app, RevenueCat, and your billing balance before enabling production purchase readiness. Configure all products and the Paid Apps Agreement as needed; [Apple reviews in-app purchases in sandbox](https://developer.apple.com/help/app-review/before-submitting-for-review/configure-in-app-purchases/).
+4. **Complete the listing and review details.** Use genuine screenshots from the relevant Apple devices and accurate descriptions, privacy information, support and privacy URLs. Provide the dedicated Apple review account and clear steps to the main features. Include external services and other details Apple needs. Keep the account usable throughout review.
+5. **Submit and follow the status.** Associate the correct build with the version, submit the app and required in-app purchases, and monitor App Review. [Selecting a build](https://developer.apple.com/help/app-store-connect/manage-builds/choose-a-build-to-submit/) and uploading it are separate from submitting it for review and releasing it.
+
+See [review access and updates](/publishing) for shared preparation. A compatible EAS Update can update JavaScript and assets, but it cannot replace a new signed binary when native capabilities change.

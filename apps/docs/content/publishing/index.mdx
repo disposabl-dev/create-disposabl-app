@@ -1,0 +1,23 @@
+---
+title: Publishing
+description: Prepare, submit, and maintain a mobile store release.
+---
+
+A successful build gives you a file to test. Uploading it gives the store a build to process. Neither means the app has passed review or is available to customers. Follow the store's status through approval and release.
+
+- [Publish to the Apple App Store](/publishing/apple)
+- [Publish to Google Play](/publishing/google-play)
+
+## Prepare review access
+
+For an app that needs sign-in, maintain two separate, ordinary accounts: one for Apple review and one for Google Play review. Give each a working sign-in and enough credits or other access to exercise the complete app without asking a reviewer to create a provider account, pay personally, or wait for a one-time code. Keep the credentials in each store's private review-access fields, not in your repository or public documentation. [Apple](https://developer.apple.com/help/app-review/before-submitting-for-review/complete-review/) and [Google](https://support.google.com/googleplay/android-developer/answer/15748846) describe what access to provide.
+
+If the app creates projects through GitHub, Convex, or Expo, connect each review account through the normal authorization flow to dedicated, isolated resources. Restrict access to the test resources each account needs. Check the actual permissions: creating repositories can require broader organization permissions than reading a single repository, and a Convex team authorization may cover more than one project. Do not copy another user's stored credentials or connect a personal organization with unrelated projects. Test the entire creation flow using each account, and make sure deleting or resetting one account does not remove the other's resources. Where a provider or feature is optional, configure it only if the review path needs it.
+
+Keep a documented way for an operator to replenish test credits and reset each account's test data through normal provider administration. Do not invent a purchase or present a manual grant as one. For the actual purchase flow, use a real store sandbox transaction and verify the complete path: store receipt, RevenueCat webhook, provider credit balance, and usable credits in the app. Only enable global payment readiness after that proof. For example, Disposabl's current product offers a $5 monthly plan with 750 credits per cycle and a $5 top-up with 500 non-expiring credits; your app's prices, products, and terms may differ.
+
+## Privacy and updates
+
+Publish an accurate privacy policy and support contact. Check what the shipped app and its SDKs collect or share, including connected providers, analytics, and AI services. Verify consent before sending personal data to third-party AI, and provide in-app reporting where your AI content requires it. Test account deletion and explain what is retained. Complete each store's privacy declarations from observed production behavior, not test-only assumptions.
+
+EAS Update can deliver compatible JavaScript and assets to an installed binary with the matching runtime. Native dependencies, SDK changes, permissions, signing, or other native configuration changes require a new compatible store binary and the applicable store review. Test an update on the actual installed release build; an OTA publication does not itself prove delivery. See [Expo's runtime guidance](https://docs.expo.dev/build/updates/).

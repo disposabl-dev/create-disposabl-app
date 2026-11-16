@@ -1,0 +1,12 @@
+---
+title: Google Play
+description: Sign, test, and submit an Android release.
+---
+
+1. **Keep the same signing identity.** Confirm the package name and increase the version code. Build a release Android App Bundle with the correct upload key. A debug APK proves neither release signing nor upgrade continuity. With Play App Signing, Google uses the app signing key for distributed installs; the upload key signs the bundle you send to Play. Preserve the upload keystore and its recovery process. See [Android app signing](https://developer.android.com/studio/publish/app-signing).
+2. **Check the right fingerprint.** In Play Console's App Integrity page, distinguish the upload certificate from the app signing certificate and compare the complete fingerprint and algorithm. Google Android OAuth clients commonly require the app signing certificate's **SHA-1**; other registration flows may request **SHA-256**. Neither fingerprint is a substitute for the other. See [Google's client authentication guide](https://developers.google.com/android/guides/client-auth).
+3. **Upload and test.** Upload the signed bundle to a suitable Play testing track and install the Play-delivered build on a device. EAS can build a bundle without a Play service account. If automated submission is not configured, download the verified bundle and upload it manually in Play Console. A successful EAS build or upload is not a Play review decision.
+4. **Complete review access and declarations.** Provide a dedicated Google review account that works without the reviewer's own provider accounts, personal payment, or an inaccessible one-time code. Test its complete flow and credits first. Complete the Data safety form, privacy policy, and app access instructions from the actual release. If users can create accounts, provide both the in-app deletion path and an accessible [web deletion request link](https://support.google.com/googleplay/android-developer/answer/13327111), including any retained-data exceptions. Give users a way to report offensive AI-generated content when applicable.
+5. **Submit and follow the status.** Verify the intended track, release notes, device screenshots, content declarations, and signing details. Submit in Play Console and follow the release through review and publication; a testing-track upload alone does not mean the production release is live.
+
+See [review access and updates](/publishing) for account preparation, purchase testing, and EAS Update limits.
