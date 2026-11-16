@@ -38,6 +38,7 @@ const events = [];
 const instances = [];
 let initialized = 0;
 let saved = null;
+const alerts = [];
 let finishRead;
 const readPreference = mock(
   () =>
@@ -67,6 +68,9 @@ mock.module("expo-secure-store", () => ({
   setItemAsync: async (_key, value) => {
     saved = value;
   },
+}));
+mock.module("react-native", () => ({
+  Alert: { alert: (...args) => alerts.push(args) },
 }));
 mock.module("posthog-react-native", () => ({
   default: class {
@@ -110,7 +114,8 @@ afterEach(async () => {
   await act(async () => renderer?.unmount());
 });
 
-test("concurrent preference consumers share one read and opt-out cannot be overwritten", async () => {
+test("analytics stays off without consent and concurrent consumers share one read", async () => {
+  process.env.EXPO_PUBLIC_E2E = "false";
   await act(async () => {
     renderer = create(
       createElement(
@@ -119,7 +124,7 @@ test("concurrent preference consumers share one read and opt-out cannot be overw
         createElement(ProductTelemetry, {
           pathname: "/",
           token: null,
-          ready: true,
+          ready: false,
         }),
         createElement(AnalyticsPreference),
       ),
@@ -132,16 +137,25 @@ test("concurrent preference consumers share one read and opt-out cannot be overw
   captureProductAction("agent_stop_attempt");
   expect(events).toHaveLength(0);
   await act(async () => finishRead(null));
+  expect(renderer.root.findByType("PreferenceRow").props.value).toBe("No");
+  expect(requests).toHaveBeenCalledTimes(0);
+  expect(alerts).toHaveLength(1);
+  expect(alerts[0][0]).toBe("Allow usage analytics?");
+  await act(async () => {
+    alerts[0][2].find((button) => button.text === "Allow").onPress();
+    await Promise.resolve();
+  });
+  expect(saved).toBe("allow");
+  expect(renderer.root.findByType("PreferenceRow").props.value).toBe("Yes");
+  expect(readPreference).toHaveBeenCalledTimes(1);
+  expect(initialized).toBe(0);
+  expect(requests).toHaveBeenCalledTimes(0);
+  // Exercise withdrawal and restore consent for the later SDK checks.
   await act(async () => {
     renderer.root.findByType("PreferenceRow").props.onPress();
     await Promise.resolve();
   });
-  expect(saved).toBe("1");
-  expect(renderer.root.findByType("PreferenceRow").props.value).toBe("No");
-  expect(readPreference).toHaveBeenCalledTimes(1);
-  expect(initialized).toBe(0);
-  expect(requests).toHaveBeenCalledTimes(0);
-  // Restore the preference for the later independent SDK behavior checks.
+  expect(saved).toBe("deny");
   await act(async () => {
     renderer.root.findByType("PreferenceRow").props.onPress();
     await Promise.resolve();
@@ -243,7 +257,7 @@ test("production waits for bootstrap, sanitizes screen and stops on local opt-ou
     renderer.root.findByType("PreferenceRow").props.onPress();
     await Promise.resolve();
   });
-  expect(saved).toBe("1");
+  expect(saved).toBe("deny");
   expect(stops).toHaveBeenCalled();
   expect(instances.every((instance) => instance.optedOut)).toBe(true);
   captureProductAction("agent_send_attempt");

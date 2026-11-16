@@ -1,5 +1,5 @@
 export const publisher = {
-  operatorName: "Yast AI",
+  operatorName: "Yast Ai, Inc.",
   privacyEmail: "vivek@yast.ai",
   providers: [
     {

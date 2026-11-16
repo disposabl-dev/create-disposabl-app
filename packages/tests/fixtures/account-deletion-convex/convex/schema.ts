@@ -1,6 +1,16 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 export default defineSchema({
+  computeSessions: defineTable({
+    userId: v.string(),
+    activationLease: v.optional(v.object({ until: v.number() })),
+  }).index("by_userId_activationUntil", ["userId", "activationLease.until"]),
+  apps: defineTable({
+    userId: v.string(),
+    agent: v.optional(
+      v.object({ lease: v.optional(v.object({ expiresAt: v.number() })) }),
+    ),
+  }).index("by_userId_agentLeaseUntil", ["userId", "agent.lease.expiresAt"]),
   deletionReceipts: defineTable({
     reference: v.string(),
     ownerId: v.string(),

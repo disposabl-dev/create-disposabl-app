@@ -1,6 +1,7 @@
 import PostHog from "posthog-react-native";
 import * as SecureStore from "expo-secure-store";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Alert } from "react-native";
 import {
   PreferenceRow,
   PreferenceSection,
@@ -12,8 +13,10 @@ import {
 } from "./telemetry-policy";
 import { createTelemetryLeaseController } from "../../../../packages/disposabl-kit/client/lib/telemetry-lease";
 
-const key = "disposabl.product.analytics.optout.v1";
+const key = "disposabl.product.analytics.consent.v1";
 let allowed: boolean | null = null;
+let undecided = false;
+let prompted = false;
 let preferencePending = false;
 let preferenceLoad: Promise<void> | undefined;
 const listeners = new Set<() => void>();
@@ -35,12 +38,33 @@ function loadPreference() {
   // may initialize the preference, so a stale second read cannot undo opt-out.
   return (preferenceLoad ??= (async () => {
     try {
-      allowed = (await SecureStore.getItemAsync(key)) !== "1";
+      const stored = await SecureStore.getItemAsync(key);
+      undecided = stored !== "allow" && stored !== "deny";
+      allowed = stored === "allow";
     } catch {
       allowed = false;
     }
     notify();
   })());
+}
+async function savePreference(next: boolean) {
+  if (preferencePending) return false;
+  preferencePending = true;
+  if (!next) stopActive?.();
+  allowed = false;
+  notify();
+  try {
+    await SecureStore.setItemAsync(key, next ? "allow" : "deny");
+    allowed = next;
+    undecided = false;
+    return true;
+  } catch {
+    allowed = false;
+    return false;
+  } finally {
+    preferencePending = false;
+    notify();
+  }
 }
 function usePreference() {
   const [value, setValue] = useState(allowed);
@@ -60,21 +84,8 @@ export function AnalyticsPreference() {
   const [failed, setFailed] = useState(false);
   async function toggle() {
     if (value === null || preferencePending) return;
-    preferencePending = true;
-    if (value) stopActive?.();
     const next = failed ? false : !value;
-    allowed = false;
-    notify();
-    try {
-      await SecureStore.setItemAsync(key, next ? "0" : "1");
-      allowed = next;
-      setFailed(false);
-    } catch {
-      allowed = false;
-      setFailed(true);
-    }
-    preferencePending = false;
-    notify();
+    setFailed(!(await savePreference(next)));
   }
   return (
     <PreferenceSection title="Privacy">
@@ -107,6 +118,28 @@ export function ProductTelemetry({
   ready: boolean;
 }) {
   const preference = usePreference();
+  useEffect(() => {
+    if (
+      preference === null ||
+      !undecided ||
+      prompted ||
+      __DEV__ ||
+      ["true", "1"].includes(process.env.EXPO_PUBLIC_E2E ?? "") ||
+      process.env.EXPO_PUBLIC_DO_NOT_TRACK === "1" ||
+      process.env.EXPO_PUBLIC_DISPOSABL_ANALYTICS_ENABLED !== "true"
+    )
+      return;
+    prompted = true;
+    Alert.alert(
+      "Allow usage analytics?",
+      "Disposabl uses PostHog to understand which screens and actions are used. You can change this choice in Settings. Your prompts and files are not sent as analytics.",
+      [
+        { text: "No thanks", onPress: () => void savePreference(false) },
+        { text: "Allow", onPress: () => void savePreference(true) },
+      ],
+      { cancelable: false },
+    );
+  }, [preference]);
   const page = useRef(pathname);
   const identity = useRef({ token, ready, preference });
   const send = useRef<(() => void) | undefined>(undefined);

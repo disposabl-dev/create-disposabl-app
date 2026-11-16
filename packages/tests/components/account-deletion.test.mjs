@@ -86,7 +86,7 @@ test("loading and recorded status preserve access without claiming completion", 
   expect(link.props.download).toBe("deletion-request-fixture-reference.txt");
   const receipt = decodeURIComponent(link.props.href.split(",")[1]);
   expect(receipt).toContain("Reference: fixture-reference");
-  expect(receipt).toContain("Publisher: Yast AI");
+  expect(receipt).toContain("Publisher: Yast Ai, Inc.");
   expect(receipt).toContain("Support: vivek@yast.ai");
   expect(receipt).toContain("Status: requested");
   expect(receipt).toContain("Deletion is not confirmed.");
