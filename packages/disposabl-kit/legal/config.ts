@@ -11,8 +11,8 @@ import { publisher } from "./publisher";
 export const legalConfig = {
   appName: project.name === "disposabl-dev" ? "Disposabl" : project.name,
   operatorName: publisher.operatorName,
-  operatorAddress: "1111B S Governors Ave, Dover, DE 19904-6903",
-  country: "United States",
+  operatorAddress: publisher.operatorAddress,
+  country: publisher.country,
   privacyEmail: publisher.privacyEmail,
   effectiveDate: "",
   reviewed: false,

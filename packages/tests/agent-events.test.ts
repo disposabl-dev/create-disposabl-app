@@ -57,6 +57,13 @@ test("unavailable attachments finish an empty run but preserve active steering",
         {
           runQuery: async (ref: any) => {
             try {
+              if (getFunctionName(ref) === "agent/compute:get")
+                return {
+                  userId: "owner",
+                  state: "active",
+                  activation: "active",
+                  paidUntil: Date.now() + 60_000,
+                };
               if (
                 [
                   "users/internal:deletionPending",
@@ -78,6 +85,7 @@ test("unavailable attachments finish an empty run but preserve active steering",
             if (name === "agent/state:claim")
               return {
                 userId: "owner",
+                computeSessionId: "paid-session",
                 appId: "app",
                 status: "processing",
                 ...(running !== undefined

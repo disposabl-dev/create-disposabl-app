@@ -75,6 +75,7 @@ test("agent credential lookup rejects expired, stopped, failed, deleted and unco
     ...binding,
     agent: {
       threadId: binding.threadId,
+      computeSessionId: "paid-session",
       status: "processing",
       access: { expiresAt: Date.now() + 60_000 },
     },
@@ -84,7 +85,15 @@ test("agent credential lookup rejects expired, stopped, failed, deleted and unco
   const ctx = {
     db: {
       normalizeId: () => "user",
-      get: async () => ({}),
+      get: async (table: string) =>
+        table === "computeSessions"
+          ? {
+              userId: "owner",
+              state: "active",
+              activation: "active",
+              paidUntil: Date.now() + 60_000,
+            }
+          : {},
       query: () => ({
         withIndex: (index: string) => ({
           unique: async () => row,
@@ -121,6 +130,7 @@ test("only the current unexpired worker can issue access; sandboxes belong to us
     ...binding,
     agent: {
       threadId: binding.threadId,
+      computeSessionId: "paid-session",
       status: "processing",
       lease: { token: "lease", expiresAt: Date.now() + 60_000 },
     },
@@ -130,7 +140,15 @@ test("only the current unexpired worker can issue access; sandboxes belong to us
   const ctx = {
     db: {
       normalizeId: () => "user",
-      get: async () => ({}),
+      get: async (table: string) =>
+        table === "computeSessions"
+          ? {
+              userId: "owner",
+              state: "active",
+              activation: "active",
+              paidUntil: Date.now() + 60_000,
+            }
+          : {},
       query: () => ({
         withIndex: (index: string) => ({
           unique: async () => row,

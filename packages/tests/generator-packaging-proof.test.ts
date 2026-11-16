@@ -682,6 +682,8 @@ test("packaged starter and generated profiles exclude product proof fixtures", a
       for (const name of ["current", "createUser", "onSignIn"])
         assert.match(internal, new RegExp(`export const ${name} =`));
       assert.match(publisher, /operatorName: ""/);
+      assert.match(publisher, /operatorAddress: ""/);
+      assert.match(publisher, /country: ""/);
       assert.match(publisher, /privacyEmail: ""/);
       assert.doesNotMatch(publisher, /Yast AI|vivek@yast\.ai/);
       if (root !== template) {
@@ -689,13 +691,15 @@ test("packaged starter and generated profiles exclude product proof fixtures", a
           process.execPath,
           [
             "-e",
-            `import { legalConfig, legalIsDraft } from "./packages/disposabl-kit/legal/config.ts"; console.log(JSON.stringify({ names: legalConfig.providers.map(p => p.name), operator: legalConfig.operatorName, email: legalConfig.privacyEmail, reviewed: legalConfig.reviewed, draft: legalIsDraft() }));`,
+            `import { legalConfig, legalIsDraft } from "./packages/disposabl-kit/legal/config.ts"; console.log(JSON.stringify({ names: legalConfig.providers.map(p => p.name), operator: legalConfig.operatorName, address: legalConfig.operatorAddress, country: legalConfig.country, email: legalConfig.privacyEmail, reviewed: legalConfig.reviewed, draft: legalIsDraft() }));`,
           ],
           { cwd: root, encoding: "utf8" },
         );
         assert.equal(result.status, 0, result.stderr);
         const legal = JSON.parse(result.stdout);
         assert.equal(legal.operator, "");
+        assert.equal(legal.address, "");
+        assert.equal(legal.country, "");
         assert.equal(legal.email, "");
         assert.equal(legal.reviewed, false);
         assert.equal(legal.draft, true);

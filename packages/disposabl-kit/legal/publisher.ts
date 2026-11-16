@@ -1,5 +1,7 @@
 export const publisher = {
   operatorName: "Yast Ai, Inc.",
+  operatorAddress: "1111B S Governors Ave, Dover, DE 19904-6903",
+  country: "United States",
   privacyEmail: "vivek@yast.ai",
   providers: [
     {

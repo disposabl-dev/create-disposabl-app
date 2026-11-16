@@ -24,7 +24,16 @@ test("product privacy draft names connected and configured providers", () => {
     (section) => section.title === "Service providers and disclosures",
   );
   assert.ok(disclosure);
-  for (const name of ["Convex", "GitHub", "Expo", "Boat", "Google", "PostHog"])
+  for (const name of [
+    "Convex",
+    "GitHub",
+    "Expo",
+    "Boat",
+    "Google",
+    "PostHog",
+    "Autumn",
+    "RevenueCat",
+  ])
     assert.ok(
       disclosure.paragraphs.some((paragraph) =>
         paragraph.startsWith(`${name}: `),
@@ -36,9 +45,4 @@ test("product privacy draft names connected and configured providers", () => {
       legalConfig.providers.find((provider) => provider.name === name)!.purpose,
       /when/,
     );
-  assert.ok(
-    !legalConfig.providers.some((provider) =>
-      ["Autumn", "RevenueCat"].includes(provider.name),
-    ),
-  );
 });
