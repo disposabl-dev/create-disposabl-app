@@ -1,3 +1,4 @@
+import { creditQuantity } from "../disposabl-kit/payments/config";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { BillingSession } from "../disposabl-kit/mobile/billing/session";
@@ -844,4 +845,74 @@ test("web handoff rechecks the storefront and account after link creation", asyn
       /Account changed/,
     );
   }
+});
+
+test("reviewer qualification exposes only configured top-ups to the authenticated allowlist", async () => {
+  const { nativeTopupRoutes, reviewerNativeSubscriptionsEnabled } =
+    await import("../disposabl-kit/server/billing-native-capability");
+  const reviewer = "a".repeat(32);
+  const env = {
+    REVENUECAT_CONSUMABLE_OWNER: "custom",
+    REVENUECAT_WEBHOOK_AUTH: "fixture",
+    REVENUECAT_PROJECT_ID: "project",
+    AUTUMN_SECRET_KEY: "am_sk_live_fixture",
+    REVENUECAT_ENVIRONMENT: "PRODUCTION",
+    REVENUECAT_ROUTES: JSON.stringify([
+      { app: "apple", store: "APP_STORE", product: "coins" },
+    ]),
+    REVENUECAT_MANAGED_MONTHLY_ROUTES: JSON.stringify([
+      { app: "apple", store: "APP_STORE", product: "monthly" },
+    ]),
+    REVENUECAT_REVIEWER_USERS: JSON.stringify([reviewer]),
+  };
+  const expected = [{ app: "apple", store: "APP_STORE", product: "coins" }];
+  assert.equal(reviewerNativeSubscriptionsEnabled(true, env, reviewer), true);
+  assert.deepEqual(nativeTopupRoutes(true, env, reviewer), expected);
+  for (const userId of [
+    undefined,
+    "b".repeat(32),
+    "",
+    "$RCAnonymousID:foreign",
+  ]) {
+    assert.equal(reviewerNativeSubscriptionsEnabled(true, env, userId), false);
+    assert.deepEqual(nativeTopupRoutes(true, env, userId), []);
+  }
+  for (const changes of [
+    { REVENUECAT_ROUTES: "[]" },
+    { REVENUECAT_REVIEWER_USERS: "bad" },
+    { REVENUECAT_WEBHOOK_AUTH: "" },
+    { REVENUECAT_MANAGED_MONTHLY_ROUTES: "[]" },
+  ]) {
+    assert.equal(
+      reviewerNativeSubscriptionsEnabled(
+        true,
+        { ...env, ...changes },
+        reviewer,
+      ),
+      false,
+    );
+    assert.deepEqual(
+      nativeTopupRoutes(true, { ...env, ...changes }, reviewer),
+      [],
+    );
+  }
+  assert.equal(reviewerNativeSubscriptionsEnabled(false, env, reviewer), false);
+  assert.deepEqual(
+    nativeTopupRoutes(
+      true,
+      { ...env, REVENUECAT_CONSUMABLE_INTEGRATION_VERIFIED: "true" },
+      "b".repeat(32),
+    ),
+    expected,
+  );
+  assert.deepEqual(
+    nativeTopupRoutes(
+      true,
+      { ...env, REVENUECAT_CONSUMABLE_INTEGRATION_VERIFIED: "true" },
+      reviewer,
+    ),
+    expected,
+  );
+  assert.equal(creditQuantity("monthly"), 750);
+  assert.equal(creditQuantity("topup"), 500);
 });

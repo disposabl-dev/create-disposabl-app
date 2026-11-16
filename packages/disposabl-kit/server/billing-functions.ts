@@ -11,7 +11,10 @@ import {
 } from "../../backend/convex/_generated/server";
 import { paymentsEnabled } from "../features";
 import { setupBilling } from "./billing-setup";
-import { nativeTopupRoutes } from "./billing-native-capability";
+import {
+  nativeTopupRoutes,
+  reviewerNativeSubscriptionsEnabled,
+} from "./billing-native-capability";
 import {
   balanceFromCustomer,
   monthlyPlanFromCustomer,
@@ -242,8 +245,17 @@ export const createSnapshot = (eligibility?: BillingEligibility) =>
           balance: balanceFromCustomer(customer),
           hasMonthlyPlan: monthlyPlanFromCustomer(customer),
           nativeSubscriptionsEnabled:
-            process.env.REVENUECAT_SYNC_ENABLED === "true",
-          nativeTopupRoutes: nativeTopupRoutes(paymentsEnabled, process.env),
+            process.env.REVENUECAT_SYNC_ENABLED === "true" ||
+            reviewerNativeSubscriptionsEnabled(
+              paymentsEnabled,
+              process.env,
+              userId,
+            ),
+          nativeTopupRoutes: nativeTopupRoutes(
+            paymentsEnabled,
+            process.env,
+            userId,
+          ),
           mobileWebCheckoutEnabled: mobileWebCheckoutConfigured(
             paymentsEnabled,
             process.env,

@@ -168,3 +168,51 @@ test("pending owner can still open the existing billing portal", async () => {
   });
   expect(requests).toBe(1);
 });
+
+test("snapshot qualification follows the authenticated session, not caller input", async () => {
+  const reviewer = "a".repeat(32);
+  Object.assign(process.env, {
+    AUTUMN_SECRET_KEY: "am_sk_live_fixture",
+    REVENUECAT_CONSUMABLE_OWNER: "custom",
+    REVENUECAT_WEBHOOK_AUTH: "fixture",
+    REVENUECAT_PROJECT_ID: "project",
+    REVENUECAT_ENVIRONMENT: "PRODUCTION",
+    REVENUECAT_ROUTES: JSON.stringify([
+      { app: "apple", store: "APP_STORE", product: "coins" },
+    ]),
+    REVENUECAT_MANAGED_MONTHLY_ROUTES: JSON.stringify([
+      { app: "apple", store: "APP_STORE", product: "monthly" },
+    ]),
+    REVENUECAT_REVIEWER_USERS: JSON.stringify([reviewer]),
+    REVENUECAT_SYNC_ENABLED: "false",
+    REVENUECAT_CONSUMABLE_INTEGRATION_VERIFIED: "false",
+  });
+  const session = (userId) => ({
+    ...ctx,
+    runQuery: async (ref, args) => (args.sessionId ? { userId } : false),
+  });
+  pending = false;
+  const qualified = await product.snapshot._handler(session(reviewer), {
+    userId: "b".repeat(32),
+  });
+  expect(qualified.customerId).toBe(reviewer);
+  expect(qualified.nativeSubscriptionsEnabled).toBe(true);
+  expect(qualified.nativeTopupRoutes).toEqual([
+    { app: "apple", store: "APP_STORE", product: "coins" },
+  ]);
+  const ordinary = await product.snapshot._handler(session("b".repeat(32)), {
+    userId: reviewer,
+  });
+  expect(ordinary.nativeSubscriptionsEnabled).toBe(false);
+  expect(ordinary.nativeTopupRoutes).toEqual([]);
+  await expect(
+    product.snapshot._handler(
+      { ...ctx, auth: { getUserIdentity: async () => null } },
+      {},
+    ),
+  ).rejects.toThrow();
+  process.env.REVENUECAT_MANAGED_MONTHLY_ROUTES = "broken";
+  const malformed = await product.snapshot._handler(session(reviewer), {});
+  expect(malformed.nativeSubscriptionsEnabled).toBe(false);
+  expect(malformed.nativeTopupRoutes).toEqual([]);
+});
