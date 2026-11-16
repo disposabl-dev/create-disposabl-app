@@ -35,6 +35,43 @@ export const seed = mutation({
     return null;
   },
 });
+export const seedAi = mutation({
+  args: { userId: v.id("users"), count: v.number() },
+  handler: async (ctx, { userId, count }) => {
+    await ctx.db.insert("aiConsents", {
+      userId,
+      version: "fixture",
+      granted: true,
+      updatedAt: 1,
+    });
+    for (let i = 0; i < count; i++)
+      await ctx.db.insert("aiReports", {
+        userId,
+        appId: "fixture",
+        threadId: "fixture",
+        messageId: String(i),
+        reason: "other",
+        status: "open",
+      });
+  },
+});
+export const inspectAi = query({
+  args: { userId: v.id("users") },
+  handler: async (ctx, { userId }) => ({
+    consents: (
+      await ctx.db
+        .query("aiConsents")
+        .withIndex("by_userId", (q) => q.eq("userId", userId))
+        .take(200)
+    ).length,
+    reports: (
+      await ctx.db
+        .query("aiReports")
+        .withIndex("by_userId", (q) => q.eq("userId", userId))
+        .take(200)
+    ).length,
+  }),
+});
 export const seedRetained = mutation({
   args: { userId: v.id("users") },
   handler: async (ctx, { userId }) => {

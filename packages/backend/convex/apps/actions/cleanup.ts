@@ -5,7 +5,7 @@ import {
   internalAction,
 } from "@disposabl/disposabl-kit/server/lib/functions";
 import { ConvexError, v } from "convex/values";
-import { internal } from "../../_generated/api";
+import { components, internal } from "../../_generated/api";
 import { credential } from "../../connections/actions/credentials";
 import { validateExpo } from "../../connections/actions/expo";
 import {
@@ -292,6 +292,19 @@ export const remove = internalAction({
           message:
             "GitHub and Convex cleanup is complete. Open this Expo project's settings, sign in to Expo if needed, and delete the project there. Then retry Disposabl deletion to verify cleanup and remove the app record. Disposabl never asks for your Expo password.",
         });
+      }
+      const threadId = await ctx.runQuery(
+        internal.apps.operations.internal.threadForDeletion,
+        { ...identity, until },
+      );
+      if (threadId) {
+        await ctx.runAction(components.agent.threads.deleteAllForThreadIdSync, {
+          threadId,
+        });
+        await ctx.runMutation(
+          internal.apps.operations.internal.confirmThreadDeletion,
+          { ...identity, until, threadId },
+        );
       }
       while (
         !(await ctx.runMutation(internal.apps.operations.internal.erase, {

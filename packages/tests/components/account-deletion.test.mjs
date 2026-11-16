@@ -60,7 +60,8 @@ test("auth disabled avoids hooks; guests get sign in", async () => {
   expect(renderer.root.findByType("a").props.href).toBe(
     "/login?returnTo=%2Flegal%2Fdelete-account",
   );
-  expect(buttons()).toHaveLength(0);
+  expect(buttons()).toHaveLength(1);
+  expect(text()).toContain("Check a deletion request");
 });
 
 test("loading and recorded status preserve access without claiming completion", async () => {

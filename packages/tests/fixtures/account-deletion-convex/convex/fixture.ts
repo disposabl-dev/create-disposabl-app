@@ -18,6 +18,7 @@ import { v } from "convex/values";
 import {
   requestDeletion,
   deletionStatus,
+  receiptStatus,
 } from "../../../../backend/convex/users/index";
 import {
   deletionPending,
@@ -52,6 +53,21 @@ export const status = query({
   args: { userId: v.union(v.id("users"), v.null()) },
   handler: (ctx, args) =>
     (deletionStatus as any)._handler(identity(ctx, args.userId), {}),
+});
+export const guestReceipt = query({
+  args: { reference: v.string() },
+  handler: (ctx, args) => (receiptStatus as any)._handler(ctx, args),
+});
+export const syntheticCompleteReceipt = mutation({
+  args: { reference: v.string() },
+  handler: async (ctx, { reference }) => {
+    const row = await ctx.db
+      .query("deletionReceipts")
+      .withIndex("by_reference", (q) => q.eq("reference", reference))
+      .unique();
+    if (!row) throw new Error("Missing receipt");
+    await ctx.db.patch(row._id, { completedAt: 999999 });
+  },
 });
 export const pending = query({
   args: { userId: v.id("users") },

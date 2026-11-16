@@ -235,14 +235,60 @@ export const erase = internalMutation({
         .take(100);
       for (const event of events) await ctx.db.delete("agentEvents", event._id);
       if (events.length === 100) return false;
-      await ctx.runMutation(
-        components.agent.threads.deleteAllForThreadIdAsync,
-        { threadId: agent.threadId },
-      );
+      if (app.operation.threadCleaned !== agent.threadId)
+        throw new ConvexError("Agent thread cleanup is not confirmed.");
     }
     // The sandbox belongs to the user and may be running their other apps.
     await ctx.db.delete("apps", app._id);
     return true;
+  },
+});
+export const threadForDeletion = internalQuery({
+  args: { ...identityFields, appId: v.string(), until: v.number() },
+  returns: v.union(v.string(), v.null()),
+  handler: async (ctx, { userId, appId, until }) => {
+    const app = await ownedApp(ctx, userId, appId);
+    if (app.operation?.kind !== "delete" || app.operation.until !== until)
+      throw new ConvexError("App deletion must be restarted.");
+    return app.agent?.threadId ?? null;
+  },
+});
+export const confirmThreadDeletion = internalMutation({
+  args: {
+    ...identityFields,
+    appId: v.string(),
+    until: v.number(),
+    threadId: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, { userId, appId, until, threadId }) => {
+    const app = await ownedApp(ctx, userId, appId);
+    if (
+      app.operation?.kind !== "delete" ||
+      app.operation.until !== until ||
+      app.agent?.threadId !== threadId
+    )
+      throw new ConvexError("App deletion must be restarted.");
+    if (await ctx.runQuery(components.agent.threads.getThread, { threadId }))
+      throw new ConvexError("Agent thread cleanup is not complete.");
+    const messages = await ctx.runQuery(
+      components.agent.messages.listMessagesByThreadId,
+      {
+        threadId,
+        order: "asc",
+        paginationOpts: { numItems: 1, cursor: null },
+      },
+    );
+    const streams = await ctx.runQuery(components.agent.streams.list, {
+      threadId,
+      statuses: ["streaming", "finished", "aborted"],
+    });
+    if (messages.page.length || streams.length)
+      throw new ConvexError("Agent messages or streams remain.");
+    await ctx.db.patch("apps", app._id, {
+      operation: { ...app.operation, threadCleaned: threadId },
+    });
+    return null;
   },
 });
 export const workflow = internalMutation({

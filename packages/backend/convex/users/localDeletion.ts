@@ -62,9 +62,19 @@ export const advanceLocalBatch = internalMutation({
         blockers: [],
       };
     }
+    const remainingConsent = await ctx.db
+      .query("aiConsents")
+      .withIndex("by_userId", (q) => q.eq("userId", args.userId))
+      .first();
+    const remainingReport = await ctx.db
+      .query("aiReports")
+      .withIndex("by_userId", (q) => q.eq("userId", args.userId))
+      .first();
     if (
       user.ephemeralDeletion?.requestedAt !== args.expectedRequestedAt ||
-      user.ephemeralDeletion.state !== "known_user_bound_cleared"
+      user.ephemeralDeletion.state !== "known_user_bound_cleared" ||
+      remainingConsent ||
+      remainingReport
     ) {
       await ctx.runMutation(internal.users.ephemeralDeletion.runBatch, args);
       return {

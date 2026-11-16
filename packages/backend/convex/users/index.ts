@@ -30,6 +30,40 @@ const deletionStatusResult = v.union(
   }),
 );
 
+/** The unguessable receipt reference grants access only to minimal status. */
+export const receiptStatus = query({
+  args: { reference: v.string() },
+  returns: v.union(
+    v.null(),
+    v.object({
+      status: v.union(v.literal("requested"), v.literal("completed")),
+      requestedAt: v.number(),
+      completedAt: v.union(v.number(), v.null()),
+    }),
+  ),
+  handler: async (ctx, { reference }) => {
+    if (
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(
+        reference,
+      )
+    )
+      return null;
+    const receipt = await ctx.db
+      .query("deletionReceipts")
+      .withIndex("by_reference", (q) => q.eq("reference", reference))
+      .unique();
+    if (!receipt) return null;
+    return {
+      status:
+        receipt.completedAt === undefined
+          ? ("requested" as const)
+          : ("completed" as const),
+      requestedAt: receipt.requestedAt,
+      completedAt: receipt.completedAt ?? null,
+    };
+  },
+});
+
 export const deletionStatus = query({
   args: {},
   returns: deletionStatusResult,

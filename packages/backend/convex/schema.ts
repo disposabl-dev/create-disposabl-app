@@ -56,6 +56,7 @@ export default defineSchema({
     reference: v.string(),
     ownerId: v.string(),
     requestedAt: v.number(),
+    completedAt: v.optional(v.number()),
   })
     .index("by_owner", ["ownerId"])
     .index("by_reference", ["reference"]),
@@ -215,6 +216,7 @@ export default defineSchema({
         androidArchitectures: v.optional(v.array(androidArchitecture)),
         pending: v.optional(pendingDelete),
         expoManual: v.optional(v.boolean()),
+        threadCleaned: v.optional(v.string()),
       }),
     ),
   })

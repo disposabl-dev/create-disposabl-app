@@ -21,12 +21,58 @@ function AuthenticatedDeletion() {
         >
           Sign in
         </a>
+        <ReceiptLookup />
       </section>
     );
   return (
     <StatusBoundary>
       <DeletionRequest />
     </StatusBoundary>
+  );
+}
+
+function ReceiptLookup() {
+  const [reference, setReference] = useState("");
+  const [submitted, setSubmitted] = useState("");
+  return (
+    <section className="mt-6" aria-labelledby="receipt-heading">
+      <h2 id="receipt-heading">Check a deletion request</h2>
+      <p>Enter the reference from your saved receipt. Keep it private.</p>
+      <label htmlFor="receipt-reference">Request reference</label>
+      <input
+        id="receipt-reference"
+        className="border p-2"
+        value={reference}
+        onChange={(event) => setReference(event.target.value)}
+      />
+      <button
+        type="button"
+        className="underline"
+        disabled={!reference.trim()}
+        onClick={() => setSubmitted(reference.trim())}
+      >
+        Check status
+      </button>
+      {submitted && (
+        <StatusBoundary>
+          <ReceiptStatus reference={submitted} />
+        </StatusBoundary>
+      )}
+    </section>
+  );
+}
+
+function ReceiptStatus({ reference }: { reference: string }) {
+  const status = useQuery(api.users.index.receiptStatus, { reference });
+  if (status === undefined)
+    return <p role="status">Loading deletion request status...</p>;
+  if (!status) return <p role="status">No request found for that reference.</p>;
+  return (
+    <p role="status">
+      {status.status === "completed" && status.completedAt !== null
+        ? `Deletion completed on ${new Date(status.completedAt).toLocaleString()}.`
+        : `Requested on ${new Date(status.requestedAt).toLocaleString()}. Deletion is not confirmed.`}
+    </p>
   );
 }
 

@@ -35,6 +35,27 @@ test(
         call("request", { userId: alice, confirmation: "DELETE" }),
       ),
     );
+    assert.deepEqual(
+      await call("guestReceipt", { reference: results[0].reference }, true),
+      {
+        status: "requested",
+        requestedAt: results[0].requestedAt,
+        completedAt: null,
+      },
+    );
+    assert.equal(
+      await call("guestReceipt", { reference: "invalid" }, true),
+      null,
+    );
+    await call("syntheticCompleteReceipt", { reference: results[0].reference });
+    assert.deepEqual(
+      await call("guestReceipt", { reference: results[0].reference }, true),
+      {
+        status: "completed",
+        requestedAt: results[0].requestedAt,
+        completedAt: 999999,
+      },
+    );
     assert.ok(
       results.every(
         (x) =>

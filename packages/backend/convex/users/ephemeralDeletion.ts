@@ -18,7 +18,6 @@ export const runBatch = internalMutation({
       user.ephemeralDeletion?.requestedAt === expectedRequestedAt
         ? user.ephemeralDeletion
         : undefined;
-    if (previous?.state === "known_user_bound_cleared") return previous;
     const handoffs = await ctx.db
       .query("billingHandoffs")
       .withIndex("by_userId", (q) => q.eq("userId", userId))
@@ -27,13 +26,34 @@ export const runBatch = internalMutation({
       .query("telemetryIdentities")
       .withIndex("by_userId", (q) => q.eq("userId", userId))
       .take(100);
+    const consents = await ctx.db
+      .query("aiConsents")
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
+      .take(100);
+    const reports = await ctx.db
+      .query("aiReports")
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
+      .take(100);
+    if (
+      previous?.state === "known_user_bound_cleared" &&
+      !handoffs.length &&
+      !identities.length &&
+      !consents.length &&
+      !reports.length
+    )
+      return previous;
     for (const row of handoffs) await ctx.db.delete("billingHandoffs", row._id);
     for (const row of identities)
       await ctx.db.delete("telemetryIdentities", row._id);
+    for (const row of consents) await ctx.db.delete("aiConsents", row._id);
+    for (const row of reports) await ctx.db.delete("aiReports", row._id);
     const progress = {
       requestedAt: expectedRequestedAt,
       state:
-        handoffs.length < 100 && identities.length < 100
+        handoffs.length < 100 &&
+        identities.length < 100 &&
+        consents.length < 100 &&
+        reports.length < 100
           ? ("known_user_bound_cleared" as const)
           : ("in_progress" as const),
       batches: (previous?.batches ?? 0) + 1,

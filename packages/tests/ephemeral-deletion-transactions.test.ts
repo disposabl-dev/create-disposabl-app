@@ -23,6 +23,36 @@ const m = (name: string, args: object) => call("mutation", name, args);
 const q = (name: string, args: object) => call("query", name, args);
 
 test(
+  "AI records are removed in bounded batches without touching another owner",
+  { skip: !base },
+  async () => {
+    const owner = await m("create", { pending: true });
+    const other = await m("create", { pending: true });
+    const args = {
+      userId: owner.userId,
+      expectedRequestedAt: owner.requestedAt,
+    };
+    await m("batch", args); // upgrade from already-completed progress
+    await m("seedAi", { userId: owner.userId, count: 101 });
+    await m("seedAi", { userId: other.userId, count: 1 });
+    assert.equal((await m("batch", args)).state, "in_progress");
+    assert.deepEqual(await q("inspectAi", { userId: owner.userId }), {
+      consents: 0,
+      reports: 1,
+    });
+    assert.equal((await m("batch", args)).state, "known_user_bound_cleared");
+    assert.deepEqual(await q("inspectAi", { userId: owner.userId }), {
+      consents: 0,
+      reports: 0,
+    });
+    assert.deepEqual(await q("inspectAi", { userId: other.userId }), {
+      consents: 1,
+      reports: 1,
+    });
+  },
+);
+
+test(
   "bounded registered cleanup is transactional, request-checked and idempotent",
   { skip: !base },
   async () => {
