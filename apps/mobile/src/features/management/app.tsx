@@ -1,11 +1,11 @@
 import { VariableContextProvider } from "nativewind";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useHeaderHeight } from "expo-router/react-navigation";
 import { Details } from "./details";
 import { PaymentGate, type BillingSnapshot } from "./payment-gate";
 import { nextSubmissionStep } from "./submission-policy";
 import { paymentsEnabled } from "@disposabl/disposabl-kit/features";
 import { MessageBubble } from "../studio/message-bubble";
+import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { MessageComposer } from "../studio/message-composer";
 import { useAttachments } from "../studio/attachments";
 import { attachmentIds } from "../studio/attachment-policy";
@@ -16,7 +16,6 @@ import { useRef, useState } from "react";
 import {
   Alert,
   FlatList,
-  KeyboardAvoidingView,
   ScrollView,
   Text,
   View,
@@ -78,7 +77,6 @@ function Chat({ appId }: { appId: string }) {
     busy: attachmentsBusy,
   } = useAttachments();
   const insets = useSafeAreaInsets();
-  const headerHeight = useHeaderHeight();
   const { width, height } = useWindowDimensions();
   const compactViewport = width > height;
   const list = useRef<FlatList>(null);
@@ -248,7 +246,7 @@ function Chat({ appId }: { appId: string }) {
     >
       <KeyboardAvoidingView
         behavior="padding"
-        keyboardVerticalOffset={headerHeight}
+        automaticOffset
         className="flex-1"
       >
         <FlatList

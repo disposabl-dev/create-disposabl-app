@@ -1,5 +1,6 @@
 import { VariableContextProvider } from "nativewind";
-import { ScrollView, View, Text } from "react-native";
+import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
+import { View, Text } from "react-native";
 import { SymbolView } from "expo-symbols";
 import * as Haptics from "expo-haptics";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
@@ -106,16 +107,16 @@ export function Screen({
         "--screen-right": Math.max(insets.right, space.gutter),
       }}
     >
-      <ScrollView
+      <KeyboardAwareScrollView
         contentInsetAdjustmentBehavior="automatic"
-        automaticallyAdjustKeyboardInsets
-        keyboardDismissMode="on-drag"
+        bottomOffset={48}
+        keyboardDismissMode="none"
         keyboardShouldPersistTaps="handled"
         className="flex-1 bg-background"
         contentContainerClassName={`w-full max-w-[760px] self-center pt-[16px] pb-[48px] pl-[var(--screen-left)] pr-[var(--screen-right)] ${contentClassName}`}
       >
         {children}
-      </ScrollView>
+      </KeyboardAwareScrollView>
       <Stack.Screen options={{ title }} />
       {notice ? (
         <VariableContextProvider

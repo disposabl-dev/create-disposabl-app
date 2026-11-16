@@ -1,3 +1,5 @@
+import { SymbolView } from "./design/nativewind";
+import { KeyboardProvider } from "react-native-keyboard-controller";
 import { ConvexAuthProvider, useAuthToken } from "@convex-dev/auth/react";
 import { ConvexProvider, ConvexReactClient, useConvexAuth } from "convex/react";
 import { Redirect, Stack, router, usePathname } from "expo-router";
@@ -34,9 +36,11 @@ export function MobileLayout({
   telemetry?: TelemetryOverride;
 }) {
   return (
-    <ThemeProvider>
-      <BackendLayout telemetry={telemetry}>{children}</BackendLayout>
-    </ThemeProvider>
+    <KeyboardProvider>
+      <ThemeProvider>
+        <BackendLayout telemetry={telemetry}>{children}</BackendLayout>
+      </ThemeProvider>
+    </KeyboardProvider>
   );
 }
 
@@ -146,6 +150,7 @@ export function AuthLayout() {
 }
 
 function CloseAuth() {
+  const colors = useTheme();
   return (
     <Pressable
       accessibilityRole="button"
@@ -153,7 +158,11 @@ function CloseAuth() {
       onPress={() => router.dismissTo("/")}
       className="p-[10px]"
     >
-      <Text className="text-foreground text-[18px]">✕</Text>
+      <SymbolView
+        name={{ ios: "xmark", android: "close" }}
+        size={20}
+        tintColor={colors.foreground}
+      />
     </Pressable>
   );
 }

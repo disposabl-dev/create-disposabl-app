@@ -1,31 +1,19 @@
 import type { PropsWithChildren } from "react";
-import {
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  Text,
-} from "react-native";
-import { useHeaderHeight } from "expo-router/react-navigation";
+import { ActivityIndicator, Pressable, Text } from "react-native";
+import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useTheme } from "../design/use-theme";
 
 export function AuthScreen({ children }: PropsWithChildren) {
-  const headerHeight = useHeaderHeight();
   return (
-    <KeyboardAvoidingView
+    <KeyboardAwareScrollView
       className="flex-1 bg-background"
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-      keyboardVerticalOffset={headerHeight}
+      contentContainerClassName={authClasses.content}
+      bottomOffset={48}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="none"
     >
-      <ScrollView
-        contentContainerClassName={authClasses.content}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="on-drag"
-      >
-        {children}
-      </ScrollView>
-    </KeyboardAvoidingView>
+      {children}
+    </KeyboardAwareScrollView>
   );
 }
 

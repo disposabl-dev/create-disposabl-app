@@ -1,22 +1,33 @@
 import { VariableContextProvider } from "nativewind";
 import { router, Stack } from "expo-router";
 import type { ReactNode } from "react";
-import { Pressable, ScrollView, Text } from "react-native";
+import { Pressable, ScrollView } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { usePreferenceColors } from "../design/preferences";
+import { useAccentColor } from "../design/theme-provider";
+import { SymbolView } from "../design/nativewind";
 
 export function ScreenCloseButton({
   label,
   onPress,
+  purpose = "close",
 }: {
   label: string;
   onPress: () => void;
+  purpose?: "done" | "close";
 }) {
+  const accent = useAccentColor();
+  const colors = usePreferenceColors();
+  const done = purpose === "done";
   return process.env.EXPO_OS === "ios" ? (
     <Stack.Toolbar placement="right">
-      <Stack.Toolbar.Button accessibilityLabel={label} onPress={onPress}>
-        Done
-      </Stack.Toolbar.Button>
+      <Stack.Toolbar.Button
+        accessibilityLabel={label}
+        icon={done ? "checkmark" : "xmark"}
+        tintColor={done ? accent : colors.text}
+        variant={done ? "prominent" : "plain"}
+        onPress={onPress}
+      />
     </Stack.Toolbar>
   ) : (
     <Stack.Screen
@@ -27,10 +38,16 @@ export function ScreenCloseButton({
             accessibilityLabel={label}
             hitSlop={12}
             onPress={onPress}
+            className="min-h-[44px] min-w-[44px] items-center justify-center"
           >
-            <Text className="text-[#18181b] dark:text-[#fafafa] text-[16px] font-semibold p-[8px]">
-              Done
-            </Text>
+            <SymbolView
+              name={{
+                ios: done ? "checkmark" : "xmark",
+                android: done ? "check" : "close",
+              }}
+              size={24}
+              tintColor={done ? accent : colors.text}
+            />
           </Pressable>
         ),
       }}
@@ -65,7 +82,11 @@ export function SettingsPage({
           contentStyle: { backgroundColor: colors.background },
         }}
       />
-      <ScreenCloseButton label="Close settings" onPress={onClose} />
+      <ScreenCloseButton
+        label="Close settings"
+        purpose="done"
+        onPress={onClose}
+      />
       <VariableContextProvider
         value={{ "--layout-padding-bottom": inset.bottom + 32 }}
       >
