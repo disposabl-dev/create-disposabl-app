@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run product web/backend E2E against a fresh owned local Convex backend.
+"""Run product web/backend and selected API E2E on an owned local backend.
 
 Requires an already verified local backend binary and cached browser. This runner
 never downloads a binary or configures a cloud deployment. Retained evidence is
@@ -260,8 +260,10 @@ def main():
             raise RuntimeError('Unexpected backend environment')
         print('Owned listeners verified; backend telemetry disabled, Boat blank, other provider values absent', flush=True)
         command([cli, 'dev', '--once', '--typecheck', 'disable', '--codegen', 'disable'], cwd=backend, environment=admin, log='sync.log')
-        command(['bun', 'run', 'e2e', 'run', '--target', 'web,backend', '--retries', '0', '--no-cache'], cwd=source, environment=testenv, log='e2e.log')
-        print('Product web/backend E2E passed', flush=True)
+        platforms = json.loads((source / 'disposabl.json').read_text()).get('platforms', [])
+        targets = 'web,backend,api' if 'api' in platforms else 'web,backend'
+        command(['bun', 'run', 'e2e', 'run', '--target', targets, '--retries', '0', '--no-cache'], cwd=source, environment=testenv, log='e2e.log')
+        print(f'Product {targets} E2E passed', flush=True)
     if any(listeners(port) for port in PORTS):
         raise RuntimeError('Listener still present after backend teardown')
     print('Owned backend stopped; ports 3520/3521 released', flush=True)
