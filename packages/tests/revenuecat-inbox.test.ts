@@ -998,3 +998,91 @@ describe("RevenueCat consumable inbox", () => {
     assert.equal(g.tables.revenueCatPurchases![0].state, "refund_unknown");
   });
 });
+
+test("reviewer sandbox routing is disabled by default and bound to exact account and product", () => {
+  const env = {
+    REVENUECAT_CONSUMABLE_OWNER: "custom",
+    REVENUECAT_WEBHOOK_AUTH: "Bearer fixture",
+    REVENUECAT_PROJECT_ID: "proj",
+    REVENUECAT_ENVIRONMENT: "PRODUCTION",
+    AUTUMN_SECRET_KEY: "am_sk_live_fixture",
+    REVENUECAT_ROUTES: JSON.stringify([
+      { app: "app", store: "APP_STORE", product: "topup" },
+    ]),
+    REVENUECAT_MANAGED_MONTHLY_ROUTES: JSON.stringify([
+      { app: "app", store: "APP_STORE", product: "monthly" },
+    ]),
+  };
+  const reviewer = "a".repeat(32);
+  const body = {
+    api_version: "1.0",
+    event: {
+      id: "delivery",
+      app_id: "app",
+      app_user_id: reviewer,
+      original_app_user_id: reviewer,
+      environment: "SANDBOX",
+      store: "APP_STORE",
+      product_id: "monthly",
+      transaction_id: "tx",
+      type: "RENEWAL",
+      expiration_at_ms: 1900000000000,
+    },
+  };
+  assert.equal(
+    selectRevenueCatRoute(body, revenueCatConfigs(true, env)!),
+    null,
+  );
+  const configs = revenueCatConfigs(true, {
+    ...env,
+    REVENUECAT_REVIEWER_USERS: JSON.stringify([reviewer]),
+  })!;
+  const route = selectRevenueCatRoute(body, configs)!;
+  assert.equal(parseRevenueCatEvent(body, route)?.expiresAt, 1900000000000);
+  assert.equal(
+    selectRevenueCatRoute(
+      { ...body, event: { ...body.event, app_user_id: "b".repeat(32) } },
+      configs,
+    ),
+    null,
+  );
+  assert.equal(
+    selectRevenueCatRoute(
+      { ...body, event: { ...body.event, store: "PLAY_STORE" } },
+      configs,
+    ),
+    null,
+  );
+  assert.equal(
+    selectRevenueCatRoute(
+      { ...body, event: { ...body.event, product_id: "other" } },
+      configs,
+    ),
+    null,
+  );
+  assert.equal(
+    parseTransfer(
+      {
+        api_version: "1.0",
+        event: {
+          id: "transfer",
+          type: "TRANSFER",
+          app_id: "app",
+          environment: "SANDBOX",
+          store: "APP_STORE",
+          transferred_from: [reviewer],
+          transferred_to: [reviewer],
+        },
+      },
+      route,
+    ),
+    null,
+  );
+  assert.equal(
+    revenueCatConfigs(true, {
+      ...env,
+      REVENUECAT_REVIEWER_USERS: JSON.stringify(["$RCAnonymousID:bad"]),
+    }),
+    null,
+  );
+});

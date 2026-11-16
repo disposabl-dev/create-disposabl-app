@@ -13,6 +13,7 @@
   },
   "build": {
     "ios-preview": {
+      "bun": "1.4.4",
       "developmentClient": false,
       "ios": { "simulator": true },
       "environment": "preview",
@@ -20,6 +21,7 @@
       "channel": "preview"
     },
     "ios-production": {
+      "bun": "1.4.4",
       "developmentClient": false,
       "distribution": "store",
       "environment": "production",

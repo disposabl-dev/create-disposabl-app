@@ -4,8 +4,11 @@ import { randomUUID } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import {
   balanceId,
+  balanceRequest,
   type PurchaseEvent,
 } from "../disposabl-kit/server/revenuecat-contract";
+
+import { pricing } from "../disposabl-kit/payments/config";
 
 const url = process.env.NATIVE_INBOX_FIXTURE_URL;
 if (url && !["http://127.0.0.1:3490", "http://localhost:3490"].includes(url))
@@ -755,5 +758,209 @@ test(
       (await call("controlState", { balanceId: id }, true)).providerCalls,
       1,
     );
+  },
+);
+
+test(
+  "allowlisted sandbox purchases enter the existing ledger with correct grants",
+  { skip: !url || !process.env.REVIEWER_TEST_USER },
+  async () => {
+    const reviewer = process.env.REVIEWER_TEST_USER!;
+    const stranger = await user();
+    const payload = (
+      customer: string,
+      product: string,
+      type: string,
+      transaction: string,
+      extra: object = {},
+    ) => ({
+      api_version: "1.0",
+      event: {
+        id: randomUUID(),
+        app_id: "apple",
+        app_user_id: customer,
+        original_app_user_id: customer,
+        environment: "SANDBOX",
+        store: "APP_STORE",
+        product_id: product,
+        transaction_id: transaction,
+        type,
+        ...extra,
+      },
+    });
+    const send = async (body: object) => {
+      const r = await fetch("http://127.0.0.1:3491/revenuecat/webhook", {
+        method: "POST",
+        headers: {
+          authorization: "fixture-only",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+      return r.status;
+    };
+    const expiry = Date.now() + 3600_000;
+    const monthly = payload(
+      reviewer,
+      "apple-monthly",
+      "INITIAL_PURCHASE",
+      randomUUID(),
+      { expiration_at_ms: expiry },
+    );
+    const incoming = monthly.event as any;
+    const e: PurchaseEvent = {
+      deliveryId: incoming.id,
+      project: "project",
+      app: "apple",
+      environment: "SANDBOX",
+      store: "APP_STORE",
+      product: "apple-monthly",
+      customer: reviewer,
+      transaction: incoming.transaction_id,
+      type: "purchase",
+      expiresAt: expiry,
+    };
+    const id = await balanceId(e);
+    await call("controlCreate", { balanceId: id });
+    assert.equal(
+      await send(
+        payload(stranger, "apple-monthly", "INITIAL_PURCHASE", randomUUID(), {
+          expiration_at_ms: expiry,
+        }),
+      ),
+      400,
+    );
+    assert.equal(
+      await send(
+        payload(reviewer, "foreign", "INITIAL_PURCHASE", randomUUID(), {
+          expiration_at_ms: expiry,
+        }),
+      ),
+      400,
+    );
+    assert.equal(
+      await send(
+        payload(reviewer, "apple-monthly", "INITIAL_PURCHASE", randomUUID()),
+      ),
+      400,
+    );
+    assert.equal(
+      await send(
+        payload(
+          "$RCAnonymousID:anonymous",
+          "apple-coins",
+          "NON_RENEWING_PURCHASE",
+          randomUUID(),
+        ),
+      ),
+      400,
+    );
+    assert.equal(
+      await send({
+        api_version: "1.0",
+        event: {
+          id: randomUUID(),
+          type: "TRANSFER",
+          app_id: "apple",
+          environment: "SANDBOX",
+          store: "APP_STORE",
+          transferred_from: [reviewer],
+          transferred_to: [stranger],
+        },
+      }),
+      400,
+    );
+    assert.equal(await send(monthly), 200);
+    assert.equal(await send(monthly), 200);
+    await awaitControl(id, (row) => row.finished === 1);
+    const op = await call("take", scope(e, id));
+    assert.equal(op.kind, "grant");
+    assert.equal(op.expiresAt, expiry);
+    assert.deepEqual(balanceRequest(reviewer, id, "grant", op.expiresAt), {
+      customer_id: reviewer,
+      feature_id: pricing.featureId,
+      balance_id: id,
+      included_grant: 750,
+      expires_at: expiry,
+    });
+    await call("finish", { balanceId: id, kind: "grant" });
+    assert.equal(
+      await send(
+        payload(reviewer, "apple-monthly", "CANCELLATION", e.transaction, {
+          cancel_reason: "UNSUBSCRIBE",
+        }),
+      ),
+      200,
+    );
+    assert.equal((await state(id)).purchase.state, "granted");
+    assert.equal(
+      await send(
+        payload(reviewer, "apple-monthly", "EXPIRATION", e.transaction),
+      ),
+      200,
+    );
+    assert.equal((await state(id)).purchase.state, "granted");
+    const renewal = payload(
+      reviewer,
+      "apple-monthly",
+      "RENEWAL",
+      randomUUID(),
+      { expiration_at_ms: expiry + 1000 },
+    );
+    const renewed: PurchaseEvent = {
+      ...e,
+      deliveryId: renewal.event.id,
+      transaction: renewal.event.transaction_id,
+      expiresAt: expiry + 1000,
+    };
+    const renewalId = await balanceId(renewed);
+    await call("controlCreate", { balanceId: renewalId });
+    assert.equal(await send(renewal), 200);
+    await awaitControl(renewalId, (row) => row.finished === 1);
+    const renewedOp = await call("take", scope(renewed, renewalId));
+    assert.equal(renewedOp.expiresAt, expiry + 1000);
+    assert.deepEqual(
+      balanceRequest(reviewer, renewalId, "grant", renewedOp.expiresAt),
+      {
+        customer_id: reviewer,
+        feature_id: pricing.featureId,
+        balance_id: renewalId,
+        included_grant: 750,
+        expires_at: expiry + 1000,
+      },
+    );
+    assert.equal(
+      await send(
+        payload(reviewer, "apple-monthly", "CANCELLATION", e.transaction, {
+          cancel_reason: "CUSTOMER_SUPPORT",
+        }),
+      ),
+      200,
+    );
+    assert.equal((await state(id)).purchase.state, "refund_review");
+    const topup = payload(
+      reviewer,
+      "apple-coins",
+      "NON_RENEWING_PURCHASE",
+      randomUUID(),
+    );
+    const te: PurchaseEvent = {
+      ...e,
+      deliveryId: topup.event.id,
+      transaction: topup.event.transaction_id,
+      product: "apple-coins",
+      expiresAt: undefined,
+    };
+    const tid = await balanceId(te);
+    await call("controlCreate", { balanceId: tid });
+    assert.equal(await send(topup), 200);
+    await awaitControl(tid, (row) => row.finished === 1);
+    const top = await call("take", scope(te, tid));
+    assert.deepEqual(balanceRequest(reviewer, tid, "grant", top.expiresAt), {
+      customer_id: reviewer,
+      feature_id: pricing.featureId,
+      balance_id: tid,
+      included_grant: 500,
+    });
   },
 );

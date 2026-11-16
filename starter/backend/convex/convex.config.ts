@@ -24,6 +24,7 @@ const app = defineApp({
     REVENUECAT_WEBHOOK_AUTH: v.optional(v.string()),
     REVENUECAT_PROJECT_ID: v.optional(v.string()),
     REVENUECAT_ENVIRONMENT: v.optional(v.string()),
+    REVENUECAT_REVIEWER_USERS: v.optional(v.string()),
     REVENUECAT_ROUTES: v.optional(v.string()),
     REVENUECAT_MANAGED_MONTHLY_ROUTES: v.optional(v.string()),
     REVENUECAT_SYNC_ENABLED: v.optional(v.string()),

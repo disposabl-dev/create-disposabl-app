@@ -10,10 +10,12 @@ export const purchaseEventFields = {
   product: v.string(),
   customer: v.string(),
   transaction: v.string(),
+  expiresAt: v.optional(v.number()),
   type: v.union(
     v.literal("purchase"),
     v.literal("cancel"),
     v.literal("review"),
+    v.literal("ignore"),
   ),
 };
 export const revenueCatDeliveries = defineTable({
@@ -44,6 +46,7 @@ export const revenueCatPurchases = defineTable({
     v.literal("refunded"),
     v.literal("review"),
   ),
+  expiresAt: v.optional(v.number()),
   refundPending: v.boolean(),
   reviewPending: v.boolean(),
   refundEvidence: v.optional(v.string()),

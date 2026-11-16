@@ -62,7 +62,7 @@ const claimRef = makeFunctionReference<
     store: string;
     product: string;
   },
-  { customer: string; kind: "grant" | "refund" } | null
+  { customer: string; kind: "grant" | "refund"; expiresAt?: number } | null
 >("revenuecat:claim");
 const completeRef = makeFunctionReference<
   "mutation",
@@ -119,6 +119,7 @@ export const createWebhook = (
     }
     const event = parseRevenueCatEvent(payload, config);
     if (!event) return new Response("Invalid event", { status: 400 });
+    if (event.type === "ignore") return Response.json({ status: "ignored" });
     const result = await ctx.runMutation(receiveRef, {
       event,
       balanceId: await balanceId(event),
@@ -303,7 +304,8 @@ export const receive = internalMutation({
         existingDelivery.balanceId !== balanceId ||
         existingDelivery.customer !== event.customer ||
         existingDelivery.type !== event.type ||
-        existingDelivery.product !== event.product
+        existingDelivery.product !== event.product ||
+        existingDelivery.expiresAt !== event.expiresAt
       )
         throw new Error("Conflicting delivery");
       return existingDelivery.conflict ? "operator_review" : "pending";
@@ -314,7 +316,9 @@ export const receive = internalMutation({
       .unique();
     const conflict =
       !!prior &&
-      (prior.customer !== event.customer || prior.product !== event.product);
+      (prior.customer !== event.customer ||
+        prior.product !== event.product ||
+        (event.type === "purchase" && prior.expiresAt !== event.expiresAt));
     await ctx.db.insert("revenueCatDeliveries", {
       ...event,
       balanceId,
@@ -337,6 +341,9 @@ export const receive = internalMutation({
         transaction: event.transaction,
         product: event.product,
         customer: event.customer,
+        ...(event.expiresAt === undefined
+          ? {}
+          : { expiresAt: event.expiresAt }),
         state,
         refundPending: false,
         reviewPending: false,
@@ -393,6 +400,7 @@ export const claim = internalMutation({
     v.object({
       customer: v.string(),
       kind: v.union(v.literal("grant"), v.literal("refund")),
+      expiresAt: v.optional(v.number()),
     }),
   ),
   handler: async (
@@ -425,6 +433,8 @@ export const claim = internalMutation({
       .take(1);
     if (holds.length) return null;
     if (row.state === "queued") {
+      if (row.expiresAt !== undefined && row.expiresAt <= Date.now())
+        return null;
       const customerId = ctx.db.normalizeId("users", row.customer);
       if (!customerId || !(await ctx.db.get("users", customerId))) return null;
     }
@@ -433,7 +443,11 @@ export const claim = internalMutation({
     await ctx.db.patch("revenueCatPurchases", row._id, {
       state: kind === "grant" ? "grant_unknown" : "refund_unknown",
     });
-    return { customer: row.customer, kind };
+    return {
+      customer: row.customer,
+      kind,
+      ...(row.expiresAt === undefined ? {} : { expiresAt: row.expiresAt }),
+    };
   },
 });
 
@@ -517,9 +531,11 @@ export const complete = internalMutation({
 export async function dispatchBalance(
   config: RevenueCatConfig,
   balanceId: string,
-  claimOperation: (
-    scope: ReturnType<typeof scopedOperation>,
-  ) => Promise<{ customer: string; kind: "grant" | "refund" } | null>,
+  claimOperation: (scope: ReturnType<typeof scopedOperation>) => Promise<{
+    customer: string;
+    kind: "grant" | "refund";
+    expiresAt?: number;
+  } | null>,
   completeOperation: (kind: "grant" | "refund") => Promise<unknown>,
   fetcher: typeof fetch = fetch,
 ) {
@@ -527,11 +543,21 @@ export async function dispatchBalance(
     scopedOperation({ config, balanceId }),
   );
   if (!operation) return;
+  if (
+    config.reviewerCustomers &&
+    !config.reviewerCustomers.includes(operation.customer)
+  )
+    return;
   try {
     const result = await billingRequest(
       config.autumnKey,
       operation.kind === "grant" ? "balances.create" : "balances.update",
-      balanceRequest(operation.customer, balanceId, operation.kind),
+      balanceRequest(
+        operation.customer,
+        balanceId,
+        operation.kind,
+        operation.expiresAt,
+      ),
       fetcher,
     );
     if (result.success === true) await completeOperation(operation.kind);

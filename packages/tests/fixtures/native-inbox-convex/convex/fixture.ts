@@ -159,6 +159,7 @@ export const take = mutation({
     v.object({
       customer: v.string(),
       kind: v.union(v.literal("grant"), v.literal("refund")),
+      expiresAt: v.optional(v.number()),
     }),
   ),
   handler: (ctx, a) => (claim as any)._handler(ctx, a),

@@ -9,6 +9,8 @@ export type RevenueCatConfig = {
   store: "APP_STORE" | "PLAY_STORE";
   autumnKey: string;
   managedMonthlyProducts?: string[];
+  reviewerCustomers?: string[];
+  reviewerMonthly?: boolean;
 };
 
 export type PurchaseEvent = {
@@ -20,7 +22,8 @@ export type PurchaseEvent = {
   product: string;
   customer: string;
   transaction: string;
-  type: "purchase" | "cancel" | "review";
+  type: "purchase" | "cancel" | "review" | "ignore";
+  expiresAt?: number;
 };
 
 export function parseTransfer(payload: unknown, config: RevenueCatConfig) {
@@ -43,6 +46,7 @@ export function parseTransfer(payload: unknown, config: RevenueCatConfig) {
       (id) => typeof id === "string" && id.length > 0 && id.length <= 256,
     );
   if (
+    config.reviewerCustomers !== undefined ||
     e.type !== "TRANSFER" ||
     e.app_id !== config.app ||
     e.environment !== config.environment ||
@@ -149,6 +153,42 @@ export function revenueCatConfigs(
       (config.managedMonthlyProducts ??= []).push(route.product);
     }
   }
+  if (environment === "PRODUCTION" && env.REVENUECAT_REVIEWER_USERS) {
+    let users: unknown;
+    try {
+      users = JSON.parse(env.REVENUECAT_REVIEWER_USERS);
+    } catch {
+      return null;
+    }
+    if (
+      !Array.isArray(users) ||
+      !users.length ||
+      users.length > 20 ||
+      !users.every(
+        (id) => typeof id === "string" && /^[a-z0-9]{20,64}$/.test(id),
+      ) ||
+      new Set(users).size !== users.length
+    )
+      return null;
+    const reviewers = users as string[];
+    const sandbox = result.flatMap((route) => [
+      {
+        ...route,
+        environment: "SANDBOX" as const,
+        managedMonthlyProducts: undefined,
+        reviewerCustomers: reviewers,
+      },
+      ...(route.managedMonthlyProducts ?? []).map((product) => ({
+        ...route,
+        product,
+        environment: "SANDBOX" as const,
+        managedMonthlyProducts: undefined,
+        reviewerCustomers: reviewers,
+        reviewerMonthly: true,
+      })),
+    ]);
+    result.push(...sandbox);
+  }
   return result;
 }
 
@@ -235,16 +275,48 @@ export function parseRevenueCatEvent(
   const customer = e.app_user_id as string;
   if (
     customer.startsWith("$RCAnonymousID:") ||
+    (config.reviewerCustomers &&
+      !config.reviewerCustomers.includes(customer)) ||
     (e.original_app_user_id !== undefined &&
       e.original_app_user_id !== customer)
   )
     return null;
-  const type =
-    e.type === "NON_RENEWING_PURCHASE"
-      ? "purchase"
-      : e.type === "CANCELLATION"
-        ? "cancel"
-        : "review";
+  let type: PurchaseEvent["type"];
+  let expiresAt: number | undefined;
+  if (config.reviewerMonthly) {
+    if (e.type === "INITIAL_PURCHASE" || e.type === "RENEWAL") {
+      if (
+        !Number.isSafeInteger(e.expiration_at_ms) ||
+        (e.expiration_at_ms as number) <= 0
+      )
+        return null;
+      expiresAt = e.expiration_at_ms as number;
+      type = "purchase";
+    } else if (
+      e.type === "CANCELLATION" &&
+      e.cancel_reason === "CUSTOMER_SUPPORT"
+    )
+      type = "cancel";
+    else if (
+      (e.type === "CANCELLATION" &&
+        [
+          "UNSUBSCRIBE",
+          "BILLING_ERROR",
+          "DEVELOPER_INITIATED",
+          "PRICE_INCREASE",
+        ].includes(e.cancel_reason as string)) ||
+      e.type === "EXPIRATION"
+    )
+      type = "ignore";
+    else type = "review";
+  } else {
+    type =
+      e.type === "NON_RENEWING_PURCHASE"
+        ? "purchase"
+        : e.type === "CANCELLATION"
+          ? "cancel"
+          : "review";
+  }
   return {
     deliveryId: e.id as string,
     project: config.project,
@@ -255,6 +327,7 @@ export function parseRevenueCatEvent(
     customer,
     transaction: e.transaction_id as string,
     type,
+    ...(expiresAt === undefined ? {} : { expiresAt }),
   };
 }
 
@@ -282,13 +355,19 @@ export function balanceRequest(
   customer: string,
   balance: string,
   kind: "grant" | "refund",
+  expiresAt?: number,
 ) {
   return {
     customer_id: customer,
     feature_id: pricing.featureId,
     balance_id: balance,
     ...(kind === "grant"
-      ? { included_grant: creditQuantity("topup") }
+      ? {
+          included_grant: creditQuantity(
+            expiresAt === undefined ? "topup" : "monthly",
+          ),
+          ...(expiresAt === undefined ? {} : { expires_at: expiresAt }),
+        }
       : { remaining: 0 }),
   };
 }

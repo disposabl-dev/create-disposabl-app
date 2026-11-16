@@ -44,6 +44,15 @@ try:
     subprocess.run([cli,'dev','--once','--typecheck','enable','--codegen','disable'],cwd=workfixture,env=env,check=True)
     env['NATIVE_INBOX_FIXTURE_URL']='http://127.0.0.1:3490'
     subprocess.run(['bun','test','packages/tests/native-inbox-transactions.test.ts'],cwd=source,env=env,check=True)
+    # Configure one synthetic reviewer after creating it on this owned backend.
+    request=urllib.request.Request('http://127.0.0.1:3490/api/mutation', data=json.dumps({'path':'fixture:user','args':{'label':'reviewer'},'format':'json'}).encode(), headers={'Content-Type':'application/json'})
+    reviewer=json.load(urllib.request.urlopen(request))['value']
+    review_values={'REVENUECAT_ENVIRONMENT':'PRODUCTION','AUTUMN_SECRET_KEY':'am_sk_live_fixture','REVENUECAT_REVIEWER_USERS':json.dumps([reviewer]),'REVENUECAT_MANAGED_MONTHLY_ROUTES':'[{"app":"apple","store":"APP_STORE","product":"apple-monthly"}]'}
+    for k,v in review_values.items(): subprocess.run([cli,'env','set',k,v],cwd=workfixture,env=env,check=True,stdout=subprocess.DEVNULL)
+    env['REVIEWER_TEST_USER']=reviewer
+    subprocess.run(['bun','test','packages/tests/native-inbox-transactions.test.ts','-t','allowlisted sandbox purchases'],cwd=source,env=env,check=True)
+    for k,v in values.items(): subprocess.run([cli,'env','set',k,v],cwd=workfixture,env=env,check=True,stdout=subprocess.DEVNULL)
+    env.pop('REVIEWER_TEST_USER',None)
     # Retain the same database while deploying payments off, then back on.
     env['NATIVE_INBOX_RECOVERY_FILE']=str(work/'recovery.json')
     config['features']=[feature for feature in config['features'] if feature != 'payments']
