@@ -1,16 +1,22 @@
 import { useAction } from "convex/react";
 import { makeFunctionReference } from "convex/server";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AppState, Linking, Platform, Text, View } from "react-native";
+import {
+  AppState,
+  Linking,
+  Platform,
+  Pressable,
+  Text,
+  View,
+} from "react-native";
 import type { PurchasesPackage } from "react-native-purchases";
-import { AuthButton, authClasses } from "../components/auth-ui";
 import { billingSession } from "./session";
 import {
   monthlyOfferingId,
   presentMonthlyPaywall,
   selectMonthlyOffering,
 } from "./paywall";
-import { creditQuantity, monthlyLabel } from "../../payments/config";
+import { creditQuantity } from "../../payments/config";
 import { paymentOptions, storeEligibility } from "./policy";
 import { useWebCheckout } from "./web-checkout";
 import { useTopup } from "./use-topup";
@@ -210,121 +216,175 @@ export function AccountBilling({ customerId }: { customerId: string }) {
     }
   }
 
+  const disabled = busy || web.busy || topup.busy;
+  const openManagement = (url: string) => {
+    void Linking.openURL(url).catch(() =>
+      setMessage("Could not open subscription settings."),
+    );
+  };
+
   return (
-    <View className={authClasses.card}>
-      <Text className={authClasses.title}>Credits</Text>
-      <Text className={authClasses.body}>
-        Available: {data?.balance ?? "unavailable"}
-      </Text>
-      <Text className={authClasses.body}>
-        {monthlyLabel()}: {creditQuantity("monthly")} credits each billing
-        cycle. Unused monthly credits expire.
-      </Text>
+    <View className="gap-4">
+      <View>
+        <Text className="text-[13px] font-medium text-muted-foreground">
+          Available
+        </Text>
+        <Text className="text-[28px] font-bold tracking-[-0.5px] text-foreground">
+          {data?.balance == null
+            ? "Unavailable"
+            : `${new Intl.NumberFormat().format(data.balance)} credits`}
+        </Text>
+      </View>
       {data?.hasMonthlyPlan && (
-        <Text className={authClasses.body}>
-          Your monthly plan is active or scheduled.
+        <Text className="text-[14px] text-muted-foreground">
+          Monthly plan active or scheduled.
         </Text>
       )}
       {data?.monthlyCheckoutPending && (
-        <Text className={authClasses.body}>
-          Finish or cancel your website checkout before subscribing here.
+        <Text className="text-[14px] text-muted-foreground">
+          Finish or cancel your website checkout first.
         </Text>
       )}
       {monthly ? (
-        <AuthButton
-          title={`${monthly.product.priceString} / month`}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{
+            disabled:
+              disabled ||
+              data?.hasMonthlyPlan !== false ||
+              data?.monthlyCheckoutPending !== false,
+          }}
           disabled={
-            busy ||
-            web.busy ||
-            topup.busy ||
+            disabled ||
             data?.hasMonthlyPlan !== false ||
             data?.monthlyCheckoutPending !== false
           }
           onPress={() => void transact(false)}
-        />
+          className={`rounded-[14px] bg-foreground p-4 active:opacity-60 ${disabled || data?.hasMonthlyPlan !== false || data?.monthlyCheckoutPending !== false ? "opacity-60" : ""}`}
+        >
+          <View className="flex-row items-center justify-between gap-2">
+            <Text className="text-[16px] font-semibold text-background">
+              {creditQuantity("monthly")} credits / month
+            </Text>
+            <Text className="text-[16px] font-semibold text-background">
+              {monthly.product.priceString} / mo
+            </Text>
+          </View>
+          <Text className="mt-1 text-[13px] text-background opacity-70">
+            Unused credits expire monthly
+          </Text>
+        </Pressable>
       ) : (
-        <Text className={authClasses.body}>
-          Store subscriptions are unavailable.
+        <Text className="text-[14px] text-muted-foreground">
+          Store subscriptions unavailable.
         </Text>
-      )}
-      {web.available && (
-        <AuthButton
-          title="Buy monthly on website"
-          disabled={busy || web.busy || topup.busy}
-          onPress={() => void web.open()}
-        />
       )}
       {topup.product && (
-        <AuthButton
-          title={`Buy ${creditQuantity("topup")} credits · ${topup.product.priceString}`}
-          disabled={busy || web.busy || topup.busy}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ disabled }}
+          disabled={disabled}
           onPress={() => void topup.purchase()}
-        />
+          className={`rounded-[14px] border border-border px-4 py-3 active:opacity-60 ${disabled ? "opacity-60" : ""}`}
+        >
+          <View className="flex-row items-center justify-between gap-2">
+            <Text className="text-[16px] font-semibold text-foreground">
+              {creditQuantity("topup")} credits once
+            </Text>
+            <Text className="text-[16px] font-semibold text-foreground">
+              {topup.product.priceString}
+            </Text>
+          </View>
+          <Text className="mt-1 text-[13px] text-muted-foreground">
+            Never expires
+          </Text>
+        </Pressable>
       )}
-      {web.topupAvailable && (
-        <AuthButton
-          title="Buy top-up on website"
-          disabled={busy || web.busy || topup.busy}
-          onPress={() => void web.open("topup")}
-        />
-      )}
-      {!!topup.message && (
-        <Text accessibilityRole="alert" className={authClasses.body}>
-          {topup.message}
-        </Text>
-      )}
-      <AuthButton
-        title="Refresh credits"
-        disabled={busy}
-        onPress={() => {
-          void refresh(generation.current);
-        }}
-      />
-      {!!key && data?.nativeSubscriptionsEnabled && (
-        <AuthButton
-          title="Restore purchases"
+      <View className="flex-row flex-wrap gap-x-5 gap-y-2">
+        {web.available && (
+          <BillingLink
+            title="Monthly on website"
+            disabled={disabled}
+            onPress={() => void web.open()}
+          />
+        )}
+        {web.topupAvailable && (
+          <BillingLink
+            title="Top-up on website"
+            disabled={disabled}
+            onPress={() => void web.open("topup")}
+          />
+        )}
+        <BillingLink
+          title="Refresh"
           disabled={busy}
-          onPress={() => void transact(true)}
+          onPress={() => void refresh(generation.current)}
         />
-      )}
-      <Text className={authClasses.body}>
-        Cancel or manage your subscription with the provider you originally
-        paid. For a website purchase, use Manage website billing on the website
-        pricing page.
+        {!!key && data?.nativeSubscriptionsEnabled && (
+          <BillingLink
+            title="Restore"
+            disabled={busy}
+            onPress={() => void transact(true)}
+          />
+        )}
+      </View>
+      <Text className="text-[13px] leading-[18px] text-muted-foreground">
+        Manage or cancel where you subscribed:
       </Text>
-      {[
-        [
-          "Manage Apple subscriptions",
-          "https://apps.apple.com/account/subscriptions",
-        ],
-        [
-          "Manage Google Play subscriptions",
-          "https://play.google.com/store/account/subscriptions",
-        ],
-      ].map(([title, url]) => (
-        <AuthButton
-          key={title}
-          title={title!}
-          onPress={() => {
-            void Linking.openURL(url!).catch(() =>
-              setMessage("Could not open subscription settings."),
-            );
-          }}
+      <View className="flex-row flex-wrap gap-x-5 gap-y-2">
+        <BillingLink
+          title="Apple"
+          onPress={() =>
+            openManagement("https://apps.apple.com/account/subscriptions")
+          }
         />
-      ))}
-      {!!refreshError && (
-        <Text className={authClasses.body}>{refreshError}</Text>
-      )}
-      {!!message && (
-        <Text accessibilityRole="alert" className={authClasses.body}>
-          {message}
+        <BillingLink
+          title="Google Play"
+          onPress={() =>
+            openManagement(
+              "https://play.google.com/store/account/subscriptions",
+            )
+          }
+        />
+        <Text className="py-1 text-[13px] text-muted-foreground">
+          Website: pricing page
         </Text>
-      )}
-      {!!web.error && (
-        <Text accessibilityRole="alert" className={authClasses.body}>
-          {web.error}
-        </Text>
-      )}
+      </View>
+      {[topup.message, refreshError, message, web.error]
+        .filter(Boolean)
+        .map((text, index) => (
+          <Text
+            key={index}
+            accessibilityRole="alert"
+            className="text-[14px] leading-[20px] text-muted-foreground"
+          >
+            {text}
+          </Text>
+        ))}
     </View>
+  );
+}
+
+function BillingLink({
+  title,
+  onPress,
+  disabled = false,
+}: {
+  title: string;
+  onPress: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ disabled }}
+      disabled={disabled}
+      onPress={onPress}
+      className={`py-1 active:opacity-60 ${disabled ? "opacity-60" : ""}`}
+    >
+      <Text className="text-[14px] font-semibold text-primary-text">
+        {title}
+      </Text>
+    </Pressable>
   );
 }
