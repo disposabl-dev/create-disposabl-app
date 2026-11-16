@@ -29,7 +29,7 @@ export async function ensureReceipt(
 }
 const receipt = v.object({
   reference: v.string(),
-  ownerId: v.string(),
+  ownerId: v.optional(v.string()),
   requestedAt: v.number(),
 });
 /** Internal support lookup; a reference is not an authorization credential. */

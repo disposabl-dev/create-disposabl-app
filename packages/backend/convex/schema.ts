@@ -54,7 +54,7 @@ export default defineSchema({
     .index("by_userId", ["userId"]),
   deletionReceipts: defineTable({
     reference: v.string(),
-    ownerId: v.string(),
+    ownerId: v.optional(v.string()),
     requestedAt: v.number(),
     completedAt: v.optional(v.number()),
   })
@@ -154,6 +154,17 @@ export default defineSchema({
     lease: v.optional(v.string()),
   }).index("by_key", ["key"]),
   users: defineTable({
+    managedSandbox: v.optional(
+      v.object({
+        state: v.union(
+          v.literal("never"),
+          v.literal("uncertain"),
+          v.literal("known"),
+          v.literal("deleted"),
+        ),
+        sandboxId: v.optional(v.string()),
+      }),
+    ),
     deletionRequestedAt: v.optional(v.number()),
     mcpDeletion: v.optional(mcpDeletionProgress),
     authDeletion: v.optional(authDeletionProgress),

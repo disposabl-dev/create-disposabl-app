@@ -361,3 +361,139 @@ test(
     );
   },
 );
+
+test(
+  "new account advances to a durable ownerless receipt and retries safely",
+  { skip: !base },
+  async () => {
+    const { randomUUID } = await import("node:crypto");
+    async function invoke(
+      kind: string,
+      path: string,
+      args: object,
+      token?: string,
+    ): Promise<any> {
+      const response = await fetch(`${base}/api/${kind}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ path, args, format: "json" }),
+      });
+      const result = (await response.json()) as any;
+      if (result.status !== "success")
+        throw new Error(result.errorMessage ?? "Fixture failed");
+      return result.value;
+    }
+    const username = `completion${randomUUID().replaceAll("-", "")}`;
+    const password = `Fixture-${randomUUID()}!`;
+    await invoke("mutation", "auth:signUpWithUsernamePassword", {
+      username,
+      password,
+    });
+    const signed = await invoke("mutation", "auth:signInWithUsernamePassword", {
+      username,
+      password,
+    });
+    const token = signed.tokens.accessToken;
+    const user = await invoke("query", "users/index:current", {}, token);
+    const requested = await invoke(
+      "mutation",
+      "users/index:requestDeletion",
+      { confirmation: "DELETE" },
+      token,
+    );
+    const args = {
+      userId: user.id,
+      expectedRequestedAt: requested.requestedAt,
+      reference: requested.reference,
+    };
+    let result;
+    for (let n = 0; n < 12; n++) {
+      result = await invoke("action", "fixture:advanceDeletion", args);
+      if (result.state !== "advanced") break;
+    }
+    assert.equal(result.state, "completed");
+    assert.equal(
+      (await invoke("action", "fixture:advanceDeletion", args)).state,
+      "completed",
+    );
+    const receipt = await invoke("query", "fixture:receipt", {
+      reference: requested.reference,
+    });
+    assert.equal(receipt.ownerId, null);
+    assert.ok(receipt.completedAt >= requested.requestedAt);
+    const guest = await invoke("query", "users/index:receiptStatus", {
+      reference: requested.reference,
+    });
+    assert.equal(guest.status, "completed");
+    assert.equal("ownerId" in guest, false);
+  },
+);
+
+test(
+  "captured sandbox ID survives retries and mismatched identities stay blocked",
+  { skip: !base },
+  async () => {
+    const known = await m("seedSandboxRequest", {
+      sandboxId: "synthetic-sandbox",
+      historical: false,
+    });
+    const other = await m("seedSandboxRequest", {
+      sandboxId: "different-sandbox",
+      historical: false,
+    });
+    const unknown = await m("seedSandboxRequest", { historical: true });
+    const first = await m("prepareSandbox", known);
+    assert.equal(first.state, "known");
+    assert.equal(first.sandboxId, "synthetic-sandbox");
+    assert.deepEqual(await m("prepareSandbox", known), first);
+    assert.equal((await m("prepareSandbox", unknown)).state, "blocked");
+    await assert.rejects(
+      m("finishSandbox", { ...known, sandboxId: "different-sandbox" }),
+      /identity changed/,
+    );
+    await assert.rejects(
+      m("finishSandbox", { ...other, sandboxId: first.sandboxId }),
+      /identity changed/,
+    );
+    await m("finishSandbox", { ...known, sandboxId: first.sandboxId });
+    assert.equal((await m("prepareSandbox", known)).state, "deleted");
+    assert.equal((await m("prepareSandbox", other)).state, "known");
+  },
+);
+
+test(
+  "terminal transaction rejects wrong owner and incomplete cleanup",
+  { skip: !base },
+  async () => {
+    const owner = await m("create", { pending: true });
+    const other = await m("create", { pending: true });
+    const reference = crypto.randomUUID();
+    await m("seedReceipt", {
+      userId: owner.userId,
+      requestedAt: owner.requestedAt,
+      reference,
+    });
+    await assert.rejects(
+      m("completeDeletion", {
+        userId: other.userId,
+        expectedRequestedAt: owner.requestedAt,
+        reference,
+      }),
+      /Matching deletion request/,
+    );
+    await assert.rejects(
+      m("completeDeletion", {
+        userId: owner.userId,
+        expectedRequestedAt: owner.requestedAt,
+        reference,
+      }),
+      /sandbox cleanup is unverified/,
+    );
+    const row = await q("receipt", { reference });
+    assert.equal(row.ownerId, owner.userId);
+    assert.equal(row.completedAt, null);
+  },
+);

@@ -1,6 +1,6 @@
 import { internalAction } from "@disposabl/disposabl-kit/server/lib/functions";
 import { v, type Infer } from "convex/values";
-import { makeFunctionReference } from "convex/server";
+import { anyApi, makeFunctionReference } from "convex/server";
 import { components, internal } from "../../_generated/api";
 import { env } from "../../_generated/server";
 import {
@@ -233,6 +233,9 @@ export const tick = internalAction({
             await closeArchived();
             return null;
           }
+          await ctx.runMutation(anyApi.users.fulfillment.markProvisioning, {
+            userId: current.userId,
+          });
           sandbox = await boat.create(ctx, {
             ...ref,
             options: {

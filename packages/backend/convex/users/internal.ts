@@ -83,8 +83,11 @@ export const createUser = internalMutation({
     return await ctx.db.insert(
       "users",
       provider.name === "google"
-        ? { profile: displayProfile(provider.profile) }
-        : {},
+        ? {
+            profile: displayProfile(provider.profile),
+            managedSandbox: { state: "never" },
+          }
+        : { managedSandbox: { state: "never" } },
     );
   },
 });

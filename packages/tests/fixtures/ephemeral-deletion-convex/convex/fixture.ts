@@ -1,5 +1,6 @@
 import {
   mutationGeneric as mutation,
+  actionGeneric as action,
   queryGeneric as query,
   anyApi,
 } from "convex/server";
@@ -238,4 +239,84 @@ export const authenticatedCleanup = mutation({
       ...args,
     });
   },
+});
+
+export const advanceDeletion = action({
+  args: {
+    userId: v.id("users"),
+    expectedRequestedAt: v.number(),
+    reference: v.string(),
+  },
+  handler: (ctx, args) =>
+    ctx.runAction(anyApi.users.actions.fulfillment.advance, args),
+});
+export const receipt = query({
+  args: { reference: v.string() },
+  handler: async (ctx, { reference }) => {
+    const row = await ctx.db
+      .query("deletionReceipts")
+      .withIndex("by_reference", (q) => q.eq("reference", reference))
+      .unique();
+    return row
+      ? {
+          requestedAt: row.requestedAt,
+          completedAt: row.completedAt ?? null,
+          ownerId: row.ownerId ?? null,
+        }
+      : null;
+  },
+});
+
+export const seedSandboxRequest = mutation({
+  args: { sandboxId: v.optional(v.string()), historical: v.boolean() },
+  handler: async (ctx, { sandboxId, historical }) => {
+    const userId = await ctx.db.insert("users", {
+      deletionRequestedAt: 123456,
+      ...(historical
+        ? {}
+        : {
+            managedSandbox: sandboxId
+              ? { state: "known" as const, sandboxId }
+              : { state: "uncertain" as const },
+          }),
+    });
+    return { userId, expectedRequestedAt: 123456 };
+  },
+});
+export const prepareSandbox = mutation({
+  args: { userId: v.id("users"), expectedRequestedAt: v.number() },
+  handler: (ctx, args) =>
+    ctx.runMutation(anyApi.users.fulfillment.prepare, args),
+});
+export const finishSandbox = mutation({
+  args: {
+    userId: v.id("users"),
+    expectedRequestedAt: v.number(),
+    sandboxId: v.string(),
+  },
+  handler: (ctx, args) =>
+    ctx.runMutation(anyApi.users.fulfillment.markSandboxDeleted, args),
+});
+
+export const seedReceipt = mutation({
+  args: {
+    userId: v.id("users"),
+    requestedAt: v.number(),
+    reference: v.string(),
+  },
+  handler: (ctx, { userId, requestedAt, reference }) =>
+    ctx.db.insert("deletionReceipts", {
+      ownerId: userId,
+      requestedAt,
+      reference,
+    }),
+});
+export const completeDeletion = mutation({
+  args: {
+    userId: v.id("users"),
+    expectedRequestedAt: v.number(),
+    reference: v.string(),
+  },
+  handler: (ctx, args) =>
+    ctx.runMutation(anyApi.users.fulfillment.complete, args),
 });
