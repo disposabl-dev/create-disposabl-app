@@ -186,7 +186,7 @@ jobs:
         id: fingerprint
         if: needs.changes.outputs.android == 'true'
         env:
-          UPDATE_POLICY: ${{ github.event_name == 'push' && github.repository == 'disposabl-dev/create-disposabl-app' && 'disabled' || '' }}
+          UPDATE_POLICY: ${{ github.event_name == 'push' && github.repository == 'disposabl-dev/create-disposabl-app' && 'expo' || '' }}
         working-directory: apps/mobile
         run: bash "$GITHUB_WORKSPACE/.github/scripts/mobile.sh" expo-fingerprint
       - name: Update
@@ -286,7 +286,7 @@ jobs:
         env:
           RUNTIME: ${{ needs.web.outputs.android_runtime }}
           BUNDLETOOL_JAR: ${{ runner.temp }}/bundletool.jar
-          UPDATE_POLICY: ${{ github.event_name == 'push' && github.repository == 'disposabl-dev/create-disposabl-app' && 'disabled' || '' }}
+          UPDATE_POLICY: ${{ github.event_name == 'push' && github.repository == 'disposabl-dev/create-disposabl-app' && 'expo' || '' }}
           DISPOSABL_ANDROID_VERSION_CODE: ${{ needs.web.outputs.android_version_code || github.run_number }}
           DISPOSABL_ANDROID_CHANNEL: *channel
           DISPOSABL_ANDROID_SIGNING: ${{ github.event_name == 'push' && secrets.DISPOSABL_ANDROID_SIGNING || '' }}

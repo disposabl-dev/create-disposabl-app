@@ -19,7 +19,7 @@ case "${1:-}" in
   verify-source|verify-submission-source) verify_source ;;
   build)
     verify_source
-    [[ "${UPDATE_POLICY:-}" == disabled && -z "${EXPO_PROJECT_ID:-}" ]] || { echo 'Production updates must remain disabled' >&2; exit 1; }
+    [[ "${UPDATE_POLICY:-}" == expo && "${EXPO_PROJECT_ID:-}" == 7609475b-183a-4488-b1b0-0d7cc35aaaf0 ]] || { echo 'Production updates require the Disposabl Expo project' >&2; exit 1; }
     [[ "${EXPO_PUBLIC_DISPOSABL_ANALYTICS_ENABLED:-}" == true ]] || { echo 'Production analytics must be enabled' >&2; exit 1; }
     [[ -z "${EXPO_PUBLIC_E2E:-}" ]] || { echo 'E2E is not permitted' >&2; exit 1; }
     for name in EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY EXPO_PUBLIC_REVENUECAT_ANDROID_MONTHLY_PRODUCT EXPO_PUBLIC_REVENUECAT_ANDROID_APP_ID EXPO_PUBLIC_REVENUECAT_ANDROID_TOPUP_PRODUCT; do
@@ -41,7 +41,7 @@ case "${1:-}" in
       .android.package == "com.yastai.disposabl" and
       .extra.disposablAndroidPayments == true and
       .extra.disposablAndroidArchitectures == ["arm64-v8a", "x86_64"] and
-      (if $policy == "expo" then .extra.eas.projectId == $project and .updates.url == ("https://u.expo.dev/" + $project) and .updates.requestHeaders["expo-channel-name"] == "production" and .android.runtimeVersion.policy == "fingerprint" else (.updates.url == null and .extra.eas.projectId == null and .updates.enabled != true) end)
+      $policy == "expo" and .extra.eas.projectId == $project and .updates.enabled != false and .updates.url == ("https://u.expo.dev/" + $project) and .updates.requestHeaders == {"expo-channel-name":"production"} and .android.runtimeVersion.policy == "fingerprint"
     ' <<< "$config" >/dev/null || { echo 'Production Expo configuration does not match selected policy' >&2; exit 1; }
     node apps/mobile/scripts/play-aab.mjs
     ;;

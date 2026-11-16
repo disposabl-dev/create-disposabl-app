@@ -1,15 +1,15 @@
 import os,subprocess,tempfile,pathlib,json,textwrap
 root=pathlib.Path(__file__).resolve().parents[2]
 tmp=pathlib.Path(tempfile.mkdtemp(prefix='play-bundle-inert-')); b=tmp/'bin';b.mkdir(); sha='a'*40
-scripts={'git':f'#!/bin/sh\necho {sha}\n','gh':'#!/bin/sh\ncase "$*" in *compare*) echo "${COMPARISON-identical}" ;; *) echo "${MAIN_SHA:-'+sha+'}" ;; esac\nexit "${GH_EXIT:-0}"\n','bun':'#!/bin/sh\nprintf \'%s\\n\' \'{"android":{"package":"com.yastai.disposabl"},"extra":{"disposablAndroidPayments":true,"disposablAndroidArchitectures":["arm64-v8a","x86_64"]},"updates":{}}\'\n','node':'#!/bin/sh\ntest -f "$ANDROID_KEYSTORE_PATH"\ntest "$PLAY_UPLOAD_CERT_SHA256" = BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB\necho helper-invoked\n'}
+scripts={'git':f'#!/bin/sh\necho {sha}\n','gh':'#!/bin/sh\ncase "$*" in *compare*) echo "${COMPARISON-identical}" ;; *) echo "${MAIN_SHA:-'+sha+'}" ;; esac\nexit "${GH_EXIT:-0}"\n','bun':'#!/bin/sh\nprintf \'%s\\n\' \'{"android":{"package":"com.yastai.disposabl","runtimeVersion":{"policy":"fingerprint"}},"extra":{"eas":{"projectId":"7609475b-183a-4488-b1b0-0d7cc35aaaf0"},"disposablAndroidPayments":true,"disposablAndroidArchitectures":["arm64-v8a","x86_64"]},"updates":{"url":"https://u.expo.dev/7609475b-183a-4488-b1b0-0d7cc35aaaf0","requestHeaders":{"expo-channel-name":"production"}}}\'\n','node':'#!/bin/sh\ntest -f "$ANDROID_KEYSTORE_PATH"\ntest "$PLAY_UPLOAD_CERT_SHA256" = BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB\necho helper-invoked\n'}
 for name,data in scripts.items(): p=b/name;p.write_text(data);p.chmod(0o755)
-e={**os.environ,'PATH':str(b)+':/usr/bin:/bin','STORAGE_BUDGET_VERIFIED':'true','GITHUB_REF':'refs/heads/main','EXPECTED_SOURCE_SHA':sha,'GITHUB_SHA':sha,'GITHUB_REPOSITORY':'example/repo','UPDATE_POLICY':'disabled','EXPO_PROJECT_ID':'','EXPO_PUBLIC_DISPOSABL_ANALYTICS_ENABLED':'true','PLAY_UPLOAD_CERT_SHA256':'B'*64,'RUNNER_TEMP':str(tmp),'DISPOSABL_ANDROID_SIGNING':json.dumps({'keystoreBase64':'YQ==','storePassword':'synthetic-secret-one','keyAlias':'synthetic-secret-two','keyPassword':'synthetic-secret-three'})}
+e={**os.environ,'PATH':str(b)+':/usr/bin:/bin','STORAGE_BUDGET_VERIFIED':'true','GITHUB_REF':'refs/heads/main','EXPECTED_SOURCE_SHA':sha,'GITHUB_SHA':sha,'GITHUB_REPOSITORY':'example/repo','UPDATE_POLICY':'expo','EXPO_PROJECT_ID':'7609475b-183a-4488-b1b0-0d7cc35aaaf0','EXPO_PUBLIC_DISPOSABL_ANALYTICS_ENABLED':'true','PLAY_UPLOAD_CERT_SHA256':'B'*64,'RUNNER_TEMP':str(tmp),'DISPOSABL_ANDROID_SIGNING':json.dumps({'keystoreBase64':'YQ==','storePassword':'synthetic-secret-one','keyAlias':'synthetic-secret-two','keyPassword':'synthetic-secret-three'})}
 for name in ['EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY','EXPO_PUBLIC_REVENUECAT_ANDROID_MONTHLY_PRODUCT','EXPO_PUBLIC_REVENUECAT_ANDROID_APP_ID','EXPO_PUBLIC_REVENUECAT_ANDROID_TOPUP_PRODUCT']:
  e[name]='fixture'
 for name in ['EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY','EXPO_PUBLIC_REVENUECAT_ANDROID_MONTHLY_PRODUCT','EXPO_PUBLIC_REVENUECAT_ANDROID_APP_ID','EXPO_PUBLIC_REVENUECAT_ANDROID_TOPUP_PRODUCT']:
  r=subprocess.run(['bash',str(root/'.github/scripts/play-bundle.sh'),'build'],cwd=root,env={**e,name:'  '},capture_output=True,text=True)
  assert r.returncode != 0 and f'Missing {name}' in r.stderr
-for case,overrides,ok in [('valid',{},True),('queued-main',{'COMPARISON':'ahead','MAIN_SHA':'b'*40},True),('rewritten-main',{'COMPARISON':'diverged'},False),('api-failure',{'GH_EXIT':'1'},False),('wrong-sha',{'GITHUB_SHA':'b'*40},False),('analytics-disabled',{'EXPO_PUBLIC_DISPOSABL_ANALYTICS_ENABLED':'false'},False),('wrong-ref',{'GITHUB_REF':'refs/heads/other'},False),('bad-policy',{'UPDATE_POLICY':'expo'},False),('bad-signing',{'DISPOSABL_ANDROID_SIGNING':'{}'},False),('e2e',{'EXPO_PUBLIC_E2E':'true'},False)]:
+for case,overrides,ok in [('valid',{},True),('queued-main',{'COMPARISON':'ahead','MAIN_SHA':'b'*40},True),('rewritten-main',{'COMPARISON':'diverged'},False),('api-failure',{'GH_EXIT':'1'},False),('wrong-sha',{'GITHUB_SHA':'b'*40},False),('analytics-disabled',{'EXPO_PUBLIC_DISPOSABL_ANALYTICS_ENABLED':'false'},False),('wrong-ref',{'GITHUB_REF':'refs/heads/other'},False),('bad-policy',{'UPDATE_POLICY':'disabled'},False),('bad-signing',{'DISPOSABL_ANDROID_SIGNING':'{}'},False),('e2e',{'EXPO_PUBLIC_E2E':'true'},False)]:
  r=subprocess.run(['bash',str(root/'.github/scripts/play-bundle.sh'),'build'],cwd=root,env={**e,**overrides},capture_output=True,text=True)
  assert (r.returncode==0)==ok,(case,r.returncode,r.stderr)
  assert not (tmp/'play-upload.jks').exists(),case
@@ -26,7 +26,7 @@ workflow=(root/'.github/workflows/pipeline.yml').read_text()
 assert not (root/'.github/workflows/play-bundle.yml').exists()
 assert '  android-play:\n' not in workflow and 'DISPOSABL_ANDROID_PLAY_ENABLED' not in workflow
 assert "if: needs.web.outputs.android_build == 'true'" in workflow
-assert "UPDATE_POLICY: ${{ github.event_name == 'push' && github.repository == 'disposabl-dev/create-disposabl-app' && 'disabled' || '' }}" in workflow
+assert "UPDATE_POLICY: ${{ github.event_name == 'push' && github.repository == 'disposabl-dev/create-disposabl-app' && 'expo' || '' }}" in workflow
 build=workflow.split('  android:',1)[1].split('  android-submit:',1)[0]
 job=workflow.split('  android-submit:',1)[1].split('  android-failure:',1)[0]
 assert build.count('android-build') == 1 and "vars.ANDROID_PLAY_SUBMIT == 'true'" in job

@@ -20,22 +20,30 @@ const env = {
   EXPO_PUBLIC_CONVEX_SITE_URL: "https://www.disposabl.dev",
   EXPO_PUBLIC_CONVEX_URL: "https://vivid-caterpillar-633.convex.cloud",
   DISPOSABL_ANDROID_VERSION_CODE: "123",
-  UPDATE_POLICY: "disabled",
+  UPDATE_POLICY: "expo",
 };
 const abis = ["arm64-v8a", "x86_64"];
 const manifest = {
   applicationId: "com.yastai.disposabl",
   androidArchitectures: abis,
-  projectId: "project",
+  projectId: "7609475b-183a-4488-b1b0-0d7cc35aaaf0",
+  runtimeVersion: "a".repeat(40),
 };
 const config = {
-  android: { package: manifest.applicationId, versionCode: 123 },
+  android: {
+    package: manifest.applicationId,
+    versionCode: 123,
+    runtimeVersion: { policy: "fingerprint" },
+  },
   extra: {
     disposablAndroidPayments: true,
     disposablAndroidArchitectures: abis,
-    eas: { projectId: "project" },
+    eas: { projectId: "7609475b-183a-4488-b1b0-0d7cc35aaaf0" },
   },
-  updates: { enabled: false },
+  updates: {
+    url: "https://u.expo.dev/7609475b-183a-4488-b1b0-0d7cc35aaaf0",
+    requestHeaders: { "expo-channel-name": "production" },
+  },
 };
 
 test("product production custom domain passes the existing release policy", () => {

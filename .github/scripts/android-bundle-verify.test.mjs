@@ -7,10 +7,19 @@ import { tmpdir } from "node:os";
 import {
   verifyInputs,
   verifyEmbedded,
+  verifyFingerprint,
 } from "../../apps/mobile/scripts/android-release-verify.mjs";
-import { verifyBundle } from "../../apps/mobile/scripts/verify-play-aab.mjs";
+import {
+  verifyBundle,
+  verifyNativeUpdates,
+} from "../../apps/mobile/scripts/verify-play-aab.mjs";
 
 const abis = ["arm64-v8a", "x86_64"];
+
+test("artifact fingerprint must match the selected runtime", () => {
+  verifyFingerprint("abc\n", "abc");
+  assert.throws(() => verifyFingerprint("wrong", "abc"), /fingerprint/);
+});
 const config = {
   android: { package: "app.example", versionCode: 123 },
   scheme: ["example"],
@@ -74,24 +83,58 @@ test("embedded config must match build configuration", () => {
     /payments/,
   );
 });
+test("native update metadata requires the exact project, channel and runtime", () => {
+  const projectId = "7609475b-183a-4488-b1b0-0d7cc35aaaf0";
+  const meta = (name, value) =>
+    `<meta-data android:name="expo.modules.updates.${name}" android:value="${value}"/>`;
+  const text = [
+    meta("ENABLED", "true"),
+    meta("EXPO_UPDATE_URL", `https://u.expo.dev/${projectId}`),
+    meta("EXPO_RUNTIME_VERSION", "@string/expo_runtime_version"),
+    meta(
+      "UPDATES_CONFIGURATION_REQUEST_HEADERS_KEY",
+      "{&quot;expo-channel-name&quot;:&quot;production&quot;}",
+    ),
+  ].join("\n");
+  const expected = { projectId, channel: "production" };
+  verifyNativeUpdates(text, expected);
+  for (const altered of [
+    text.replace('android:value="true"', 'android:value="false"'),
+    text.replace(projectId, "wrong-project"),
+    text.replace("production&quot;", "preview&quot;"),
+    text.replace("@string/expo_runtime_version", "wrong"),
+    text + meta("ENABLED", "true"),
+  ])
+    assert.throws(() => verifyNativeUpdates(altered, expected));
+});
 test("product policy stays strict while Expo identity supports fingerprinting", () => {
   const product = {
     ...config,
-    android: { ...config.android, package: "com.yastai.disposabl" },
+    android: {
+      ...config.android,
+      package: "com.yastai.disposabl",
+      runtimeVersion: { policy: "fingerprint" },
+    },
+    updates: {
+      url: "https://u.expo.dev/7609475b-183a-4488-b1b0-0d7cc35aaaf0",
+      requestHeaders: { "expo-channel-name": "production" },
+    },
     extra: {
       ...config.extra,
       disposablAndroidPayments: true,
-      eas: { projectId: "fixture-project" },
+      eas: { projectId: "7609475b-183a-4488-b1b0-0d7cc35aaaf0" },
     },
   };
   const selected = {
     ...manifest,
     applicationId: product.android.package,
-    projectId: "fixture-project",
+    projectId: "7609475b-183a-4488-b1b0-0d7cc35aaaf0",
+    runtimeVersion: "a".repeat(40),
   };
   const productEnv = {
     ...env,
     GH_REPO: "disposabl-dev/create-disposabl-app",
+    UPDATE_POLICY: "expo",
     EXPO_PUBLIC_DISPOSABL_ANALYTICS_ENABLED: "true",
   };
   verifyInputs(product, selected, productEnv);
@@ -116,7 +159,7 @@ test("product policy stays strict while Expo identity supports fingerprinting", 
     );
   for (const patch of [
     { EXPO_PUBLIC_DISPOSABL_ANALYTICS_ENABLED: "false" },
-    { UPDATE_POLICY: "expo" },
+    { UPDATE_POLICY: "disabled" },
   ])
     assert.throws(
       () => verifyInputs(product, selected, { ...productEnv, ...patch }),

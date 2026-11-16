@@ -3,6 +3,13 @@ import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { verifyBundle } from "./verify-play-aab.mjs";
 
+export function verifyFingerprint(actual, expected) {
+  if (actual.trim() !== expected)
+    throw new Error(
+      "Artifact runtime fingerprint does not match release manifest",
+    );
+}
+
 export function verifyInputs(config, manifest, env) {
   if (config.android?.package !== manifest.applicationId)
     throw new Error("Expo package does not match release manifest");
@@ -31,14 +38,17 @@ export function verifyInputs(config, manifest, env) {
         config.extra?.disposablAndroidPayments !== true ||
         JSON.stringify(abis) !== JSON.stringify(["arm64-v8a", "x86_64"]) ||
         env.EXPO_PUBLIC_DISPOSABL_ANALYTICS_ENABLED !== "true" ||
-        env.UPDATE_POLICY !== "disabled" ||
-        config.updates?.requestHeaders != null
+        env.UPDATE_POLICY !== "expo" ||
+        manifest.projectId !== "7609475b-183a-4488-b1b0-0d7cc35aaaf0" ||
+        config.extra?.eas?.projectId !== manifest.projectId ||
+        config.android?.runtimeVersion?.policy !== "fingerprint" ||
+        !/^[a-f0-9]{40,64}$/.test(manifest.runtimeVersion || "") ||
+        config.updates?.enabled === false ||
+        config.updates?.url !== `https://u.expo.dev/${manifest.projectId}` ||
+        JSON.stringify(config.updates?.requestHeaders) !==
+          JSON.stringify({ "expo-channel-name": "production" })
       )
         throw new Error("Disposabl production configuration policy mismatch");
-      // Shared builds retain the Expo identity for runtime fingerprinting.
-      // That identity never enables OTA: URL, headers and enabled are checked.
-      if (config.extra?.eas?.projectId !== manifest.projectId)
-        throw new Error("Disposabl Expo project identity mismatch");
       if (env.ANDROID_PLAY_SUBMIT === "true") {
         for (const name of [
           "EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY",
@@ -77,6 +87,22 @@ export function verifyEmbedded(config, embedded) {
     ["version", embedded.android?.versionCode, config.android?.versionCode],
     ["scheme", embedded.scheme, config.scheme],
     ["updates", embedded.updates?.enabled, config.updates?.enabled],
+    ["update URL", embedded.updates?.url, config.updates?.url],
+    [
+      "update headers",
+      embedded.updates?.requestHeaders,
+      config.updates?.requestHeaders,
+    ],
+    [
+      "runtime policy",
+      embedded.android?.runtimeVersion,
+      config.android?.runtimeVersion,
+    ],
+    [
+      "Expo project",
+      embedded.extra?.eas?.projectId,
+      config.extra?.eas?.projectId,
+    ],
     [
       "payments",
       embedded.extra?.disposablAndroidPayments,
@@ -109,6 +135,20 @@ if (
       execFileSync("unzip", ["-p", artifact, entry], { encoding: "utf8" }),
     );
     verifyEmbedded(config, embedded);
+    if (
+      process.env.GH_REPO === "disposabl-dev/create-disposabl-app" &&
+      process.env.CHANNEL === "production"
+    ) {
+      const prefix = artifact.endsWith(".aab") ? "base/assets" : "assets";
+      const fingerprint = execFileSync(
+        "unzip",
+        ["-p", artifact, `${prefix}/fingerprint`],
+        {
+          encoding: "utf8",
+        },
+      ).trim();
+      verifyFingerprint(fingerprint, manifest.runtimeVersion);
+    }
     if (artifact.endsWith(".aab")) {
       if (!process.env.BUNDLETOOL_JAR)
         throw new Error("Bundletool is required for AAB validation");
@@ -120,6 +160,11 @@ if (
         expectedCert: cert.toUpperCase(),
         bundletool: process.env.BUNDLETOOL_JAR,
         production: process.env.CHANNEL === "production",
+        updates:
+          process.env.GH_REPO === "disposabl-dev/create-disposabl-app" &&
+          process.env.CHANNEL === "production"
+            ? { projectId: manifest.projectId, channel: "production" }
+            : undefined,
       });
     }
   } else if (operation !== "inputs")

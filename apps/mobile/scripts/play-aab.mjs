@@ -198,6 +198,10 @@ const verified = verifyBundle({
   expectedCert: signingCert,
   bundletool: required("BUNDLETOOL_JAR"),
   production: true,
+  updates:
+    env.UPDATE_POLICY === "expo"
+      ? { projectId: required("EXPO_PROJECT_ID"), channel: "production" }
+      : undefined,
 });
 const { uploadCertificateSha256: _certificate, ...bundleResult } = verified;
 console.log(

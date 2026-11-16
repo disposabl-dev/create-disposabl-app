@@ -9,6 +9,39 @@ export function fingerprint(text) {
   return matches[0][1].replaceAll(":", "").toUpperCase();
 }
 
+export function verifyNativeUpdates(manifest, { projectId, channel }) {
+  const metadata = (name) => {
+    const tags = [...manifest.matchAll(/<meta-data\b[^>]*\/?\s*>/g)]
+      .map(([tag]) => tag)
+      .filter((tag) => tag.includes(`android:name="${name}"`));
+    if (tags.length !== 1) throw new Error(`Missing or duplicate ${name}`);
+    return /\bandroid:value="([^"]*)"/
+      .exec(tags[0])?.[1]
+      ?.replaceAll("&quot;", '"')
+      .replaceAll("&amp;", "&");
+  };
+  const prefix = "expo.modules.updates.";
+  if (
+    metadata(prefix + "ENABLED") !== "true" ||
+    metadata(prefix + "EXPO_UPDATE_URL") !==
+      `https://u.expo.dev/${projectId}` ||
+    metadata(prefix + "EXPO_RUNTIME_VERSION") !== "@string/expo_runtime_version"
+  )
+    throw new Error("Native update configuration mismatch");
+  let headers;
+  try {
+    headers = JSON.parse(
+      metadata(prefix + "UPDATES_CONFIGURATION_REQUEST_HEADERS_KEY"),
+    );
+  } catch {
+    throw new Error("Invalid native update headers");
+  }
+  if (
+    JSON.stringify(headers) !== JSON.stringify({ "expo-channel-name": channel })
+  )
+    throw new Error("Native update channel mismatch");
+}
+
 export function verifyBundle({
   bundle,
   packageId,
@@ -17,6 +50,7 @@ export function verifyBundle({
   expectedCert,
   bundletool,
   production = false,
+  updates,
   execute,
 }) {
   const run =
@@ -47,6 +81,20 @@ export function verifyBundle({
   ]);
   if (production && manifest.includes("e2e_network_security_config"))
     throw new Error("Bundle contains E2E network configuration");
+  if (updates) {
+    verifyNativeUpdates(manifest, updates);
+    const runtime = run("java", [
+      "-jar",
+      bundletool,
+      "dump",
+      "resources",
+      `--bundle=${bundle}`,
+      "--resource=string/expo_runtime_version",
+      "--values",
+    ]);
+    if (!/\(default\) - \[STR\] "file:fingerprint"/.test(runtime))
+      throw new Error("Native runtime must use the embedded fingerprint");
+  }
   const targetSdk = Number(
     /\bandroid:targetSdkVersion="(\d+)"/.exec(manifest)?.[1],
   );
