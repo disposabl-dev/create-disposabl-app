@@ -1,4 +1,4 @@
-import { anyApi } from "convex/server";
+import { internal } from "../_generated/api";
 import { v } from "convex/values";
 import { internalMutation } from "@disposabl/disposabl-kit/server/lib/functions";
 
@@ -47,12 +47,16 @@ export const resume = internalMutation({
         nextAt: Date.now(),
       },
     });
-    await ctx.scheduler.runAfter(0, anyApi.users.actions.fulfillment.automate, {
-      userId,
-      expectedRequestedAt,
-      reference,
-      token,
-    });
+    await ctx.scheduler.runAfter(
+      0,
+      internal.users.actions.fulfillment.automate,
+      {
+        userId,
+        expectedRequestedAt,
+        reference,
+        token,
+      },
+    );
     return true;
   },
 });
@@ -89,7 +93,7 @@ export const claim = internalMutation({
         nextAt: undefined,
       },
     });
-    await ctx.scheduler.runAfter(timeout, anyApi.users.automation.expire, {
+    await ctx.scheduler.runAfter(timeout, internal.users.automation.expire, {
       userId,
       expectedRequestedAt,
       reference,
@@ -195,7 +199,7 @@ export const finish = internalMutation({
     });
     await ctx.scheduler.runAfter(
       delay,
-      anyApi.users.actions.fulfillment.automate,
+      internal.users.actions.fulfillment.automate,
       { userId, expectedRequestedAt, reference, token: nextToken },
     );
     return null;

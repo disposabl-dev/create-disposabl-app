@@ -1,5 +1,4 @@
 import { v } from "convex/values";
-import { anyApi } from "convex/server";
 import { internalAction } from "@disposabl/disposabl-kit/server/lib/functions";
 import { components, internal } from "../../_generated/api";
 import { env } from "../../_generated/server";
@@ -65,13 +64,13 @@ export const advance = internalAction({
     detail: string;
   }> => {
     if (
-      await ctx.runQuery(anyApi.users.fulfillment.completedReceipt, {
+      await ctx.runQuery(internal.users.fulfillment.completedReceipt, {
         reference: args.reference,
         expectedRequestedAt: args.expectedRequestedAt,
       })
     )
       return { state: "completed", detail: "Account deletion completed." };
-    if (!(await ctx.runQuery(anyApi.users.fulfillment.requestMatches, args)))
+    if (!(await ctx.runQuery(internal.users.fulfillment.requestMatches, args)))
       return {
         state: "blocked",
         detail: "Deletion request and receipt do not match.",
@@ -81,7 +80,7 @@ export const advance = internalAction({
       expectedRequestedAt: args.expectedRequestedAt,
     };
     const prepared = await ctx.runMutation(
-      anyApi.users.fulfillment.prepare,
+      internal.users.fulfillment.prepare,
       identity,
     );
     if (prepared.state === "blocked")
@@ -102,19 +101,19 @@ export const advance = internalAction({
           ownerId: args.userId,
           key: "workspace",
         });
-      await ctx.runMutation(anyApi.users.fulfillment.markSandboxDeleted, {
+      await ctx.runMutation(internal.users.fulfillment.markSandboxDeleted, {
         ...identity,
         sandboxId: prepared.sandboxId,
       });
       return { state: "advanced", detail: "Managed sandbox deleted." };
     }
-    const app = await ctx.runMutation(anyApi.users.fulfillment.app, identity);
+    const app = await ctx.runMutation(internal.users.fulfillment.app, identity);
     if (app) {
       if (app.threadId)
         await ctx.runAction(components.agent.threads.deleteAllForThreadIdSync, {
           threadId: app.threadId,
         });
-      await ctx.runMutation(anyApi.users.fulfillment.eraseAppBatch, {
+      await ctx.runMutation(internal.users.fulfillment.eraseAppBatch, {
         ...identity,
         ...app,
       });
@@ -136,12 +135,12 @@ export const advance = internalAction({
       };
     if (
       !(await ctx.runMutation(
-        anyApi.users.fulfillment.clearConnections,
+        internal.users.fulfillment.clearConnections,
         identity,
       ))
     )
       return { state: "advanced", detail: "Connection cleanup advanced." };
-    await ctx.runMutation(anyApi.users.fulfillment.complete, args);
+    await ctx.runMutation(internal.users.fulfillment.complete, args);
     return { state: "completed", detail: "Account deletion completed." };
   },
 });
@@ -156,7 +155,7 @@ export const automate = internalAction({
   },
   returns: v.null(),
   handler: async (ctx, args): Promise<null> => {
-    if (!(await ctx.runMutation(anyApi.users.automation.claim, args)))
+    if (!(await ctx.runMutation(internal.users.automation.claim, args)))
       return null;
     const { token: _token, ...request } = args;
     try {
@@ -164,17 +163,17 @@ export const automate = internalAction({
         state: "advanced" | "blocked" | "completed";
         detail: string;
       } = await ctx.runAction(
-        anyApi.users.actions.fulfillment.advance,
+        internal.users.actions.fulfillment.advance,
         request,
       );
       if (result.state !== "completed")
-        await ctx.runMutation(anyApi.users.automation.finish, {
+        await ctx.runMutation(internal.users.automation.finish, {
           ...args,
           outcome: result.state,
           detail: result.detail,
         });
     } catch {
-      await ctx.runMutation(anyApi.users.automation.finish, {
+      await ctx.runMutation(internal.users.automation.finish, {
         ...args,
         outcome: "failed",
         detail: "",

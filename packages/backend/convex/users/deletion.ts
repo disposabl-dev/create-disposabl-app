@@ -58,7 +58,7 @@ export async function requireNotDeleting(
 /** Native product entry points treat a pending or removed account as signed out. */
 export async function getActiveSessionUserId(
   ctx: QueryCtx | MutationCtx | ActionCtx,
-) {
+): Promise<string | null> {
   const userId = await getSessionUserId(ctx);
   if (!userId) return null;
   return (await ctx.runQuery(internal.users.internal.deletionPending, {

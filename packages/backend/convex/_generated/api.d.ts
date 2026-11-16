@@ -8,10 +8,10 @@
  * @module
  */
 
-import type * as agent_activation from "../agent/activation.js";
 import type * as agent_access from "../agent/access.js";
 import type * as agent_actions_compute from "../agent/actions/compute.js";
 import type * as agent_actions_run from "../agent/actions/run.js";
+import type * as agent_activation from "../agent/activation.js";
 import type * as agent_api_policy from "../agent/api_policy.js";
 import type * as agent_attachments from "../agent/attachments.js";
 import type * as agent_boat from "../agent/boat.js";
@@ -21,9 +21,12 @@ import type * as agent_computeDebit from "../agent/computeDebit.js";
 import type * as agent_computeRecovery from "../agent/computeRecovery.js";
 import type * as agent_computeValidator from "../agent/computeValidator.js";
 import type * as agent_credits from "../agent/credits.js";
+import type * as agent_disclosure from "../agent/disclosure.js";
 import type * as agent_events from "../agent/events.js";
 import type * as agent_index from "../agent/index.js";
 import type * as agent_internal from "../agent/internal.js";
+import type * as agent_noticeBalance from "../agent/noticeBalance.js";
+import type * as agent_safety from "../agent/safety.js";
 import type * as agent_state from "../agent/state.js";
 import type * as agent_threads from "../agent/threads.js";
 import type * as agent_validator from "../agent/validator.js";
@@ -42,6 +45,7 @@ import type * as apps_posthog from "../apps/posthog.js";
 import type * as apps_validator from "../apps/validator.js";
 import type * as auth from "../auth.js";
 import type * as authEmail from "../authEmail.js";
+import type * as authMigration from "../authMigration.js";
 import type * as authSetup from "../authSetup.js";
 import type * as billing from "../billing.js";
 import type * as billingHandoff from "../billingHandoff.js";
@@ -89,14 +93,18 @@ import type * as releases_index from "../releases/index.js";
 import type * as releases_internal from "../releases/internal.js";
 import type * as revenuecat from "../revenuecat.js";
 import type * as telemetry from "../telemetry.js";
+import type * as users_actions_fulfillment from "../users/actions/fulfillment.js";
 import type * as users_authDeletion from "../users/authDeletion.js";
+import type * as users_automation from "../users/automation.js";
 import type * as users_deletion from "../users/deletion.js";
 import type * as users_ephemeralDeletion from "../users/ephemeralDeletion.js";
 import type * as users_fileDeletion from "../users/fileDeletion.js";
+import type * as users_fulfillment from "../users/fulfillment.js";
 import type * as users_index from "../users/index.js";
 import type * as users_internal from "../users/internal.js";
 import type * as users_localDeletion from "../users/localDeletion.js";
 import type * as users_mcpDeletion from "../users/mcpDeletion.js";
+import type * as users_receipts from "../users/receipts.js";
 import type * as users_validator from "../users/validator.js";
 import type * as validator from "../validator.js";
 
@@ -107,10 +115,10 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
-  "agent/activation": typeof agent_activation;
   "agent/access": typeof agent_access;
   "agent/actions/compute": typeof agent_actions_compute;
   "agent/actions/run": typeof agent_actions_run;
+  "agent/activation": typeof agent_activation;
   "agent/api_policy": typeof agent_api_policy;
   "agent/attachments": typeof agent_attachments;
   "agent/boat": typeof agent_boat;
@@ -120,9 +128,12 @@ declare const fullApi: ApiFromModules<{
   "agent/computeRecovery": typeof agent_computeRecovery;
   "agent/computeValidator": typeof agent_computeValidator;
   "agent/credits": typeof agent_credits;
+  "agent/disclosure": typeof agent_disclosure;
   "agent/events": typeof agent_events;
   "agent/index": typeof agent_index;
   "agent/internal": typeof agent_internal;
+  "agent/noticeBalance": typeof agent_noticeBalance;
+  "agent/safety": typeof agent_safety;
   "agent/state": typeof agent_state;
   "agent/threads": typeof agent_threads;
   "agent/validator": typeof agent_validator;
@@ -141,6 +152,7 @@ declare const fullApi: ApiFromModules<{
   "apps/validator": typeof apps_validator;
   auth: typeof auth;
   authEmail: typeof authEmail;
+  authMigration: typeof authMigration;
   authSetup: typeof authSetup;
   billing: typeof billing;
   billingHandoff: typeof billingHandoff;
@@ -188,14 +200,18 @@ declare const fullApi: ApiFromModules<{
   "releases/internal": typeof releases_internal;
   revenuecat: typeof revenuecat;
   telemetry: typeof telemetry;
+  "users/actions/fulfillment": typeof users_actions_fulfillment;
   "users/authDeletion": typeof users_authDeletion;
+  "users/automation": typeof users_automation;
   "users/deletion": typeof users_deletion;
   "users/ephemeralDeletion": typeof users_ephemeralDeletion;
   "users/fileDeletion": typeof users_fileDeletion;
+  "users/fulfillment": typeof users_fulfillment;
   "users/index": typeof users_index;
   "users/internal": typeof users_internal;
   "users/localDeletion": typeof users_localDeletion;
   "users/mcpDeletion": typeof users_mcpDeletion;
+  "users/receipts": typeof users_receipts;
   "users/validator": typeof users_validator;
   validator: typeof validator;
 }>;

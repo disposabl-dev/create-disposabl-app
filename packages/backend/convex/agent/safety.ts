@@ -8,6 +8,7 @@ import {
   type MutationCtx,
 } from "../_generated/server";
 import { components } from "../_generated/api";
+import type { Id } from "../_generated/dataModel";
 import { getActiveSessionUserId } from "../users/deletion";
 import { ownedApp } from "../apps/internal";
 import schema from "../schema";
@@ -105,7 +106,7 @@ export async function createReport(
 export const report = mutation({
   args: { appId: v.string(), messageId: v.string(), reason },
   returns: v.id("aiReports"),
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<Id<"aiReports">> => {
     const userId = await getActiveSessionUserId(ctx);
     if (!userId) throw new ConvexError("Sign in to report a response.");
     return createReport(ctx, userId, args);
