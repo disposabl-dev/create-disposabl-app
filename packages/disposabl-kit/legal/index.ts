@@ -1,6 +1,7 @@
 import { privacy } from "./documents/privacy";
 import { terms } from "./documents/terms";
 import type { LegalDocument } from "./types";
+import { legalConfig } from "./config";
 
 export { legalConfig, legalIsDraft } from "./config";
 export const legalDocuments: LegalDocument[] = [
@@ -29,7 +30,7 @@ export const legalDocuments: LegalDocument[] = [
     sections: [
       {
         title: "Request account deletion",
-        paragraphs: [
+        paragraphs: legalConfig.deletionInstructions ?? [
           "Use the available request option or contact the publisher below. A request does not itself delete your account; the publisher must confirm how it will be handled.",
           "Clearing browser storage or uninstalling an app does not delete information held by the service. Some records may be retained where applicable law requires or permits it; ask the publisher about its retention policy.",
           "Account deletion does not itself cancel an app-store subscription. Manage subscriptions through the store where you purchased them.",

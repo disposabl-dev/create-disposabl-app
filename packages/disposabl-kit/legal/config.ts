@@ -14,11 +14,13 @@ export const legalConfig = {
   operatorAddress: publisher.operatorAddress,
   country: publisher.country,
   privacyEmail: publisher.privacyEmail,
-  effectiveDate: "",
+  effectiveDate: publisher.policy?.effectiveDate ?? "",
   reviewed: false,
-  retention: "",
-  internationalTransfers: "",
-  audience: "",
+  retention: publisher.policy?.retention ?? "",
+  internationalTransfers: publisher.policy?.internationalTransfers ?? "",
+  audience: publisher.policy?.audience ?? "",
+  aiNotice: publisher.policy?.aiNotice ?? "",
+  deletionInstructions: publisher.policy?.deletionInstructions,
   providers: [
     {
       name: "Convex",

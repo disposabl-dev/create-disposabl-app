@@ -25,6 +25,7 @@ export const privacy: LegalDocument = {
       title: "Service providers and disclosures",
       paragraphs: [
         "We use service providers to operate the service. They receive information needed for their role, subject to the applicable agreements and legal obligations.",
+        ...(c.aiNotice ? [c.aiNotice] : []),
         ...c.providers.map((p) => `${p.name}: ${p.purpose}.`),
         "We may disclose information where required by law, to protect legal rights or safety, or as part of a business transfer subject to applicable protections and notices.",
       ],

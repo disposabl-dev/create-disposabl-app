@@ -51,7 +51,10 @@ export function LegalPage({
         </p>
       )}
       {legalConfig.effectiveDate && (
-        <p className="mt-4 text-sm">Effective {legalConfig.effectiveDate}</p>
+        <p className="mt-4 text-sm">
+          {legalIsDraft() ? "Planned effective date" : "Effective"}{" "}
+          {legalConfig.effectiveDate}
+        </p>
       )}
       {document ? (
         <div className="mt-10 space-y-9">

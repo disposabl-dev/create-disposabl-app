@@ -700,7 +700,7 @@ test("packaged starter and generated profiles exclude product proof fixtures", a
           process.execPath,
           [
             "-e",
-            `import { legalConfig, legalIsDraft } from "./packages/disposabl-kit/legal/config.ts"; console.log(JSON.stringify({ names: legalConfig.providers.map(p => p.name), operator: legalConfig.operatorName, address: legalConfig.operatorAddress, country: legalConfig.country, email: legalConfig.privacyEmail, reviewed: legalConfig.reviewed, draft: legalIsDraft() }));`,
+            `import { legalConfig, legalIsDraft } from "./packages/disposabl-kit/legal/config.ts"; import { legalDocuments } from "./packages/disposabl-kit/legal/index.ts"; console.log(JSON.stringify({ documents: JSON.stringify(legalDocuments), names: legalConfig.providers.map(p => p.name), operator: legalConfig.operatorName, address: legalConfig.operatorAddress, country: legalConfig.country, email: legalConfig.privacyEmail, retention: legalConfig.retention, aiNotice: legalConfig.aiNotice, deletion: legalConfig.deletionInstructions, reviewed: legalConfig.reviewed, draft: legalIsDraft() }));`,
           ],
           { cwd: root, encoding: "utf8" },
         );
@@ -710,9 +710,17 @@ test("packaged starter and generated profiles exclude product proof fixtures", a
         assert.equal(legal.address, "");
         assert.equal(legal.country, "");
         assert.equal(legal.email, "");
+        assert.doesNotMatch(
+          legal.documents,
+          /Yast Ai|vivek@yast\.ai|no fixed deletion date|Boat.s remote sandbox/,
+        );
+        assert.match(legal.documents, /Before publication, specify retention/);
+        assert.equal(legal.retention, "");
+        assert.equal(legal.aiNotice, "");
+        assert.equal(legal.deletion, undefined);
         assert.equal(legal.reviewed, false);
         assert.equal(legal.draft, true);
-        for (const name of ["GitHub", "Expo", "Boat"])
+        for (const name of ["GitHub", "Expo", "Boat", "OpenAI"])
           assert.ok(!legal.names.includes(name));
         assert.deepEqual(
           legal.names,

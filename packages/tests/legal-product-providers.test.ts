@@ -18,7 +18,7 @@ test("product privacy draft names connected and configured providers", () => {
   assert.equal(rendered.status, 0, rendered.stderr);
   const html = rendered.stdout;
   assert.match(html, /Draft documents/);
-  for (const name of ["GitHub", "Expo", "Boat"])
+  for (const name of ["GitHub", "Expo", "Boat", "OpenAI"])
     assert.match(html, new RegExp(`${name}:`));
   const disclosure = privacy.sections.find(
     (section) => section.title === "Service providers and disclosures",
@@ -29,6 +29,7 @@ test("product privacy draft names connected and configured providers", () => {
     "GitHub",
     "Expo",
     "Boat",
+    "OpenAI",
     "Google",
     "PostHog",
     "Autumn",
@@ -45,4 +46,34 @@ test("product privacy draft names connected and configured providers", () => {
       legalConfig.providers.find((provider) => provider.name === name)!.purpose,
       /when/,
     );
+});
+
+test("product policy renders AI, retention and deletion instructions", () => {
+  for (const [slug, expected] of [
+    [
+      "privacy",
+      ["OpenAI", "18 or older", "no fixed deletion date", "United States"],
+    ],
+    [
+      "delete-account",
+      [
+        "Save the receipt reference",
+        "schedules bounded cleanup",
+        "vivek@yast.ai",
+        "your provider accounts",
+      ],
+    ],
+  ] as const) {
+    const rendered = spawnSync(
+      process.execPath,
+      [
+        "-e",
+        `import { createElement } from "react"; import { renderToStaticMarkup } from "react-dom/server"; import { LegalPage } from "./packages/disposabl-kit/client/components/legal-page.tsx"; console.log(renderToStaticMarkup(createElement(LegalPage, { slug: "${slug}" })));`,
+      ],
+      { cwd: import.meta.dirname + "/../..", encoding: "utf8" },
+    );
+    assert.equal(rendered.status, 0, rendered.stderr);
+    for (const text of expected)
+      assert.ok(rendered.stdout.includes(text), text);
+  }
 });

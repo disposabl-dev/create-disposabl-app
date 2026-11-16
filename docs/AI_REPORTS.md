@@ -1,0 +1,5 @@
+# AI report operations
+
+The proposed launch owner is Vivek. Check the internal `agent/safety:inspectReports` open queue regularly, with a daily check as an operational target. Review unsafe reports first, then offensive and other reports. Inspect the linked assistant output with `agent/safety:inspectReport`, assess the report, and use findings to inform content filtering and moderation. Escalate urgent safety concerns through appropriate channels as circumstances require. Resolve reviewed reports using `agent/safety:resolveReport` with the operator name.
+
+These are manual operating steps, not automated notifications, response guarantees, or a staffed escalation service. The query returns at most 100 rows and has no cursor; if more than 100 are open, the displayed batch is not the whole queue. Review and resolve the displayed reports to expose subsequent rows. Confirm that this process can keep up with volume; the cap remains an operational limitation. There is no report-specific throttle in this implementation, so monitor abuse and address it operationally. Avoid copying prompts or output outside the tools needed for review.
