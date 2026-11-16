@@ -1,10 +1,21 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { anyApi } from "convex/server";
+import { makeFunctionReference } from "convex/server";
 import { ConvexError, v } from "convex/values";
 import { internal } from "../_generated/api";
 import { query, mutation } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 import { ensureReceipt, findReceipt } from "./receipts";
+
+const automateDeletion = makeFunctionReference<
+  "action",
+  {
+    userId: Id<"users">;
+    expectedRequestedAt: number;
+    reference: string;
+    token: string;
+  },
+  null
+>("users/actions/fulfillment:automate");
 
 export const current = query({
   args: {},
@@ -115,16 +126,12 @@ export const requestDeletion = mutation({
           nextAt,
         },
       });
-      await ctx.scheduler.runAfter(
-        3000,
-        anyApi.users.actions.fulfillment.automate,
-        {
-          userId: id,
-          expectedRequestedAt: requestedAt,
-          reference: receipt.reference,
-          token,
-        },
-      );
+      await ctx.scheduler.runAfter(3000, automateDeletion, {
+        userId: id,
+        expectedRequestedAt: requestedAt,
+        reference: receipt.reference,
+        token,
+      });
     }
     return {
       status: "requested" as const,
