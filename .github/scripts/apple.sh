@@ -3,8 +3,15 @@ set -euo pipefail
 report() { node "$GITHUB_WORKSPACE/.github/scripts/disposabl.mjs" report ios "$@"; }
 check_source() { test "$(gh api "repos/$GH_REPO/$SOURCE_PATH" --jq 'if has("head") then (if .state == "open" then .head.sha else "closed" end) else .object.sha end')" = "$SOURCE"; }
 runtime() { bun x --no-install expo-updates runtimeversion:resolve --platform ios --workflow managed | jq -er 'select(.fingerprintSources != null) | .runtimeVersion | select(test("^[a-f0-9]{40,64}$"))'; }
+product_payments() {
+  [[ "${GH_REPO:-}" == disposabl-dev/create-disposabl-app ]] || return 0
+  for name in EXPO_PUBLIC_REVENUECAT_IOS_API_KEY EXPO_PUBLIC_REVENUECAT_IOS_MONTHLY_PRODUCT EXPO_PUBLIC_REVENUECAT_IOS_APP_ID EXPO_PUBLIC_REVENUECAT_IOS_TOPUP_PRODUCT; do
+    [[ "${!name:-}" =~ [^[:space:]] ]] || { echo "Missing $name" >&2; return 1; }
+  done
+}
 case "${1:?operation required}" in
   ota-plan)
+    product_payments
     check_source
     RUNTIME=$(runtime)
     identifier=$(bun x --no-install expo config --json | jq -er --arg project "$EXPO_PROJECT_ID" 'select(.extra.eas.projectId == $project) | .ios.bundleIdentifier | select(type == "string" and length > 0)')
@@ -36,6 +43,7 @@ case "${1:?operation required}" in
     echo "Published iOS OTA to $CHANNEL for runtime $expected. Compatible installed apps download it on launch or after a long inactive interval." >> "$GITHUB_STEP_SUMMARY"
     ;;
   deliver)
+    product_payments
     # A successful build may never have been submitted. Recover delivery without
     # building another identical binary or duplicating a queued submission.
     : "${BUILD_ID:?Matching iOS build required}"
@@ -87,6 +95,7 @@ case "${1:?operation required}" in
     echo 'ready=true' >> "$GITHUB_OUTPUT"
     ;;
   production)
+    product_payments
     report building
     jq --arg channel "$CHANNEL" --arg number "$DISPOSABL_IOS_BUILD_NUMBER" \
       --arg url "$CONVEX_URL" --arg site "$CONVEX_SITE_URL" \

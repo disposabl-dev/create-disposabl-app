@@ -28,7 +28,7 @@ export function verifyInputs(config, manifest, env) {
     if (env.GH_REPO === "disposabl-dev/create-disposabl-app") {
       if (
         config.android?.package !== "com.yastai.disposabl" ||
-        config.extra?.disposablAndroidPayments !== false ||
+        config.extra?.disposablAndroidPayments !== true ||
         JSON.stringify(abis) !== JSON.stringify(["arm64-v8a", "x86_64"]) ||
         env.EXPO_PUBLIC_DISPOSABL_ANALYTICS_ENABLED !== "true" ||
         env.UPDATE_POLICY !== "disabled" ||
@@ -39,6 +39,16 @@ export function verifyInputs(config, manifest, env) {
       // That identity never enables OTA: URL, headers and enabled are checked.
       if (config.extra?.eas?.projectId !== manifest.projectId)
         throw new Error("Disposabl Expo project identity mismatch");
+      if (env.ANDROID_PLAY_SUBMIT === "true") {
+        for (const name of [
+          "EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY",
+          "EXPO_PUBLIC_REVENUECAT_ANDROID_MONTHLY_PRODUCT",
+          "EXPO_PUBLIC_REVENUECAT_ANDROID_APP_ID",
+          "EXPO_PUBLIC_REVENUECAT_ANDROID_TOPUP_PRODUCT",
+        ]) {
+          if (!env[name]?.trim()) throw new Error(`Missing ${name}`);
+        }
+      }
     }
     if (env.EXPO_PUBLIC_E2E === "true")
       throw new Error("E2E is not permitted in production");

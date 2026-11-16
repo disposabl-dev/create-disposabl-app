@@ -31,7 +31,7 @@ const manifest = {
 const config = {
   android: { package: manifest.applicationId, versionCode: 123 },
   extra: {
-    disposablAndroidPayments: false,
+    disposablAndroidPayments: true,
     disposablAndroidArchitectures: abis,
     eas: { projectId: "project" },
   },

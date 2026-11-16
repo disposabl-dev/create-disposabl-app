@@ -22,6 +22,9 @@ case "${1:-}" in
     [[ "${UPDATE_POLICY:-}" == disabled && -z "${EXPO_PROJECT_ID:-}" ]] || { echo 'Production updates must remain disabled' >&2; exit 1; }
     [[ "${EXPO_PUBLIC_DISPOSABL_ANALYTICS_ENABLED:-}" == true ]] || { echo 'Production analytics must be enabled' >&2; exit 1; }
     [[ -z "${EXPO_PUBLIC_E2E:-}" ]] || { echo 'E2E is not permitted' >&2; exit 1; }
+    for name in EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY EXPO_PUBLIC_REVENUECAT_ANDROID_MONTHLY_PRODUCT EXPO_PUBLIC_REVENUECAT_ANDROID_APP_ID EXPO_PUBLIC_REVENUECAT_ANDROID_TOPUP_PRODUCT; do
+      [[ "${!name:-}" =~ [^[:space:]] ]] || { echo "Missing $name" >&2; exit 1; }
+    done
     : "${DISPOSABL_ANDROID_SIGNING:?Missing signing bundle}"
     values=$(jq -er '[.keystoreBase64, .storePassword, .keyAlias, .keyPassword] | if all(.[]; type == "string" and length > 0 and (contains("\n") | not) and (contains("\r") | not)) then .[] else error("Invalid signing bundle") end' <<< "$DISPOSABL_ANDROID_SIGNING")
     signing=()
@@ -36,7 +39,7 @@ case "${1:-}" in
     config=$(cd apps/mobile && bun x --no-install expo config --json)
     jq -e --arg policy "$UPDATE_POLICY" --arg project "$EXPO_PROJECT_ID" '
       .android.package == "com.yastai.disposabl" and
-      .extra.disposablAndroidPayments == false and
+      .extra.disposablAndroidPayments == true and
       .extra.disposablAndroidArchitectures == ["arm64-v8a", "x86_64"] and
       (if $policy == "expo" then .extra.eas.projectId == $project and .updates.url == ("https://u.expo.dev/" + $project) and .updates.requestHeaders["expo-channel-name"] == "production" and .android.runtimeVersion.policy == "fingerprint" else (.updates.url == null and .extra.eas.projectId == null and .updates.enabled != true) end)
     ' <<< "$config" >/dev/null || { echo 'Production Expo configuration does not match selected policy' >&2; exit 1; }

@@ -141,6 +141,25 @@ else if (!args.includes('update')) process.exit(5);
   }
 }
 
+test("product iOS delivery requires public store configuration", async () => {
+  const config = {
+    GH_REPO: "disposabl-dev/create-disposabl-app",
+    EXPO_PUBLIC_REVENUECAT_IOS_API_KEY: "fixture",
+    EXPO_PUBLIC_REVENUECAT_IOS_MONTHLY_PRODUCT: "monthly",
+    EXPO_PUBLIC_REVENUECAT_IOS_APP_ID: "app",
+    EXPO_PUBLIC_REVENUECAT_IOS_TOPUP_PRODUCT: "topup",
+  };
+  for (const name of Object.keys(config).filter((key) => key !== "GH_REPO")) {
+    for (const operation of ["ota-plan", "production", "deliver"]) {
+      const result = await run(operation, { ...config, [name]: " " });
+      assert.notEqual(result.status, 0);
+      assert.match(result.stderr, new RegExp(`Missing ${name}`));
+      assert.equal(result.trace, "");
+    }
+  }
+  assert.equal((await run("ota-plan", config)).status, 0);
+});
+
 test("iOS reuses only a matching finished production binary", async () => {
   const result = await run("ota-plan");
   assert.equal(result.status, 0, result.stderr);

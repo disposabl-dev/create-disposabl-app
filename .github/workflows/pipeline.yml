@@ -230,6 +230,7 @@ jobs:
       CONVEX_SITE_URL: ${{ needs.web.outputs.convex_site_url }}
       EXPO_PUBLIC_CONVEX_URL: ${{ needs.web.outputs.convex_url }}
       EXPO_PUBLIC_CONVEX_SITE_URL: ${{ needs.web.outputs.convex_site_url }}
+      ANDROID_PLAY_SUBMIT: ${{ vars.ANDROID_PLAY_SUBMIT }}
     steps:
       - *checkout
       - name: Prepare Android disk space

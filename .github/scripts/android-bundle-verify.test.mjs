@@ -78,7 +78,11 @@ test("product policy stays strict while Expo identity supports fingerprinting", 
   const product = {
     ...config,
     android: { ...config.android, package: "com.yastai.disposabl" },
-    extra: { ...config.extra, eas: { projectId: "fixture-project" } },
+    extra: {
+      ...config.extra,
+      disposablAndroidPayments: true,
+      eas: { projectId: "fixture-project" },
+    },
   };
   const selected = {
     ...manifest,
@@ -91,6 +95,25 @@ test("product policy stays strict while Expo identity supports fingerprinting", 
     EXPO_PUBLIC_DISPOSABL_ANALYTICS_ENABLED: "true",
   };
   verifyInputs(product, selected, productEnv);
+  const submission = {
+    ...productEnv,
+    ANDROID_PLAY_SUBMIT: "true",
+    EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY: "fixture",
+    EXPO_PUBLIC_REVENUECAT_ANDROID_MONTHLY_PRODUCT: "monthly",
+    EXPO_PUBLIC_REVENUECAT_ANDROID_APP_ID: "app",
+    EXPO_PUBLIC_REVENUECAT_ANDROID_TOPUP_PRODUCT: "topup",
+  };
+  verifyInputs(product, selected, submission);
+  for (const name of [
+    "EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY",
+    "EXPO_PUBLIC_REVENUECAT_ANDROID_MONTHLY_PRODUCT",
+    "EXPO_PUBLIC_REVENUECAT_ANDROID_APP_ID",
+    "EXPO_PUBLIC_REVENUECAT_ANDROID_TOPUP_PRODUCT",
+  ])
+    assert.throws(
+      () => verifyInputs(product, selected, { ...submission, [name]: " " }),
+      /Missing/,
+    );
   for (const patch of [
     { EXPO_PUBLIC_DISPOSABL_ANALYTICS_ENABLED: "false" },
     { UPDATE_POLICY: "expo" },
@@ -100,7 +123,7 @@ test("product policy stays strict while Expo identity supports fingerprinting", 
       /policy/,
     );
   for (const patch of [
-    { extra: { ...product.extra, disposablAndroidPayments: true } },
+    { extra: { ...product.extra, disposablAndroidPayments: false } },
     { extra: { ...product.extra, eas: { projectId: "other" } } },
     {
       updates: {
