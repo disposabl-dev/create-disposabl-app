@@ -174,7 +174,10 @@ test("product browser gate shares exact-source checks with publication", async (
       };
       publish: { needs: string[] };
       packages: { needs: string[] };
-      android: { needs: string[] };
+      android: {
+        needs: string[];
+        steps: { name?: string; env?: Record<string, string> }[];
+      };
       "android-submit": { needs: string; if: string };
     };
   };
@@ -237,10 +240,17 @@ test("product browser gate shares exact-source checks with publication", async (
     assert.ok(pipeline.jobs[name].needs.includes("web"));
   assert.equal(pipeline.jobs["android-submit"].needs, "android");
   assert.match(pipeline.jobs["android-submit"].if, /ANDROID_PLAY_SUBMIT/);
-  assert.match(
+  const productUpdatePolicy =
+    "${{ github.event_name == 'push' && github.repository == 'disposabl-dev/create-disposabl-app' && 'expo' || '' }}";
+  assert.equal(
     pipeline.jobs.web.steps.find((step) => step.name === "Fingerprint")?.env
-      ?.UPDATE_POLICY ?? "",
-    /disposabl-dev\/create-disposabl-app.*disabled/,
+      ?.UPDATE_POLICY,
+    productUpdatePolicy,
+  );
+  assert.equal(
+    pipeline.jobs.android.steps.find((step) => step.name === "Build")?.env
+      ?.UPDATE_POLICY,
+    productUpdatePolicy,
   );
   const checkout = reusable.jobs.check.steps.find((step) =>
     step.uses?.startsWith("actions/checkout@"),
