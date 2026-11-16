@@ -214,7 +214,7 @@ export const paidSend = fixtureAction({
               body.customer_id !== userId
             )
               throw new Error("Unexpected inert credit lookup");
-            return { balances: { credits: { remaining: balance } } };
+            return { balances: { disposabl_credits: { remaining: balance } } };
           },
         ),
     ),

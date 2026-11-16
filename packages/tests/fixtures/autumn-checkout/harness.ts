@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { mock } from "bun:test";
+import { pricing } from "../../../disposabl-kit/payments/config";
 
 // Isolated process: this fixture alone enables the billing boundary and supplies an identity.
 const functions = await import("../../../disposabl-kit/server/lib/functions");
@@ -47,9 +48,9 @@ const server = Bun.serve({
     if (method === "customers.get_or_create") {
       assert.equal(body.customer_id, "fixture-user");
       return Response.json({
-        balances: { credits: { remaining: balance } },
+        balances: { [pricing.featureId]: { remaining: balance } },
         subscriptions: active
-          ? [{ plan_id: "credits_monthly", status: "active" }]
+          ? [{ plan_id: pricing.monthly.planId, status: "active" }]
           : [],
       });
     }
@@ -142,15 +143,19 @@ const ids = [
 try {
   const created = await (billing.setup as any)._handler({}, {});
   assert.equal(created.created.length, 3);
-  const monthly = catalog.plans.get("credits_monthly");
-  const topup = catalog.plans.get("credits_topup");
+  const monthly = catalog.plans.get(pricing.monthly.planId);
+  const topup = catalog.plans.get(pricing.topup.planId);
   assert.deepEqual(monthly.price, { amount: 5, interval: "month" });
   assert.deepEqual(monthly.items, [
-    { feature_id: "credits", included: 750, reset: { interval: "month" } },
+    {
+      feature_id: pricing.featureId,
+      included: 750,
+      reset: { interval: "month" },
+    },
   ]);
   assert.deepEqual(topup.items, [
     {
-      feature_id: "credits",
+      feature_id: pricing.featureId,
       price: {
         amount: 5,
         billing_units: 500,
@@ -176,7 +181,7 @@ try {
   assert.equal(attaches.length, 1);
   assert.deepEqual(attaches[0].body, {
     customer_id: "fixture-user",
-    plan_id: "credits_monthly",
+    plan_id: pricing.monthly.planId,
     redirect_mode: "always",
     success_url: "https://app.example/pricing",
   });
@@ -215,9 +220,9 @@ try {
   await checkout("topup", ids[2]);
   attaches = calls.filter((call) => call.method === "billing.attach");
   assert.deepEqual(attaches[2].body.feature_quantities, [
-    { feature_id: "credits", quantity: 500, adjustable: false },
+    { feature_id: pricing.featureId, quantity: 500, adjustable: false },
   ]);
-  assert.equal(attaches[2].body.plan_id, "credits_topup");
+  assert.equal(attaches[2].body.plan_id, pricing.topup.planId);
   assert.equal((await snapshot()).balance, 750);
   balance = 1250;
   assert.equal((await snapshot()).balance, 1250);

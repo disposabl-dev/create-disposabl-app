@@ -437,6 +437,12 @@ test("packaged starter and generated profiles exclude product proof fixtures", a
       }
     }
     for await (const root of profiles()) {
+      const catalog = await readFile(
+        join(root, "packages/disposabl-kit/payments/catalog.ts"),
+        "utf8",
+      );
+      assert.doesNotMatch(catalog, /disposabl_(credits|monthly|topup)/);
+      assert.match(catalog, /monthlyPlanId: "credits_monthly"/);
       const workflow = await readFile(
         join(root, ".github/workflows/pipeline.yml"),
         "utf8",

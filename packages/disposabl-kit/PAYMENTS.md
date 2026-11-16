@@ -16,6 +16,8 @@ Configure `AUTUMN_SECRET_KEY` and `BILLING_RETURN_URL` on this app's Convex depl
 
 ## Catalog initialization
 
+Disposabl uses Yast-dev's USD production organization with separate IDs `disposabl_credits`, `disposabl_monthly`, and `disposabl_topup`. These isolate Disposabl balances from Yast plans. The generator replaces `payments/catalog.ts` with the starter's own default IDs; it does not copy production credentials.
+
 `payments/config.ts` is the editable source for plan IDs, prices, credits and currency. The default catalog has a consumable `credits` feature, a $5 monthly plan with 750 included credits resetting each month, and a $5 prepaid top-up with `billing_units: 500` and `interval: "one_off"`. The monthly multiplier changes the monthly allowance without changing top-ups. Top-ups have no reset or expiry configuration. Web checkout sends exactly that credit quantity. The web pricing page, mobile allowance text and optional Autumn configuration example use the same source.
 
 The internal Convex action `billing:setup` takes `{}` and returns `{ enabled, created, preserved }`. It is re-exported by both the app backend and starter backend. With payments disabled, it returns before reading credentials or calling Autumn. When enabled without `AUTUMN_SECRET_KEY`, it fails with a setup message identifying the missing deployment credential. Customer checkout never initializes the catalog.

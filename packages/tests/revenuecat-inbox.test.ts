@@ -27,7 +27,7 @@ import {
   inspectReviewDeliveries,
 } from "../disposabl-kit/server/revenuecat-functions";
 
-import { creditQuantity } from "../disposabl-kit/payments/config";
+import { creditQuantity, pricing } from "../disposabl-kit/payments/config";
 import { paymentsEnabled } from "../disposabl-kit/features";
 
 const config = {
@@ -919,7 +919,7 @@ describe("RevenueCat consumable inbox", () => {
     assert.equal(f.jobs.length, 2);
     assert.deepEqual(balanceRequest(event.customer, id, "grant"), {
       customer_id: event.customer,
-      feature_id: "credits",
+      feature_id: pricing.featureId,
       balance_id: id,
       included_grant: creditQuantity("topup"),
     });
@@ -984,7 +984,7 @@ describe("RevenueCat consumable inbox", () => {
     });
     assert.deepEqual(balanceRequest(event.customer, id, "refund"), {
       customer_id: event.customer,
-      feature_id: "credits",
+      feature_id: pricing.featureId,
       balance_id: id,
       remaining: 0,
     });

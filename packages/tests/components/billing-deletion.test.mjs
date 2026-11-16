@@ -1,5 +1,6 @@
 import { test, expect } from "bun:test";
 import config from "../../../disposabl.json";
+import { pricing } from "../../disposabl-kit/payments/config";
 import { getFunctionName } from "convex/server";
 config.features.push("payments");
 process.env.AUTUMN_SECRET_KEY = "fixture-only";
@@ -35,7 +36,7 @@ globalThis.fetch = async (_url, init) => {
   calls.push(JSON.parse(init.body));
   return Response.json({
     subscriptions: [],
-    balances: { credits: { remaining: 20 } },
+    balances: { [pricing.featureId]: { remaining: 20 } },
     payment_url: "https://checkout.example/test",
   });
 };

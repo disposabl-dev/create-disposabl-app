@@ -91,7 +91,7 @@ test("defaults create monthly included credits and nonexpiring prepaid top-ups o
     {
       method: "features.create",
       body: {
-        feature_id: "credits",
+        feature_id: pricing.featureId,
         name: "Credits",
         type: "metered",
         consumable: true,
@@ -100,13 +100,13 @@ test("defaults create monthly included credits and nonexpiring prepaid top-ups o
     {
       method: "plans.create",
       body: {
-        plan_id: "credits_monthly",
+        plan_id: pricing.monthly.planId,
         name: "Monthly credits",
         auto_enable: false,
         price: { amount: 5, interval: "month" },
         items: [
           {
-            feature_id: "credits",
+            feature_id: pricing.featureId,
             included: 750,
             reset: { interval: "month" },
           },
@@ -116,13 +116,13 @@ test("defaults create monthly included credits and nonexpiring prepaid top-ups o
     {
       method: "plans.create",
       body: {
-        plan_id: "credits_topup",
+        plan_id: pricing.topup.planId,
         name: "Credits top-up",
         add_on: true,
         auto_enable: false,
         items: [
           {
-            feature_id: "credits",
+            feature_id: pricing.featureId,
             price: {
               amount: 5,
               billing_units: 500,
@@ -177,14 +177,14 @@ test("edited config drives new IDs, prices and quantities without assuming USD",
 
 test("custom, archived and unrelated catalog entries remain byte-for-byte unchanged", async () => {
   const p = provider();
-  p.features.set("credits", {
-    id: "credits",
+  p.features.set(pricing.featureId, {
+    id: pricing.featureId,
     type: "credit_system",
     archived: true,
     creditSchema: ["custom"],
   });
-  p.plans.set("credits_monthly", {
-    id: "credits_monthly",
+  p.plans.set(pricing.monthly.planId, {
+    id: pricing.monthly.planId,
     price: { amount: 37 },
     version: 8,
     archived: true,
@@ -192,8 +192,8 @@ test("custom, archived and unrelated catalog entries remain byte-for-byte unchan
   p.plans.set("enterprise", { id: "enterprise", name: "Custom deal" });
   const before = JSON.stringify([...p.features, ...p.plans]);
   const result = await setupBilling(true, env, pricing, p.fetcher);
-  assert.deepEqual(result.created, ["plans:credits_topup"]);
-  p.plans.delete("credits_topup");
+  assert.deepEqual(result.created, [`plans:${pricing.topup.planId}`]);
+  p.plans.delete(pricing.topup.planId);
   assert.equal(JSON.stringify([...p.features, ...p.plans]), before);
 });
 
@@ -203,7 +203,7 @@ test("partial failure stops writes and a later run resumes from provider state",
     const body = JSON.parse(String(init?.body));
     if (
       String(url).endsWith("plans.create") &&
-      body.plan_id === "credits_topup"
+      body.plan_id === pricing.topup.planId
     )
       return new Response("private error", { status: 500 });
     return p.fetcher(url, init);
@@ -215,7 +215,7 @@ test("partial failure stops writes and a later run resumes from provider state",
   assert.equal(p.features.size, 1);
   assert.equal(p.plans.size, 1);
   const resumed = await setupBilling(true, env, pricing, p.fetcher);
-  assert.deepEqual(resumed.created, ["plans:credits_topup"]);
+  assert.deepEqual(resumed.created, [`plans:${pricing.topup.planId}`]);
   assert.equal(
     p.calls.filter((call) => call.method.endsWith(".create")).length,
     3,
@@ -265,7 +265,7 @@ test("uncertain create is not retried in place; next run discovers committed ent
     assert.equal(p.calls.length, 3);
     assert.equal(p.plans.size, 0);
     const resumed = await setupBilling(true, env, pricing, p.fetcher);
-    assert.deepEqual(resumed.preserved, ["features:credits"]);
+    assert.deepEqual(resumed.preserved, [`features:${pricing.featureId}`]);
     assert.equal(resumed.created.length, 2);
   }
 });

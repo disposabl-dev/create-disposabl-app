@@ -1,3 +1,5 @@
+import { catalog } from "./catalog";
+
 export type Pricing = {
   currency: string;
   creditsPerDollar: number;
@@ -10,9 +12,9 @@ export type Pricing = {
 export const pricing: Pricing = {
   currency: "USD",
   creditsPerDollar: 100,
-  featureId: "credits",
-  monthly: { planId: "credits_monthly", price: 5, creditMultiplier: 1.5 },
-  topup: { planId: "credits_topup", price: 5 },
+  featureId: catalog.featureId,
+  monthly: { planId: catalog.monthlyPlanId, price: 5, creditMultiplier: 1.5 },
+  topup: { planId: catalog.topupPlanId, price: 5 },
 };
 
 export type Purchase = "monthly" | "topup";

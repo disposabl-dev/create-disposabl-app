@@ -264,7 +264,7 @@ export const deliverInert = action({
                       required_balance: 10,
                       allowed: args.balance >= 10,
                       balance: {
-                        feature_id: "credits",
+                        feature_id: "disposabl_credits",
                         unlimited: false,
                         overage_allowed: false,
                         remaining: args.balance,
@@ -392,7 +392,7 @@ export const fundFixture = action({
                   args.mode === "malformed"
                     ? {}
                     : {
-                        feature_id: "credits",
+                        feature_id: "disposabl_credits",
                         unlimited: false,
                         overage_allowed: false,
                         remaining: args.responseBalance,

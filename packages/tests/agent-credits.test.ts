@@ -17,7 +17,7 @@ test("compute debit validates the atomic check response and never retries ambigu
     customer_id: "owner",
     required_balance: 10,
     balance: {
-      feature_id: "credits",
+      feature_id: "disposabl_credits",
       unlimited: false,
       overage_allowed: false,
       remaining: 0,
@@ -30,7 +30,7 @@ test("compute debit validates the atomic check response and never retries ambigu
       assert.equal(method, "balances.check");
       assert.deepEqual(body, {
         customer_id: "owner",
-        feature_id: "credits",
+        feature_id: "disposabl_credits",
         required_balance: 10,
         send_event: true,
       });
@@ -80,7 +80,7 @@ const customer =
   (remaining: unknown) =>
   async (_key: string, _method: string, body: object) => {
     assert.deepEqual(body, { customer_id: "owner" });
-    return { balances: { credits: { remaining } } };
+    return { balances: { disposabl_credits: { remaining } } };
   };
 
 test("credits gate checks the actual owner balance and fails closed", async () => {
@@ -210,7 +210,7 @@ test("debit response is preserved through the real HTTP parser without a second 
             required_balance: 10,
             allowed: true,
             balance: {
-              feature_id: "credits",
+              feature_id: "disposabl_credits",
               unlimited: false,
               overage_allowed: false,
               remaining: 7,

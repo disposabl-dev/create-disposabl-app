@@ -208,7 +208,7 @@ test(
     const first = await evidence();
     expect(first.username).toBe(username);
     expect(first.calls).toHaveLength(1);
-    expect(first.calls[0].planId).toBe("credits_monthly");
+    expect(first.calls[0].planId).toBe("disposabl_monthly");
     expect(first.calls[0].userId).toBe(first.userId);
     expect(first.attempts).toHaveLength(1);
     expect(first.attempts[0].userId).toBe(first.userId);

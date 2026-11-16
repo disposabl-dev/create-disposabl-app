@@ -125,7 +125,7 @@ test("non-consuming balance observation validates the response", async () => {
     required_balance: 10,
     allowed: false,
     balance: {
-      feature_id: "credits",
+      feature_id: "disposabl_credits",
       unlimited: false,
       overage_allowed: false,
       remaining: 0,
@@ -137,7 +137,7 @@ test("non-consuming balance observation validates the response", async () => {
       assert.equal(method, "balances.check");
       assert.deepEqual(body, {
         customer_id: "owner",
-        feature_id: "credits",
+        feature_id: "disposabl_credits",
         required_balance: 10,
         send_event: false,
       });

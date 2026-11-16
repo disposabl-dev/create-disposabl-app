@@ -41,7 +41,7 @@ test("loopback provider faults preserve the debit and snapshot boundaries", asyn
           required_balance: 10,
           allowed,
           balance: {
-            feature_id: "credits",
+            feature_id: "disposabl_credits",
             unlimited: false,
             overage_allowed: false,
             remaining: balance,
@@ -117,7 +117,7 @@ test("loopback provider faults preserve the debit and snapshot boundaries", asyn
     assert.equal(check.headers["x-api-version"], "2.6.0");
     assert.deepEqual(check.body, {
       customer_id: "owner",
-      feature_id: "credits",
+      feature_id: "disposabl_credits",
       required_balance: 10,
       send_event: true,
     });
