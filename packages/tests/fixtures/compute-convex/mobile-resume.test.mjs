@@ -1,9 +1,12 @@
 import { expect, mock, test } from "bun:test";
+mock.module("@expo/vector-icons/MaterialCommunityIcons", () => ({
+  default: "PlatformIcon",
+}));
 import { createElement } from "react";
 import { act, create } from "react-test-renderer";
 import { getFunctionName } from "convex/server";
 
-Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true, __DEV__: false });
 let balance = 0;
 let appStateListener;
 const send = mock(async () => ({}));
@@ -50,6 +53,7 @@ mock.module("expo-router", () => ({
   useLocalSearchParams: () => ({ appId: "test-app" }),
 }));
 mock.module("react-native", () => ({
+  Alert: { alert: mock() },
   AppState: {
     addEventListener: (_event, listener) => {
       appStateListener = listener;
@@ -125,6 +129,13 @@ mock.module(
 mock.module(
   "../../../../packages/disposabl-kit/mobile/billing/use-topup",
   () => ({ useTopup: () => ({ product: null, busy: false }) }),
+);
+mock.module(
+  "../../../../apps/mobile/src/features/management/ai-safety",
+  () => ({
+    useAiConsent: () => ({ allowed: true, request() {} }),
+    reportRef: {},
+  }),
 );
 const { AppScreen } =
   await import("../../../../apps/mobile/src/features/management/app");

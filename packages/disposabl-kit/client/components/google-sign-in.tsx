@@ -35,8 +35,6 @@ export function GoogleSignIn() {
             return "That sign-in expired. Please try again.";
           case "INVALID_FLOW":
             return "Please start Google sign-in again in this browser.";
-          case "REJECTED":
-            return "Google sign-in was declined.";
           case "OTHER_ERROR":
             return "Google sign-in failed. Please try again.";
           default:

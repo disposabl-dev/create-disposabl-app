@@ -23,6 +23,7 @@ export const authDeletionProgress = v.object({
   sessionsDeleted: v.number(),
   refreshTokensDeleted: v.number(),
   passwordsCleared: v.boolean(),
+  googleCleared: v.optional(v.boolean()),
   linkedRowsCleared: v.boolean(),
   unattributedAuthRowsUnverified: v.literal(true),
   updatedAt: v.number(),

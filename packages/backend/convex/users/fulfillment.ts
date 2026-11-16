@@ -368,6 +368,7 @@ export const complete = internalMutation({
     if (
       user.mcpDeletion?.state !== "attributed_complete" ||
       user.authDeletion?.state !== "linked_auth_cleared" ||
+      !user.authDeletion.googleCleared ||
       user.ephemeralDeletion?.requestedAt !== expectedRequestedAt ||
       user.ephemeralDeletion.state !== "known_user_bound_cleared" ||
       user.fileDeletion?.state !== "known_convex_cleared"

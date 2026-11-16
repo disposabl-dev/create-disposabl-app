@@ -30,20 +30,17 @@ export const current = internalQuery({
   },
 });
 
-const authProvider = v.union(
+const authMethod = v.union(
   v.object({
     name: v.literal("emailPassword"),
-    accountId: v.string(),
     profile: v.object({}),
   }),
   v.object({
-    name: v.literal("password"),
-    accountId: v.string(),
+    name: v.literal("usernamePassword"),
     profile: v.object({}),
   }),
   v.object({
     name: v.literal("google"),
-    accountId: v.string(),
     profile: vGoogleProfile,
   }),
 );
@@ -54,21 +51,21 @@ const authProvider = v.union(
  */
 export const createUser = internalMutation({
   args: {
-    provider: authProvider,
+    method: authMethod,
   },
   returns: v.id("users"),
-  handler: async (ctx, { provider }) => {
-    if (env.AUTH_GOOGLE_ONLY === "true" && provider.name !== "google")
+  handler: async (ctx, { method }) => {
+    if (env.AUTH_GOOGLE_ONLY === "true" && method.name !== "google")
       throw new ConvexError("Use Sign in with Google for this app.");
-    if (provider.name === "password" && env.RESEND_API_KEY?.trim()) {
+    if (method.name === "usernamePassword" && env.RESEND_API_KEY?.trim()) {
       throw new ConvexError(
         "New accounts must use verified email and password.",
       );
     }
     return await ctx.db.insert(
       "users",
-      provider.name === "google"
-        ? { profile: displayProfile(provider.profile) }
+      method.name === "google"
+        ? { profile: displayProfile(method.profile) }
         : {},
     );
   },
@@ -76,14 +73,14 @@ export const createUser = internalMutation({
 
 /** Enforce Google-only policy even when an old client calls password sign-in. */
 export const onSignIn = internalMutation({
-  args: { userId: v.id("users"), provider: authProvider },
+  args: { userId: v.id("users"), method: authMethod },
   returns: v.null(),
-  handler: async (ctx, { userId, provider }) => {
-    if (env.AUTH_GOOGLE_ONLY === "true" && provider.name !== "google")
+  handler: async (ctx, { userId, method }) => {
+    if (env.AUTH_GOOGLE_ONLY === "true" && method.name !== "google")
       throw new ConvexError("Use Sign in with Google for this app.");
-    if (provider.name === "google")
+    if (method.name === "google")
       await ctx.db.patch("users", userId, {
-        profile: displayProfile(provider.profile),
+        profile: displayProfile(method.profile),
       });
     return null;
   },

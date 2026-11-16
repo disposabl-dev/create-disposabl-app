@@ -18,7 +18,7 @@ def code(email):
 def signup(email, password):
     start=call('mutation','signUpWithEmailPassword',{'email':email,'password':password})
     assert start['success']
-    finish=call('mutation','completeSignUp',{'emailCode':code(email),'browserSecret':start['browserSecret']})
+    finish=call('mutation','completeSignUpWithEmailPassword',{'emailCode':code(email),'browserSecret':start['browserSecret']})
     assert finish['status']=='complete'
     return finish['tokens']['accessToken']
 def login(email,password):

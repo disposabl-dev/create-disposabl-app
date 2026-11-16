@@ -311,6 +311,10 @@ function make({
           return null;
         throw error;
       }
+      if (name === "users/fulfillment:markProvisioning") {
+        expect(args.userId).toBe("owner");
+        return null;
+      }
       if (name.startsWith("agent/activation:"))
         return activationHandlers[name.split(":")[1]]._handler(ctx, args);
       if (name === "agent/state:claim") {

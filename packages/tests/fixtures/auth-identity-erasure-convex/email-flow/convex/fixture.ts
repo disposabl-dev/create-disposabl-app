@@ -20,7 +20,7 @@ const c = componentsGeneric() as unknown as {
 };
 const auth = setupConvexAuth({ component: c.auth });
 export const createUser = internalMutation({
-  args: { provider: v.any() },
+  args: { method: v.any() },
   returns: v.id("users"),
   handler: (ctx) => ctx.db.insert("users", { label: "synthetic" }),
 });
@@ -44,7 +44,7 @@ export const send = internalMutation({
 });
 export const {
   signUpWithEmailPassword,
-  completeSignUp,
+  completeSignUpWithEmailPassword,
   signInWithEmailPassword,
   changePassword,
   startPasswordRecovery,

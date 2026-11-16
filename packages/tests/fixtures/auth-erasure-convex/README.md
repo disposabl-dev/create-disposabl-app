@@ -1,5 +1,7 @@
 # Isolated auth-erasure fixture
 
+This historical fixture targets the pre-stable Auth component API and cannot qualify the selected stable 2.0 package without migration. Do not run it as proof for the current selection.
+
 Use only a disposable loopback Convex backend on ports 3540/3541. These public fixture wrappers can create and erase synthetic identities. Never deploy them to a shared or cloud backend. Set `E2E_TELEMETRY_DISABLED=1` in both the process and backend before synchronization; use no provider credentials.
 
 Resolve the selected archive from the root `package.json` catalog and verify its bytes before preparing the fixture. Preserve the repository-relative layout when copying this fixture: its product wrapper imports the actual `packages/backend/convex/users/authDeletion.ts` handler. Extract the archive into this fixture's `authpkg/` directory, removing npm's enclosing `package/` directory. Link the installed dependencies for both the fixture and extracted package. Append the fixture-only files as follows:

@@ -57,6 +57,8 @@ def main():
     selected = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(selected)
     auth = selected.verify_selected_auth(root, checkout / 'node_modules/@convex-dev/auth')
+    if not auth['version'].startswith('2.0.0-beta.0-reboot.'):
+        raise RuntimeError('This historical fixture targets the pre-stable auth component API; use a stable-v2 fixture instead')
     modules = root / 'node_modules'
     modules.mkdir()
     for dep in (checkout / 'node_modules').iterdir():

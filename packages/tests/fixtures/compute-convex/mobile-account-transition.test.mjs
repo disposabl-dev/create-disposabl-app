@@ -1,9 +1,12 @@
 import { expect, mock, test } from "bun:test";
+mock.module("@expo/vector-icons/MaterialCommunityIcons", () => ({
+  default: "PlatformIcon",
+}));
 import { createContext, createElement, useContext } from "react";
 import { act, create } from "react-test-renderer";
 import { getFunctionName } from "convex/server";
 import { ConvexError } from "convex/values";
-Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true, __DEV__: false });
 const Session = createContext(null);
 const token = (id, signature = "signature") =>
   `header.${Buffer.from(JSON.stringify({ sub: id })).toString("base64url")}.${signature}`;
@@ -161,6 +164,13 @@ mock.module(
 );
 const { ConnectionProvider } =
   await import("../../../../apps/mobile/src/features/studio/connections");
+mock.module(
+  "../../../../apps/mobile/src/features/management/ai-safety",
+  () => ({
+    useAiConsent: () => ({ allowed: true, request() {} }),
+    reportRef: {},
+  }),
+);
 const { AppScreen } =
   await import("../../../../apps/mobile/src/features/management/app");
 const { ManagementHome } =

@@ -30,7 +30,7 @@ test("email module honors the deployment origin and optional sender", async () =
   });
   for (const name of [
     "signUpWithEmailPassword",
-    "completeSignUp",
+    "completeSignUpWithEmailPassword",
     "signInWithEmailPassword",
     "changePassword",
     "startPasswordRecovery",

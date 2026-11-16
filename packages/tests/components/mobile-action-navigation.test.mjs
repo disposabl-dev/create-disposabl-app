@@ -1,4 +1,7 @@
 import { afterEach, expect, mock, test } from "bun:test";
+mock.module("@expo/vector-icons/MaterialCommunityIcons", () => ({
+  default: "PlatformIcon",
+}));
 import { createElement, createContext } from "react";
 import { act, create } from "react-test-renderer";
 

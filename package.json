@@ -31,7 +31,7 @@
     "packages/*"
   ],
   "catalog": {
-    "@convex-dev/auth": "file:vendor/convex-auth-040d8e36-disposabl.2.tgz",
+    "@convex-dev/auth": "file:vendor/convex-auth-2.0.0-disposabl.2.tgz",
     "convex": "^1.50.0",
     "lucide-react": "^1.70.0",
     "react": "19.3.0",

@@ -24,7 +24,7 @@ const emailSender = {
 
 export const {
   signUpWithEmailPassword,
-  completeSignUp,
+  completeSignUpWithEmailPassword,
   signInWithEmailPassword,
   changePassword,
   startPasswordRecovery,

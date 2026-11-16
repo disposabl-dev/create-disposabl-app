@@ -17,6 +17,8 @@ export function authErrorMessage(error: {
       return "If this email belongs to an account, a reset link will arrive shortly.";
     case "INVALID_EMAIL":
       return "Enter a valid email address.";
+    case "USERNAME_TOO_LONG":
+      return `Username must be at most ${error.maximumLength} characters.`;
     case "USERNAME_TOO_SHORT":
       return `Username must be at least ${error.minimumLength} characters.`;
     case "USERNAME_HAS_SURROUNDING_WHITESPACE":

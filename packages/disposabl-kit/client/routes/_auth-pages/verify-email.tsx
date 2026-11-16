@@ -1,4 +1,4 @@
-import { useCompleteSignUp } from "@convex-dev/auth/methods/email-password/react";
+import { useCompleteSignUpWithEmailPassword } from "@convex-dev/auth/methods/email-password/react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { api } from "../../../../backend/convex/_generated/api";
@@ -8,7 +8,9 @@ import { PasswordPage } from "../../components/password-page";
 
 function VerifyEmail() {
   const { code } = Route.useSearch();
-  const state = useCompleteSignUp(api.authEmail, { emailCode: code });
+  const state = useCompleteSignUpWithEmailPassword(api.authEmail, {
+    emailCode: code,
+  });
   useEffect(() => {
     if (state.status !== "complete") return;
     const destination =

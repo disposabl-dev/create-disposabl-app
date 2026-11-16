@@ -53,7 +53,10 @@ export const advanceLocalBatch = internalMutation({
         blockers: [],
       };
     }
-    if (user.authDeletion?.state !== "linked_auth_cleared") {
+    if (
+      user.authDeletion?.state !== "linked_auth_cleared" ||
+      !user.authDeletion.googleCleared
+    ) {
       await ctx.runMutation(internal.users.authDeletion.runBatch, args);
       return {
         status: "requested",

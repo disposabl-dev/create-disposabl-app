@@ -1,5 +1,5 @@
 import { authReturnPath } from "../lib/auth-return";
-import { useCompleteSignUp } from "@convex-dev/auth/methods/email-password/react";
+import { useCompleteSignUpWithEmailPassword } from "@convex-dev/auth/methods/email-password/react";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { Text, TextInput } from "react-native";
@@ -56,7 +56,9 @@ export function EmailVerification() {
 
 function CompleteVerification({ code }: { code: string }) {
   const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
-  const state = useCompleteSignUp(api.authEmail, { emailCode: code });
+  const state = useCompleteSignUpWithEmailPassword(api.authEmail, {
+    emailCode: code,
+  });
   useEffect(() => {
     if (state.status === "complete") router.replace(authReturnPath(returnTo));
   }, [state.status, returnTo]);

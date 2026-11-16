@@ -124,9 +124,8 @@ test("Google sign-in stores provider identity and excludes unverified email", as
         },
       },
     };
-    const provider = {
+    const method = {
       name: "google",
-      accountId: "google-account",
       profile: {
         id: "google-account",
         email: "google@example.com",
@@ -134,17 +133,23 @@ test("Google sign-in stores provider identity and excludes unverified email", as
         name: "Google User",
       },
     };
-    await (createUser as any)._handler(ctx, { provider });
-    await (onSignIn as any)._handler(ctx, { userId: "owner", provider });
-    assert.deepEqual(
-      saved,
-      [0, 1].map(() => ({
+    await (createUser as any)._handler(ctx, { method });
+    await (onSignIn as any)._handler(ctx, { userId: "owner", method });
+    assert.deepEqual(saved, [
+      {
         profile: {
           name: "Google User",
           ...(emailVerified ? { email: "google@example.com" } : {}),
         },
-      })),
-    );
+        managedSandbox: { state: "never" },
+      },
+      {
+        profile: {
+          name: "Google User",
+          ...(emailVerified ? { email: "google@example.com" } : {}),
+        },
+      },
+    ]);
   }
 });
 

@@ -50,6 +50,7 @@ test("local operator advances one current stage and reports blockers", async () 
   let fileBlocked = true;
   const ctx = {
     db: {
+      query: () => ({ withIndex: () => ({ first: async () => null }) }),
       get: async (_table: string, id: string) =>
         id === "owner"
           ? user
@@ -74,6 +75,7 @@ test("local operator advances one current stage and reports blockers", async () 
       if (name === "users/authDeletion:runBatch") {
         user.authDeletion = {
           state: "linked_auth_cleared",
+          googleCleared: true,
           usernameCleared: true,
           attributedEmailsCleared: true,
           unattributedEmailChallengesUnverified: true,

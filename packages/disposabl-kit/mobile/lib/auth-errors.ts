@@ -15,6 +15,8 @@ export function authErrorMessage(error: AuthError): string {
       return "Incorrect username or password.";
     case "USERNAME_TAKEN":
       return "That username is already taken.";
+    case "USERNAME_TOO_LONG":
+      return `Username must be at most ${error.maximumLength} characters.`;
     case "USERNAME_TOO_SHORT":
       return `Username must be at least ${error.minimumLength} characters.`;
     case "USERNAME_HAS_SURROUNDING_WHITESPACE":

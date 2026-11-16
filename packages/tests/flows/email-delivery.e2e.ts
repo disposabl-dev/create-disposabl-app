@@ -72,7 +72,7 @@ test(
       .map((link: string) => new URL(link).searchParams.get("code"))
       .find(Boolean);
     if (!code) throw new Error("Verification email has no code link");
-    const verified = await call("authEmail:completeSignUp", {
+    const verified = await call("authEmail:completeSignUpWithEmailPassword", {
       emailCode: code,
       browserSecret: signup.browserSecret,
     });

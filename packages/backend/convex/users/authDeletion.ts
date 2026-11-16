@@ -12,8 +12,12 @@ export const runBatch = internalMutation({
     if (!user || user.deletionRequestedAt !== expectedRequestedAt)
       throw new ConvexError("Matching deletion request not found.");
     const previous = user.authDeletion;
-    if (previous?.state === "linked_auth_cleared") return previous;
+    if (previous?.state === "linked_auth_cleared" && previous.googleCleared)
+      return previous;
     await ctx.runMutation(components.auth.public.beginUserErasure, { userId });
+    await ctx.runMutation(components.authGoogle.provider.beginUserErasure, {
+      userId,
+    });
     const passwords = await ctx.runMutation(
       components.authPassword.public.eraseUserPasswords,
       { userId },
@@ -30,9 +34,16 @@ export const runBatch = internalMutation({
       components.auth.public.purgeUserLinkedAuth,
       { userId },
     );
+    const google = await ctx.runMutation(
+      components.authGoogle.provider.purgeUserLinkedAuth,
+      { userId },
+    );
     const progress = {
       state:
-        passwords.complete && core.linkedRowsCleared && email.complete
+        passwords.complete &&
+        core.linkedRowsCleared &&
+        email.complete &&
+        google.complete
           ? ("linked_auth_cleared" as const)
           : ("in_progress" as const),
       batches: (previous?.batches ?? 0) + 1,
@@ -45,12 +56,16 @@ export const runBatch = internalMutation({
       usernameCleared: true as const,
       attributedEmailsCleared: email.complete,
       unattributedEmailChallengesUnverified: true as const,
-      accountsDeleted: (previous?.accountsDeleted ?? 0) + core.deletedAccounts,
+      accountsDeleted:
+        (previous?.accountsDeleted ?? 0) +
+        core.deletedAccounts +
+        google.deletedAccounts,
       sessionsDeleted: (previous?.sessionsDeleted ?? 0) + core.deletedSessions,
       refreshTokensDeleted:
         (previous?.refreshTokensDeleted ?? 0) + core.deletedRefreshTokens,
       passwordsCleared: passwords.complete,
-      linkedRowsCleared: core.linkedRowsCleared,
+      googleCleared: google.complete,
+      linkedRowsCleared: core.linkedRowsCleared && google.complete,
       unattributedAuthRowsUnverified: true as const,
       updatedAt: Date.now(),
     };
