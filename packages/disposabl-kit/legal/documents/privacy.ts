@@ -18,13 +18,14 @@ export const privacy: LegalDocument = {
       paragraphs: [
         "When you use account features, we handle account identifiers and the profile information supplied through sign-in to authenticate you and provide access to your account. We handle content you submit to provide the features you request.",
         "Our infrastructure processes technical information needed to deliver requests, protect the service, and investigate faults. Avoid sending information we do not need.",
+        ...(c.dataNotice ? [c.dataNotice] : []),
         "The legal basis for providing requested account and service features is performance of our contract with you. Security and abuse prevention rely on our legitimate interest in protecting the service, balanced against your rights. We also process information where required by law. Where we rely on consent, you may withdraw it without affecting earlier lawful processing.",
       ],
     },
     {
       title: "Service providers and disclosures",
       paragraphs: [
-        "We use service providers to operate the service. They receive information needed for their role, subject to the applicable agreements and legal obligations.",
+        "We use service providers to operate the service. They receive information needed for their role.",
         ...(c.aiNotice ? [c.aiNotice] : []),
         ...c.providers.map((p) => `${p.name}: ${p.purpose}.`),
         "We may disclose information where required by law, to protect legal rights or safety, or as part of a business transfer subject to applicable protections and notices.",

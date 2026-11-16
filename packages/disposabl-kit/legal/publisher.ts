@@ -6,6 +6,9 @@ export const publisher: Publisher = {
   country: "United States",
   privacyEmail: "vivek@yast.ai",
   policy: {
+    reviewed: true,
+    dataNotice:
+      "We handle information about purchases, credit balances and compute use to provide billing, reconcile transactions and operate Agent Mode. If you connect a provider, we handle the account and authorization information needed for the connection. In production, optional usage analytics are sent to PostHog only when you opt in; you can change your analytics choice in the app.",
     effectiveDate: "2026-11-16",
     audience:
       "Disposabl is intended for adults aged 18 or older. You must be at least 18 to create an account or use the service.",
@@ -27,6 +30,16 @@ export const publisher: Publisher = {
       name: "GitHub",
       purpose:
         "Repository access and workflows when you connect a GitHub account",
+    },
+    {
+      name: "Vercel",
+      purpose:
+        "Connection infrastructure for supported provider account setup when configured",
+    },
+    {
+      name: "Stripe",
+      purpose:
+        "Payment processing for website purchases when you choose to pay",
     },
     {
       name: "Expo",

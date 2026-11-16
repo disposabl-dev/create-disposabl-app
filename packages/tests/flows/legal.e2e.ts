@@ -1,21 +1,23 @@
 import { test } from "@e2e-dev/web";
 import { expect } from "e2e";
 import { authenticationEnabled } from "../../disposabl-kit/features";
-import { legalConfig } from "../../disposabl-kit/legal";
+import { legalConfig, legalIsDraft } from "../../disposabl-kit/legal";
 
 for (const [path, title] of [
   ["/legal/privacy", "Privacy policy"],
   ["/legal/terms", "Terms of service"],
 ] as const) {
   test(
-    `${title} is public and identified as a draft`,
+    `${title} is public with its publication status`,
     { platforms: ["web"] },
     async ({ app, screen, browser }) => {
       await app.open(path);
       await expect(screen.getByRole("heading", title)).toBeVisible();
-      await expect(browser.locator('[role="note"]')).toHaveText(
-        "Draft documents. Publisher details and data practices are still being reviewed. These documents are not yet final.",
-      );
+      if (legalIsDraft())
+        await expect(browser.locator('[role="note"]')).toHaveText(
+          "Draft documents. Publisher details and data practices are still being reviewed. These documents are not yet final.",
+        );
+      else await expect(browser.locator('[role="note"]')).toHaveCount(0);
       await expect(
         screen.getByRole("link", "All legal documents"),
       ).toBeVisible();

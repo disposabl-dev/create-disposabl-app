@@ -46,9 +46,7 @@ test(
     );
     await app.open("/legal/privacy");
     await expect(screen.getByRole("heading", "Privacy policy")).toBeVisible();
-    await expect(browser.locator('[role="note"]')).toContainText(
-      "Draft documents",
-    );
+    await expect(browser.locator('[role="note"]')).toHaveCount(0);
     await expect(
       screen.getByText("Yast Ai, Inc. operates Disposabl", { exact: false }),
     ).toBeVisible();
@@ -62,9 +60,7 @@ test(
     await expect(
       screen.getByRole("heading", "Delete your account"),
     ).toBeVisible();
-    await expect(browser.locator('[role="note"]')).toContainText(
-      "Draft documents",
-    );
+    await expect(browser.locator('[role="note"]')).toHaveCount(0);
     await expect(screen.getByRole("link", "vivek@yast.ai")).toHaveAttribute(
       "href",
       "mailto:vivek@yast.ai",

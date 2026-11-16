@@ -4,9 +4,9 @@ import { legalConfig, legalIsDraft } from "../disposabl-kit/legal/config";
 import { spawnSync } from "node:child_process";
 import { privacy } from "../disposabl-kit/legal/documents/privacy";
 
-test("product privacy draft names connected and configured providers", () => {
-  assert.equal(legalConfig.reviewed, false);
-  assert.equal(legalIsDraft(), true);
+test("product privacy policy names connected and configured providers", () => {
+  assert.equal(legalConfig.reviewed, true);
+  assert.equal(legalIsDraft(), false);
   const rendered = spawnSync(
     process.execPath,
     [
@@ -17,8 +17,9 @@ test("product privacy draft names connected and configured providers", () => {
   );
   assert.equal(rendered.status, 0, rendered.stderr);
   const html = rendered.stdout;
-  assert.match(html, /Draft documents/);
-  for (const name of ["GitHub", "Expo", "Boat", "OpenAI"])
+  assert.doesNotMatch(html, /Draft documents/);
+  assert.match(html, /Effective 2026-11-16/);
+  for (const name of ["GitHub", "Expo", "Boat", "OpenAI", "Vercel", "Stripe"])
     assert.match(html, new RegExp(`${name}:`));
   const disclosure = privacy.sections.find(
     (section) => section.title === "Service providers and disclosures",
@@ -30,6 +31,8 @@ test("product privacy draft names connected and configured providers", () => {
     "Expo",
     "Boat",
     "OpenAI",
+    "Vercel",
+    "Stripe",
     "Google",
     "PostHog",
     "Autumn",

@@ -12,7 +12,9 @@ export type Publisher = {
   privacyEmail: string;
   providers: { name: string; purpose: string }[];
   policy?: {
+    reviewed?: boolean;
     effectiveDate?: string;
+    dataNotice?: string;
     retention?: string;
     internationalTransfers?: string;
     audience?: string;
