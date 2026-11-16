@@ -44,6 +44,7 @@ const excluded = [
   "packages/tests/compute-stop.test.ts",
   "packages/tests/agent-safety.test.ts",
   "packages/tests/app-thread-deletion.test.ts",
+  "packages/tests/deletion-automation.test.ts",
   "packages/tests/auth-deletion-current.test.ts",
   "packages/tests/boat-deletion.test.ts",
   "packages/backend/convex/users/localDeletion.ts",
