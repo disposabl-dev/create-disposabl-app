@@ -52,7 +52,7 @@ const options = (distinctId) => ({
 test("actual native SDK keeps a revoked lease opted out and starts a fresh identity", async () => {
   const old = new PostHog("fixture", options("fixture-old"));
   await old.ready();
-  expect(require(join(sdkDir, "../package.json")).version).toBe("4.85.3");
+  expect(require(join(sdkDir, "../package.json")).version).toBe("4.87.0");
   expect(native.setup).toHaveBeenCalledTimes(0);
   expect(old.getDistinctId()).toBe("fixture-old");
   await old.optOut();
