@@ -82,7 +82,7 @@ function PricingPage() {
               ))}
             </div>
             {paymentsEnabled ? (
-              <Checkout onAttempt={captureProductAction} />
+              <Checkout onAttempt={captureProductAction} embedded />
             ) : (
               <p className="pricing-availability">
                 Agent Mode purchases are not available on this website yet.

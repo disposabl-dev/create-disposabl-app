@@ -531,7 +531,14 @@ test(
     await expect(browser.locator(".pricing-grid")).toContainText(
       "Credits do not expire",
     );
-    await expect(browser.locator(".pricing-availability")).toBeVisible();
+    await expect(
+      screen.getByRole("heading", "Pricing", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      screen.getByText("Sign in to purchase credits."),
+    ).toBeVisible();
+    await expect(screen.getByRole("button", "Choose monthly")).toBeDisabled();
+    await expect(screen.getByRole("button", "Buy top-up")).toBeDisabled();
     await app.open("/");
     await browser.locator('.marketing-links a[href="/pricing"]').tap();
     await expect(browser).toHaveURL("/pricing");

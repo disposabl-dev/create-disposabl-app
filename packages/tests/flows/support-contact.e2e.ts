@@ -50,7 +50,7 @@ test(
       "Draft documents",
     );
     await expect(
-      screen.getByText("Yast AI operates Disposabl", { exact: false }),
+      screen.getByText("Yast Ai, Inc. operates Disposabl", { exact: false }),
     ).toBeVisible();
     await expect(
       screen.getByText(
@@ -70,7 +70,7 @@ test(
       "mailto:vivek@yast.ai",
     );
     await expect(
-      screen.getByText("A request does not itself delete your account", {
+      screen.getByText("A request schedules bounded cleanup", {
         exact: false,
       }),
     ).toBeVisible();

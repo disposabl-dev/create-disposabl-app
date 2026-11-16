@@ -28,7 +28,7 @@ test(
       newPassword: "Not-a-real-password-2",
     });
     expect(denied.value?.success).toBe(false);
-    expect(denied.value?.userError?.error).toBe("NOT_SIGNED_IN");
+    expect(denied.value?.userError?.error).toBe("NOT_LOGGED_IN");
     const emailDenied = await call("mutation", "authEmail:changePassword", {
       currentPassword: "Not-a-real-password-1",
       newPassword: "Not-a-real-password-2",

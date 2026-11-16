@@ -67,20 +67,27 @@ export type BillingAttempt =
 
 export function Pricing({
   onAttempt,
-}: { onAttempt?: (attempt: BillingAttempt) => void } = {}) {
+  embedded = false,
+}: { onAttempt?: (attempt: BillingAttempt) => void; embedded?: boolean } = {}) {
   if (!paymentsEnabled)
     return (
       <section className="mx-auto max-w-5xl p-8">
-        <h1>Payments are unavailable</h1>
+        {embedded ? (
+          <h2>Payments are unavailable</h2>
+        ) : (
+          <h1>Payments are unavailable</h1>
+        )}
         <SubscriptionHelp />
       </section>
     );
-  return <SessionPricing onAttempt={onAttempt} />;
+  return <SessionPricing onAttempt={onAttempt} embedded={embedded} />;
 }
 function SessionPricing({
   onAttempt,
+  embedded,
 }: {
   onAttempt?: (attempt: BillingAttempt) => void;
+  embedded: boolean;
 }) {
   const token = useAuthToken();
   const { isAuthenticated, isLoading } = useConvexAuth();
@@ -90,6 +97,7 @@ function SessionPricing({
       key={session ?? "signed-out"}
       session={session}
       onAttempt={onAttempt}
+      embedded={embedded}
     />
   );
 }
@@ -119,9 +127,11 @@ function SubscriptionHelp() {
 function PurchasePage({
   session,
   onAttempt,
+  embedded,
 }: {
   session: string | null;
   onAttempt?: (attempt: BillingAttempt) => void;
+  embedded: boolean;
 }) {
   const identity = useConsentIdentity();
   const [{ handoff, fromIos }] = useState(() =>
@@ -270,7 +280,11 @@ function PurchasePage({
   return (
     <section className="mx-auto max-w-5xl space-y-8 p-8">
       <div>
-        <h1 className="text-3xl font-semibold">Pricing</h1>
+        {embedded ? (
+          <h2 className="text-3xl font-semibold">Pricing</h2>
+        ) : (
+          <h1 className="text-3xl font-semibold">Pricing</h1>
+        )}
       </div>
       {isLoading ? (
         <p>Checking your account...</p>
