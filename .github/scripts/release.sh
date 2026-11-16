@@ -12,25 +12,43 @@ name=$(node -p "require('./packages/$PACKAGE/package.json').name")
 node .github/scripts/disposabl.mjs report "$platform" building
 if GITHUB_TOKEN="$GH_TOKEN" npm_config_workspaces_update=false bun run --cwd "packages/$PACKAGE" release; then
   version=$(node -p "require('./packages/$PACKAGE/package.json').version")
-  # semantic-release may succeed without a new release. Verify latest in that
-  # case, but never require a public version before attempting OIDC publication.
+  # A no-op release must still verify the exact latest stable tag, not npm's
+  # possibly stale latest dist-tag (for example while a publish is scanning).
+  if [[ "$version" == *development* ]]; then
+    version=""
+    tags=$(git tag --merged HEAD --sort=-version:refname --list "$name@[0-9]*")
+    while IFS= read -r tag; do
+      candidate=${tag#"$name@"}
+      if [[ "$candidate" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        version=$candidate
+        break
+      fi
+    done <<< "$tags"
+    if [[ -z "$version" ]]; then
+      node .github/scripts/disposabl.mjs report "$platform" failed 'Release completed without a stable package tag to verify.'
+      exit 1
+    fi
+  fi
   published="$name@$version"
-  [[ "$version" != *development* ]] || published=$name
   # npm scans newly published packages before they become visible. Retry a
   # bounded number of times, but never report ready without registry proof.
   available=false
-  for attempt in {1..12}; do
-    if PUBLISHED_VERSION=$(npm view "$published" version --fetch-retries=0 --fetch-timeout=10000); then
+  registry_deadline=$((SECONDS + 600))
+  for attempt in {1..61}; do
+    (( SECONDS < registry_deadline )) || break
+    if PUBLISHED_VERSION=$(npm view "$published" version --prefer-online --fetch-retries=0 --fetch-timeout=5000); then
       available=true
       break
     fi
-    if (( attempt < 12 )); then sleep 10; fi
+    remaining=$((registry_deadline - SECONDS))
+    (( remaining > 0 )) || break
+    if (( attempt < 61 )); then sleep "$((remaining < 10 ? remaining : 10))"; fi
   done
   if [[ "$available" != true ]]; then
     node .github/scripts/disposabl.mjs report "$platform" failed 'Release finished, but npm availability could not be verified; check the registry lookup error.'
     exit 1
   fi
-  if [[ -z "$PUBLISHED_VERSION" || ( "$published" != "$name" && "$PUBLISHED_VERSION" != "$version" ) ]]; then
+  if [[ -z "$PUBLISHED_VERSION" || "$PUBLISHED_VERSION" != "$version" ]]; then
     node .github/scripts/disposabl.mjs report "$platform" failed 'npm returned no matching published version.'
     exit 1
   fi

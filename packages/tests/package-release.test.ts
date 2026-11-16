@@ -18,6 +18,7 @@ function release(options: {
   available?: string;
   failure?: boolean;
   visibleAfter?: number;
+  tag?: string;
 }) {
   const directory = mkdtempSync(join(tmpdir(), "package-release-"));
   try {
@@ -56,6 +57,7 @@ count=$(grep -c "^npm " calls)
 printf '%s\\n' "$AVAILABLE"`,
     );
     executable("sleep", ":");
+    executable("git", `printf '%s\\n' "$TAG"`);
     executable(
       "node",
       `if [[ "$1" == -p ]]; then
@@ -78,6 +80,7 @@ fi`,
         AVAILABLE: options.available ?? "",
         FAIL_RELEASE: String(options.failure ?? false),
         VISIBLE_AFTER: String(options.visibleAfter ?? 0),
+        TAG: options.tag ?? "@fixture/sdk@1.2.3",
       },
     });
     const calls = join(directory, "calls");
@@ -104,7 +107,7 @@ test("first publication runs before any registry lookup", () => {
 test("no new release reports the existing public version", () => {
   const result = release({ available: "1.2.3" });
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.calls, /npm view @fixture\/sdk version/);
+  assert.match(result.calls, /npm view @fixture\/sdk@1\.2\.3 version/);
   assert.match(result.calls, /ready version=1\.2\.3/);
 });
 
@@ -115,15 +118,15 @@ test("release authorization failure is a failed job, not a successful skip", () 
   assert.doesNotMatch(result.calls, /npm view| ready /);
 });
 
-test("unavailable registry or no public version cannot report ready", () => {
-  for (const prepared of [undefined, "1.0.0"]) {
+for (const prepared of [undefined, "1.0.0"]) {
+  test(`unavailable registry cannot report ${prepared ? "new" : "existing"} release ready`, () => {
     const result = release({ prepared });
     assert.equal(result.status, 1);
     assert.match(result.calls, /release\n/);
     assert.match(result.calls, /availability could not be verified/);
     assert.doesNotMatch(result.calls, / ready /);
-  }
-});
+  });
+}
 
 test("a mismatched registry version cannot report ready", () => {
   const result = release({ prepared: "1.0.0", available: "0.9.0" });
@@ -141,4 +144,17 @@ test("new publication waits for delayed registry visibility", () => {
   assert.equal(result.status, 0, result.stderr);
   assert.equal((result.calls.match(/npm view/g) ?? []).length, 3);
   assert.match(result.calls, /report typescript-sdk ready version=1\.0\.0/);
+});
+
+test("a stale registry version cannot satisfy a newer existing tag", () => {
+  const result = release({ tag: "@fixture/sdk@1.0.0", available: "0.0.1" });
+  assert.equal(result.status, 1);
+  assert.match(result.calls, /npm view @fixture\/sdk@1\.0\.0 version/);
+  assert.doesNotMatch(result.calls, / ready /);
+});
+
+test("no release tag fails closed", () => {
+  const result = release({ tag: "", available: "1.0.0" });
+  assert.equal(result.status, 1);
+  assert.doesNotMatch(result.calls, /npm view| ready /);
 });
