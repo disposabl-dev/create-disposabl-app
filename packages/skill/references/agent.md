@@ -4,6 +4,8 @@ Use this flow when the user asks for remote execution. Local development remains
 
 Each user has one persistent sandbox for all their apps. Each app has its own conversation and directory. Each app can have multiple previews. To compare alternatives or improve results through hill climbing, ask the agent to create a separate branch/worktree and scoped preview backend for each variant. Keep the same app ID, use distinct ports, and compare the actual behavior of the variants. Aborting one app must leave the other conversations running.
 
+Include [preview storage and cleanup](preview-storage.md) in remote draft and publish requests. Stop the draft's processes and retain its test evidence before cleanup. Reuse the active worktree for follow-up requests.
+
 Use the connected Disposabl API/MCP tools, or `bunx --package create-disposabl-app@latest disposabl`. Remote work needs a Disposabl login but no local app directory, `disposabl.json`, or generator installation.
 
 When payments are enabled, each agent request needs at least 10 credits. Compute costs 10 credits per 10-minute window for the shared sandbox, not per app; AI is currently included. If a request returns `credits_required`, tell the user to add credits using the server-provided payment URL. Do not open it or start checkout automatically, or include credentials in the link. If no URL is returned, report that billing setup is unavailable rather than inventing one. If `credits_unavailable` is returned, ask the user to retry. A payment before the current window ends can keep active work running; after expiry, send a new message only when the user explicitly requests it.

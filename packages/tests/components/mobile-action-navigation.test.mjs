@@ -9,6 +9,10 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const actions = [];
 const push = mock();
 let apps = [];
+let auth = { isAuthenticated: true, isLoading: false };
+let appStatus = "Exhausted";
+const loadMore = mock();
+const pageOptions = mock();
 const router = { push, replace: mock(), back: mock(), canGoBack: () => false };
 mock.module("../../../apps/mobile/src/features/product-telemetry", () => ({
   captureProductAction: (action) => actions.push(action),
@@ -70,8 +74,11 @@ mock.module("@disposabl/disposabl-kit/platforms", () => ({
   resolvePlatforms: (value) => value,
 }));
 mock.module("convex/react", () => ({
-  useConvexAuth: () => ({ isAuthenticated: true, isLoading: false }),
-  usePaginatedQuery: () => ({ results: apps, status: "Exhausted" }),
+  useConvexAuth: () => auth,
+  usePaginatedQuery: (_query, _args, options) => {
+    pageOptions(options);
+    return { results: apps, status: appStatus, loadMore };
+  },
   useQuery: () => undefined,
   useMutation: () => async () => "https://fixture.invalid",
   useAction: () => async () => ({}),
@@ -147,6 +154,10 @@ afterEach(async () => {
   actions.length = 0;
   push.mockClear();
   apps = [];
+  auth = { isAuthenticated: true, isLoading: false };
+  appStatus = "Exhausted";
+  loadMore.mockClear();
+  pageOptions.mockClear();
 });
 
 test("actual create and app navigation buttons emit one fixed category", async () => {
@@ -230,4 +241,67 @@ test("MCP choice shows its logo in the selected theme color", async () => {
   expect(choice.findByType("Path").props.fill).toBe("foreground");
   await act(async () => choice.props.onPress());
   expect(choice.findByType("Path").props.fill).toBe("background");
+});
+
+test("Apps auth loading and guest states keep the shared screen and hook boundary", async () => {
+  auth = { isAuthenticated: false, isLoading: true };
+  await mount(Apps);
+  expect(renderer.root.findByType("Screen").props.title).toBe("Your apps");
+  expect(
+    renderer.root.findByType("ActivityIndicator").props.accessibilityLabel,
+  ).toBe("Loading apps");
+  expect(pageOptions).not.toHaveBeenCalled();
+  await act(async () => renderer.unmount());
+  auth = { isAuthenticated: false, isLoading: false };
+  await mount(Apps);
+  expect(renderer.root.findByType("Screen").props.title).toBe("Your apps");
+  expect(
+    renderer.root.findAllByType("Label").map((node) => node.props.children),
+  ).toEqual([
+    "A home for your ideas.",
+    "Sign in to create and manage your apps.",
+  ]);
+  const signIn = renderer.root.findByType("Action");
+  expect(signIn.props.label).toBe("Sign in");
+  await act(async () => signIn.props.onPress());
+  expect(push).toHaveBeenCalledWith("/(auth)/login");
+  expect(pageOptions).not.toHaveBeenCalled();
+});
+
+test("Apps pagination preserves loading, empty, row navigation and page size", async () => {
+  appStatus = "LoadingFirstPage";
+  await mount(Apps);
+  expect(
+    renderer.root.findByType("ActivityIndicator").props.accessibilityLabel,
+  ).toBe("Loading apps");
+  expect(pageOptions.mock.calls[0][0]).toEqual({ initialNumItems: 20 });
+  await act(async () => renderer.unmount());
+  appStatus = "Exhausted";
+  await mount(Apps);
+  expect(renderer.root.findByType("Label").props.children).toBe(
+    "Create your first app.",
+  );
+  expect(renderer.root.findByType("Action").props.label).toBe("Create app");
+  await act(async () => renderer.unmount());
+  apps = [{ appId: "example-id", name: "Example", platforms: ["web"] }];
+  appStatus = "CanLoadMore";
+  await mount(Apps);
+  expect(renderer.root.findByType("Touch").props.label).toBe("Open Example");
+  await act(async () => renderer.root.findByType("Touch").props.onPress());
+  expect(push).toHaveBeenCalledWith({
+    pathname: "/(authenticated)/apps/[appId]",
+    params: { appId: "example-id" },
+  });
+  const more = renderer.root.findByType("Action");
+  expect(more.props.label).toBe("More apps");
+  await act(async () => more.props.onPress());
+  expect(loadMore).toHaveBeenCalledWith(
+    pageOptions.mock.calls[0][0].initialNumItems,
+  );
+  await act(async () => renderer.unmount());
+  appStatus = "LoadingMore";
+  await mount(Apps);
+  expect(
+    renderer.root.findByType("ActivityIndicator").props.accessibilityLabel,
+  ).toBe("Loading more apps");
 });

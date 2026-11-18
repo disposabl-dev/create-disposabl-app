@@ -7,6 +7,8 @@ import { authenticationEnabled } from "@disposabl/disposabl-kit/features";
 import { Action, Icon, Label, Screen, Touch } from "./ui";
 import { captureProductAction } from "../product-telemetry";
 
+const APP_PAGE_SIZE = 20;
+
 export default function AppsScreen() {
   return authenticationEnabled ? (
     <SessionApps />
@@ -18,18 +20,21 @@ export default function AppsScreen() {
 }
 function SessionApps() {
   const { isAuthenticated, isLoading } = useConvexAuth();
-  if (isLoading)
+  if (isLoading || !isAuthenticated)
     return (
       <Screen title="Your apps">
-        <ActivityIndicator accessibilityLabel="Loading apps" />
-      </Screen>
-    );
-  if (!isAuthenticated)
-    return (
-      <Screen title="Your apps">
-        <Label variant="title">A home for your ideas.</Label>
-        <Label>Sign in to create and manage your apps.</Label>
-        <Action label="Sign in" onPress={() => router.push("/(auth)/login")} />
+        {isLoading ? (
+          <ActivityIndicator accessibilityLabel="Loading apps" />
+        ) : (
+          <>
+            <Label variant="title">A home for your ideas.</Label>
+            <Label>Sign in to create and manage your apps.</Label>
+            <Action
+              label="Sign in"
+              onPress={() => router.push("/(auth)/login")}
+            />
+          </>
+        )}
       </Screen>
     );
   return <OwnedApps />;
@@ -40,7 +45,7 @@ function OwnedApps() {
   const { results, status, loadMore } = usePaginatedQuery(
     api.apps.index.list,
     {},
-    { initialNumItems: 20 },
+    { initialNumItems: APP_PAGE_SIZE },
   );
   return (
     <>
@@ -93,7 +98,11 @@ function OwnedApps() {
         )}
         ListFooterComponent={
           status === "CanLoadMore" ? (
-            <Action label="More apps" secondary onPress={() => loadMore(20)} />
+            <Action
+              label="More apps"
+              secondary
+              onPress={() => loadMore(APP_PAGE_SIZE)}
+            />
           ) : status === "LoadingMore" ? (
             <ActivityIndicator accessibilityLabel="Loading more apps" />
           ) : undefined

@@ -1,4 +1,6 @@
 {
+  "appId": "cd48e355-7bb4-492c-980c-b44224377b62",
+  "serviceOrigin": "https://www.disposabl.dev",
   "version": "0.1.0",
   "platforms": ["web", "android", "ios", "api", "mcp", "cli", "typescript-sdk"],
   "features": ["authentication", "docs", "analytics", "payments"],

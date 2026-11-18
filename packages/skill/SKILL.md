@@ -67,6 +67,8 @@ Before generating the product, write a concise `APP_BRIEF.md` with its purpose, 
 
 An installer from `main` receives production updates, not PR preview updates. After the generated app passes review and its selected-platform checks, merge through the authorized delivery workflow to publish the production update. Compatible Android JavaScript and asset changes use EAS Update; native dependency or configuration changes need a new binary. Desktop delivery needs its configured native update feed. Do not report that an update reached an installed app until that behavior is verified.
 
+Follow [preview storage and cleanup](references/preview-storage.md) when a draft starts, while it waits for review, and after publishing it.
+
 ## Preview updates every two minutes
 
 Run this in the active app worktree immediately after setup, after opening or updating its PR, and whenever the user asks for a preview:
