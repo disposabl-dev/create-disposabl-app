@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Application API",
-    "version": "13.0.0"
+    "version": "14.0.0"
   },
   "security": [
     {
@@ -2021,6 +2021,12 @@
                       "type": "string"
                     },
                     "productionConvexSiteUrl": {
+                      "type": "string"
+                    },
+                    "publicSiteUrl": {
+                      "type": "string"
+                    },
+                    "productionSiteUrl": {
                       "type": "string"
                     },
                     "repositoryUrl": {

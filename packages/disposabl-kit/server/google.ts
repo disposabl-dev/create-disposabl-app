@@ -5,6 +5,8 @@ import { env } from "../../backend/convex/_generated/server";
 
 const path = "/oauth/relay/google";
 const issuer = "disposabl-google-preview";
+const publicOrigin =
+  /^https:\/\/[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.disposabl\.xyz$/;
 const convexOrigin = /^https:\/\/[a-z0-9-]+\.convex\.site$/;
 
 export function googleConfigured() {
@@ -32,8 +34,8 @@ export async function googleAuthorizationState(state: string) {
     throw new ConvexError("Google sign-in is unavailable.");
   if (!env.AUTH_GOOGLE_RELAY_URL) return state;
   const { url, key } = relaySettings();
-  const origin = env.CONVEX_SITE_URL;
-  if (!origin || !convexOrigin.test(origin))
+  const origin = env.PUBLIC_SITE_URL ?? env.CONVEX_SITE_URL;
+  if (!origin || !(convexOrigin.test(origin) || publicOrigin.test(origin)))
     throw new Error("Google preview requires a Convex HTTP origin.");
   return new SignJWT({ state, origin })
     .setProtectedHeader({ alg: "HS256", typ: "JWT" })
@@ -65,7 +67,9 @@ export const googleRelay = httpActionGeneric(async (_ctx, request) => {
     });
     if (
       typeof payload.origin !== "string" ||
-      !convexOrigin.test(payload.origin) ||
+      !(
+        convexOrigin.test(payload.origin) || publicOrigin.test(payload.origin)
+      ) ||
       typeof payload.state !== "string" ||
       !/^[A-Za-z0-9_-]{43}$/.test(payload.state)
     )

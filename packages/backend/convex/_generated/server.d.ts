@@ -53,6 +53,7 @@ type Env = {
   readonly POSTHOG_ENABLED: string | undefined;
   readonly POSTHOG_HOST: string | undefined;
   readonly POSTHOG_PROJECT_TOKEN: string | undefined;
+  readonly PUBLIC_SITE_URL: string | undefined;
   readonly R2_ACCESS_KEY_ID: string | undefined;
   readonly R2_ACCOUNT_ID: string | undefined;
   readonly R2_BUCKET_NAME: string | undefined;

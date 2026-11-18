@@ -20,6 +20,9 @@ mock.module("../../backend/convex/previews/token/actions/management", () => ({
 mock.module("../../backend/convex/apps/actions/billing", () => ({
   provisionPayments: async () => {},
 }));
+mock.module("../../backend/convex/gateway/actions/origin", () => ({
+  configurePublicOrigin: async () => {},
+}));
 const { create } =
   await import("../../backend/convex/previews/token/actions/create");
 
@@ -38,7 +41,11 @@ test("preview tokens only stage architectures when completion is requested", asy
     runMutation: async (ref, args) => {
       const name = getFunctionName(ref);
       calls.push({ name, args });
-      return name.endsWith(":begin") ? { until } : null;
+      return name.endsWith(":begin")
+        ? { until }
+        : name === "gateway/internal:register"
+          ? `https://fixture${args.reference ? "-draft" : ""}.disposabl.xyz`
+          : null;
     },
   };
   const args = {

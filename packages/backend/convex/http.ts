@@ -5,7 +5,7 @@ import {
   bootstrap as telemetryBootstrap,
 } from "./telemetry";
 import { download } from "./downloads/http";
-import { token, report } from "./github/actions/http";
+import { token, report, site } from "./github/actions/http";
 import createHttpRouter from "@disposabl/disposabl-kit/server/http";
 import { posthogMetadata } from "./connections/http";
 import { desktopUpdate } from "./desktopUpdates";
@@ -40,6 +40,7 @@ http.route({
 });
 http.route({ path: "/github/token", method: "POST", handler: token });
 http.route({ path: "/github/report", method: "POST", handler: report });
+http.route({ path: "/github/site", method: "POST", handler: site });
 
 http.route({
   pathPrefix: "/desktop/updates/",

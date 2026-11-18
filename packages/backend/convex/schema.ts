@@ -35,6 +35,14 @@ import {
 } from "./connections/validator";
 
 export default defineSchema({
+  appHosts: defineTable({
+    appId: v.string(),
+    reference: v.optional(v.string()),
+    slug: v.string(),
+    origin: v.optional(v.string()),
+  })
+    .index("by_slug", ["slug"])
+    .index("by_appId_reference", ["appId", "reference"]),
   aiConsents: defineTable({
     userId: v.string(),
     version: v.string(),

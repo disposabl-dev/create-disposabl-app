@@ -1,6 +1,11 @@
 import { v } from "convex/values";
 import { featureIds } from "@disposabl/disposabl-kit/feature-options";
 
+export const hostResolution = v.union(
+  v.null(),
+  v.object({ origin: v.string() }),
+);
+
 export const feature = v.union(...featureIds.map((id) => v.literal(id)));
 
 export const platformNames = [

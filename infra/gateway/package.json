@@ -1,0 +1,15 @@
+{
+  "name": "disposabl-gateway",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@vercel/functions": "3.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "typescript": "~6.0.3"
+  }
+}

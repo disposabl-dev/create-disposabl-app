@@ -44,8 +44,8 @@ function createMcp(eligibility?: AccountEligibility): McpServer | undefined {
         name: "disposabl",
         title: "Disposabl",
         version: "1.0.0",
-        siteUrl: env.CONVEX_SITE_URL,
-        consentUrl: `${env.CONVEX_SITE_URL}/consent`,
+        siteUrl: env.PUBLIC_SITE_URL ?? env.CONVEX_SITE_URL,
+        consentUrl: `${env.PUBLIC_SITE_URL ?? env.CONVEX_SITE_URL}/consent`,
         scopes: {},
         clientMetadataDocumentHosts: ["claude.ai"],
         tools: eligibility
@@ -172,7 +172,10 @@ export default function createHttpRouter(
       method: "GET",
       handler: httpActionGeneric(async () =>
         Response.json(
-          { ...openapi, servers: [{ url: env.CONVEX_SITE_URL }] },
+          {
+            ...openapi,
+            servers: [{ url: env.PUBLIC_SITE_URL ?? env.CONVEX_SITE_URL }],
+          },
           { headers: cors },
         ),
       ),

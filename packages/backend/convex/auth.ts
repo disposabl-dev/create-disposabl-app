@@ -31,7 +31,7 @@ export const { startSignInWithGoogle, completeSignInWithGoogle } = setupGoogle(
     component: components.authGoogle,
     authorizationState: googleAuthorizationState,
     allowedRedirectOrigins: [
-      env.CONVEX_SITE_URL,
+      env.PUBLIC_SITE_URL ?? env.CONVEX_SITE_URL,
       ...(env.AUTH_REDIRECT_ORIGINS ?? "")
         .split(",")
         .map((origin) => origin.trim()),

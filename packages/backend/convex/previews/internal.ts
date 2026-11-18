@@ -22,6 +22,7 @@ import {
 } from "../validator";
 import type { Doc } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
+import { assignHost, siteFor, convexSitePattern } from "../gateway/model";
 
 export function validateReference(reference: string) {
   if (
@@ -56,9 +57,11 @@ export function presentPlatforms(
         artifactId: _artifactId,
         ...latest
       } = release ?? {};
-      const url =
-        releasedUrl ??
-        (site && Object.hasOwn(routes, name) ? site + routes[name] : undefined);
+      const url = Object.hasOwn(routes, name)
+        ? site
+          ? site + routes[name]
+          : undefined
+        : releasedUrl;
       const enabled = app.platforms.includes(name);
       return [
         platformKey(name),
@@ -75,21 +78,21 @@ export function presentPlatforms(
     }),
   );
 }
-function present(
+async function present(
+  ctx: Pick<QueryCtx, "db">,
   preview: Doc<"previews">,
   app: Doc<"apps">,
-): Infer<typeof previewResult> {
+): Promise<Infer<typeof previewResult>> {
+  const site = await siteFor(ctx, app.appId, preview.reference);
   return {
     appId: preview.appId,
     reference: preview.reference,
     stage: preview.stage,
-    ...(preview.deployment ? { deployment: preview.deployment } : {}),
+    ...(preview.deployment && site
+      ? { deployment: { ...preview.deployment, convexSiteUrl: site } }
+      : {}),
     updatedAt: preview.updatedAt,
-    platforms: presentPlatforms(
-      app,
-      preview.releases,
-      preview.deployment?.convexSiteUrl,
-    ),
+    platforms: presentPlatforms(app, preview.releases, site),
   };
 }
 async function findPreview(
@@ -111,7 +114,7 @@ export const get = internalQuery({
   handler: async (ctx, args) => {
     const app = await ownedApp(ctx, args.userId, args.appId);
     const preview = await findPreview(ctx, args);
-    return preview ? present(preview, app) : null;
+    return preview ? present(ctx, preview, app) : null;
   },
 });
 export const list = internalQuery({
@@ -136,7 +139,9 @@ export const list = internalQuery({
       .paginate(paginationOpts);
     return {
       ...result,
-      page: result.page.map((preview) => present(preview, app)),
+      page: await Promise.all(
+        result.page.map((preview) => present(ctx, preview, app)),
+      ),
     };
   },
 });
@@ -166,9 +171,10 @@ export const finish = internalMutation({
   args: { ...identityFields, ...previewIdentity, deployment },
   returns: v.null(),
   handler: async (ctx, args) => {
-    await ownedApp(ctx, args.userId, args.appId);
+    const app = await ownedApp(ctx, args.userId, args.appId);
     const preview = await findPreview(ctx, args);
     if (!preview) throw new ConvexError("Preview not found.");
+    await assignHost(ctx, app, args.reference, args.deployment.convexSiteUrl);
     await ctx.db.patch("previews", preview._id, {
       deployment: args.deployment,
       updatedAt: Date.now(),
@@ -232,6 +238,21 @@ export const report = internalMutation({
         previous.run.id === args.run.id &&
         previous.run.attempt === args.run.attempt
       );
+    if (
+      args.status === "ready" &&
+      ["web", "api", "mcp"].includes(args.platform) &&
+      args.url
+    ) {
+      const origin = new URL(args.url).origin;
+      if (!convexSitePattern.test(origin))
+        throw new ConvexError("Expected a Convex deployment origin.");
+      await assignHost(
+        ctx,
+        app,
+        args.production ? undefined : args.reference,
+        origin,
+      );
+    }
     if (transition)
       await scheduleTelemetry(
         ctx,

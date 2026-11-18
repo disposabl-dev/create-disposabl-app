@@ -951,6 +951,8 @@ export type PreviewsTokenCreateResponses = {
     convexSiteUrl: string;
     deployKey: string;
     productionConvexSiteUrl?: string;
+    publicSiteUrl?: string;
+    productionSiteUrl?: string;
     repositoryUrl?: string;
     analytics?: {
       projectId: number;

@@ -20,7 +20,7 @@ type WorkflowRun = {
   repository: { id: number };
   head_repository: { id: number };
 };
-async function authorize(ctx: ActionCtx, appId: string, token: string) {
+export async function authorize(ctx: ActionCtx, appId: string, token: string) {
   const claims = await verifyGitHubToken(token);
   const app = await ctx.runQuery(internal.apps.internal.githubApp, { appId });
   if (!app) throw new Error("Repository is not linked to this app.");

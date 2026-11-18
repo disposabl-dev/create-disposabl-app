@@ -28,11 +28,6 @@ import type { DataModel } from "./dataModel.js";
  * `convex.config.ts`.
  */
 type Env = {
-  readonly R2_ACCOUNT_ID: string | undefined;
-  readonly R2_BUCKET_NAME: string | undefined;
-  readonly R2_ACCESS_KEY_ID: string | undefined;
-  readonly R2_SECRET_ACCESS_KEY: string | undefined;
-  readonly REVENUECAT_MANAGED_MONTHLY_ROUTES: string | undefined;
   readonly CONVEX_CLOUD_URL: string;
   readonly CONVEX_SITE_URL: string;
   readonly AUTH_EMAIL_ORIGIN: string | undefined;
@@ -42,12 +37,31 @@ type Env = {
   readonly AUTH_GOOGLE_RELAY_SECRET: string | undefined;
   readonly AUTH_GOOGLE_RELAY_URL: string | undefined;
   readonly AUTH_REDIRECT_ORIGINS: string | undefined;
+  readonly AUTUMN_SECRET_KEY: string | undefined;
+  readonly BILLING_IOS_RETURN_CHANNELS: string | undefined;
+  readonly BILLING_RETURN_URL: string | undefined;
+  readonly DISPOSABL_ENVIRONMENT: string | undefined;
+  readonly MOBILE_WEB_CHECKOUT_ENABLED: string | undefined;
   readonly POSTHOG_ENABLED: string | undefined;
   readonly POSTHOG_HOST: string | undefined;
   readonly POSTHOG_PROJECT_TOKEN: string | undefined;
+  readonly PUBLIC_SITE_URL: string | undefined;
+  readonly R2_ACCESS_KEY_ID: string | undefined;
+  readonly R2_ACCOUNT_ID: string | undefined;
+  readonly R2_BUCKET_NAME: string | undefined;
+  readonly R2_SECRET_ACCESS_KEY: string | undefined;
   readonly RESEND_API_KEY: string | undefined;
   readonly RESEND_FROM_EMAIL: string | undefined;
   readonly RESEND_WEBHOOK_SECRET: string | undefined;
+  readonly REVENUECAT_CONSUMABLE_INTEGRATION_VERIFIED: string | undefined;
+  readonly REVENUECAT_CONSUMABLE_OWNER: string | undefined;
+  readonly REVENUECAT_ENVIRONMENT: string | undefined;
+  readonly REVENUECAT_MANAGED_MONTHLY_ROUTES: string | undefined;
+  readonly REVENUECAT_PROJECT_ID: string | undefined;
+  readonly REVENUECAT_REVIEWER_USERS: string | undefined;
+  readonly REVENUECAT_ROUTES: string | undefined;
+  readonly REVENUECAT_SYNC_ENABLED: string | undefined;
+  readonly REVENUECAT_WEBHOOK_AUTH: string | undefined;
 };
 
 /**

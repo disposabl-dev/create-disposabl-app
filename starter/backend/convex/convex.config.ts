@@ -11,6 +11,7 @@ import { defineApp } from "convex/server";
 
 const app = defineApp({
   env: {
+    PUBLIC_SITE_URL: v.optional(v.string()),
     R2_ACCOUNT_ID: v.optional(v.string()),
     R2_BUCKET_NAME: v.optional(v.string()),
     R2_ACCESS_KEY_ID: v.optional(v.string()),

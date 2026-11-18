@@ -15,6 +15,7 @@ type Target = {
   convexUrl: string;
   deployKey?: string;
   kind: "dev" | "prod";
+  publicSiteUrl?: string;
 };
 export async function configureBillingDeployment(
   target: Target,
@@ -66,7 +67,7 @@ export async function configureBillingDeployment(
             ? [
                 {
                   name: "BILLING_RETURN_URL",
-                  value: `https://${target.name}.convex.site/pricing`,
+                  value: `${target.publicSiteUrl ?? `https://${target.name}.convex.site`}/pricing`,
                 },
               ]
             : []),
@@ -87,7 +88,7 @@ export async function provisionPayments(
   features: readonly string[],
   managementToken: string,
   development: Target,
-  production: { name: string; deploymentUrl: string },
+  production: { name: string; deploymentUrl: string; publicSiteUrl?: string },
 ) {
   if (!features.includes("payments")) return;
   const connection = await ctx.runQuery(internal.connections.internal.get, {
@@ -116,6 +117,7 @@ export async function provisionPayments(
         convexUrl: production.deploymentUrl,
         deployKey,
         kind: "prod",
+        publicSiteUrl: production.publicSiteUrl,
       },
       keys.live,
     );
