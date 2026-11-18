@@ -4,6 +4,7 @@ import { LegalFooter } from "../components/legal-page";
 import { LogOut } from "../components/ui/log-out";
 import { useContext, useState } from "react";
 import { ThemeProvider } from "../lib/theme";
+import { createWebConvexClient } from "../lib/convex-client";
 import {
   createFileRoute,
   Outlet,
@@ -12,7 +13,7 @@ import {
 import { ConvexAuthProvider, useAuthToken } from "@convex-dev/auth/react";
 import {
   ConvexProvider,
-  ConvexReactClient,
+  type ConvexReactClient,
   useConvexAuth,
   useQuery,
 } from "convex/react";
@@ -33,7 +34,7 @@ function Providers() {
     const url = import.meta.env.VITE_CONVEX_URL;
     if (!url)
       throw new Error("Set VITE_CONVEX_URL to your Convex deployment URL");
-    return new ConvexReactClient(url);
+    return createWebConvexClient(url);
   });
 
   return (

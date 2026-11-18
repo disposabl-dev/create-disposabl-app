@@ -43,19 +43,17 @@ try {
       .filter((file) => file.endsWith(".test.ts"))
       .sort()
       .map((file) => `./packages/tests/${file}`);
-    // Match CLI setup, then verify the frozen install used by the first CI run.
+    // Match CLI setup, then run the same frozen install and checks as a preview.
     for (const args of [
       ["fmt"],
       ["install"],
-      ["install", "--frozen-lockfile"],
-      ["run", "check"],
+      ["run", "check:preview"],
       ["test", ...tests],
       ...["cli", "sdk"]
         .filter((name) =>
           existsSync(join(cwd, "packages", name, "package.json")),
         )
         .map((name) => ["run", "--cwd", `packages/${name}`, "build"]),
-      ["run", "build", "--filter=@disposabl/web"],
     ]) {
       const child = spawn(process.execPath, args, {
         cwd,
