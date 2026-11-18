@@ -239,6 +239,7 @@ const touched = [
   "apps/web/src/routeTree.gen.ts",
   "packages/tests/flows/landing.e2e.ts",
   "packages/tests/flows/github-identity.e2e.ts",
+  "package.json",
   "bun.lock",
   "packages/tests/flows/agent.e2e.ts",
   "turbo.json",
@@ -266,6 +267,11 @@ while (pending.length) {
 }
 const json = async (path: string) =>
   JSON.parse(await readFile(join(root, path), "utf8"));
+const manifest = await json("package.json");
+manifest.devDependencies["@disposabl/cli"] = "latest";
+// Keep Bun's "latest" resolution on the registry, not the optional app CLI.
+const appCli = await json("packages/cli/package.json");
+appCli.name = "@disposabl/starter-cli";
 const backendPath = "packages/backend/package.json";
 const backend = await json(backendPath);
 const lock = Bun.JSONC.parse(
@@ -615,6 +621,8 @@ mobileConfig.expo.plugins = mobileConfig.expo.plugins.filter(
     !chatPackages.includes(typeof plugin === "string" ? plugin : plugin[0]),
 );
 for (const [path, value] of [
+  ["package.json", manifest],
+  ["packages/cli/package.json", appCli],
   ["apps/mobile/package.json", mobile],
   ["apps/web/package.json", web],
   ["apps/mobile/app.json", mobileConfig],

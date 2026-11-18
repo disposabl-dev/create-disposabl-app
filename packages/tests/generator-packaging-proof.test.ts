@@ -451,6 +451,23 @@ test("packaged starter and generated profiles exclude product proof fixtures", a
       }
     }
     for await (const root of profiles()) {
+      const manifest = JSON.parse(
+        await readFile(join(root, "package.json"), "utf8"),
+      );
+      assert.equal(manifest.devDependencies["@disposabl/cli"], "latest");
+      const lock = Bun.JSONC.parse(
+        await readFile(join(root, "bun.lock"), "utf8"),
+      );
+      assert.equal(
+        lock.workspaces[""].devDependencies["@disposabl/cli"],
+        "latest",
+      );
+      const management = Object.values(lock.packages).find(
+        (entry: unknown) =>
+          Array.isArray(entry) && /^@disposabl\/cli@\d/.test(entry[0]),
+      ) as string[] | undefined;
+      assert.ok(management, "management CLI must resolve from the registry");
+
       const catalog = await readFile(
         join(root, "packages/disposabl-kit/payments/catalog.ts"),
         "utf8",
@@ -776,3 +793,43 @@ test("packaged starter and generated profiles exclude product proof fixtures", a
     await rm(temp, { recursive: true, force: true });
   }
 });
+
+test(
+  "generated root management bin uses the registry with and without the app CLI",
+  { timeout: 60_000 },
+  async () => {
+    const temp = await mkdtemp(join(tmpdir(), "disposabl-management-cli-"));
+    try {
+      for (const cli of [false, true]) {
+        const app = join(temp, cli ? "with-cli" : "without-cli");
+        await createApp(template, app, "management-fixture", {
+          version: "test",
+          platforms: selectPlatforms(cli ? "web,cli" : "web"),
+          features: [],
+        });
+        const install = spawnSync(process.execPath, ["install"], {
+          cwd: app,
+          encoding: "utf8",
+        });
+        assert.equal(install.status, 0, install.stdout + install.stderr);
+        const manifest = JSON.parse(
+          await readFile(
+            join(app, "node_modules/@disposabl/cli/package.json"),
+            "utf8",
+          ),
+        );
+        assert.notEqual(manifest.version, "0.0.0-development");
+        const version = spawnSync(
+          process.execPath,
+          ["run", "disposabl", "--version"],
+          { cwd: app, encoding: "utf8" },
+        );
+        assert.equal(version.status, 0, version.stderr);
+        assert.equal(version.stdout.trim(), manifest.version);
+        assert.equal(existsSync(join(app, "packages/cli")), cli);
+      }
+    } finally {
+      await rm(temp, { recursive: true, force: true });
+    }
+  },
+);

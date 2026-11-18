@@ -1,5 +1,7 @@
-import { expect, test } from "bun:test";
-import { execFileSync } from "node:child_process";
+// @ts-expect-error bun:test is not included in the workspace's Node type set.
+import { expect } from "bun:test";
+import { test } from "node:test";
+import { execFileSync, spawnSync } from "node:child_process";
 import {
   existsSync,
   mkdirSync,
@@ -60,7 +62,7 @@ test("preview cleanup removes only the published worktree and its generated file
       headRefOid: git("rev-parse", "draft"),
     };
     const cleanup = (overrides: Partial<typeof merged> = {}, path = draft) =>
-      Bun.spawnSync([process.execPath, script, path, "12"], {
+      spawnSync(process.execPath, [script, path, "12"], {
         cwd: repo,
         env: {
           ...process.env,
@@ -74,19 +76,19 @@ test("preview cleanup removes only the published worktree and its generated file
       { headRefOid: "other-commit" },
       { isCrossRepository: true },
     ]) {
-      expect(cleanup(pr).exitCode).toBe(1);
+      expect(cleanup(pr).status).toBe(1);
       expect(existsSync(draft)).toBe(true);
     }
-    expect(cleanup({}, repo).exitCode).toBe(1);
+    expect(cleanup({}, repo).status).toBe(1);
     writeFileSync(join(draft, "untracked.txt"), "keep my work");
-    expect(cleanup().exitCode).toBe(1);
+    expect(cleanup().status).toBe(1);
     expect(existsSync(join(draft, "untracked.txt"))).toBe(true);
     rmSync(join(draft, "untracked.txt"));
     git("worktree", "lock", draft);
-    expect(cleanup().exitCode).toBe(1);
+    expect(cleanup().status).toBe(1);
     git("worktree", "unlock", draft);
 
-    expect(cleanup().exitCode).toBe(0);
+    expect(cleanup().status).toBe(0);
     expect(existsSync(draft)).toBe(false);
     expect(existsSync(join(other, "node_modules", "cache"))).toBe(true);
     expect(existsSync(join(repo, "node_modules", "cache"))).toBe(true);

@@ -19,6 +19,7 @@ When setup finishes:
 ```sh
 cd my-app
 bun run dev
+bun run disposabl apps list # installed management CLI
 ```
 
 Use the app name you chose instead of `my-app`. Your website opens automatically. Mobile apps need a development build before you can open them on a device; they do not use Expo Go. See the generated `apps/mobile/README.md` for the next steps.
