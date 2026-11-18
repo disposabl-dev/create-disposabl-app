@@ -65,6 +65,8 @@ Use the host's worktree and delegation tools when required. Keep tokens in ignor
 
 Before generating the product, write a concise `APP_BRIEF.md` with its purpose, selected platforms and intended user flow. Commit that real change, push the feature branch, and open its PR. Keep the starter usable while the selected native builds from the initial `main` push run in parallel with generation.
 
+Before pushing implementation commits to that PR, regenerate and commit Convex bindings when backend functions or schemas change. Run `bun run check:preview` in a clean local checkout of the intended commit with the app's development web URLs. This runs the pipeline's checks and production web build before CI starts.
+
 An installer from `main` receives production updates, not PR preview updates. After the generated app passes review and its selected-platform checks, merge through the authorized delivery workflow to publish the production update. Compatible Android JavaScript and asset changes use EAS Update; native dependency or configuration changes need a new binary. Desktop delivery needs its configured native update feed. Do not report that an update reached an installed app until that behavior is verified.
 
 ## Preview updates every two minutes
