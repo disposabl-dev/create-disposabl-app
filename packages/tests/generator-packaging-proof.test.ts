@@ -19,6 +19,15 @@ import {
   selectPlatforms,
 } from "../create-disposabl-app/options";
 
+declare const Bun: {
+  JSONC: {
+    parse(text: string): {
+      workspaces: Record<string, { devDependencies: Record<string, string> }>;
+      packages: Record<string, unknown>;
+    };
+  };
+};
+
 const excluded = [
   ".github/workflows/play-bundle.yml",
   ".github/workflows/product-checks.yml",
