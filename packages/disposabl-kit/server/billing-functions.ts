@@ -26,13 +26,21 @@ import {
 } from "./billing";
 
 export const setup = internalAction({
-  args: {},
+  args: { preview: v.optional(v.literal(true)) },
   returns: v.object({
     enabled: v.boolean(),
     created: v.array(v.string()),
     preserved: v.array(v.string()),
   }),
-  handler: async () => setupBilling(paymentsEnabled, process.env),
+  handler: async (_ctx, { preview }) => {
+    if (!paymentsEnabled || !preview)
+      return setupBilling(paymentsEnabled, process.env);
+
+    const key = process.env.AUTUMN_SECRET_KEY?.trim();
+    if (key && !key.startsWith("am_sk_test_"))
+      throw new Error("Preview billing requires an Autumn sandbox key.");
+    return setupBilling(Boolean(key), process.env);
+  },
 });
 
 async function context(ctx: { auth: Auth }) {
