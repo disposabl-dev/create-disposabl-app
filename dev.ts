@@ -33,7 +33,9 @@ if (env.CONVEX_DEPLOY_KEY && !env.CONVEX_DEPLOY_KEY.startsWith("dev:"))
   );
 const url = env.CONVEX_URL;
 const site =
-  env.CONVEX_SITE_URL || url?.replace(/\.convex\.cloud$/, ".convex.site");
+  env.PUBLIC_SITE_URL ||
+  env.CONVEX_SITE_URL ||
+  url?.replace(/\.convex\.cloud$/, ".convex.site");
 if (!url || !site)
   throw new Error(
     "Configure CONVEX_URL and CONVEX_SITE_URL in packages/backend/.env.local.",

@@ -56,9 +56,18 @@ const config = defineConfig(({ mode }) => {
   )
     throw new Error("VITE_PUBLIC_SITE_URL must be an HTTP(S) origin");
   const siteUrl = publicUrl.origin;
-  const indexable = isProductionSite(mode, url.origin, site);
+  const productionSite = (app as { productionSiteUrl?: string })
+    .productionSiteUrl;
+  const indexable = isProductionSite(
+    mode,
+    url.origin,
+    productionSite
+      ? { origin: productionSite, backendOrigin: productionSite }
+      : site,
+  );
   const prerenderFilter = createPrerenderFilter();
   const productionBackend =
+    productionSite ||
     (app as { productionConvexSiteUrl?: string }).productionConvexSiteUrl ||
     site.backendOrigin;
 

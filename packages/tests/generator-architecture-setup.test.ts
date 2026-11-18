@@ -204,6 +204,19 @@ test(
             readFileSync(join(app, "packages/backend/.env.local"), "utf8"),
             /CONVEX_SITE_URL="https:\/\/fixture-dev\.convex\.site"/,
           );
+          execFileSync(process.execPath, ["dev.ts"], {
+            cwd: app,
+            stdio: "pipe",
+          });
+          assert.match(
+            readFileSync(join(app, "apps/web/.env.local"), "utf8"),
+            /VITE_CONVEX_SITE_URL=https:\/\/fixture-main\.disposabl\.xyz/,
+          );
+          assert.equal(
+            JSON.parse(readFileSync(join(app, "disposabl.json"), "utf8"))
+              .productionSiteUrl,
+            "https://fixture.disposabl.xyz",
+          );
           assert.equal(complete[0]!.configured, true);
           assert.deepEqual(complete[0]!.body, {
             appId: "fixture-app",

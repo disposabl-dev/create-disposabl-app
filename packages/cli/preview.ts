@@ -165,7 +165,14 @@ export async function configureDevelopment(
     if (ignored.status !== 0 || tracked.status !== 1)
       throw new Error(`${file} must be untracked and ignored by Git.`);
   }
-  if (value.productionConvexSiteUrl || value.analytics || config.analytics) {
+  if (
+    value.productionConvexSiteUrl ||
+    value.productionSiteUrl ||
+    value.analytics ||
+    config.analytics
+  ) {
+    if (value.productionSiteUrl)
+      config.productionSiteUrl = value.productionSiteUrl;
     if (value.productionConvexSiteUrl)
       config.productionConvexSiteUrl = value.productionConvexSiteUrl;
     // Project tokens are public ingestion configuration. OAuth credentials stay in Disposabl.
@@ -191,8 +198,9 @@ export async function configureDevelopment(
       CONVEX_DEPLOY_KEY: value.deployKey,
       CONVEX_URL: value.convexUrl,
       CONVEX_SITE_URL: value.convexSiteUrl,
+      ...(value.publicSiteUrl ? { PUBLIC_SITE_URL: value.publicSiteUrl } : {}),
     },
-    ["CONVEX_DEPLOYMENT"],
+    ["CONVEX_DEPLOYMENT", "PUBLIC_SITE_URL"],
   );
   await updateEnv(join(root, files[1]!), {
     VITE_CONVEX_URL: value.convexUrl,
