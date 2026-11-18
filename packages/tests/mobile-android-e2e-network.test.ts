@@ -14,6 +14,7 @@ const keys = [
   "EXPO_PUBLIC_CONVEX_SITE_URL",
   "CONVEX_URL",
   "CONVEX_SITE_URL",
+  "PUBLIC_SITE_URL",
   "E2E_ANDROID_APP_ID",
   "E2E_ANDROID_SCHEME",
   "DISPOSABL_MOBILE_CHANNEL",
@@ -32,6 +33,29 @@ function withEnv(values: Record<string, string>, run: () => void) {
     }
   }
 }
+
+test("mobile config accepts the registered public site and rejects other backends", () => {
+  const env = {
+    CONVEX_URL: "https://app.convex.cloud",
+    CONVEX_SITE_URL: "https://app.convex.site",
+    PUBLIC_SITE_URL: "https://app.disposabl.xyz",
+    EXPO_PUBLIC_CONVEX_URL: "https://app.convex.cloud",
+    EXPO_PUBLIC_CONVEX_SITE_URL: "https://app.disposabl.xyz",
+  };
+  withEnv(env, () => assert.doesNotThrow(() => configure({ config: {} })));
+  for (const key of ["EXPO_PUBLIC_CONVEX_URL", "EXPO_PUBLIC_CONVEX_SITE_URL"])
+    withEnv({ ...env, [key]: "https://other.example" }, () =>
+      assert.throws(() => configure({ config: {} }), /conflicts/),
+    );
+  withEnv(
+    {
+      ...env,
+      PUBLIC_SITE_URL: "",
+      EXPO_PUBLIC_CONVEX_SITE_URL: env.CONVEX_SITE_URL,
+    },
+    () => assert.doesNotThrow(() => configure({ config: {} })),
+  );
+});
 
 test("production and E2E-off configurations retain default network security", () => {
   for (const e2e of [undefined, "false"])

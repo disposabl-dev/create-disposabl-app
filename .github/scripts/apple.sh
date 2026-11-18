@@ -100,7 +100,7 @@ case "${1:?operation required}" in
     jq --arg channel "$CHANNEL" --arg number "$DISPOSABL_IOS_BUILD_NUMBER" \
       --arg url "$CONVEX_URL" --arg site "$CONVEX_SITE_URL" --arg publicSite "$EXPO_PUBLIC_CONVEX_SITE_URL" \
       --arg project "$EXPO_PROJECT_ID" --arg owner "${EXPO_OWNER:-}" --arg slug "${EXPO_SLUG:-}" \
-      '.build["ios-production"].env += {DISPOSABL_MOBILE_CHANNEL: $channel, DISPOSABL_IOS_BUILD_NUMBER: $number, CONVEX_URL: $url, CONVEX_SITE_URL: $site, EXPO_PUBLIC_CONVEX_URL: $url, EXPO_PUBLIC_CONVEX_SITE_URL: $publicSite, EXPO_PROJECT_ID: $project, EXPO_OWNER: $owner, EXPO_SLUG: $slug}' eas.json > "$RUNNER_TEMP/eas-production.json"
+      '.build["ios-production"].env += {DISPOSABL_MOBILE_CHANNEL: $channel, DISPOSABL_IOS_BUILD_NUMBER: $number, CONVEX_URL: $url, CONVEX_SITE_URL: $site, PUBLIC_SITE_URL: $publicSite, EXPO_PUBLIC_CONVEX_URL: $url, EXPO_PUBLIC_CONVEX_SITE_URL: $publicSite, EXPO_PROJECT_ID: $project, EXPO_OWNER: $owner, EXPO_SLUG: $slug}' eas.json > "$RUNNER_TEMP/eas-production.json"
     mv "$RUNNER_TEMP/eas-production.json" eas.json
     if [[ -n "${ASC_APP_ID:-}" ]]; then
       jq --arg id "$ASC_APP_ID" '.submit["ios-production"].ios.ascAppId = $id' eas.json > "$RUNNER_TEMP/eas-submit.json"
