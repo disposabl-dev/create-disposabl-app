@@ -32,6 +32,8 @@ type Development = {
   convexSiteUrl: string;
   deployKey: string;
   productionConvexSiteUrl?: string;
+  publicSiteUrl?: string;
+  productionSiteUrl?: string;
   repositoryUrl?: string;
   analytics?: { projectId: number; projectToken: string; host: string };
 };
@@ -94,6 +96,13 @@ export async function configureDevelopment(
     !/^https:\/\/[a-z0-9-]+\.convex\.site$/.test(value.productionConvexSiteUrl)
   )
     throw new Error("Unexpected production Convex site URL.");
+  for (const url of [value.publicSiteUrl, value.productionSiteUrl]) {
+    if (
+      url !== undefined &&
+      !/^https:\/\/[a-z0-9]+(?:[a-z0-9-]*[a-z0-9])?\.disposabl\.xyz$/.test(url)
+    )
+      throw new Error("Unexpected public site URL.");
+  }
   if (config.features?.includes("analytics") && !value.analytics)
     throw new Error(
       "Analytics setup is incomplete. Connect PostHog and retry app setup.",
@@ -187,12 +196,12 @@ export async function configureDevelopment(
   );
   await updateEnv(join(root, files[1]!), {
     VITE_CONVEX_URL: value.convexUrl,
-    VITE_CONVEX_SITE_URL: value.convexSiteUrl,
+    VITE_CONVEX_SITE_URL: value.publicSiteUrl ?? value.convexSiteUrl,
   });
   if (files[2])
     await updateEnv(join(root, files[2]), {
       EXPO_PUBLIC_CONVEX_URL: value.convexUrl,
-      EXPO_PUBLIC_CONVEX_SITE_URL: value.convexSiteUrl,
+      EXPO_PUBLIC_CONVEX_SITE_URL: value.publicSiteUrl ?? value.convexSiteUrl,
     });
 }
 

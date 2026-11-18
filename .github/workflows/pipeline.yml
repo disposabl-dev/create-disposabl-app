@@ -97,6 +97,7 @@ jobs:
       android_version_code: ${{ steps.android-version.outputs.version }}
       convex_url: ${{ steps.deploy.outputs.CONVEX_URL }}
       convex_site_url: ${{ steps.deploy.outputs.CONVEX_SITE_URL }}
+      public_site_url: ${{ steps.deploy.outputs.PUBLIC_SITE_URL }}
     env:
       PLATFORM: android
       DISPOSABL_ANDROID_SIGNING: ${{ github.event_name == 'push' && secrets.DISPOSABL_ANDROID_SIGNING || '' }}
@@ -157,7 +158,7 @@ jobs:
           export AUTH_TARGET=--prod
           target=()
           if [[ "$CHANNEL" != production ]]; then export AUTH_TARGET="--preview-name $CHANNEL"; target=(--preview-name "$CHANNEL"); fi
-          bun x --no-install convex deploy --yes "${target[@]}" --cmd-url-env-var-name CONVEX_URL --cmd 'for name in CONVEX_URL CONVEX_SITE_URL; do value=$(printenv "$name"); test -n "$value" || exit 1; for prefix in "" VITE_ EXPO_PUBLIC_; do export "$prefix$name=$value"; printf "%s=%s\n" "$prefix$name" "$value" | tee -a "$GITHUB_ENV" >> "$GITHUB_OUTPUT"; done; done; bun run --cwd ../.. build --filter=@disposabl/web'
+          bun x --no-install convex deploy --yes "${target[@]}" --cmd-url-env-var-name CONVEX_URL --cmd 'set -e; for name in CONVEX_URL CONVEX_SITE_URL; do value=$(printenv "$name"); test -n "$value"; printf "%s=%s\n" "$name" "$value" | tee -a "$GITHUB_ENV" >> "$GITHUB_OUTPUT"; done; export VITE_CONVEX_URL="$CONVEX_URL"; if node -e "process.exit(require(\"../../disposabl.json\").appId ? 0 : 1)"; then node ../../.github/scripts/disposabl.mjs site; PUBLIC_SITE_URL=$(sed -n "s/^PUBLIC_SITE_URL=//p" "$GITHUB_OUTPUT" | tail -1); export PUBLIC_SITE_URL; bun x --no-install convex env set $AUTH_TARGET PUBLIC_SITE_URL "$PUBLIC_SITE_URL"; else PUBLIC_SITE_URL="$CONVEX_SITE_URL"; printf "PUBLIC_SITE_URL=%s\n" "$PUBLIC_SITE_URL" >> "$GITHUB_OUTPUT"; fi; export VITE_CONVEX_SITE_URL="$PUBLIC_SITE_URL"; bun run --cwd ../.. build --filter=@disposabl/web'
           setup_target=(--prod)
           if [[ "$CHANNEL" != production ]]; then setup_target=("${target[@]}"); fi
           bun x --no-install convex run "${setup_target[@]}" billing:setup '{}'
@@ -229,7 +230,7 @@ jobs:
       CONVEX_URL: ${{ needs.web.outputs.convex_url }}
       CONVEX_SITE_URL: ${{ needs.web.outputs.convex_site_url }}
       EXPO_PUBLIC_CONVEX_URL: ${{ needs.web.outputs.convex_url }}
-      EXPO_PUBLIC_CONVEX_SITE_URL: ${{ needs.web.outputs.convex_site_url }}
+      EXPO_PUBLIC_CONVEX_SITE_URL: ${{ needs.web.outputs.public_site_url }}
       ANDROID_PLAY_SUBMIT: ${{ vars.ANDROID_PLAY_SUBMIT }}
     steps:
       - *checkout
@@ -362,7 +363,7 @@ jobs:
       CONVEX_URL: ${{ needs.web.outputs.convex_url }}
       CONVEX_SITE_URL: ${{ needs.web.outputs.convex_site_url }}
       EXPO_PUBLIC_CONVEX_URL: ${{ needs.web.outputs.convex_url }}
-      EXPO_PUBLIC_CONVEX_SITE_URL: ${{ needs.web.outputs.convex_site_url }}
+      EXPO_PUBLIC_CONVEX_SITE_URL: ${{ needs.web.outputs.public_site_url }}
       EXPO_PROJECT_ID: ${{ secrets.EXPO_PROJECT_ID || vars.EXPO_PROJECT_ID }}
       EXPO_OWNER: ${{ secrets.EXPO_OWNER || vars.EXPO_OWNER }}
       EXPO_SLUG: ${{ secrets.EXPO_SLUG || vars.EXPO_SLUG }}
@@ -424,7 +425,7 @@ jobs:
       CONVEX_URL: ${{ needs.web.outputs.convex_url }}
       CONVEX_SITE_URL: ${{ needs.web.outputs.convex_site_url }}
       EXPO_PUBLIC_CONVEX_URL: ${{ needs.web.outputs.convex_url }}
-      EXPO_PUBLIC_CONVEX_SITE_URL: ${{ needs.web.outputs.convex_site_url }}
+      EXPO_PUBLIC_CONVEX_SITE_URL: ${{ needs.web.outputs.public_site_url }}
     steps:
       - *checkout
       - *node
