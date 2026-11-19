@@ -737,7 +737,9 @@ test("deployment telemetry sends only approved platform, channel and elapsed tim
   delete process.env.E2E_TELEMETRY_DISABLED;
   delete process.env.POSTHOG_ENABLED;
   let body: any;
+  let requests = 0;
   globalThis.fetch = (async (_input, init) => {
+    requests++;
     body = JSON.parse(String(init?.body));
     return new Response();
   }) as typeof fetch;
@@ -747,7 +749,7 @@ test("deployment telemetry sends only approved platform, channel and elapsed tim
     "owner",
     config,
   );
-  assert.equal(body, undefined);
+  assert.equal(requests, 0);
   await captureTelemetry(
     "platform_deployment",
     {
