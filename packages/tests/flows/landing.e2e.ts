@@ -762,7 +762,12 @@ test(
     await expect(browser.locator(".app-foundation")).toContainText("blog");
     await expect(
       browser.locator('footer nav[aria-label="Explore Disposabl"] a'),
-    ).toHaveCount(4);
+    ).toHaveCount(5);
+    await expect(
+      browser.locator(
+        'footer nav[aria-label="Explore Disposabl"] a[href="/guides"]',
+      ),
+    ).toHaveText("Guides");
     await expect(
       browser.locator('footer nav[aria-label="Footer navigation"] a'),
     ).toHaveCount(4);
