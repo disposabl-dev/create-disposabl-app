@@ -164,7 +164,7 @@ export default function createHttpRouter(
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
       "Access-Control-Allow-Headers":
-        "Authorization, Content-Type, X-Disposabl-Source",
+        "Authorization, Content-Type, X-Disposabl-Source, traceparent",
       "Cache-Control": "no-store",
     };
     http.route({

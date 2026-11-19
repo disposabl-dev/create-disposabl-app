@@ -8,6 +8,7 @@ import {
   type McpUser,
 } from "@convex-dev/mcp";
 import { scheduleTelemetry } from "./telemetry";
+import { parseTraceparent } from "../../lib/observability";
 import { makeFunctionReference as reference } from "convex/server";
 import {
   v,
@@ -117,6 +118,7 @@ export function createPlatforms(
                 operation: id,
                 outcome: "success",
                 duration_ms: Date.now() - startedAt,
+                started_at_ms: startedAt,
               },
               user.userId,
             );
@@ -130,6 +132,7 @@ export function createPlatforms(
                 operation: id,
                 outcome: "error",
                 duration_ms: Date.now() - startedAt,
+                started_at_ms: startedAt,
               },
               user.userId,
             );
@@ -163,6 +166,9 @@ export function createPlatforms(
           { error: "method_not_allowed" },
           { status: 405, headers: { Allow: method } },
         );
+      const doNotTrack =
+        request.headers.get("DNT") === "1" ||
+        request.headers.get("Sec-GPC") === "1";
       try {
         const user = policy
           ? await policy.authenticate(ctx, request, authenticate)
@@ -199,7 +205,9 @@ export function createPlatforms(
         const startedAt = Date.now();
         const header = request.headers.get("X-Disposabl-Source");
         const source = header === "cli" || header === "sdk" ? header : "api";
+        const traceparent = request.headers.get("traceparent");
         const record = async (outcome: "success" | "error") => {
+          if (doNotTrack) return;
           await scheduleTelemetry(
             ctx,
             "api_operation",
@@ -208,6 +216,9 @@ export function createPlatforms(
               operation: operation.name,
               outcome,
               duration_ms: Date.now() - startedAt,
+              started_at_ms: startedAt,
+              ...(traceparent &&
+                parseTraceparent(traceparent) && { traceparent }),
             },
             user.userId,
           );
@@ -257,11 +268,12 @@ export function createPlatforms(
           return Response.json({ error: "invalid_request" }, { status: 400 });
         const operation = spec.find((item) => item.path === url.pathname)!;
         const header = request.headers.get("X-Disposabl-Source");
-        await scheduleTelemetry(ctx, "api_operation", {
-          source: header === "cli" || header === "sdk" ? header : "api",
-          operation: operation.name,
-          outcome: "error",
-        });
+        if (!doNotTrack)
+          await scheduleTelemetry(ctx, "api_operation", {
+            source: header === "cli" || header === "sdk" ? header : "api",
+            operation: operation.name,
+            outcome: "error",
+          });
         console.error("platform_api_internal_error");
         return Response.json({ error: "internal_error" }, { status: 500 });
       }

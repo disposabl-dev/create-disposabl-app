@@ -58,6 +58,8 @@ export function safeTelemetryEvent(
     distinct_id: input.distinctId,
     $geoip_disable: true,
     platform: input.source,
+    source: input.source,
+    environment: "production",
     ...(typeof input.sessionId === "string" && uuid.test(input.sessionId)
       ? { $session_id: input.sessionId }
       : {}),

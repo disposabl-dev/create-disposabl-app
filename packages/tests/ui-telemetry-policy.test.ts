@@ -109,6 +109,8 @@ test("web events emit only fixed fields and stop at the lease deadline", () => {
     distinct_id: "server-id",
     $geoip_disable: true,
     platform: "web",
+    source: "web",
+    environment: "production",
     page: "connections",
     $current_url: "https://www.disposabl.dev/dashboard/connections",
   });
@@ -127,6 +129,8 @@ test("web events emit only fixed fields and stop at the lease deadline", () => {
       distinct_id: "server-id",
       $geoip_disable: true,
       platform: "web",
+      source: "web",
+      environment: "production",
       action: "open_connections",
     },
   );
@@ -140,6 +144,8 @@ test("web events emit only fixed fields and stop at the lease deadline", () => {
     distinct_id: "server-id",
     $geoip_disable: true,
     platform: "web",
+    source: "web",
+    environment: "production",
     $exception_list: [
       {
         type: "Error",

@@ -22,11 +22,11 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 
 const config = defineConfig(({ mode }) => {
-  const { VITE_CONVEX_SITE_URL, VITE_PUBLIC_SITE_URL } = loadEnv(
-    mode,
-    process.cwd(),
-    "VITE_",
-  );
+  const {
+    VITE_CONVEX_SITE_URL,
+    VITE_PUBLIC_SITE_URL,
+    VITE_DISPOSABL_ANALYTICS_ENABLED,
+  } = loadEnv(mode, process.cwd(), "VITE_");
   if (!VITE_CONVEX_SITE_URL) {
     throw new Error(
       "Set VITE_CONVEX_SITE_URL to the public Convex site origin",
@@ -56,20 +56,21 @@ const config = defineConfig(({ mode }) => {
   )
     throw new Error("VITE_PUBLIC_SITE_URL must be an HTTP(S) origin");
   const siteUrl = publicUrl.origin;
-  const productionSite = (app as { productionSiteUrl?: string })
-    .productionSiteUrl;
+  const production = app as {
+    productionSiteUrl?: string;
+    productionConvexSiteUrl?: string;
+  };
+  const brandedSite = production.productionSiteUrl;
   const indexable = isProductionSite(
     mode,
     url.origin,
-    productionSite
-      ? { origin: productionSite, backendOrigin: productionSite }
-      : site,
+    brandedSite ? { origin: brandedSite, backendOrigin: brandedSite } : site,
   );
   const prerenderFilter = createPrerenderFilter();
-  const productionBackend =
-    productionSite ||
-    (app as { productionConvexSiteUrl?: string }).productionConvexSiteUrl ||
-    site.backendOrigin;
+  const productionOrigins = [
+    brandedSite || site.origin,
+    production.productionConvexSiteUrl || site.backendOrigin,
+  ];
 
   return {
     define: {
@@ -77,9 +78,10 @@ const config = defineConfig(({ mode }) => {
       "import.meta.env.VITE_PUBLIC_SITE_URL": JSON.stringify(siteUrl),
       "import.meta.env.VITE_SEARCH_INDEXABLE": JSON.stringify(indexable),
       "import.meta.env.VITE_DISPOSABL_ANALYTICS_ENABLED": JSON.stringify(
-        indexable &&
-          !!productionBackend &&
-          url.origin === productionBackend &&
+        mode === "production" &&
+          productionOrigins.includes(url.origin) &&
+          (!process.env.CHANNEL || process.env.CHANNEL === "production") &&
+          VITE_DISPOSABL_ANALYTICS_ENABLED !== "false" &&
           process.env.E2E_TELEMETRY_DISABLED !== "1" &&
           (app.features as readonly string[]).includes("analytics")
           ? "true"

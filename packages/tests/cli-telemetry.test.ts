@@ -281,10 +281,12 @@ test("anonymous events link on login and reset between users with only approved 
       "$geoip_disable",
       "$ip",
       "command",
+      "environment",
       "invocation",
       "outcome",
       "platform",
       "product",
+      "source",
       "version",
     ].sort(),
   );

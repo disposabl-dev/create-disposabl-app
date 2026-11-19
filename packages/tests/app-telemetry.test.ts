@@ -9,13 +9,14 @@ afterEach(() => {
   Object.assign(process.env, originalEnv);
 });
 
-test("release transitions measure from creation and ignore duplicate reports", async () => {
+test("only production release transitions are measured, once per report", async () => {
   const { report } = await import("../backend/convex/previews/internal");
   const { default: appConfig } = await import("../../disposabl.json");
   const features = [...appConfig.features];
   const original = Date.now;
   const scheduled: any[] = [];
   let release: any = null;
+  let preview: any = null;
   const app = {
     _id: "row",
     _creationTime: 1000,
@@ -41,11 +42,13 @@ test("release transitions measure from creation and ignore duplicate reports", a
     db: {
       query: (table: string) => ({
         withIndex: () => ({
-          unique: async () => (table === "apps" ? app : release),
+          unique: async () =>
+            table === "apps" ? app : table === "previews" ? preview : release,
         }),
       }),
-      insert: async (_table: string, data: any) => {
-        release = { _id: "release", ...data };
+      insert: async (table: string, data: any) => {
+        if (table === "previews") preview = { _id: "preview", ...data };
+        else release = { _id: "release", ...data };
       },
       patch: async (_table: string, _id: string, data: any) => {
         release = { ...release, ...data };
@@ -64,6 +67,13 @@ test("release transitions measure from creation and ignore duplicate reports", a
     run: { id: 1, attempt: 1, number: 1, commitSha: "sha", url: "private" },
   };
   try {
+    await (report as any)._handler(ctx, {
+      ...args,
+      reference: "feature/preview",
+      production: false,
+    });
+    assert.equal(preview?.releases.web.status, "ready");
+    assert.equal(scheduled.length, 0);
     await (report as any)._handler(ctx, args);
     await (report as any)._handler(ctx, args);
     assert.equal(scheduled.length, 1);

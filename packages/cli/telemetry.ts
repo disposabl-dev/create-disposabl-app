@@ -47,8 +47,7 @@ export function telemetryConfig(
     env.BUN_ENV === "test" ||
     env.CI ||
     env.E2E_TELEMETRY_DISABLED ||
-    ["1", "true"].includes(env.DO_NOT_TRACK?.toLowerCase() ?? "") ||
-    env.DISPOSABL_TELEMETRY_DISABLED === "1" ||
+    telemetryOptedOut() ||
     env.DISPOSABL_API_KEY ||
     (env.DISPOSABL_API_ORIGIN &&
       env.DISPOSABL_API_ORIGIN !== "https://www.disposabl.dev") ||
@@ -59,6 +58,13 @@ export function telemetryConfig(
   )
     return null;
   return { token, host: host! };
+}
+
+export function telemetryOptedOut() {
+  return (
+    ["1", "true"].includes(process.env.DO_NOT_TRACK?.toLowerCase() ?? "") ||
+    process.env.DISPOSABL_TELEMETRY_DISABLED === "1"
+  );
 }
 
 const directory = () => join(homedir(), ".config", "disposabl");
@@ -120,7 +126,12 @@ async function send(
       api_key: config.token,
       event,
       distinct_id: distinctId,
-      properties: { ...properties, $geoip_disable: true, $ip: "0.0.0.0" },
+      properties: {
+        ...properties,
+        environment: "production",
+        $geoip_disable: true,
+        $ip: "0.0.0.0",
+      },
     }),
   });
   return response.ok;
@@ -174,6 +185,7 @@ export async function capture(
       outcome === "started" && (await firstExecution(path, product, version));
     const properties = {
       product,
+      source: product,
       command: allowed.includes(command) ? command : "other",
       outcome,
       version,
