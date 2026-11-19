@@ -408,3 +408,26 @@ test("meaningful workflow mutations are rejected", () => {
   requiresChecks(publish.jobs.publish);
   expect(() => requiresChecks(badPublish)).toThrow();
 });
+
+test("product iOS builds use hosted compute and retain a verified recovery trail", () => {
+  const job = pipeline.jobs["ios-production"];
+  expect(job["runs-on"]).toContain("xcode-27");
+  expect(step(job, "Restore verified iOS build provenance").with.path).toBe(
+    ".ios-provenance/build.json",
+  );
+  expect(step(job, "Restore same-run iOS upload").with.path).toBe(
+    ".ios-upload/build.json",
+  );
+  expect(
+    step(job, "Upload and verify product iOS binary").env.IOS_RECOVERY,
+  ).toContain("ios-upload.outputs.cache-hit");
+  expect(step(job, "Submit exact product build for App Review").if).toContain(
+    "disposabl-dev/create-disposabl-app",
+  );
+  expect(step(job, "Publish compatible iOS production update").if).toContain(
+    "ios-review.outputs.ota == 'true'",
+  );
+  expect(step(job, "Build and submit to TestFlight").if).toContain(
+    "github.repository != 'disposabl-dev/create-disposabl-app'",
+  );
+});

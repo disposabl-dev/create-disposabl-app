@@ -121,7 +121,7 @@ jobs:
         run: |
           python3 .github/scripts/play-bundle.test.py
           python3 .github/scripts/android-release.test.py
-          node --test .github/scripts/android-bundle-verify.test.mjs
+          node --test .github/scripts/android-bundle-verify.test.mjs .github/scripts/apple-review.test.mjs
       - &bun
         uses: oven-sh/setup-bun@v2
         with: { bun-version: *bun-version }
@@ -424,14 +424,15 @@ jobs:
     needs: [changes, web]
     if: github.event_name == 'push' && needs.web.outputs.ios == 'true'
     permissions: *release-permissions
-    runs-on: ${{ needs.changes.outputs.linux_runner }}
-    timeout-minutes: 20
+    runs-on: ${{ github.repository == 'disposabl-dev/create-disposabl-app' && 'xcode-27' || needs.changes.outputs.linux_runner }}
+    timeout-minutes: 90
     env:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
       EXPO_PROJECT_ID: ${{ secrets.EXPO_PROJECT_ID || vars.EXPO_PROJECT_ID }}
       EXPO_OWNER: ${{ secrets.EXPO_OWNER || vars.EXPO_OWNER }}
       EXPO_SLUG: ${{ secrets.EXPO_SLUG || vars.EXPO_SLUG }}
       EXPO_NO_DOTENV: "1"
+      ASC_APP_ID: ${{ secrets.ASC_APP_ID || vars.ASC_APP_ID }}
       CONVEX_URL: ${{ needs.web.outputs.convex_url }}
       CONVEX_SITE_URL: ${{ needs.web.outputs.convex_site_url }}
       EXPO_PUBLIC_CONVEX_URL: ${{ needs.web.outputs.convex_url }}
@@ -460,20 +461,96 @@ jobs:
         if: steps.apple-prerequisites.outputs.ready == 'true'
         working-directory: apps/mobile
         run: bash "$GITHUB_WORKSPACE/.github/scripts/apple.sh" ota-plan
+      - name: Restore verified iOS build provenance
+        id: ios-provenance
+        if: github.repository == 'disposabl-dev/create-disposabl-app' && steps.apple-prerequisites.outputs.ready == 'true'
+        uses: actions/cache/restore@v4
+        with:
+          path: .ios-provenance/build.json
+          key: ios-native-${{ env.ASC_APP_ID }}-${{ env.EXPO_PROJECT_ID }}-${{ steps.ios-plan.outputs.version }}-${{ steps.ios-plan.outputs.runtime }}
+      - name: Validate iOS build provenance
+        id: ios-baseline
+        if: github.repository == 'disposabl-dev/create-disposabl-app' && steps.ios-provenance.outputs.cache-hit == 'true'
+        env:
+          APP_VERSION: ${{ steps.ios-plan.outputs.version }}
+          RUNTIME: ${{ steps.ios-plan.outputs.runtime }}
+          IOS_IDENTIFIER: ${{ steps.ios-plan.outputs.identifier }}
+        run: |
+          build=$(jq -er --arg app "$ASC_APP_ID" --arg project "$EXPO_PROJECT_ID" --arg version "$APP_VERSION" --arg runtime "$RUNTIME" --arg identifier "$IOS_IDENTIFIER" 'select(.app == $app and .project == $project and .version == $version and .runtime == $runtime and .identifier == $identifier) | .build | select(test("^[0-9]+$"))' .ios-provenance/build.json)
+          echo "build=$build" >> "$GITHUB_OUTPUT"
+      - name: Restore same-run iOS upload
+        id: ios-upload
+        if: github.repository == 'disposabl-dev/create-disposabl-app' && steps.apple-prerequisites.outputs.ready == 'true' && steps.ios-provenance.outputs.cache-hit != 'true'
+        uses: actions/cache/restore@v4
+        with:
+          path: .ios-upload/build.json
+          key: ios-upload-${{ github.run_id }}-${{ github.sha }}
+      - name: Build product iOS binary
+        if: github.repository == 'disposabl-dev/create-disposabl-app' && steps.apple-prerequisites.outputs.ready == 'true' && steps.ios-provenance.outputs.cache-hit != 'true' && steps.ios-upload.outputs.cache-hit != 'true'
+        working-directory: apps/mobile
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+          DEVELOPER_DIR: /Applications/Xcode_27.2.app/Contents/Developer
+          APP_VERSION: ${{ steps.ios-plan.outputs.version }}
+          RUNTIME: ${{ steps.ios-plan.outputs.runtime }}
+          IOS_IDENTIFIER: ${{ steps.ios-plan.outputs.identifier }}
+          IOS_PHASE: build
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/apple.sh" production
+      - name: Save same-run iOS upload
+        if: github.repository == 'disposabl-dev/create-disposabl-app' && steps.apple-prerequisites.outputs.ready == 'true' && steps.ios-provenance.outputs.cache-hit != 'true' && steps.ios-upload.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: .ios-upload/build.json
+          key: ios-upload-${{ github.run_id }}-${{ github.sha }}
+      - name: Upload and verify product iOS binary
+        if: github.repository == 'disposabl-dev/create-disposabl-app' && steps.apple-prerequisites.outputs.ready == 'true' && steps.ios-provenance.outputs.cache-hit != 'true'
+        working-directory: apps/mobile
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+          DEVELOPER_DIR: /Applications/Xcode_27.2.app/Contents/Developer
+          APP_VERSION: ${{ steps.ios-plan.outputs.version }}
+          RUNTIME: ${{ steps.ios-plan.outputs.runtime }}
+          IOS_IDENTIFIER: ${{ steps.ios-plan.outputs.identifier }}
+          IOS_PHASE: upload
+          IOS_RECOVERY: ${{ steps.ios-upload.outputs.cache-hit == 'true' && 'true' || 'false' }}
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/apple.sh" production
+      - name: Save verified iOS build provenance
+        if: github.repository == 'disposabl-dev/create-disposabl-app' && steps.apple-prerequisites.outputs.ready == 'true' && steps.ios-provenance.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: .ios-provenance/build.json
+          key: ios-native-${{ env.ASC_APP_ID }}-${{ env.EXPO_PROJECT_ID }}-${{ steps.ios-plan.outputs.version }}-${{ steps.ios-plan.outputs.runtime }}
+      - name: Submit exact product build for App Review
+        id: ios-review
+        if: github.repository == 'disposabl-dev/create-disposabl-app' && steps.apple-prerequisites.outputs.ready == 'true'
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+          APP_VERSION: ${{ steps.ios-plan.outputs.version }}
+          BUILD_NUMBER: ${{ steps.ios-baseline.outputs.build || github.run_number }}
+        run: |
+          test "$(gh api "repos/$GH_REPO/$SOURCE_PATH" --jq .object.sha)" = "$SOURCE"
+          node .github/scripts/apple-review.mjs
+          node .github/scripts/disposabl.mjs report ios ready 'Exact iOS build uploaded and App Store review reconciled; Apple distribution may still be pending.'
       - name: Publish compatible iOS production update
-        if: steps.ios-plan.outputs.action == 'update'
+        if: steps.ios-plan.outputs.action == 'update' || (github.repository == 'disposabl-dev/create-disposabl-app' && steps.ios-provenance.outputs.cache-hit == 'true' && steps.ios-review.outputs.ota == 'true')
         working-directory: apps/mobile
         env:
           RUNTIME: ${{ steps.ios-plan.outputs.runtime }}
         run: bash "$GITHUB_WORKSPACE/.github/scripts/apple.sh" ota
       - name: Build and submit to TestFlight
-        if: steps.ios-plan.outputs.action == 'build'
+        if: github.repository != 'disposabl-dev/create-disposabl-app' && steps.ios-plan.outputs.action == 'build'
         working-directory: apps/mobile
         env:
           ASC_APP_ID: ${{ secrets.ASC_APP_ID || vars.ASC_APP_ID }}
         run: bash "$GITHUB_WORKSPACE/.github/scripts/apple.sh" production
       - name: Reconcile delivery of the compatible native build
-        if: steps.ios-plan.outputs.action == 'update'
+        if: github.repository != 'disposabl-dev/create-disposabl-app' && steps.ios-plan.outputs.action == 'update'
         working-directory: apps/mobile
         env:
           BUILD_ID: ${{ steps.ios-plan.outputs.build_id }}
