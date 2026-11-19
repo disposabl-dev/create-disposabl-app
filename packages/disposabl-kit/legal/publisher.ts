@@ -8,7 +8,7 @@ export const publisher: Publisher = {
   policy: {
     reviewed: true,
     dataNotice:
-      "We handle information about purchases, credit balances and compute use to provide billing, reconcile transactions and operate Agent Mode. If you connect a provider, we handle the account and authorization information needed for the connection. In production, optional usage analytics are sent to PostHog only when you opt in; you can change your analytics choice in the app.",
+      "We handle information about purchases, credit balances and compute use to provide billing, reconcile transactions and operate Agent Mode. If you connect a provider, we handle the account and authorization information needed for the connection. If you post a comment in Guides, your comment and display name are public. We store likes, blocks and reports to operate and moderate Guides. In production, optional usage analytics are sent to PostHog only when you opt in; you can change your analytics choice in the app.",
     effectiveDate: "2026-11-16",
     audience:
       "Disposabl is intended for adults aged 18 or older. You must be at least 18 to create an account or use the service.",
@@ -26,6 +26,10 @@ export const publisher: Publisher = {
     ],
   },
   providers: [
+    {
+      name: "Mux",
+      purpose: "Delivery of Guides videos you watch",
+    },
     {
       name: "GitHub",
       purpose:

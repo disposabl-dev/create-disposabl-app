@@ -5,6 +5,7 @@ import {
   revenueCatTransferHolds,
 } from "@disposabl/disposabl-kit/server/revenuecat-validator";
 import { desktopUpdateTable } from "./desktopUpdates/validator";
+import { guideTables } from "./guides/model";
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 import {
@@ -35,6 +36,7 @@ import {
 } from "./connections/validator";
 
 export default defineSchema({
+  ...guideTables,
   appHosts: defineTable({
     appId: v.string(),
     reference: v.optional(v.string()),
@@ -163,6 +165,7 @@ export default defineSchema({
     lease: v.optional(v.string()),
   }).index("by_key", ["key"]),
   users: defineTable({
+    guideCommentsBanned: v.optional(v.boolean()),
     managedSandbox: v.optional(
       v.object({
         state: v.union(

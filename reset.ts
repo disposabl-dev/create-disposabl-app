@@ -154,6 +154,7 @@ const productGuides = [
   "packages/disposabl-kit/guides.ts",
   "packages/disposabl-kit/guide-media.json",
   "packages/tests/flows/guides.e2e.ts",
+  "packages/tests/flows/guide-engagement.e2e.ts",
 ];
 
 // Validate every required input before removing anything. Unrelated skill
@@ -597,6 +598,7 @@ for (const dependency of [
   "@vercel/connect",
   "libsodium-wrappers",
   "node-forge",
+  "obscenity",
 ])
   delete backend.dependencies[dependency];
 delete backend.devDependencies["@types/node-forge"];
