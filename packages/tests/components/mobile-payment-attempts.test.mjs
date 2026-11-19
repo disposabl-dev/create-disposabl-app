@@ -41,7 +41,8 @@ mock.module("../../../packages/disposabl-kit/mobile/billing/session", () => ({
     endTransaction() {
       releasedTransactions++;
     },
-    run: async () => {},
+    run: async (_id, _version, _key, fn) =>
+      fn({ canMakePayments: async () => true, getOfferings: async () => ({}) }),
   },
 }));
 mock.module(
@@ -64,8 +65,10 @@ mock.module("../../../packages/disposabl-kit/mobile/billing/use-topup", () => ({
 }));
 mock.module("../../../packages/disposabl-kit/mobile/billing/paywall", () => ({
   monthlyOfferingId: "",
-  presentMonthlyPaywall: async () => {},
-  selectMonthlyOffering: () => null,
+  purchaseMonthlySubscription: async () => {},
+  selectMonthlyOffering: () => ({
+    availablePackages: [{ product: { priceString: "$5" } }],
+  }),
 }));
 mock.module("expo-secure-store", () => ({
   getItemAsync: async () => "allow",
@@ -158,7 +161,7 @@ afterEach(async () => {
   transaction = true;
   captureThrows = false;
   releasedTransactions = 0;
-  webBusy = false;
+  topupBusy = false;
   topupBusy = false;
   available = true;
   topupAvailable = true;
@@ -166,39 +169,31 @@ afterEach(async () => {
 });
 test("actual payment handlers emit fixed attempt categories once", async () => {
   await mount();
-  await press("View subscription");
-  await press("Buy monthly on website");
+  await press("750 credits ·");
   await press("Buy 5");
-  await press("Buy top-up on website");
   expect(events.map((e) => e.properties.action)).toEqual([
     "billing_native_subscription_attempt",
-    "billing_website_monthly_attempt",
     "billing_native_topup_attempt",
-    "billing_website_topup_attempt",
   ]);
-  expect(calls).toEqual(["monthly", "topup", "topup"]);
+  expect(calls).toEqual(["topup"]);
   await act(async () => renderer.update(tree()));
-  expect(events).toHaveLength(4);
+  expect(events).toHaveLength(2);
   expect(JSON.stringify(events)).not.toContain("secret-marker");
 });
 test("busy, stale session, unavailable and transaction guards do not emit", async () => {
   await mount();
-  webBusy = true;
+  topupBusy = true;
   await act(async () => renderer.update(tree()));
-  await press("View subscription");
-  await press("Buy monthly on website");
+  await press("750 credits ·");
   await press("Buy 5");
-  await press("Buy top-up on website");
-  webBusy = false;
+  topupBusy = false;
   current = false;
   await act(async () => renderer.update(tree()));
-  await press("View subscription");
-  await press("Buy monthly on website");
+  await press("750 credits ·");
   await press("Buy 5");
-  await press("Buy top-up on website");
   current = true;
   transaction = false;
-  await press("View subscription");
+  await press("750 credits ·");
   available = false;
   topupAvailable = false;
   product = null;
@@ -213,14 +208,14 @@ test("expired telemetry lease and opt-out suppress handler events", async () => 
   await mount();
   const now = Date.now;
   Date.now = () => now() + 31000;
-  await press("Buy monthly on website");
+  await press("750 credits ·");
   Date.now = now;
   expect(events).toHaveLength(0);
   await act(async () => {
     renderer.root.findByType("PreferenceRow").props.onPress();
     await Promise.resolve();
   });
-  await press("Buy top-up on website");
+  await press("Buy 5");
   expect(events).toHaveLength(0);
   await act(async () => {
     renderer.root.findByType("PreferenceRow").props.onPress();
@@ -231,7 +226,7 @@ test("E2E never initializes telemetry for payment attempts", async () => {
   process.env.EXPO_PUBLIC_E2E = "true";
   const count = globalThis.fetch.mock.calls.length;
   await mount();
-  await press("Buy monthly on website");
+  await press("750 credits ·");
   expect(events).toHaveLength(0);
   expect(globalThis.fetch.mock.calls.length).toBe(count);
   process.env.EXPO_PUBLIC_E2E = "false";
@@ -240,10 +235,8 @@ test("E2E never initializes telemetry for payment attempts", async () => {
 test("SDK failure cannot interrupt billing or strand its transaction lock", async () => {
   await mount();
   captureThrows = true;
-  await press("View subscription");
-  await press("Buy monthly on website");
+  await press("750 credits ·");
   await press("Buy 5");
-  await press("Buy top-up on website");
   expect(releasedTransactions).toBe(1);
-  expect(calls).toEqual(["monthly", "topup", "topup"]);
+  expect(calls).toEqual(["topup"]);
 });

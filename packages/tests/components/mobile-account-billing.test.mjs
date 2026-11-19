@@ -8,6 +8,7 @@ process.env.EXPO_PUBLIC_REVENUECAT_IOS_MONTHLY_PRODUCT = "test-monthly";
 let snapshotFails = false;
 let offeringFails = false;
 let renderer;
+const purchasePackage = mock();
 const snapshot = {
   balance: 1000,
   customerId: "customer",
@@ -19,7 +20,8 @@ const snapshot = {
 };
 const sdk = {
   canMakePayments: async () => true,
-  getStorefront: async () => ({ countryCode: "USA" }),
+  getCustomerInfo: async () => ({ activeSubscriptions: [] }),
+  purchasePackage,
   getOfferings: async () => {
     if (offeringFails) throw new Error("BILLING_UNAVAILABLE");
     return {
@@ -56,6 +58,8 @@ mock.module("../../../packages/disposabl-kit/mobile/billing/session", () => ({
     acquire: () => 1,
     release() {},
     current: () => true,
+    beginTransaction: () => true,
+    endTransaction() {},
     run: async (_id, _version, _key, action) => action(sdk),
   },
 }));
@@ -99,31 +103,33 @@ const texts = () =>
         .join(""),
     ]);
 const contains = (text) => texts().some((value) => value.includes(text));
-const refresh = async () => {
+const press = async (label) => {
   const button = renderer.root
     .findAllByType("Pressable")
     .find((node) =>
       node
         .findAllByType("Text")
-        .some((text) => text.children.includes("Refresh")),
+        .some((text) => text.children.join("").includes(label)),
     );
   expect(button).toBeDefined();
   await act(async () => {
     button.props.onPress();
   });
 };
+const refresh = () => press("Refresh");
 afterEach(async () => {
   await act(async () => renderer?.unmount());
   renderer = undefined;
   snapshotFails = false;
   offeringFails = false;
+  purchasePackage.mockReset();
 });
 
 test("a store offerings failure preserves a verified balance and does not offer a purchase", async () => {
   offeringFails = true;
   await mount();
   expect(contains("1,000 credits")).toBe(true);
-  expect(contains("Store subscriptions unavailable.")).toBe(true);
+  expect(contains("Store unavailable. Please try again.")).toBe(true);
   expect(contains("750 credits / month")).toBe(false);
 });
 
@@ -146,4 +152,18 @@ test("refresh recovers balance and offering when the store comes back", async ()
   expect(contains("1,000 credits")).toBe(true);
   expect(contains("750 credits / month")).toBe(true);
   expect(contains("$5.00 / mo")).toBe(true);
+});
+
+test("monthly credits open the store directly and cancellation stays quiet", async () => {
+  purchasePackage.mockRejectedValue({ userCancelled: true });
+  await mount();
+  await press("750 credits / month");
+  expect(purchasePackage).toHaveBeenCalledTimes(1);
+  expect(purchasePackage.mock.calls[0][0].product.identifier).toBe(
+    "test-monthly",
+  );
+  expect(contains("cancelled")).toBe(false);
+  expect(
+    renderer.root.findAllByProps({ accessibilityRole: "alert" }),
+  ).toHaveLength(0);
 });

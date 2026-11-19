@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 
-test("mobile settings link to deletion when authentication is enabled", () => {
+test("mobile settings link to deletion only for signed-in accounts", () => {
   for (const disabled of ["true", "false"]) {
     const result = spawnSync(
       process.execPath,

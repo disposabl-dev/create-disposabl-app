@@ -13,9 +13,8 @@ export type BillingSnapshot = {
 
 type Store = Pick<
   typeof Purchases,
-  "getCustomerInfo" | "getOfferings" | "canMakePayments"
+  "getCustomerInfo" | "getOfferings" | "canMakePayments" | "purchasePackage"
 >;
-type Outcome = "purchased" | "restored" | "cancelled";
 
 /** Reject mixed offerings until top-up synchronization is verified. */
 export function validMonthlyOffering(
@@ -52,17 +51,13 @@ export function selectMonthlyOffering(
 }
 
 /** Must run inside BillingSession.run so identity changes are serialized. */
-export async function presentMonthlyPaywall(
+export async function purchaseMonthlySubscription(
   sdk: Store,
   getSnapshot: () => Promise<BillingSnapshot>,
   current: () => boolean,
   productId: string,
-  present: (
-    offering: PurchasesOffering,
-    current: () => boolean,
-  ) => Promise<Outcome> = showPaywall,
   offeringId?: string,
-): Promise<Outcome> {
+): Promise<void> {
   const check = () => {
     if (!current()) throw new Error("Account changed.");
   };
@@ -84,24 +79,6 @@ export async function presentMonthlyPaywall(
   check();
   const offering = selectMonthlyOffering(offerings, productId, offeringId);
   if (!offering) throw new Error("Store offering is unavailable.");
-  const outcome = await present(offering, current);
+  await sdk.purchasePackage(offering.availablePackages[0]);
   check();
-  return outcome;
-}
-
-async function showPaywall(
-  offering: PurchasesOffering,
-  current: () => boolean,
-): Promise<Outcome> {
-  const { default: ui, PAYWALL_RESULT } =
-    await import("react-native-purchases-ui");
-  if (!current()) throw new Error("Account changed.");
-  const result = await ui.presentPaywall({
-    offering,
-    displayCloseButton: true,
-  });
-  if (result === PAYWALL_RESULT.PURCHASED) return "purchased";
-  if (result === PAYWALL_RESULT.RESTORED) return "restored";
-  if (result === PAYWALL_RESULT.CANCELLED) return "cancelled";
-  throw new Error("Store offering is unavailable.");
 }

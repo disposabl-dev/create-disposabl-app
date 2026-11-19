@@ -289,7 +289,7 @@ test("a failed login cannot leave another user's identity trusted", async () => 
 });
 
 test("monthly paywall permits only a verified current offering and fresh customer", async () => {
-  const { presentMonthlyPaywall, validMonthlyOffering } =
+  const { purchaseMonthlySubscription, validMonthlyOffering } =
     await import("../disposabl-kit/mobile/billing/paywall");
   const monthly = {
     product: { identifier: "monthly", subscriptionPeriod: "P1M" },
@@ -310,61 +310,72 @@ test("monthly paywall permits only a verified current offering and fresh custome
     canMakePayments: async () => true,
     getCustomerInfo: async () => ({ activeSubscriptions: [] }),
     getOfferings: async () => ({ current: { availablePackages: [monthly] } }),
+    purchasePackage: async () => {
+      shown++;
+    },
   };
-  const show = async () => {
-    shown++;
-    return "cancelled" as const;
-  };
+  let purchased: unknown;
   assert.equal(
-    await presentMonthlyPaywall(
+    await purchaseMonthlySubscription(
+      {
+        ...sdk,
+        purchasePackage: async (item: unknown) => {
+          purchased = item;
+        },
+      } as never,
+      snapshot,
+      () => true,
+      "monthly",
+    ),
+    undefined,
+  );
+  assert.equal(purchased, monthly);
+  assert.equal(
+    await purchaseMonthlySubscription(
       sdk as never,
       snapshot,
       () => true,
       "monthly",
-      show,
     ),
-    "cancelled",
+    undefined,
   );
   assert.equal(shown, 1);
   for (const monthlyCheckoutPending of [true, undefined]) {
     await assert.rejects(
-      presentMonthlyPaywall(
+      purchaseMonthlySubscription(
         sdk as never,
         async () =>
           ({ ...(await snapshot()), monthlyCheckoutPending }) as never,
         () => true,
         "monthly",
-        show,
       ),
       /website checkout/,
     );
   }
   await assert.rejects(
-    presentMonthlyPaywall(
+    purchaseMonthlySubscription(
       { ...sdk, canMakePayments: async () => false } as never,
       snapshot,
       () => true,
       "monthly",
-      show,
     ),
     /restricted/,
   );
   await assert.rejects(
-    presentMonthlyPaywall(
+    purchaseMonthlySubscription(
       sdk as never,
       async () => ({ ...(await snapshot()), hasMonthlyPlan: true }),
       () => true,
       "monthly",
-      show,
     ),
     /existing_subscription/,
   );
   await assert.rejects(
-    presentMonthlyPaywall(sdk as never, snapshot, () => false, "monthly", show),
+    purchaseMonthlySubscription(sdk as never, snapshot, () => false, "monthly"),
     /Account changed/,
   );
   await assert.rejects(
-    presentMonthlyPaywall(
+    purchaseMonthlySubscription(
       {
         ...sdk,
         getOfferings: async () => ({
@@ -374,7 +385,6 @@ test("monthly paywall permits only a verified current offering and fresh custome
       snapshot,
       () => true,
       "monthly",
-      show,
     ),
     /unavailable/,
   );
@@ -560,7 +570,7 @@ test("web top-up preflight rechecks storefront, product, route and account indep
 });
 
 test("explicit monthly offering is consistent across readiness, paywall, and web preflight", async () => {
-  const { presentMonthlyPaywall, selectMonthlyOffering } =
+  const { purchaseMonthlySubscription, selectMonthlyOffering } =
     await import("../disposabl-kit/mobile/billing/paywall");
   const monthly = {
     product: { identifier: "monthly", subscriptionPeriod: "P1M" },
@@ -595,19 +605,17 @@ test("explicit monthly offering is consistent across readiness, paywall, and web
     getStorefront: async () => ({ countryCode: "USA" }),
     getCustomerInfo: async () => ({ activeSubscriptions: [] }),
     getOfferings: async () => offerings,
+    purchasePackage: async (item: unknown) => {
+      shown = item;
+    },
   };
   let shown: unknown;
-  const show = async (offering: unknown) => {
-    shown = offering;
-    return "cancelled" as const;
-  };
   const paywall = (id?: string) =>
-    presentMonthlyPaywall(
+    purchaseMonthlySubscription(
       sdk as never,
       snapshot,
       () => current,
       "monthly",
-      show,
       id,
     );
   const web = (id?: string) =>
@@ -633,7 +641,7 @@ test("explicit monthly offering is consistent across readiness, paywall, and web
     good as never,
   );
   await paywall("safe");
-  assert.equal(shown, good);
+  assert.equal(shown, monthly);
   await web("safe");
   const withCurrent = { ...offerings, current: good };
   assert.equal(
@@ -641,12 +649,11 @@ test("explicit monthly offering is consistent across readiness, paywall, and web
     good as never,
   );
   const defaultSdk = { ...sdk, getOfferings: async () => withCurrent };
-  await presentMonthlyPaywall(
+  await purchaseMonthlySubscription(
     defaultSdk as never,
     snapshot,
     () => current,
     "monthly",
-    show,
   );
   await preflightWebMonthly(
     defaultSdk as never,
@@ -667,12 +674,11 @@ test("explicit monthly offering is consistent across readiness, paywall, and web
       return offerings;
     },
   };
-  const pendingPaywall = presentMonthlyPaywall(
+  const pendingPaywall = purchaseMonthlySubscription(
     changingSdk as never,
     snapshot,
     () => current,
     "monthly",
-    show,
     "safe",
   );
   await started.promise;

@@ -8,7 +8,7 @@ import {
   PreferenceSeparator,
 } from "../design/preferences";
 
-export function SettingsLinks() {
+export function SettingsLinks({ signedIn = false }: { signedIn?: boolean }) {
   const site = config.platforms.includes("web")
     ? process.env.EXPO_PUBLIC_CONVEX_SITE_URL
     : undefined;
@@ -28,7 +28,7 @@ export function SettingsLinks() {
     <PreferenceSection title="About">
       {site && (
         <>
-          {authenticationEnabled && (
+          {authenticationEnabled && signedIn && (
             <>
               <PreferenceRow
                 icon={{
