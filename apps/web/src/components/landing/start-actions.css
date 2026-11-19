@@ -75,10 +75,6 @@
   width: 100%;
   max-width: 360px;
 }
-.store-control {
-  position: relative;
-  min-width: 0;
-}
 .store-button {
   display: flex;
   align-items: center;
@@ -99,12 +95,6 @@
 }
 .footer-invitation .store-buttons {
   flex-shrink: 0;
-}
-.store-tooltip {
-  display: block;
-  color: var(--muted);
-  text-align: center;
-  font-size: 16px;
 }
 .copy-fallback {
   border: 1px solid var(--line);
