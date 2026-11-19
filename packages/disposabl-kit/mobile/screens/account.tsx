@@ -164,6 +164,17 @@ function SignedInSettings({
         </PreferenceSection>
       )}
       {/* payments:end */}
+      <SettingsLinks signedIn />
+      {footer}
+      <Version />
+      {error && (
+        <ThemedText
+          accessibilityRole="alert"
+          className="mt-3 text-[#dc2626] dark:text-[#f87171]"
+        >
+          {error}
+        </ThemedText>
+      )}
       <View className="mt-7">
         <PreferenceCard>
           <PreferenceRow
@@ -178,17 +189,6 @@ function SignedInSettings({
           />
         </PreferenceCard>
       </View>
-      {error && (
-        <ThemedText
-          accessibilityRole="alert"
-          className="mt-3 text-[#dc2626] dark:text-[#f87171]"
-        >
-          {error}
-        </ThemedText>
-      )}
-      <SettingsLinks />
-      {footer}
-      <Version />
     </SettingsPage>
   );
 }

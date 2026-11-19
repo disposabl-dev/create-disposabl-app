@@ -117,10 +117,6 @@ function Chat({ appId }: { appId: string }) {
     const fileIds = attachmentIds(attachments);
     if (!text.trim() || busy || attachmentsBusy || !fileIds) return;
     if (consent.allowed === undefined) return;
-    if (!consent.allowed) {
-      consent.request();
-      return;
-    }
     setBusy(true);
     setError("");
     let started = false;
@@ -147,6 +143,7 @@ function Chat({ appId }: { appId: string }) {
           return;
         }
       }
+      if (!(await consent.confirm(isActive)) || !isActive()) return;
       if (!beginSend(fileIds)) return;
       started = true;
       const submitted = text;

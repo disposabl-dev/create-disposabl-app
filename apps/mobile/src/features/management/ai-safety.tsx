@@ -29,29 +29,39 @@ export const reportRef = makeFunctionReference<
 export function useAiConsent() {
   const allowed = useQuery(statusRef, {});
   const set = useMutation(consentRef);
-  const request = () =>
-    Alert.alert("Allow AI sharing?", AI_DISCLOSURE, [
-      { text: "Not now", style: "cancel" },
-      {
-        text: "Allow",
-        onPress: () => {
-          void set({ granted: true, version: CONSENT_VERSION }).catch(() =>
-            Alert.alert("Permission not saved", "Please try again."),
-          );
-        },
-      },
-    ]);
-  return { allowed, request, set };
+  async function confirm(isActive: () => boolean) {
+    if (allowed === undefined || !isActive()) return false;
+    if (allowed) return true;
+    const agreed = await new Promise<boolean>((resolve) =>
+      Alert.alert(
+        "Send to AI?",
+        AI_DISCLOSURE,
+        [
+          { text: "Not now", style: "cancel", onPress: () => resolve(false) },
+          { text: "Allow and send", onPress: () => resolve(true) },
+        ],
+        { cancelable: true, onDismiss: () => resolve(false) },
+      ),
+    );
+    if (!agreed || !isActive()) return false;
+    try {
+      await set({ granted: true, version: CONSENT_VERSION });
+      return isActive();
+    } catch {
+      if (isActive()) Alert.alert("Permission not saved", "Please try again.");
+      return false;
+    }
+  }
+  return { allowed, confirm, set };
 }
 export function AiConsentPreference() {
-  const { allowed, request, set } = useAiConsent();
+  const { allowed, set } = useAiConsent();
+  if (!allowed) return null;
   return (
     <PreferenceRow
       icon={{ ios: "lock", android: "lock" }}
-      label="AI sharing permission"
-      value={allowed ? "Allowed" : "Not allowed"}
+      label="Revoke AI sharing"
       onPress={() => {
-        if (!allowed) return request();
         Alert.alert(
           "Revoke AI sharing?",
           "New requests will be blocked. Already running remote work may continue; stop it in its conversation.",

@@ -92,6 +92,9 @@ test.skipIf(!features.authenticationEnabled)(
     await mount();
     expect(renderer.root.findAllByType("Appearance")).toHaveLength(1);
     expect(query).not.toHaveBeenCalled();
+    expect(
+      renderer.root.findByType("SettingsLinks").props.signedIn,
+    ).toBeUndefined();
     const signIn = renderer.root.findByType("Row");
     expect(signIn.props.label).toBe("Sign in");
     await act(async () => signIn.props.onPress());
@@ -108,11 +111,17 @@ test.skipIf(!features.authenticationEnabled)(
     authenticated = true;
     await mount();
     expect(renderer.root.findAllByType("Profile")).toHaveLength(1);
+    expect(renderer.root.findByType("SettingsLinks").props.signedIn).toBe(true);
+    const lastCard = renderer.root.findByType("SettingsPage").children.at(-1);
+    expect(lastCard.findByType("Row").props.label).toBe("Log out");
     query.mockClear();
     authenticated = false;
     await act(async () => renderer.update(createElement(AccountScreen)));
     expect(renderer.root.findAllByType("Profile")).toHaveLength(0);
     expect(renderer.root.findAllByType("Appearance")).toHaveLength(1);
+    expect(
+      renderer.root.findByType("SettingsLinks").props.signedIn,
+    ).toBeUndefined();
     expect(query).not.toHaveBeenCalled();
   },
 );

@@ -22,19 +22,22 @@ let renderer;
 afterEach(async () => {
   await act(async () => renderer?.unmount());
 });
-test("delete account is linked only when authentication is enabled", async () => {
-  await act(async () => {
-    renderer = create(createElement(SettingsLinks));
+for (const signedIn of [false, true]) {
+  test(`deletion link for signed-in=${signedIn}, authentication=${enabled}`, async () => {
+    await act(async () => {
+      renderer = create(createElement(SettingsLinks, { signedIn }));
+    });
+    const rows = renderer.root.findAllByType("Row");
+    const deletion = rows.find((row) => row.props.label === "Delete account");
+    expect(rows.some((row) => row.props.label === "Privacy policy")).toBe(true);
+    if (!enabled || !signedIn) {
+      expect(deletion).toBeUndefined();
+      return;
+    }
+    expect(deletion).toBeDefined();
+    await act(async () => deletion.props.onPress());
+    expect(open).toHaveBeenCalledWith(
+      "https://example.test/legal/delete-account",
+    );
   });
-  const rows = renderer.root.findAllByType("Row");
-  const deletion = rows.find((row) => row.props.label === "Delete account");
-  if (!enabled) {
-    expect(deletion).toBeUndefined();
-    return;
-  }
-  expect(deletion).toBeDefined();
-  await act(async () => deletion.props.onPress());
-  expect(open).toHaveBeenCalledWith(
-    "https://example.test/legal/delete-account",
-  );
-});
+}

@@ -38,6 +38,9 @@ test(
     ).toBeVisible();
     await openGuestSettings(screen);
     await expect(screen.getByRole("button", /Appearance:/)).toBeVisible();
+    await expect(
+      screen.getByRole("button", "Delete account", { exact: true }),
+    ).toHaveCount(0);
     await screen.getByRole("button", "Close settings", { exact: true }).tap();
     await expect(
       screen.getByRole("button", "Close settings", { exact: true }),
@@ -176,7 +179,9 @@ test(
     ).toBeVisible();
     await screen.getByRole("button", "Set up your workspace").tap();
     await expect(screen.getByRole("button", "Connect accounts")).toBeVisible();
-    await expect(screen.getByText("0 of 2 essentials connected")).toBeVisible();
+    await expect(
+      screen.getByText("Connect once. Every app you create stays yours."),
+    ).toBeVisible();
     await openMobile({ app, device, screen }, true);
     await expect(
       screen.getByRole("button", "Set up your workspace"),

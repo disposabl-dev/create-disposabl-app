@@ -101,7 +101,7 @@ mock.module(
   () => ({ PaymentGate: "PaymentGate" }),
 );
 mock.module("../../../apps/mobile/src/features/management/ai-safety", () => ({
-  useAiConsent: () => ({ allowed: true, request: mock() }),
+  useAiConsent: () => ({ allowed: true, confirm: async () => true }),
 }));
 mock.module("../../../apps/mobile/src/features/management/ui", () => ({
   ErrorBoundary: "ErrorBoundary",
