@@ -13,6 +13,26 @@ import { api } from "../lib/convex";
 import { authClasses } from "./auth-ui";
 import { GoogleButton } from "./google-button";
 
+function failureCode(stage: string, error: unknown) {
+  // Never render exception messages: they can contain an OAuth URL or ticket.
+  if (
+    error instanceof Error &&
+    error.message === "Invalid sign-in return URL" &&
+    typeof error.cause === "string" &&
+    ["scheme", "host", "port", "path", "credentials", "fragment"].includes(
+      error.cause,
+    )
+  )
+    return `${stage}-destination-${error.cause}`;
+  const kind =
+    error instanceof TypeError
+      ? "type"
+      : error instanceof Error && error.message === "Invalid sign-in return URL"
+        ? "destination"
+        : "failed";
+  return `${stage}-${kind}`;
+}
+
 export function GoogleSignIn({ disabled = false }: { disabled?: boolean }) {
   const { signIn } = useSignInWithGoogle(api.auth);
   const params = useLocalSearchParams<{
@@ -77,26 +97,32 @@ export function GoogleSignIn({ disabled = false }: { disabled?: boolean }) {
     working.current = true;
     setPending(true);
     setError(null);
+    let stage = "configuration";
     try {
       const origin = process.env.EXPO_PUBLIC_CONVEX_SITE_URL;
       if (!origin) throw new Error("Missing backend URL");
+      stage = "authorization";
       const result = await signIn({
         redirectTo: new URL(mobileAuthPath, origin).href,
       });
-      if (result.status !== "redirect")
-        throw new Error("Could not start sign-in");
+      if (result.status !== "redirect") throw result.userError.cause;
+      stage = "browser";
       const response = await openAuthSessionAsync(
         result.redirect.href,
         mobileAuthReturnUrl,
       );
       if (!mounted.current) return;
       if (response.type === "success") {
+        stage = "callback";
         const callback = mobileAuthCallback(response.url);
+        stage = "completion";
         await finish(callback.code, callback.error);
       }
-    } catch {
+    } catch (cause) {
       if (mounted.current)
-        setError("Couldn't connect to Google. Please try again.");
+        setError(
+          `Couldn't connect to Google. Please try again. (${failureCode(stage, cause)})`,
+        );
     } finally {
       working.current = false;
       if (mounted.current) setPending(false);

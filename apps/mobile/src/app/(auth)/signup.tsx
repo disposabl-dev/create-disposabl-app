@@ -1,1 +1,5 @@
-export { SignupScreen as default } from "@disposabl/disposabl-kit/mobile";
+import { SignupScreen } from "@disposabl/disposabl-kit/mobile";
+
+export default function Signup() {
+  return <SignupScreen initialGoogleEnabled />;
+}

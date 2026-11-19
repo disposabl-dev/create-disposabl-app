@@ -1,1 +1,5 @@
-export { LoginScreen as default } from "@disposabl/disposabl-kit/mobile";
+import { LoginScreen } from "@disposabl/disposabl-kit/mobile";
+
+export default function Login() {
+  return <LoginScreen initialGoogleEnabled />;
+}
