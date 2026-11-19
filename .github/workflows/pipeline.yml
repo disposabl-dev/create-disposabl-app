@@ -366,7 +366,8 @@ jobs:
     if: github.event_name == 'pull_request' && needs.web.outputs.ios == 'true'
     permissions: *release-permissions
     runs-on: ${{ needs.changes.outputs.macos_runner }}
-    timeout-minutes: 20
+    # Cold simulator builds compile native dependencies for both architectures.
+    timeout-minutes: 60
     env:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
       CONVEX_URL: ${{ needs.web.outputs.convex_url }}
