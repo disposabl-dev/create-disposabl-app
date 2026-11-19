@@ -25,6 +25,13 @@ test("deployment setup verifies expected key mode before contacting Autumn", asy
       ),
     );
   assert.equal(p.calls.length, 0);
+  assert.deepEqual(await setupBilling(true, {}, pricing, p.fetcher, "live"), {
+    enabled: true,
+    pending: true,
+    created: [],
+    preserved: [],
+  });
+  assert.equal(p.calls.length, 0);
   assert.equal(
     (await setupBilling(false, {}, pricing, p.fetcher, "live")).enabled,
     false,
@@ -81,6 +88,7 @@ test("disabled setup reads neither credentials, pricing nor provider", async () 
     await setupBilling(false, unreadable, unreadable as Pricing, fetcher),
     {
       enabled: false,
+      pending: false,
       created: [],
       preserved: [],
     },

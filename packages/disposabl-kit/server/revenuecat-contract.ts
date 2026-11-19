@@ -1,4 +1,5 @@
 import { creditQuantity, pricing } from "../payments/config";
+import { billingKey } from "./billing";
 
 export type RevenueCatConfig = {
   authorization: string;
@@ -77,7 +78,7 @@ export function revenueCatConfigs(
   if (!enabled || env.REVENUECAT_CONSUMABLE_OWNER !== "custom") return null;
   const authorization = env.REVENUECAT_WEBHOOK_AUTH?.trim();
   const project = env.REVENUECAT_PROJECT_ID?.trim();
-  const autumnKey = env.AUTUMN_SECRET_KEY?.trim();
+  const autumnKey = billingKey(env);
   const environment = env.REVENUECAT_ENVIRONMENT;
   if (
     !authorization ||

@@ -1,14 +1,28 @@
 "use node";
 
-import { ConvexError } from "convex/values";
+import { ConvexError, v } from "convex/values";
+import {
+  identityFields,
+  internalAction,
+} from "@disposabl/disposabl-kit/server/lib/functions";
 import type { ActionCtx } from "../../_generated/server";
 import { internal } from "../../_generated/api";
-import { unseal } from "../../connections/actions/credentials";
 import {
-  validateAutumnKey,
+  connectionsUrl,
+  credential,
+  seal,
+  unseal,
+} from "../../connections/actions/credentials";
+import {
+  management,
+  productionDeployment,
+} from "../../previews/token/actions/management";
+import {
+  createTenant,
+  requireLiveStripe,
+  stripeUrl,
   type AutumnKeys,
-} from "../../connections/actions/autumn";
-import { management } from "../../previews/token/actions/management";
+} from "./autumn";
 
 type Target = {
   name: string;
@@ -84,27 +98,25 @@ export async function configureBillingDeployment(
 /** Runs under setup's lease and before committing applied feature selections. */
 export async function provisionPayments(
   ctx: ActionCtx,
-  userId: string,
+  setup: { userId: string; appId: string; until: number },
   features: readonly string[],
   convex: {
     token: string;
     projectId: number;
     development: Target;
-    production: { name: string; deploymentUrl: string; publicSiteUrl?: string };
   },
 ) {
   if (!features.includes("payments")) return;
-  const connection = await ctx.runQuery(internal.connections.internal.get, {
-    userId,
-    provider: "autumn",
-  });
-  if (!connection)
-    throw new ConvexError("Connect Autumn before enabling payments.");
-  const keys = JSON.parse(
-    unseal(connection.token, `${userId}:autumn`),
-  ) as AutumnKeys;
-  await validateAutumnKey(keys.sandbox, "test");
-  if (keys.live) await validateAutumnKey(keys.live, "live");
+  const tenant = await ctx.runMutation(internal.apps.autumn.prepare, setup);
+  const context = autumnContext(setup);
+  const keys: AutumnKeys = tenant.encryptedKeys
+    ? JSON.parse(unseal(tenant.encryptedKeys, context))
+    : await createTenant(setup.appId, tenant.ownerEmail);
+  if (!tenant.encryptedKeys)
+    await ctx.runMutation(internal.apps.autumn.saveKeys, {
+      ...setup,
+      encryptedKeys: seal(JSON.stringify(keys), context),
+    });
   await configureBillingDeployment(convex.development, keys.sandbox);
   // GitHub previews are separate from named development deployments.
   // Rerunning an existing pull request can reuse its preview.
@@ -122,24 +134,98 @@ export async function provisionPayments(
       ],
     },
   );
-  if (keys.live) {
-    const { production } = convex;
-    const { deployKey } = await management<{ deployKey: string }>(
-      convex.token,
-      `/deployments/${encodeURIComponent(production.name)}/create_deploy_key`,
-      { name: "disposabl-billing-setup" },
-    );
-    if (!deployKey.startsWith(`prod:${production.name}|`))
-      throw new Error("Expected a production-scoped key.");
-    await configureBillingDeployment(
-      {
-        name: production.name,
-        convexUrl: production.deploymentUrl,
-        deployKey,
-        kind: "prod",
-        publicSiteUrl: production.publicSiteUrl,
-      },
-      keys.live,
-    );
-  }
 }
+
+const identity = { ...identityFields, appId: v.string() };
+function autumnContext({ userId, appId }: { userId: string; appId: string }) {
+  return `${userId}:${appId}:autumn`;
+}
+
+export const beginStripe = internalAction({
+  args: identity,
+  returns: v.string(),
+  handler: async (ctx, args): Promise<string> => {
+    await ctx.runQuery(internal.apps.autumn.target, args);
+    const redirect = new URL("/dashboard/billing", connectionsUrl());
+    redirect.searchParams.set("appId", args.appId);
+    return stripeUrl(args.appId, redirect.href);
+  },
+});
+
+export const enableLivePayments = internalAction({
+  args: identity,
+  returns: v.null(),
+  handler: async (ctx, args): Promise<null> => {
+    const { until } = await ctx.runMutation(
+      internal.apps.operations.internal.begin,
+      {
+        ...args,
+        kind: "setup",
+      },
+    );
+    try {
+      const { encryptedKeys, projectId, publicSiteUrl } = await ctx.runQuery(
+        internal.apps.autumn.target,
+        args,
+      );
+      await requireLiveStripe(args.appId);
+      const { token } = await credential(ctx, args.userId, "convex");
+      const production = await productionDeployment(token, projectId);
+      const convexUrl = new URL(production.deploymentUrl).origin;
+      const { live } = JSON.parse(
+        unseal(encryptedKeys, autumnContext(args)),
+      ) as AutumnKeys;
+      const { deployKey } = await management<{ deployKey: string }>(
+        token,
+        `/deployments/${encodeURIComponent(production.name)}/create_deploy_key`,
+        { name: "disposabl-billing-setup" },
+      );
+      if (!deployKey.startsWith(`prod:${production.name}|`))
+        throw new Error("Expected a production-scoped key.");
+      await configureBillingDeployment(
+        {
+          name: production.name,
+          convexUrl,
+          deployKey,
+          kind: "prod",
+          publicSiteUrl,
+        },
+        live,
+      );
+      const setup = await fetch(`${convexUrl}/api/function`, {
+        method: "POST",
+        redirect: "error",
+        signal: AbortSignal.timeout(60_000),
+        headers: {
+          Authorization: `Convex ${deployKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          path: "billing:setup",
+          format: "convex_encoded_json",
+          args: { expectedEnvironment: "live" },
+        }),
+      });
+      if (!setup.ok)
+        throw new ConvexError(
+          "Stripe is connected. Deploy this app to production and retry billing setup.",
+        );
+      const result = await setup.json();
+      if (
+        result.status !== "success" ||
+        result.value?.enabled !== true ||
+        result.value?.pending !== false
+      )
+        throw new ConvexError(
+          "Stripe is connected, but the billing catalog is not ready. Retry billing setup.",
+        );
+      return null;
+    } finally {
+      await ctx.runMutation(internal.apps.operations.internal.finish, {
+        ...args,
+        until,
+        retryDelete: false,
+      });
+    }
+  },
+});

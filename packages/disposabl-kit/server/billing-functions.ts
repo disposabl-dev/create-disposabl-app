@@ -19,6 +19,7 @@ import {
   balanceFromCustomer,
   monthlyPlanFromCustomer,
   billingContext,
+  billingKey,
   billingRequest,
   purchaseRequest,
   mobileWebCheckoutConfigured,
@@ -33,6 +34,7 @@ export const setup = internalAction({
   },
   returns: v.object({
     enabled: v.boolean(),
+    pending: v.boolean(),
     created: v.array(v.string()),
     preserved: v.array(v.string()),
   }),
@@ -244,8 +246,25 @@ export const createSnapshot = (eligibility?: BillingEligibility) =>
       checkoutNeedsReview: v.boolean(),
       monthlyCheckoutPending: v.boolean(),
       customerId: v.string(),
+      billingPending: v.optional(v.boolean()),
     }),
     handler: async (ctx) => {
+      if (paymentsEnabled && !billingKey(process.env)) {
+        const userId = await getSessionUserId(ctx);
+        if (!userId) throw new Error("Please sign in to use payments.");
+        await eligibility?.(ctx, userId);
+        return {
+          balance: null,
+          hasMonthlyPlan: null,
+          nativeSubscriptionsEnabled: false,
+          nativeTopupRoutes: [],
+          mobileWebCheckoutEnabled: false,
+          checkoutNeedsReview: false,
+          monthlyCheckoutPending: false,
+          customerId: userId,
+          billingPending: true,
+        };
+      }
       const { key, userId } = await context(ctx);
       await eligibility?.(ctx, userId);
       try {

@@ -11,18 +11,16 @@ export async function setupBilling(
 ) {
   const result = {
     enabled,
+    pending: false,
     created: [] as string[],
     preserved: [] as string[],
   };
   if (!enabled) return result;
   const key = env.AUTUMN_SECRET_KEY?.trim();
   if (!key) {
-    const instruction =
-      expectedEnvironment === "live"
-        ? "Connect live Stripe in Autumn, add the live Autumn key, and rerun app setup."
-        : "Connect an Autumn sandbox key and rerun app setup.";
+    if (expectedEnvironment === "live") return { ...result, pending: true };
     throw new Error(
-      `Payments setup requires AUTUMN_SECRET_KEY on this Convex deployment. ${instruction}`,
+      "Payments setup requires AUTUMN_SECRET_KEY on this Convex deployment. Rerun app setup to provision sandbox billing.",
     );
   }
   if (

@@ -20,7 +20,7 @@ import {
   computeSessionFields,
   computeDebitFields,
 } from "./agent/computeValidator";
-import { pendingDelete } from "./apps/validator";
+import { autumnTenant, pendingDelete } from "./apps/validator";
 import {
   deployment,
   platform,
@@ -225,6 +225,7 @@ export default defineSchema({
     agentRemoteUnresolved: v.optional(v.boolean()),
     agentResumeBusy: v.optional(v.boolean()),
     posthogProject: v.optional(posthogProject),
+    autumn: v.optional(autumnTenant),
     githubOwner: v.optional(v.string()),
     githubRepo: v.optional(v.string()),
     convexProjectId: v.optional(v.number()),

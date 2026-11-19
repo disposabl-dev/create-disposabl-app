@@ -118,13 +118,3 @@ export const resumeGithubInstall = action({
       userId: await requireUser(ctx),
     }),
 });
-
-export const connectAutumn = action({
-  args: { sandboxKey: v.string(), liveKey: v.optional(v.string()) },
-  returns: v.null(),
-  handler: async (ctx, args): Promise<null> =>
-    ctx.runAction(internal.connections.actions.autumn.connect, {
-      ...args,
-      userId: await requireUser(ctx),
-    }),
-});

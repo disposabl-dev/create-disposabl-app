@@ -1,5 +1,4 @@
 import { mobileAuthReturnUrl } from "../../../../../packages/disposabl-kit/lib/mobile-auth";
-import { AutumnConnection } from "../../components/connections/autumn-connection";
 import { PosthogConnection } from "../../components/connections/posthog-connection";
 import { useAuthToken } from "@convex-dev/auth/react";
 import {
@@ -41,7 +40,6 @@ export function Connections({ onContinue }: { onContinue?: () => void } = {}) {
     disconnect,
     mobile,
     analyticsRequired,
-    paymentsRequired,
     fromCli,
     fromMobile,
     initialized: setupInitialized,
@@ -54,10 +52,8 @@ export function Connections({ onContinue }: { onContinue?: () => void } = {}) {
     Number(Boolean(status?.github)) +
     Number(Boolean(status?.convex)) +
     Number(mobile && Boolean(status?.expo)) +
-    Number(analyticsRequired && Boolean(status?.posthog)) +
-    Number(paymentsRequired && Boolean(status?.autumn));
-  const required =
-    2 + Number(mobile) + Number(analyticsRequired) + Number(paymentsRequired);
+    Number(analyticsRequired && Boolean(status?.posthog));
+  const required = 2 + Number(mobile) + Number(analyticsRequired);
   const ready =
     setupInitialized &&
     status?.ready &&
@@ -203,16 +199,6 @@ export function Connections({ onContinue }: { onContinue?: () => void } = {}) {
         <div className="space-y-3">
           <GithubConnection setup={setup} />
           {providers.filter(({ id }) => id === "convex").map(renderProvider)}
-          <AutumnConnection
-            connected={status.autumn}
-            required={paymentsRequired}
-            available={status.available.autumn}
-            busy={busy}
-            run={run}
-            disconnect={async () => {
-              await disconnect({ provider: "autumn" });
-            }}
-          />
           {providers.filter(({ id }) => id === "expo").map(renderProvider)}
           <PosthogConnection
             connected={status.posthog}

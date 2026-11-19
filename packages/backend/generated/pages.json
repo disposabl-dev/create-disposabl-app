@@ -88,6 +88,10 @@
     "authenticated": true
   },
   {
+    "path": "/dashboard/billing",
+    "authenticated": true
+  },
+  {
     "path": "/dashboard/connections",
     "authenticated": true
   }

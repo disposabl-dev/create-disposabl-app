@@ -24,6 +24,7 @@ test("catalog setup is internal, validated and runs on the dev deployment's firs
     setup.returns,
     v.object({
       enabled: v.boolean(),
+      pending: v.boolean(),
       created: v.array(v.string()),
       preserved: v.array(v.string()),
     }),
@@ -88,16 +89,24 @@ case "$*" in *'convex run '*) exit "$SETUP_EXIT";; esac
         if (setupExit === "0") await run;
         else await assert.rejects(run);
         const calls = (await readFile(callsFile, "utf8")).trim().split("\n");
-        assert.match(calls[0], /convex deploy --yes/);
+        const offset = channel === "production" ? 1 : 0;
+        if (offset)
+          assert.equal(
+            calls[0],
+            "x --no-install convex env set --prod BILLING_ENVIRONMENT live",
+          );
+        assert.match(calls[offset], /convex deploy --yes/);
         const target =
           channel === "production" ? "--prod" : "--preview-name pr-42";
         assert.equal(
-          calls[1],
+          calls[offset + 1],
           `x --no-install convex run ${target} billing:setup {"expectedEnvironment":"${channel === "production" ? "live" : "test"}"}`,
         );
-        assert.equal(calls.length, setupExit === "0" ? 3 : 2);
+        assert.equal(calls.length, offset + (setupExit === "0" ? 3 : 2));
         if (setupExit === "0")
-          assert.ok(calls[2].includes(`static-hosting upload ${target}`));
+          assert.ok(
+            calls[offset + 2].includes(`static-hosting upload ${target}`),
+          );
       }
     }
   } finally {

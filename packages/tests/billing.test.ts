@@ -59,6 +59,13 @@ describe("billing boundary", () => {
         AUTUMN_SECRET_KEY: "am_sk_live_fixture",
       }),
     );
+    assert.throws(() =>
+      billingConfig(true, {
+        ...sandbox,
+        BILLING_ENVIRONMENT: "live",
+        BILLING_RETURN_URL: "https://example.com/pricing",
+      }),
+    );
   });
   test("unusable checkout responses are treated as unknown", () => {
     assert.equal(

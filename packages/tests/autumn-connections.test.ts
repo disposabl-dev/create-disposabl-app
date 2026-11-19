@@ -1,313 +1,374 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { validateAutumnKey } from "../backend/convex/connections/actions/autumn";
+import { getFunctionName } from "convex/server";
 import {
-  provisionPayments,
+  createTenant,
+  requireLiveStripe,
+  stripeUrl,
+} from "../backend/convex/apps/actions/autumn";
+import {
   configureBillingDeployment,
+  enableLivePayments,
+  provisionPayments,
 } from "../backend/convex/apps/actions/billing";
-import { status } from "../backend/convex/connections/internal";
+import {
+  seal,
+  unseal,
+} from "../backend/convex/connections/actions/credentials";
+import { connectionsUrl } from "../backend/convex/connections/config";
 
+const appId = "93299405-1234-4321-8d59-efdf91c9d828";
+const slug = "app-93299405123443218d59efdf91c9d828";
 const sandbox = "am_sk_test_fixture";
 const live = "am_sk_live_fixture";
-test("Autumn keys are validated with a read-only plan lookup and sanitized errors", async () => {
-  let calls = 0;
-  const fetcher = (async (url: string, init: RequestInit) => {
-    calls++;
-    assert.equal(url, "https://api.useautumn.com/v1/plans.list");
-    assert.equal(init.body, "{}");
-    assert.equal(init.redirect, "error");
-    return Response.json({ list: [] });
-  }) as typeof fetch;
-  await validateAutumnKey(sandbox, "test", fetcher);
-  await assert.rejects(validateAutumnKey(live, "test", fetcher), /sandbox/);
-  assert.equal(calls, 1);
-  await assert.rejects(
-    validateAutumnKey(sandbox, "test", (async () => {
-      throw new Error("private token detail");
-    }) as typeof fetch),
-    /Autumn could not verify/,
-  );
-});
-
-test("payments-off setup neither reads credentials nor configures deployments", async () => {
-  const ctx = {
-    runQuery: () => {
-      throw new Error("Unexpected credential read");
-    },
-  };
-  await provisionPayments(ctx as never, "owner", [], {
-    token: "unused",
-    projectId: 42,
-    development: {
-      name: "dev-app",
-      convexUrl: "https://dev-app.convex.cloud",
-      deployKey: "dev:dev-app|fixture",
-      kind: "dev",
-    },
-    production: {
-      name: "prod-app",
-      deploymentUrl: "https://prod-app.convex.cloud",
-    },
-  });
-});
-
-test("deployment provisioning separates live and sandbox keys and chooses its own return URL", async () => {
-  const target = {
+const setup = { userId: "owner", appId, until: Date.now() + 60_000 };
+const convex = {
+  token: "fixture-convex-oauth",
+  projectId: 42,
+  development: {
     name: "dev-app",
     convexUrl: "https://dev-app.convex.cloud",
     deployKey: "dev:dev-app|fixture",
     kind: "dev" as const,
-  };
-  const bodies: { changes: unknown[] }[] = [];
-  let existing: { value: string } | null = null;
-  const fetcher = (async (url: string, init: RequestInit) => {
-    if (url.endsWith("/api/query")) {
-      assert.deepEqual(JSON.parse(String(init.body)), {
-        path: "_system/cli/queryEnvironmentVariables:get",
-        args: { name: "BILLING_RETURN_URL" },
-        format: "json",
-      });
-      return Response.json({ status: "success", value: existing });
-    }
-    bodies.push(JSON.parse(String(init.body)));
-    return new Response();
-  }) as typeof fetch;
-  await assert.rejects(
-    configureBillingDeployment(target, live, fetcher),
-    /Invalid billing deployment/,
-  );
-  assert.equal(bodies.length, 0);
-  await configureBillingDeployment(target, sandbox, fetcher);
-  assert.deepEqual(bodies[0]?.changes, [
-    { name: "AUTUMN_SECRET_KEY", value: sandbox },
-    {
-      name: "BILLING_RETURN_URL",
-      value: "https://dev-app.convex.site/pricing",
-    },
-  ]);
-  existing = { value: "https://custom.example/pricing" };
-  await configureBillingDeployment(target, sandbox, fetcher);
-  assert.deepEqual(bodies[1]?.changes, [
-    { name: "AUTUMN_SECRET_KEY", value: sandbox },
-  ]);
-  await assert.rejects(
-    configureBillingDeployment(target, sandbox, (async () =>
-      Response.json({ status: "error" })) as typeof fetch),
-    /Could not read billing configuration/,
-  );
-  await assert.rejects(
-    configureBillingDeployment(
-      { ...target, convexUrl: "https://attacker.example" },
-      sandbox,
-      fetcher,
-    ),
-    /Invalid billing deployment/,
-  );
-});
+  },
+};
 
-test("Autumn is required only when payments is selected", async () => {
-  const ctx = {
-    db: {
-      query: (table: string) => ({
-        withIndex: (_index: string, filter: (q: any) => void) => {
-          let provider: string | undefined;
-          const q = {
-            eq: (key: string, value: string) => {
-              if (key === "provider") provider = value;
-              return q;
-            },
-          };
-          filter(q);
-          return {
-            order: () => ({ first: async () => ({ owner: "owner" }) }),
-            unique: async () =>
-              table === "connections" && provider === "convex"
-                ? { name: "team" }
-                : null,
-          };
-        },
-      }),
-    },
-  };
-  const previousOrigin = process.env.CONNECTIONS_ORIGIN;
-  process.env.CONNECTIONS_ORIGIN = "http://127.0.0.1:3311";
-  try {
-    assert.equal(
-      (await (status as any)._handler(ctx, { userId: "owner", features: [] }))
-        .ready,
-      true,
-    );
-    const required = await (status as any)._handler(ctx, {
-      userId: "owner",
-      features: ["payments"],
-    });
-    assert.deepEqual(required.missing, ["autumn"]);
-    assert.equal(
-      new URL(required.connectionsUrl).searchParams.get("features"),
-      "payments",
-    );
-  } finally {
-    if (previousOrigin === undefined) delete process.env.CONNECTIONS_ORIGIN;
-    else process.env.CONNECTIONS_ORIGIN = previousOrigin;
-  }
-});
-
-test("saved Autumn credentials are encrypted for the authenticated owner", async () => {
-  const { connect } =
-    await import("../backend/convex/connections/actions/autumn");
-  const { unseal } =
-    await import("../backend/convex/connections/actions/credentials");
-  const previousKey = process.env.CONNECTIONS_ENCRYPTION_KEY;
+async function fixture(fetcher: typeof fetch, run: () => Promise<void>) {
   const originalFetch = globalThis.fetch;
-  process.env.CONNECTIONS_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString(
-    "base64",
-  );
-  globalThis.fetch = (async () => Response.json({ list: [] })) as typeof fetch;
-  let saved: any;
-  try {
-    const result = await (connect as any)._handler(
-      {
-        runMutation: async (_ref: unknown, value: unknown) => {
-          saved = value;
-        },
-      },
-      {
-        userId: "owner",
-        sandboxKey: sandbox,
-        liveKey: live,
-      },
-    );
-    assert.equal(result, null);
-    assert.equal(saved.userId, "owner");
-    assert.equal(saved.token.includes(sandbox), false);
-    assert.deepEqual(JSON.parse(unseal(saved.token, "owner:autumn")), {
-      sandbox,
-      live,
-    });
-    assert.throws(() => unseal(saved.token, "another-owner:autumn"));
-  } finally {
-    globalThis.fetch = originalFetch;
-    if (previousKey === undefined)
-      delete process.env.CONNECTIONS_ENCRYPTION_KEY;
-    else process.env.CONNECTIONS_ENCRYPTION_KEY = previousKey;
-  }
-});
-
-test("connected sandbox keys reach CI previews without production and retries keep the keys separate", async () => {
-  const { seal } =
-    await import("../backend/convex/connections/actions/credentials");
-  const previousKey = process.env.CONNECTIONS_ENCRYPTION_KEY;
-  const originalFetch = globalThis.fetch;
+  const previous = { ...process.env };
+  process.env.AUTUMN_PLATFORM_KEY = "am_sk_test_platform_fixture";
   process.env.CONNECTIONS_ENCRYPTION_KEY = Buffer.alloc(32, 8).toString(
     "base64",
   );
-  const calls: string[] = [];
-  const previewDefaults: unknown[] = [];
-  const deploymentSecrets: { target: string; key: string }[] = [];
-  let failProduction = true;
-  let failPreview = false;
-  globalThis.fetch = (async (url: string, init: RequestInit) => {
-    calls.push(url);
-    if (url.includes("plans.list")) return Response.json({ list: [] });
-    if (url.endsWith("update_default_environment_variables")) {
-      assert.equal(
-        url,
-        "https://api.convex.dev/v1/projects/42/update_default_environment_variables",
-      );
-      assert.equal(
-        new Headers(init.headers).get("Authorization"),
-        "Bearer management",
-      );
-      previewDefaults.push(JSON.parse(String(init.body)));
-      return new Response(null, { status: failPreview ? 503 : 200 });
-    }
-    if (url.includes("create_deploy_key"))
-      return Response.json({ deployKey: "prod:prod-app|fixture" });
-    if (url.endsWith("/api/query"))
-      return Response.json({ status: "success", value: null });
-    const { changes } = JSON.parse(String(init.body));
-    deploymentSecrets.push({
-      target: new URL(url).hostname,
-      key: changes.find(
-        ({ name }: { name: string }) => name === "AUTUMN_SECRET_KEY",
-      ).value,
-    });
-    return new Response(null, {
-      status: failProduction && url.includes("prod-app") ? 500 : 200,
-    });
-  }) as typeof fetch;
-  const development = {
-    name: "dev-app",
-    convexUrl: "https://dev-app.convex.cloud",
-    deployKey: "dev:dev-app|fixture",
-    kind: "dev" as const,
-  };
-  const production = {
-    name: "prod-app",
-    deploymentUrl: "https://prod-app.convex.cloud",
-  };
-  let keys: { sandbox: string; live?: string } = { sandbox };
-  const ctx = {
-    runQuery: async () => ({
-      token: seal(JSON.stringify(keys), "owner:autumn"),
-    }),
-  };
-  const run = () =>
-    provisionPayments(ctx as never, "owner", ["payments"], {
-      token: "management",
-      projectId: 42,
-      development,
-      production,
-    });
-  const expectedPreview = {
-    changes: [
-      {
-        name: "AUTUMN_SECRET_KEY",
-        deploymentType: "preview",
-        value: sandbox,
-        applyToExistingDeployments: true,
-      },
-    ],
-  };
+  globalThis.fetch = fetcher;
   try {
     await run();
-    assert.deepEqual(previewDefaults, [expectedPreview]);
-    assert.deepEqual(deploymentSecrets, [
-      { target: "dev-app.convex.cloud", key: sandbox },
-    ]);
-    assert.equal(
-      calls.some((url) => url.includes("prod-app")),
-      false,
-    );
-    keys = { sandbox, live };
-    calls.length = 0;
-    failPreview = true;
-    await assert.rejects(run(), /Convex management request failed \(503\)/);
-    assert.equal(
-      calls.some((url) => url.includes("prod-app")),
-      false,
-    );
-    calls.length = 0;
-    failPreview = false;
-    await assert.rejects(run(), /Could not configure payments/);
-    assert.equal(
-      calls.filter((url) => url.endsWith("update_environment_variables"))
-        .length,
-      2,
-    );
-    failProduction = false;
-    calls.length = 0;
-    deploymentSecrets.length = 0;
-    await run();
-    assert.deepEqual(previewDefaults, Array(4).fill(expectedPreview));
-    assert.deepEqual(deploymentSecrets, [
-      { target: "dev-app.convex.cloud", key: sandbox },
-      { target: "prod-app.convex.cloud", key: live },
-    ]);
   } finally {
     globalThis.fetch = originalFetch;
-    if (previousKey === undefined)
-      delete process.env.CONNECTIONS_ENCRYPTION_KEY;
-    else process.env.CONNECTIONS_ENCRYPTION_KEY = previousKey;
+    for (const name of ["AUTUMN_PLATFORM_KEY", "CONNECTIONS_ENCRYPTION_KEY"]) {
+      if (previous[name] === undefined) delete process.env[name];
+      else process.env[name] = previous[name];
+    }
   }
+}
+
+test("payments-off setup bypasses the managed tenant and payment setup asks for no Autumn connection", async () => {
+  await provisionPayments(
+    { runMutation: () => assert.fail("Unexpected tenant access") } as never,
+    setup,
+    [],
+    convex,
+  );
+  const original = process.env.CONNECTIONS_ORIGIN;
+  process.env.CONNECTIONS_ORIGIN = "https://disposabl.example";
+  try {
+    assert.equal(new URL(connectionsUrl(["payments"])).search, "");
+    assert.equal(
+      new URL(connectionsUrl(["analytics", "payments"])).searchParams.get(
+        "features",
+      ),
+      "analytics",
+    );
+  } finally {
+    if (original === undefined) delete process.env.CONNECTIONS_ORIGIN;
+    else process.env.CONNECTIONS_ORIGIN = original;
+  }
+});
+
+test("managed app provisioning creates one tenant, saves scoped keys, and installs only sandbox credentials in previews", async () => {
+  let encryptedKeys: string | undefined;
+  let created = 0;
+  const writes: Array<{
+    name: string;
+    value: string;
+    deploymentType?: string;
+    applyToExistingDeployments?: boolean;
+  }> = [];
+  const ctx = {
+    runMutation: (
+      ref: Parameters<typeof getFunctionName>[0],
+      args: typeof setup & { encryptedKeys?: string },
+    ) => {
+      assert.equal(args.appId, appId);
+      assert.equal(args.userId, "owner");
+      if (getFunctionName(ref) === "apps/autumn:prepare")
+        return { ownerEmail: "owner@example.test", encryptedKeys };
+      assert.equal(getFunctionName(ref), "apps/autumn:saveKeys");
+      encryptedKeys = args.encryptedKeys;
+      return null;
+    },
+  };
+  await fixture(
+    (async (url: string, init: RequestInit) => {
+      const body = JSON.parse(String(init.body));
+      if (url === "https://api.useautumn.com/v1/platform/organizations") {
+        assert.equal(
+          new Headers(init.headers).get("Authorization"),
+          "Bearer am_sk_test_platform_fixture",
+        );
+        assert.deepEqual(body, {
+          user_email: "owner@example.test",
+          name: "Disposabl " + slug,
+          slug,
+          env: "both",
+        });
+        created++;
+        return Response.json(
+          { test_secret_key: sandbox, live_secret_key: live },
+          { status: 201 },
+        );
+      }
+      if (url === "https://dev-app.convex.cloud/api/query")
+        return Response.json({
+          status: "success",
+          value: { value: "https://chosen.example/pricing" },
+        });
+      assert.ok(
+        url ===
+          "https://dev-app.convex.cloud/api/update_environment_variables" ||
+          url ===
+            "https://api.convex.dev/v1/projects/42/update_default_environment_variables",
+      );
+      writes.push(...body.changes);
+      return new Response();
+    }) as typeof fetch,
+    async () => {
+      await provisionPayments(ctx as never, setup, ["payments"], convex);
+      await provisionPayments(ctx as never, setup, ["payments"], convex);
+      assert.equal(created, 1);
+      assert.ok(
+        encryptedKeys &&
+          !encryptedKeys.includes(sandbox) &&
+          !encryptedKeys.includes(live),
+      );
+      assert.deepEqual(
+        JSON.parse(unseal(encryptedKeys, `owner:${appId}:autumn`)),
+        { sandbox, live },
+      );
+      assert.throws(() => unseal(encryptedKeys!, "another-app"));
+      assert.deepEqual(
+        writes,
+        [0, 1].flatMap(() => [
+          { name: "AUTUMN_SECRET_KEY", value: sandbox },
+          {
+            name: "AUTUMN_SECRET_KEY",
+            deploymentType: "preview",
+            value: sandbox,
+            applyToExistingDeployments: true,
+          },
+        ]),
+      );
+    },
+  );
+});
+
+test("Stripe activation checks this tenant's live connection and validates OAuth links", async () => {
+  let connected = false;
+  let url = "https://connect.stripe.com/oauth/authorize?state=fixture";
+  await fixture(
+    (async (endpoint: string, init: RequestInit) => {
+      const body = JSON.parse(String(init.body));
+      assert.equal(body.organization_slug, slug);
+      assert.equal(body.env, "live");
+      if (endpoint.endsWith("/platform/oauth_url")) {
+        assert.equal(
+          body.redirect_url,
+          "https://example.test/dashboard/billing",
+        );
+        return Response.json({ oauth_url: url });
+      }
+      assert.equal(
+        endpoint,
+        "https://api.useautumn.com/v1/platform.get_stripe_connection",
+      );
+      return Response.json({
+        connected,
+        account_id: connected ? "acct_fixture" : null,
+      });
+    }) as typeof fetch,
+    async () => {
+      await assert.rejects(requireLiveStripe(appId), /Connect live Stripe/);
+      assert.equal(
+        await stripeUrl(appId, "https://example.test/dashboard/billing"),
+        url,
+      );
+      url = "https://unsafe.example/oauth";
+      await assert.rejects(
+        stripeUrl(appId, "https://example.test/dashboard/billing"),
+        /valid Stripe/,
+      );
+      connected = true;
+      await requireLiveStripe(appId);
+    },
+  );
+});
+
+test("Autumn's private preview denial is actionable and never leaks provider response data", async () => {
+  await fixture(
+    (async () =>
+      Response.json(
+        { detail: "private provider response" },
+        { status: 403 },
+      )) as typeof fetch,
+    async () => {
+      await assert.rejects(
+        createTenant(appId, "owner@example.test"),
+        (error: unknown) => {
+          assert.match(String(error), /Autumn denied Platform API access/);
+          assert.doesNotMatch(String(error), /private provider response/);
+          return true;
+        },
+      );
+    },
+  );
+});
+
+test("production deployment rejects sandbox keys and keeps existing checkout origins", async () => {
+  const target = {
+    name: "prod-app",
+    convexUrl: "https://prod-app.convex.cloud",
+    deployKey: "prod:prod-app|fixture",
+    kind: "prod" as const,
+  };
+  let writes = 0;
+  const fetcher = (async (url: string, init: RequestInit) => {
+    if (url.endsWith("/api/query"))
+      return Response.json({
+        status: "success",
+        value: { value: "https://custom.example/pricing" },
+      });
+    assert.deepEqual(JSON.parse(String(init.body)), {
+      changes: [{ name: "AUTUMN_SECRET_KEY", value: live }],
+    });
+    writes++;
+    return new Response();
+  }) as typeof fetch;
+  await assert.rejects(
+    configureBillingDeployment(target, sandbox, fetcher),
+    /Invalid billing deployment/,
+  );
+  assert.equal(writes, 0);
+  await configureBillingDeployment(target, live, fetcher);
+  assert.equal(writes, 1);
+});
+
+test("live activation waits for Stripe and initializes only this app's production catalog", async () => {
+  const cloud = "https://prod-app.convex.cloud";
+  const deployKey = "prod:prod-app|fixture";
+  const publicSiteUrl = "https://example.test";
+  const requests: string[] = [];
+  let connected = false;
+  let finished = 0;
+
+  await fixture(
+    (async (url: string, init: RequestInit) => {
+      requests.push(url);
+      const body = init.body && JSON.parse(String(init.body));
+      if (
+        url === "https://api.useautumn.com/v1/platform.get_stripe_connection"
+      ) {
+        assert.deepEqual(body, { organization_slug: slug, env: "live" });
+        return Response.json({
+          connected,
+          account_id: connected ? "acct_fixture" : null,
+        });
+      }
+      if (
+        url ===
+        "https://api.convex.dev/v1/projects/42/deployment?defaultProd=true"
+      )
+        return Response.json({
+          name: "prod-app",
+          projectId: 42,
+          kind: "cloud",
+          deploymentType: "prod",
+          deploymentUrl: cloud,
+        });
+      if (
+        url ===
+        "https://api.convex.dev/v1/deployments/prod-app/create_deploy_key"
+      )
+        return Response.json({ deployKey });
+      assert.equal(
+        new Headers(init.headers).get("Authorization"),
+        `Convex ${deployKey}`,
+      );
+      if (url === `${cloud}/api/query`)
+        return Response.json({ status: "success", value: null });
+      if (url === `${cloud}/api/update_environment_variables`) {
+        assert.deepEqual(body.changes, [
+          { name: "AUTUMN_SECRET_KEY", value: live },
+          { name: "BILLING_RETURN_URL", value: `${publicSiteUrl}/pricing` },
+        ]);
+        return new Response();
+      }
+      assert.equal(url, `${cloud}/api/function`);
+      assert.deepEqual(body, {
+        path: "billing:setup",
+        format: "convex_encoded_json",
+        args: { expectedEnvironment: "live" },
+      });
+      return Response.json({
+        status: "success",
+        value: { enabled: true, pending: false },
+      });
+    }) as typeof fetch,
+    async () => {
+      const { userId, until } = setup;
+      const ctx = {
+        runMutation(ref: Parameters<typeof getFunctionName>[0], args: unknown) {
+          if (getFunctionName(ref) === "apps/operations/internal:begin") {
+            assert.deepEqual(args, { userId, appId, kind: "setup" });
+            return { until };
+          }
+          assert.equal(getFunctionName(ref), "apps/operations/internal:finish");
+          assert.deepEqual(args, { userId, appId, until, retryDelete: false });
+          finished++;
+          return null;
+        },
+        runQuery(ref: Parameters<typeof getFunctionName>[0]) {
+          switch (getFunctionName(ref)) {
+            case "apps/autumn:target":
+              return {
+                encryptedKeys: seal(
+                  JSON.stringify({ sandbox, live }),
+                  `${userId}:${appId}:autumn`,
+                ),
+                projectId: 42,
+                publicSiteUrl,
+              };
+            case "users/internal:deletionPending":
+              return false;
+            case "connections/internal:get":
+              return { token: seal(convex.token, `${userId}:convex`) };
+            default:
+              return assert.fail("Unexpected query");
+          }
+        },
+      };
+      const activate = (
+        enableLivePayments as unknown as {
+          _handler: (
+            context: typeof ctx,
+            args: { userId: string; appId: string },
+          ) => Promise<null>;
+        }
+      )._handler;
+      await assert.rejects(
+        activate(ctx, { userId, appId }),
+        /Connect live Stripe/,
+      );
+      assert.deepEqual(requests.splice(0), [
+        "https://api.useautumn.com/v1/platform.get_stripe_connection",
+      ]);
+      assert.equal(finished, 1);
+      connected = true;
+      assert.equal(await activate(ctx, { userId, appId }), null);
+      assert.deepEqual(requests.slice(-2), [
+        `${cloud}/api/update_environment_variables`,
+        `${cloud}/api/function`,
+      ]);
+      assert.equal(finished, 2);
+    },
+  );
 });
