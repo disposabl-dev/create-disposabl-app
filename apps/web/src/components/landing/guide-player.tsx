@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Pause, Play, RotateCcw, Volume2, VolumeX, X } from "lucide-react";
 import type Hls from "hls.js";
 import type { GuideLesson } from "../../../../../packages/disposabl-kit/guides";
+import { GuideSocial } from "./guide-social";
 import "./guide-player.css";
 
 export function GuidePlayer({
@@ -21,14 +22,12 @@ export function GuidePlayer({
   const activeRef = useRef(initial);
   const [muted, setMuted] = useState(true);
   const [paused, setPaused] = useState(false);
-  const [sheetOpen, setSheetOpen] = useState(false);
+  const [descriptionOpen, setDescriptionOpen] = useState(false);
+  const [commentsOpen, setCommentsOpen] = useState(false);
   const [failed, setFailed] = useState<Set<string>>(() => new Set());
   const dialog = useRef<HTMLDialogElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const videos = useRef<(HTMLVideoElement | null)[]>([]);
-  const descriptions = useRef<(HTMLButtonElement | null)[]>([]);
-  const sheetClose = useRef<HTMLButtonElement>(null);
-  const restoreDescription = useRef(false);
   const close = useRef(onClose);
   close.current = onClose;
   const current = lessons.at(active);
@@ -48,6 +47,8 @@ export function GuidePlayer({
       activeRef.current = next;
       setActive(next);
       setPaused(false);
+      setDescriptionOpen(false);
+      setCommentsOpen(false);
     },
     [lessons.length],
   );
@@ -82,7 +83,8 @@ export function GuidePlayer({
         activeRef.current = next;
         setActive(next);
         setPaused(false);
-        setSheetOpen(false);
+        setDescriptionOpen(false);
+        setCommentsOpen(false);
       }
     };
     const resize = () => {
@@ -98,6 +100,13 @@ export function GuidePlayer({
       window.removeEventListener("resize", resize);
     };
   }, [lessons.length]);
+
+  useEffect(() => {
+    if (!current) return;
+    const url = new URL(window.location.href);
+    url.searchParams.set("lesson", current.id);
+    window.history.replaceState(null, "", url);
+  }, [current]);
 
   useEffect(() => {
     const video = videos.current[active];
@@ -154,7 +163,7 @@ export function GuidePlayer({
         if (
           index === active &&
           !paused &&
-          !sheetOpen &&
+          !commentsOpen &&
           document.visibilityState === "visible" &&
           document.hasFocus()
         )
@@ -180,19 +189,7 @@ export function GuidePlayer({
       window.removeEventListener("blur", sync);
       window.removeEventListener("focus", sync);
     };
-  }, [active, paused, sheetOpen, failed]);
-
-  useEffect(() => {
-    if (sheetOpen) sheetClose.current?.focus();
-    else if (restoreDescription.current) {
-      descriptions.current[active]?.focus();
-      restoreDescription.current = false;
-    }
-  }, [sheetOpen, active]);
-  const closeSheet = () => {
-    restoreDescription.current = true;
-    setSheetOpen(false);
-  };
+  }, [active, paused, commentsOpen, failed]);
 
   return (
     <dialog
@@ -201,12 +198,12 @@ export function GuidePlayer({
       aria-label="Guide player"
       onCancel={(event) => {
         event.preventDefault();
-        if (sheetOpen) closeSheet();
+        if (commentsOpen) setCommentsOpen(false);
         else close.current();
       }}
       onKeyDown={(event) => {
         if (
-          !sheetOpen &&
+          !commentsOpen &&
           (event.key === "ArrowDown" || event.key === "ArrowUp")
         ) {
           event.preventDefault();
@@ -214,7 +211,7 @@ export function GuidePlayer({
         }
       }}
     >
-      <div className="reel-scroll" ref={scroller} inert={sheetOpen}>
+      <div className="reel-scroll" ref={scroller} inert={commentsOpen}>
         {lessons.map((lesson, index) => (
           <section
             className="reel"
@@ -236,7 +233,7 @@ export function GuidePlayer({
                   onPlay={(event) => {
                     if (
                       index !== active ||
-                      sheetOpen ||
+                      commentsOpen ||
                       document.visibilityState !== "visible" ||
                       !document.hasFocus()
                     )
@@ -282,21 +279,31 @@ export function GuidePlayer({
               </div>
             )}
             <div className="reel-shade" aria-hidden="true" />
-            <button
-              className="reel-description"
-              ref={(element) => {
-                descriptions.current[index] = element;
-              }}
-              type="button"
-              onClick={() => setSheetOpen(true)}
-              aria-label={`About ${lesson.title}`}
-            >
-              {lesson.title}
-            </button>
+            <div className="reel-description">
+              <strong>@disposabl</strong>
+              <button
+                type="button"
+                onClick={() => setDescriptionOpen((value) => !value)}
+                aria-expanded={descriptionOpen}
+                aria-label={`About ${lesson.title}`}
+              >
+                <span>{lesson.title}</span>
+                <span
+                  className={
+                    descriptionOpen ? "reel-summary expanded" : "reel-summary"
+                  }
+                >
+                  {lesson.summary}
+                </span>
+                <span className="reel-more">
+                  {descriptionOpen ? "Less" : "More"}
+                </span>
+              </button>
+            </div>
           </section>
         ))}
       </div>
-      <div className="reel-actions" inert={sheetOpen}>
+      <div className="reel-actions" inert={commentsOpen}>
         <button type="button" onClick={onClose} aria-label="Close guide player">
           <X size={23} />
         </button>
@@ -334,33 +341,13 @@ export function GuidePlayer({
           </>
         )}
       </div>
-      {sheetOpen && (
-        <div className="reel-sheet-backdrop" onClick={closeSheet}>
-          <div
-            className="reel-sheet"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="reel-sheet-title"
-            onClick={(event) => event.stopPropagation()}
-            onKeyDown={(event) => {
-              if (event.key === "Tab") {
-                event.preventDefault();
-                sheetClose.current?.focus();
-              }
-            }}
-          >
-            <button
-              ref={sheetClose}
-              type="button"
-              aria-label="Close description"
-              onClick={closeSheet}
-            >
-              <X size={21} />
-            </button>
-            <h2 id="reel-sheet-title">{lessons[active]?.title}</h2>
-            <p>{lessons[active]?.summary}</p>
-          </div>
-        </div>
+      {current && (
+        <GuideSocial
+          key={current.id}
+          lessonId={current.id}
+          commentsOpen={commentsOpen}
+          setCommentsOpen={setCommentsOpen}
+        />
       )}
     </dialog>
   );
