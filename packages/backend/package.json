@@ -24,8 +24,7 @@
     "@vercel/connect": "^2.9.0",
     "convex": "catalog:",
     "libsodium-wrappers": "^0.8.4",
-    "node-forge": "^1.4.3",
-    "obscenity": "0.4.6"
+    "node-forge": "^1.4.3"
   },
   "devDependencies": {
     "@convex-dev/eslint-plugin": "^5.0.1",

@@ -8,6 +8,7 @@
     "test": "bun run --cwd packages/tests test",
     "test:unit": "bun run --cwd packages/tests test:unit",
     "e2e": "bun run --cwd packages/tests e2e",
+    "store:review": "node .github/scripts/submit-for-store-review.mjs",
     "build": "turbo build",
     "dev": "turbo dev",
     "lint": "turbo lint",

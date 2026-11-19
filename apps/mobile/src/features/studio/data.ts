@@ -1,7 +1,7 @@
 export const targets = ["web", "ios", "android", "api", "mcp", "cli"] as const;
 export type Target = (typeof targets)[number];
 export const targetNames: Record<Target, string> = {
-  web: "Web",
+  web: "Website",
   ios: "iOS",
   android: "Android",
   api: "API",

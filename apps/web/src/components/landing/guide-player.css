@@ -123,8 +123,7 @@
   display: flex;
   gap: 10px;
 }
-.reel-actions button,
-.reel-comments-heading button {
+.reel-actions button {
   display: grid;
   place-items: center;
   width: 44px;
@@ -182,103 +181,6 @@
 }
 .reel-notice a {
   color: #c9d3ff;
-}
-.reel-sheet-backdrop {
-  position: absolute;
-  inset: 0;
-  z-index: 4;
-  display: flex;
-  align-items: end;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.55);
-}
-.reel-comments {
-  width: min(100%, 640px);
-  max-height: min(75%, 720px);
-  display: flex;
-  flex-direction: column;
-  padding: 20px 24px max(24px, env(safe-area-inset-bottom));
-  border-radius: 22px 22px 0 0;
-  color: #f7f7f9;
-  background: #1c1e27;
-}
-.reel-comments-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.reel-comments-heading h2 {
-  margin: 0;
-  font-size: 22px;
-}
-.reel-comments-list {
-  overflow-y: auto;
-  min-height: 110px;
-  padding: 12px 0;
-}
-.reel-comments-list article {
-  padding: 12px 0;
-  border-bottom: 1px solid #363947;
-}
-.reel-comments-list p {
-  margin: 5px 0;
-  overflow-wrap: anywhere;
-  line-height: 1.5;
-}
-.reel-comment-controls {
-  display: flex;
-  gap: 14px;
-}
-.reel-comment-controls button {
-  padding: 4px 0;
-  border: 0;
-  color: #c4c8d8;
-  background: transparent;
-  cursor: pointer;
-}
-.reel-comments form {
-  display: grid;
-  gap: 6px;
-}
-.reel-comments label {
-  font-weight: 700;
-}
-.reel-comments textarea {
-  width: 100%;
-  padding: 10px;
-  resize: vertical;
-  border: 1px solid #6e7282;
-  border-radius: 8px;
-  color: white;
-  background: #10121a;
-  font: inherit;
-}
-.reel-comment-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  color: #c4c8d8;
-  font-size: 12px;
-}
-.reel-comment-footer button {
-  padding: 8px 16px;
-  border: 0;
-  border-radius: 8px;
-  color: #10121a;
-  background: #c5d1ff;
-  font-weight: 700;
-  cursor: pointer;
-}
-.reel-comment-footer button:disabled {
-  opacity: 0.5;
-}
-.reel-comments form p {
-  margin: 0;
-  color: #c4c8d8;
-  font-size: 12px;
-}
-.reel-comments a {
-  color: #c5d1ff;
 }
 @media (min-aspect-ratio: 3/4) {
   .reel video {

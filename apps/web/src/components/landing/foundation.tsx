@@ -44,7 +44,7 @@ export function Foundation() {
                 <strong>Weekly plan</strong>
                 <span>Pick up where you left off</span>
                 <div className="foundation-platforms">
-                  <BrandIcon name="Web" />
+                  <BrandIcon name="Website" />
                   <BrandIcon name="iOS" />
                   <BrandIcon name="Android" />
                 </div>
@@ -62,7 +62,7 @@ export function Foundation() {
             <div className="foundation-pipeline" aria-hidden="true">
               <div>
                 <Check size={20} />
-                <span>Web &amp; backend tests</span>
+                <span>Website &amp; backend tests</span>
               </div>
               <div>
                 <Check size={20} />

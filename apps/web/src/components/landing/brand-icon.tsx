@@ -66,6 +66,6 @@ export function BrandIcon({ name }: { name: string }) {
         height={24}
       />
     );
-  const Icon = name === "Web" ? Globe : name === "CLI" ? Terminal : Code2;
+  const Icon = name === "Website" ? Globe : name === "CLI" ? Terminal : Code2;
   return <Icon className="brand-icon" aria-hidden="true" size={24} />;
 }

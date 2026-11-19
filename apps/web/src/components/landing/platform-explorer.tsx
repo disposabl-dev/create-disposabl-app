@@ -10,7 +10,7 @@ import { BrandIcon } from "./brand-icon";
 export const stackGroups = [
   {
     id: "web",
-    label: "Web",
+    label: "Website",
     platforms: ["web"],
     stack: ["React", "TanStack Start", "Vite", "Tailwind CSS"],
     description:

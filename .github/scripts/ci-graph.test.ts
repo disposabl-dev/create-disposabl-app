@@ -409,23 +409,21 @@ test("meaningful workflow mutations are rejected", () => {
   expect(() => requiresChecks(badPublish)).toThrow();
 });
 
-test("product iOS builds use hosted compute and retain a verified recovery trail", () => {
+test("product iOS uploads to TestFlight and keeps App Review on demand", () => {
   const job = pipeline.jobs["ios-production"];
   expect(job["runs-on"]).toContain("xcode-27");
-  expect(step(job, "Restore verified iOS build provenance").with.path).toBe(
+  expect(step(job, "Restore TestFlight upload provenance").with.path).toBe(
     ".ios-provenance/build.json",
   );
-  expect(step(job, "Restore same-run iOS upload").with.path).toBe(
-    ".ios-upload/build.json",
-  );
   expect(
-    step(job, "Upload and verify product iOS binary").env.IOS_RECOVERY,
-  ).toContain("ios-upload.outputs.cache-hit");
-  expect(step(job, "Submit exact product build for App Review").if).toContain(
-    "disposabl-dev/create-disposabl-app",
+    step(job, "Build product iOS and upload to TestFlight").env.DEVELOPER_DIR,
+  ).toContain("Xcode_27.2");
+  expect(JSON.stringify(job)).not.toMatch(/ASC_PRIVATE_KEY|apple-review.mjs/);
+  expect(step(job, "Check existing TestFlight upload").run).toContain(
+    "bun run store:review ios",
   );
   expect(step(job, "Publish compatible iOS production update").if).toContain(
-    "ios-review.outputs.ota == 'true'",
+    "ios-baseline.outputs.available == 'true'",
   );
   expect(step(job, "Build and submit to TestFlight").if).toContain(
     "github.repository != 'disposabl-dev/create-disposabl-app'",

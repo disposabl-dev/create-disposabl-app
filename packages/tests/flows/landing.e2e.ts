@@ -37,10 +37,9 @@ test(
     ).toHaveAttribute("aria-pressed", "false");
     await expect(browser.locator('[data-stack="api"]')).toHaveCount(0);
     await expect(browser.locator('[data-stack="clients"]')).toHaveCount(0);
-    await expect(screen.getByRole("button", "Web included")).toHaveAttribute(
-      "aria-disabled",
-      "true",
-    );
+    await expect(
+      screen.getByRole("button", "Website included"),
+    ).toHaveAttribute("aria-disabled", "true");
     for (const name of ["macOS", "Windows", "Linux", "MCP"])
       await screen.getByRole("button", name, { exact: true }).tap();
     await expect(
@@ -831,7 +830,7 @@ test(
   { platforms: ["web"], tags: ["landing"] },
   async ({ app, browser, screen }) => {
     await app.open("/");
-    for (const label of ["Desktop", "Mobile", "Web"]) {
+    for (const label of ["Desktop", "Mobile", "Website"]) {
       await screen.getByRole("button", label, { exact: true }).tap();
       await expect(
         screen.getByRole("button", label, { exact: true }),

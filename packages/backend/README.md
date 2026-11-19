@@ -40,9 +40,3 @@ Events cover coarse page and screen categories, API and MCP operations, and setu
 The Disposabl service also emits `app_created` and accepted ready/failed `platform_deployment` reports. Creation, setup, and deployment events share an `app_id` hashed separately from user identity and scoped to the analytics project. Deployment reports include platform, preview/production channel, workflow run number and attempt, and `time_since_app_creation_ms`. This is the app's age at the report, not the build's duration. Setup's `duration_ms` remains the duration of that setup operation.
 
 To measure initial delivery, use apps with an observed creation event and take the earliest successful report per app, platform, and channel. Exclude attempts with an error report, including a correction after a ready report; run number and attempt keep retries separate. Reports before instrumentation and failed provisioning before app creation are not measured. Ready means the workflow reported an artifact or deployment, not that installation, store review, or visible device behavior was verified. Local and E2E tests never send these events.
-
-### Guides moderation
-
-Comments are public. A server-side text filter and posting interval apply before publishing. Signed-in readers can report a comment or block its author. Two distinct reports hide a comment while an operator reviews it.
-
-Use the internal `guides/maintenance:moderationQueue` query in the corresponding Convex deployment to see pending reports. Use `guides/maintenance:resolve` with the comment ID and a decision of `approve`, `remove`, or `ban`. Approve restores visibility and closes the reports. Remove deletes the comment. Ban also prevents the author from posting more Guides comments. Account deletion clears the owner's comments, likes, blocks and reports.

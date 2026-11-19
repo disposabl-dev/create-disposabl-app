@@ -37,7 +37,7 @@ Choose a visual direction suited to the product. Read the `frontend-design` skil
 
 Read [delivery checks](references/delivery.md) before native builds or delivery repairs. Aim to show a usable web preview early; first native builds can take longer. Do not promise a build deadline.
 
-For requested App Store or Google Play submission, read [store submissions](references/store-submissions.md). Build and verify the matching store artifacts and reviewer access, then follow the requested submission and release scope.
+When the user wants to put an app on the App Store or Google Play, submit an update, or fix a rejection, read [store submissions](references/store-submissions.md). Prepare the listing and verify the build on the selected devices, then use the app's review command for the stores the user chose.
 
 Prefer local development, builds, and verification whenever the toolchain is available. Do not push or start GitHub Actions merely to test changes. Use the existing release workflows for authorized publication.
 

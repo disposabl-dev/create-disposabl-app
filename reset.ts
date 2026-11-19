@@ -150,11 +150,13 @@ const productGuides = [
   "apps/web/src/components/landing/guide-library.tsx",
   "apps/web/src/components/landing/guide-library.css",
   "apps/web/src/components/landing/guide-player.tsx",
+  "apps/web/src/components/landing/guide-social.tsx",
   "apps/web/src/components/landing/guide-player.css",
   "packages/disposabl-kit/guides.ts",
   "packages/disposabl-kit/guide-media.json",
   "packages/tests/flows/guides.e2e.ts",
   "packages/tests/flows/guide-engagement.e2e.ts",
+  "packages/tests/flows/mobile-guides.e2e.ts",
 ];
 
 // Validate every required input before removing anything. Unrelated skill
@@ -598,7 +600,6 @@ for (const dependency of [
   "@vercel/connect",
   "libsodium-wrappers",
   "node-forge",
-  "obscenity",
 ])
   delete backend.dependencies[dependency];
 delete backend.devDependencies["@types/node-forge"];

@@ -201,8 +201,8 @@ function Selection({
         ))}
       </View>
       <Text className="text-[14px] leading-[21px] text-muted-foreground">
-        Web is required. CLI and TypeScript SDK require API; Analytics requires
-        Authentication and a PostHog connection.
+        A website is required. CLI and TypeScript SDK require API; Analytics
+        requires Authentication and a PostHog connection.
       </Text>
       <Button
         title={busy ? "Saving..." : "Save selection"}

@@ -26,7 +26,7 @@ export const appIdeas = [
   {
     id: "game",
     label: "Games",
-    title: "Games for web and mobile.",
+    title: "Games for websites and phones.",
     prompt:
       "A casual memory matching game for web, iOS, and Android, with touch controls, score tracking, a restart button, and accessible controls. Start with a small playable version and test it on each platform.",
   },
@@ -57,7 +57,7 @@ const details = [
   {
     title: "A planner that fits your day.",
     features: ["Tasks and routines", "Weekly goals", "Saved progress"],
-    platforms: ["Web", "Apple", "Android", "Windows", "Linux"],
+    platforms: ["Website", "Apple", "Android", "Windows", "Linux"],
   },
   {
     title: "A game you want to play.",
@@ -66,12 +66,12 @@ const details = [
       "Scores and progress",
       "Your rules and artwork",
     ],
-    platforms: ["Web", "Apple", "Android"],
+    platforms: ["Website", "Apple", "Android"],
   },
   {
     title: "An app for your people.",
     features: ["Events and RSVPs", "Member accounts", "Community updates"],
-    platforms: ["Web", "Apple", "Android"],
+    platforms: ["Website", "Apple", "Android"],
   },
   {
     title: "Bookings on your terms.",
@@ -80,12 +80,12 @@ const details = [
       "Customer accounts",
       "Appointment management",
     ],
-    platforms: ["Web", "Apple", "Android"],
+    platforms: ["Website", "Apple", "Android"],
   },
   {
     title: "Software for how you work.",
     features: ["Team access", "Approvals and activity", "Connected workspaces"],
-    platforms: ["Web", "Windows", "Apple", "Linux"],
+    platforms: ["Website", "Windows", "Apple", "Linux"],
   },
 ] as const;
 export function AppPlayground({

@@ -1,5 +1,5 @@
 export const platforms = [
-  { id: "web", label: "Web", group: "Required", status: "required" },
+  { id: "web", label: "Website", group: "Required", status: "required" },
   { id: "android", label: "Android", group: "Mobile", status: "available" },
   { id: "ios", label: "iOS", group: "Mobile", status: "available" },
   { id: "macos", label: "macOS", group: "Desktop", status: "available" },
@@ -43,7 +43,7 @@ export function parsePlatform(value: unknown): Platform {
 /** Validate persisted selections without silently dropping or adding platforms. */
 export function validatePlatforms(values: readonly unknown[]): Platform[] {
   const selected = new Set(values.map(parsePlatform));
-  if (!selected.has(requiredPlatform)) throw new Error("Web is required");
+  if (!selected.has(requiredPlatform)) throw new Error("A website is required");
   for (const id of selected) {
     for (const dependency of platformDependencies[id] ?? []) {
       if (!selected.has(dependency))
@@ -53,7 +53,7 @@ export function validatePlatforms(values: readonly unknown[]): Platform[] {
   return platformIds.filter((id) => selected.has(id));
 }
 
-/** UI selection adds the required Web platform and dependent transports. */
+/** UI selection adds the required website platform and dependent transports. */
 export function resolvePlatforms(values: readonly unknown[]): Platform[] {
   const selected = new Set(values.map(parsePlatform));
   selected.add(requiredPlatform);

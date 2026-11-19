@@ -14,6 +14,7 @@ const build = {
   isForIosSimulator: false,
   app: { id: "project" },
   appIdentifier: "app.test",
+  appVersion: "1.0.0",
   buildProfile: "ios-production",
   updateChannel: { name: "production" },
   runtime: { version: runtime },
@@ -172,6 +173,7 @@ test("iOS reuses only a matching finished production binary", async () => {
 for (const [reason, candidate] of [
   ["no binary", null],
   ["different runtime", { ...build, runtime: { version: "different" } }],
+  ["different app version", { ...build, appVersion: "1.1.0" }],
   ["simulator", { ...build, isForIosSimulator: true }],
   ["different project", { ...build, app: { id: "other" } }],
   ["preview channel", { ...build, updateChannel: { name: "preview" } }],

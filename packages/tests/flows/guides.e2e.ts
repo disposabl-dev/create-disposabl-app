@@ -94,11 +94,9 @@ test(
     await app.screenshot("guide-description");
     await description.click();
     await expect(description).toHaveAttribute("aria-expanded", "false");
-    await screen.getByRole("button", "Open comments").click();
-    await expect.poll(async () => (await videoState())[0]?.paused).toBe(true);
-    await expect(screen.getByRole("link", "Sign in to comment")).toBeVisible();
-    await screen.getByRole("button", "Close comments").click();
-    await expect.poll(async () => (await videoState())[0]?.paused).toBe(false);
+    await expect(
+      screen.getByRole("link", "Sign in to like video"),
+    ).toBeVisible();
     await screen.getByRole("button", "Close guide player").click();
     await expect(screen.getByRole("dialog", "Guide player")).toHaveCount(0);
     await expect(card).toBeFocused();
@@ -176,7 +174,7 @@ test(
 );
 
 test(
-  "signed-in viewers can like, comment, and remove their interactions",
+  "signed-in viewers can like and unlike a guide",
   { platforms: ["web"] },
   async ({ app, browser, screen }) => {
     test.skip(
@@ -188,7 +186,6 @@ test(
       throw new Error("The social test requires an isolated loopback backend.");
     const username = `guidecheck${randomUUID().replaceAll("-", "")}`;
     const password = `Guide-${randomUUID()}!`;
-    const comment = `This guide is helpful ${randomUUID()}`;
     await browser.setViewport({ width: 390, height: 844 });
     await app.open("/signup?returnTo=%2Fguides%3Flesson%3Dwelcome");
     await screen.getByRole("button", "Reject analytics").click();
@@ -199,13 +196,6 @@ test(
     await expect(screen.getByRole("dialog", "Guide player")).toBeVisible();
     await screen.getByRole("button", "Like video").click();
     await expect(screen.getByRole("button", "Unlike video")).toBeVisible();
-    await screen.getByRole("button", "Open comments").click();
-    await screen.getByLabel("Add a comment").fill(comment);
-    await screen.getByRole("button", "Post", { exact: true }).click();
-    await expect(screen.getByText(comment)).toBeVisible();
-    await screen.getByRole("button", "Delete", { exact: true }).click();
-    await expect(screen.getByText(comment)).toHaveCount(0);
-    await screen.getByRole("button", "Close comments").click();
     await screen.getByRole("button", "Unlike video").click();
     await expect(screen.getByRole("button", "Like video")).toBeVisible();
   },

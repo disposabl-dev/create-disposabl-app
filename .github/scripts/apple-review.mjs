@@ -12,6 +12,7 @@ const {
   ASC_ISSUER_ID,
   ASC_PRIVATE_KEY,
   ASC_APP_ID,
+  ASC_EXPECTED_BUNDLE_ID,
   APP_VERSION,
   BUILD_NUMBER,
   ASC_OPERATION = "review",
@@ -30,6 +31,13 @@ const { request, list } = createAppleClient({
   issuerId: ASC_ISSUER_ID,
   privateKey: ASC_PRIVATE_KEY,
 });
+if (ASC_EXPECTED_BUNDLE_ID) {
+  const { data } = await request(`/v1/apps/${ASC_APP_ID}`);
+  if (data.attributes.bundleId !== ASC_EXPECTED_BUNDLE_ID)
+    throw new Error(
+      "The App Store Connect app does not match this app's bundle ID.",
+    );
+}
 const one = (items, label) => {
   if (items.length !== 1)
     throw new Error(`Expected exactly one ${label}; found ${items.length}`);

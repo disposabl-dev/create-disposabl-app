@@ -74,18 +74,22 @@ export function Home() {
             <HeroPreview />
           </div>
           <div className="platform-ribbon launch-container">
-            <p>Web, mobile, desktop & beyond.</p>
+            <p>Websites, mobile, desktop & beyond.</p>
             <div aria-label="Supported platforms">
-              {["Web", "Apple", "Android", "Windows", "Linux"].map((name) => (
-                <span
-                  key={name}
-                  role="img"
-                  aria-label={name === "Apple" ? "iPhone, iPad and Mac" : name}
-                  title={name === "Apple" ? "iPhone, iPad and Mac" : name}
-                >
-                  <BrandIcon name={name} />
-                </span>
-              ))}
+              {["Website", "Apple", "Android", "Windows", "Linux"].map(
+                (name) => (
+                  <span
+                    key={name}
+                    role="img"
+                    aria-label={
+                      name === "Apple" ? "iPhone, iPad and Mac" : name
+                    }
+                    title={name === "Apple" ? "iPhone, iPad and Mac" : name}
+                  >
+                    <BrandIcon name={name} />
+                  </span>
+                ),
+              )}
             </div>
             <a href="/stack">
               See what's included <ArrowUpRight size={18} />

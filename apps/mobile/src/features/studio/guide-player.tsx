@@ -102,7 +102,6 @@ function LessonPage({
   toggleDescription,
   muted,
   setMuted,
-  onCommentsChange,
 }: {
   lesson: GuideLesson;
   height: number;
@@ -114,7 +113,6 @@ function LessonPage({
   toggleDescription: () => void;
   muted: boolean;
   setMuted: React.Dispatch<React.SetStateAction<boolean>>;
-  onCommentsChange: (open: boolean) => void;
 }) {
   const insets = useSafeAreaInsets();
   const [failed, setFailed] = useState(false);
@@ -124,6 +122,8 @@ function LessonPage({
       value={{
         "--layout-height": height,
         "--guide-bottom": Math.max(insets.bottom, 24),
+        "--caption-left": Math.max(insets.left + 12, 20),
+        "--caption-right": insets.right + 86,
       }}
     >
       <View className="h-[var(--layout-height)] bg-black">
@@ -164,9 +164,9 @@ function LessonPage({
             <Touch
               label={`${expanded ? "Collapse" : "Expand"} description for ${lesson.title}`}
               onPress={toggleDescription}
-              className="absolute bottom-[var(--guide-bottom)] left-[20px] right-[86px] justify-center"
+              className="absolute bottom-[var(--guide-bottom)] left-[var(--caption-left)] right-[var(--caption-right)] justify-center"
             >
-              <View className="self-start rounded-[18px] bg-black/65 px-[14px] py-[12px] gap-[4px]">
+              <View className="max-w-[448px] self-start rounded-[18px] bg-black/70 px-[14px] py-[12px] gap-[4px]">
                 <Text className="text-white text-[13px] font-bold">
                   @disposabl
                 </Text>
@@ -189,7 +189,7 @@ function LessonPage({
               title={lesson.title}
               muted={muted}
               setMuted={setMuted}
-              onCommentsChange={onCommentsChange}
+              onShare={() => setPaused(true)}
             />
           </>
         )}
@@ -223,7 +223,6 @@ export function GuideDetailScreen() {
   const [height, setHeight] = useState(0);
   const [focused, setFocused] = useState(false);
   const [expanded, setExpanded] = useState(false);
-  const [commentsOpen, setCommentsOpen] = useState(false);
   const [muted, setMuted] = useState(false);
   useFocusEffect(
     useCallback(() => {
@@ -236,6 +235,7 @@ export function GuideDetailScreen() {
       value={{
         "--guide-top": Math.max(insets.top, 12),
         "--guide-bottom": Math.max(insets.bottom, 24),
+        "--guide-left": Math.max(insets.left + 12, 16),
       }}
     >
       <View
@@ -279,14 +279,13 @@ export function GuideDetailScreen() {
                 lesson={item}
                 height={height}
                 selected={i === index}
-                active={focused && i === index && !commentsOpen}
+                active={focused && i === index}
                 paused={paused}
                 setPaused={setPaused}
                 expanded={expanded}
                 toggleDescription={() => setExpanded((value) => !value)}
                 muted={muted}
                 setMuted={setMuted}
-                onCommentsChange={setCommentsOpen}
               />
             )}
           />
@@ -294,7 +293,7 @@ export function GuideDetailScreen() {
         <Touch
           label="Close guides"
           onPress={() => router.back()}
-          className="absolute top-[var(--guide-top)] left-[16px] h-[48px] w-[48px] rounded-full bg-black/50 items-center justify-center"
+          className="absolute top-[var(--guide-top)] left-[var(--guide-left)] h-[48px] w-[48px] rounded-full bg-black/50 items-center justify-center"
         >
           <MaterialIcons name="close" size={24} color="white" />
         </Touch>

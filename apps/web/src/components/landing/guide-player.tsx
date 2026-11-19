@@ -23,7 +23,6 @@ export function GuidePlayer({
   const [muted, setMuted] = useState(true);
   const [paused, setPaused] = useState(false);
   const [descriptionOpen, setDescriptionOpen] = useState(false);
-  const [commentsOpen, setCommentsOpen] = useState(false);
   const [failed, setFailed] = useState<Set<string>>(() => new Set());
   const dialog = useRef<HTMLDialogElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
@@ -48,7 +47,6 @@ export function GuidePlayer({
       setActive(next);
       setPaused(false);
       setDescriptionOpen(false);
-      setCommentsOpen(false);
     },
     [lessons.length],
   );
@@ -84,7 +82,6 @@ export function GuidePlayer({
         setActive(next);
         setPaused(false);
         setDescriptionOpen(false);
-        setCommentsOpen(false);
       }
     };
     const resize = () => {
@@ -163,7 +160,6 @@ export function GuidePlayer({
         if (
           index === active &&
           !paused &&
-          !commentsOpen &&
           document.visibilityState === "visible" &&
           document.hasFocus()
         )
@@ -189,7 +185,7 @@ export function GuidePlayer({
       window.removeEventListener("blur", sync);
       window.removeEventListener("focus", sync);
     };
-  }, [active, paused, commentsOpen, failed]);
+  }, [active, paused, failed]);
 
   return (
     <dialog
@@ -198,20 +194,16 @@ export function GuidePlayer({
       aria-label="Guide player"
       onCancel={(event) => {
         event.preventDefault();
-        if (commentsOpen) setCommentsOpen(false);
-        else close.current();
+        close.current();
       }}
       onKeyDown={(event) => {
-        if (
-          !commentsOpen &&
-          (event.key === "ArrowDown" || event.key === "ArrowUp")
-        ) {
+        if (event.key === "ArrowDown" || event.key === "ArrowUp") {
           event.preventDefault();
           go(active + (event.key === "ArrowDown" ? 1 : -1));
         }
       }}
     >
-      <div className="reel-scroll" ref={scroller} inert={commentsOpen}>
+      <div className="reel-scroll" ref={scroller}>
         {lessons.map((lesson, index) => (
           <section
             className="reel"
@@ -233,7 +225,6 @@ export function GuidePlayer({
                   onPlay={(event) => {
                     if (
                       index !== active ||
-                      commentsOpen ||
                       document.visibilityState !== "visible" ||
                       !document.hasFocus()
                     )
@@ -303,7 +294,7 @@ export function GuidePlayer({
           </section>
         ))}
       </div>
-      <div className="reel-actions" inert={commentsOpen}>
+      <div className="reel-actions">
         <button type="button" onClick={onClose} aria-label="Close guide player">
           <X size={23} />
         </button>
@@ -345,8 +336,7 @@ export function GuidePlayer({
         <GuideSocial
           key={current.id}
           lessonId={current.id}
-          commentsOpen={commentsOpen}
-          setCommentsOpen={setCommentsOpen}
+          onShare={() => setPaused(true)}
         />
       )}
     </dialog>

@@ -49,7 +49,7 @@ const foundations = [
   {
     icon: Globe,
     title: "Interfaces",
-    text: "A web app is included. Add mobile, desktop, and developer interfaces as needed.",
+    text: "A website is included. Add mobile, desktop, and developer interfaces as needed.",
   },
   {
     icon: Database,

@@ -57,6 +57,12 @@ import type {
   ReleasesGetData,
   ReleasesGetErrors,
   ReleasesGetResponses,
+  ReleasesReviewRequestData,
+  ReleasesReviewRequestErrors,
+  ReleasesReviewRequestResponses,
+  ReleasesReviewStatusData,
+  ReleasesReviewStatusErrors,
+  ReleasesReviewStatusResponses,
   UsersCurrentData,
   UsersCurrentErrors,
   UsersCurrentResponses,
@@ -361,6 +367,48 @@ export const releasesGet = <ThrowOnError extends boolean = false>(
     security: [{ scheme: "bearer", type: "http" }],
     url: "/api/releases/get",
     ...options,
+  });
+
+export const releasesReviewRequest = <ThrowOnError extends boolean = false>(
+  options: Options<ReleasesReviewRequestData, ThrowOnError>,
+): RequestResult<
+  ReleasesReviewRequestResponses,
+  ReleasesReviewRequestErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    ReleasesReviewRequestResponses,
+    ReleasesReviewRequestErrors,
+    ThrowOnError
+  >({
+    security: [{ scheme: "bearer", type: "http" }],
+    url: "/api/releases/review/request",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+export const releasesReviewStatus = <ThrowOnError extends boolean = false>(
+  options: Options<ReleasesReviewStatusData, ThrowOnError>,
+): RequestResult<
+  ReleasesReviewStatusResponses,
+  ReleasesReviewStatusErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    ReleasesReviewStatusResponses,
+    ReleasesReviewStatusErrors,
+    ThrowOnError
+  >({
+    security: [{ scheme: "bearer", type: "http" }],
+    url: "/api/releases/review/status",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
   });
 
 export const usersCurrent = <ThrowOnError extends boolean = false>(

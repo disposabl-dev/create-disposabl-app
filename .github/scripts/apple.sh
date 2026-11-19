@@ -112,54 +112,29 @@ case "${1:?operation required}" in
     mv "$RUNNER_TEMP/eas-production.json" eas.json
     if [[ "$GH_REPO" == disposabl-dev/create-disposabl-app ]]; then
       : "${ASC_APP_ID:?ASC app ID required}" "${APP_VERSION:?App version required}" "${RUNTIME:?Runtime required}"
-      : "${IOS_PHASE:?iOS phase required}"
-      ipa="$GITHUB_WORKSPACE/.ios-upload/disposabl.ipa"
-      if [[ "$IOS_PHASE" == build ]]; then
-        check_source
-        ASC_OPERATION=preflight node "$GITHUB_WORKSPACE/.github/scripts/apple-review.mjs"
-        mkdir -p "$GITHUB_WORKSPACE/.ios-upload"
-        env -u ASC_KEY_ID -u ASC_ISSUER_ID -u ASC_PRIVATE_KEY EAS_NO_VCS=1 bun x "$EAS_CLI" build --platform ios --profile ios-production --local --output "$ipa" --non-interactive --freeze-credentials
-      fi
-      if [[ "$IOS_PHASE" == build ]]; then
-        test -s "$ipa"
-        mkdir -p "$RUNNER_TEMP/ios-ipa"
-        unzip -q "$ipa" -d "$RUNNER_TEMP/ios-ipa"
-        app=$(find "$RUNNER_TEMP/ios-ipa/Payload" -maxdepth 1 -name '*.app' -type d -print -quit)
-        test -n "$app"
-        codesign --verify --deep --strict "$app"
-        test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Info.plist")" = "$IOS_IDENTIFIER"
-        test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Info.plist")" = "$APP_VERSION"
-        test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$app/Info.plist")" = "$DISPOSABL_IOS_BUILD_NUMBER"
-        test "$(/usr/libexec/PlistBuddy -c 'Print :EXUpdatesRuntimeVersion' "$app/Expo.plist")" = "$RUNTIME"
-        test "$(/usr/libexec/PlistBuddy -c 'Print :EXUpdatesRequestHeaders:expo-channel-name' "$app/Expo.plist")" = "$CHANNEL"
-        test "$(runtime)" = "$RUNTIME"
-        check_source
-        jq -n --arg sha "$(shasum -a 256 "$ipa" | cut -d' ' -f1)" --arg source "$SOURCE" --arg app "$ASC_APP_ID" --arg version "$APP_VERSION" --arg build "$DISPOSABL_IOS_BUILD_NUMBER" --arg runtime "$RUNTIME" --arg identifier "$IOS_IDENTIFIER" --arg channel "$CHANNEL" '{sha256:$sha,source:$source,app:$app,version:$version,build:$build,runtime:$runtime,identifier:$identifier,channel:$channel}' > "$GITHUB_WORKSPACE/.ios-upload/build.json"
-        exit 0
-      fi
-      [[ "$IOS_PHASE" == upload ]] || { echo 'Invalid iOS phase' >&2; exit 1; }
-      manifest="$GITHUB_WORKSPACE/.ios-upload/build.json"
-      jq -e --arg source "$SOURCE" --arg app "$ASC_APP_ID" --arg version "$APP_VERSION" --arg build "$DISPOSABL_IOS_BUILD_NUMBER" --arg runtime "$RUNTIME" --arg identifier "$IOS_IDENTIFIER" --arg channel "$CHANNEL" '.source == $source and .app == $app and .version == $version and .build == $build and .runtime == $runtime and .identifier == $identifier and .channel == $channel and (.sha256 | test("^[a-f0-9]{64}$"))' "$manifest" >/dev/null
+      ipa="$RUNNER_TEMP/disposabl.ipa"
       check_source
-      if [[ "${IOS_RECOVERY:-false}" != true ]]; then
-        test -s "$ipa"
-        test "$(shasum -a 256 "$ipa" | cut -d' ' -f1)" = "$(jq -er .sha256 "$manifest")"
-        jq --arg id "$ASC_APP_ID" '.submit["ios-production"].ios.ascAppId = $id' eas.json > "$RUNNER_TEMP/eas-submit.json"
-        mv "$RUNNER_TEMP/eas-submit.json" eas.json
-        env -u ASC_KEY_ID -u ASC_ISSUER_ID -u ASC_PRIVATE_KEY bun x "$EAS_CLI" submit --platform ios --path "$ipa" --profile ios-production --non-interactive --wait
-      else
-        echo 'Reconciling the prior upload; no duplicate submission will be started.'
-      fi
-      export BUILD_NUMBER="$DISPOSABL_IOS_BUILD_NUMBER"
-      for attempt in {1..60}; do
-        if ASC_OPERATION=verify node "$GITHUB_WORKSPACE/.github/scripts/apple-review.mjs"; then break; else status=$?; fi
-        [[ "$status" == 75 ]] || { echo 'Apple build lookup failed; stopping without retry.' >&2; exit "$status"; }
-        if [[ "$attempt" == 60 ]]; then echo 'Apple processing was not verified; reconcile the uploaded build before retrying.' >&2; exit 1; fi
-        sleep 30
-      done
+      EAS_NO_VCS=1 bun x "$EAS_CLI" build --platform ios --profile ios-production --local --output "$ipa" --non-interactive --freeze-credentials
+      test -s "$ipa"
+      mkdir -p "$RUNNER_TEMP/ios-ipa"
+      unzip -q "$ipa" -d "$RUNNER_TEMP/ios-ipa"
+      app=$(find "$RUNNER_TEMP/ios-ipa/Payload" -maxdepth 1 -name '*.app' -type d -print -quit)
+      test -n "$app"
+      codesign --verify --deep --strict "$app"
+      test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Info.plist")" = "$IOS_IDENTIFIER"
+      test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Info.plist")" = "$APP_VERSION"
+      test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$app/Info.plist")" = "$DISPOSABL_IOS_BUILD_NUMBER"
+      test "$(/usr/libexec/PlistBuddy -c 'Print :EXUpdatesRuntimeVersion' "$app/Expo.plist")" = "$RUNTIME"
+      test "$(/usr/libexec/PlistBuddy -c 'Print :EXUpdatesRequestHeaders:expo-channel-name' "$app/Expo.plist")" = "$CHANNEL"
+      jq --arg id "$ASC_APP_ID" '.submit["ios-production"].ios.ascAppId = $id' eas.json > "$RUNNER_TEMP/eas-submit.json"
+      mv "$RUNNER_TEMP/eas-submit.json" eas.json
+      check_source
+      bun x "$EAS_CLI" submit --platform ios --path "$ipa" --profile ios-production --non-interactive --wait
       mkdir -p "$GITHUB_WORKSPACE/.ios-provenance"
-      jq -n --arg version "$APP_VERSION" --arg runtime "$RUNTIME" --arg build "$BUILD_NUMBER" --arg app "$ASC_APP_ID" --arg project "$EXPO_PROJECT_ID" --arg identifier "$IOS_IDENTIFIER" '{version:$version,runtime:$runtime,build:$build,app:$app,project:$project,identifier:$identifier}' > "$GITHUB_WORKSPACE/.ios-provenance/build.json"
-      echo "Uploaded and verified iOS $APP_VERSION build $BUILD_NUMBER; review is a separate step." >> "$GITHUB_STEP_SUMMARY"
+      jq -n --arg version "$APP_VERSION" --arg runtime "$RUNTIME" --arg build "$DISPOSABL_IOS_BUILD_NUMBER" --arg app "$ASC_APP_ID" --arg project "$EXPO_PROJECT_ID" --arg identifier "$IOS_IDENTIFIER" --arg digest "$(shasum -a 256 "$ipa" | cut -d' ' -f1)" --arg source "$SOURCE" '{version:$version,runtime:$runtime,build:$build,app:$app,project:$project,identifier:$identifier,digest:$digest,source:$source}' > "$GITHUB_WORKSPACE/.ios-provenance/build.json"
+      report ready "EAS uploaded iOS $APP_VERSION ($DISPOSABL_IOS_BUILD_NUMBER) to TestFlight. App Review is a separate step."
+      echo '### Submit for Store Review' >> "$GITHUB_STEP_SUMMARY"
+      printf 'After Apple processes the upload, run `bun run store:review ios %s %s` with the local App Store Connect key.\n' "$APP_VERSION" "$DISPOSABL_IOS_BUILD_NUMBER" >> "$GITHUB_STEP_SUMMARY"
       exit 0
     fi
     if [[ -n "${ASC_APP_ID:-}" ]]; then

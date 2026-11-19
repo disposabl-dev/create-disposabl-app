@@ -1,7 +1,7 @@
 import { ConvexError, v } from "convex/values";
 import { internalMutation } from "@disposabl/disposabl-kit/server/lib/functions";
 import { ephemeralDeletionProgress } from "./validator";
-import { clearGuideData } from "../guides/maintenance";
+import { clearGuideLikes } from "../guides/model";
 
 // Completion depends on the deletion fence on telemetry identity writes.
 export const runBatch = internalMutation({
@@ -35,7 +35,7 @@ export const runBatch = internalMutation({
       .query("aiReports")
       .withIndex("by_userId", (q) => q.eq("userId", userId))
       .take(100);
-    const guidesCleared = await clearGuideData(ctx, userId);
+    const guidesCleared = await clearGuideLikes(ctx, userId);
     if (
       previous?.state === "known_user_bound_cleared" &&
       !handoffs.length &&

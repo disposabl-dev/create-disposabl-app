@@ -60,7 +60,7 @@ const lessons: GuideLesson[] = [
     journey: "web",
     title: "Share it with a link",
     summary:
-      "A web app opens in a browser. People can use it on their phone or computer without installing it.",
+      "A website opens in a browser. People can use it on their phone or computer without installing it.",
     durationSeconds: 34.966667,
   },
   {
@@ -114,9 +114,9 @@ const lessons: GuideLesson[] = [
   {
     id: "desktop-start",
     journey: "desktop",
-    title: "Make an app for computers",
+    title: "Make a desktop app",
     summary:
-      "Your idea can become an installed computer app. Choose the computers your users actually have.",
+      "Turn your idea into a desktop app for the operating systems your users use.",
     durationSeconds: 41.7,
   },
   {
@@ -208,7 +208,7 @@ export const guideJourneys: GuideJourney[] = [
   },
   {
     id: "web",
-    title: "Web",
+    title: "Website",
     description: "A useful page, a public address, and the next improvement.",
     kind: "application",
     lessonIds: ["web-start", "web-publish", "web-run"],
@@ -229,7 +229,7 @@ export const guideJourneys: GuideJourney[] = [
   },
   {
     id: "desktop",
-    title: "Computers",
+    title: "Desktop apps",
     description: "Install on a supported computer and deliver updates.",
     kind: "application",
     lessonIds: ["desktop-start", "desktop-publish"],
