@@ -56,6 +56,9 @@ test("requires analytics, production, token, approved host, and no E2E flag", ()
   process.env.E2E_TELEMETRY_DISABLED = "1";
   assert.equal(telemetryEnabled(config), false);
   delete process.env.E2E_TELEMETRY_DISABLED;
+  process.env.DISPOSABL_ENVIRONMENT = "preview";
+  assert.equal(telemetryEnabled(config), false);
+  delete process.env.DISPOSABL_ENVIRONMENT;
   process.env.CONVEX_SITE_URL = "https://dev.convex.site";
   assert.equal(telemetryEnabled(config), false);
   process.env.DISPOSABL_ENVIRONMENT = "production";
@@ -734,16 +737,25 @@ test("deployment telemetry sends only approved platform, channel and elapsed tim
   delete process.env.E2E_TELEMETRY_DISABLED;
   delete process.env.POSTHOG_ENABLED;
   let body: any;
+  let requests = 0;
   globalThis.fetch = (async (_input, init) => {
+    requests++;
     body = JSON.parse(String(init?.body));
     return new Response();
   }) as typeof fetch;
   await captureTelemetry(
     "platform_deployment",
+    { platform: "android", channel: "preview" },
+    "owner",
+    config,
+  );
+  assert.equal(requests, 0);
+  await captureTelemetry(
+    "platform_deployment",
     {
       app_id: "private-app",
       platform: "android",
-      channel: "preview",
+      channel: "production",
       outcome: "success",
       time_since_app_creation_ms: 7200000,
       run_number: 2,
@@ -759,7 +771,7 @@ test("deployment telemetry sends only approved platform, channel and elapsed tim
   assert.equal(body.properties.run_number, 2);
   assert.equal(body.properties.run_attempt, 1);
   assert.equal(body.properties.platform, "android");
-  assert.equal(body.properties.channel, "preview");
+  assert.equal(body.properties.channel, "production");
   assert.equal(JSON.stringify(body).includes("private"), false);
   const appId = body.properties.app_id;
   assert.match(appId, /^[a-f0-9]{64}$/);
@@ -785,6 +797,55 @@ test("deployment telemetry sends only approved platform, channel and elapsed tim
     config,
   );
   assert.notEqual(body.properties.app_id, appId);
+});
+
+test("operation failures export a linked trace and structured log beside the event", async () => {
+  process.env.CONVEX_SITE_URL = config.productionConvexSiteUrl;
+  delete process.env.E2E_TELEMETRY_DISABLED;
+  delete process.env.POSTHOG_ENABLED;
+  const requests = new Map<string, any>();
+  globalThis.fetch = (async (url, init) => {
+    requests.set(new URL(String(url)).pathname, JSON.parse(String(init?.body)));
+    return new Response();
+  }) as typeof fetch;
+  const traceId = "aabbccddeeff00112233445566778899";
+  const parentId = "aabbccddeeff0011";
+  await captureTelemetry(
+    "api_operation",
+    {
+      source: "cli",
+      operation: "sample/internal:operation",
+      outcome: "error",
+      started_at_ms: 1200,
+      duration_ms: 50,
+      traceparent: `00-${traceId}-${parentId}-01`,
+    },
+    "private-user-id",
+    config,
+  );
+  const event = requests.get("/capture/");
+  const span =
+    requests.get("/i/v1/traces").resourceSpans[0].scopeSpans[0].spans[0];
+  const log =
+    requests.get("/i/v1/logs").resourceLogs[0].scopeLogs[0].logRecords[0];
+  assert.equal(event.properties.trace_id, traceId);
+  assert.equal(span.traceId, traceId);
+  assert.equal(span.parentSpanId, parentId);
+  assert.equal(span.startTimeUnixNano, "1200000000");
+  assert.equal(span.endTimeUnixNano, "1250000000");
+  assert.equal(log.spanId, span.spanId);
+  assert.equal(log.traceId, traceId);
+  assert.ok(
+    log.attributes.some(
+      ({ key, value }: any) =>
+        key === "posthogDistinctId" &&
+        value.stringValue === event.properties.distinct_id,
+    ),
+  );
+  assert.doesNotMatch(
+    JSON.stringify([...requests]),
+    /private-user-id|traceparent/,
+  );
 });
 
 test("disabled, local and E2E capture makes no transport calls", async () => {

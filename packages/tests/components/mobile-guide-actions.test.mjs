@@ -36,6 +36,7 @@ const FlatList = forwardRef(({ data, renderItem, ...props }, ref) => {
 });
 mock.module("react-native", () => ({
   Alert: { alert() {} },
+  Platform: { OS: "ios" },
   View: "View",
   ScrollView: "ScrollView",
   FlatList,

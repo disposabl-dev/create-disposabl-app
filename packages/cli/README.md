@@ -37,7 +37,7 @@ The command exits unsuccessfully while manual cleanup is pending. Rerun the same
 
 ## Usage analytics
 
-When configured for a published release, Disposabl collects the command category, outcome, package version, operating system and package-manager category. A random ID stored in `~/.config/disposabl/telemetry.json` connects anonymous usage to the Disposabl user ID after login. Logout and account changes reset that ID. Prompts, arguments, paths, error messages, credentials and email addresses are not collected. Set `DO_NOT_TRACK=1` or `DISPOSABL_TELEMETRY_DISABLED=1` to opt out. Local source, development, CI and E2E runs do not send events. This is separate from a generated app's analytics.
+Published Disposabl releases collect command category, outcome, package version, operating system and package-manager category. Requests to the Disposabl API also send operation timings and a trace ID to link CLI requests with backend timing and failure logs. A random ID stored in `~/.config/disposabl/telemetry.json` connects anonymous usage to a pseudonymous ID after login. Logout and account changes reset that ID. Prompts, arguments, paths, error messages, credentials and email addresses are excluded. Set `DO_NOT_TRACK=1` or `DISPOSABL_TELEMETRY_DISABLED=1` to opt out. Local source, development, CI and E2E runs do not send CLI telemetry. Generated apps use their own analytics configuration.
 
 Failed commands also send a fixed, coarse error-tracking event with no exception message or stack trace.
 

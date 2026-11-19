@@ -72,6 +72,7 @@ test("generated SDK attribution reaches the authenticated API event without requ
       operation: "users/internal:current",
       outcome: "success",
       duration_ms: jobs[0][2].properties.duration_ms,
+      started_at_ms: jobs[0][2].properties.started_at_ms,
     });
     assert.doesNotMatch(
       JSON.stringify(jobs),

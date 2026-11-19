@@ -43,7 +43,7 @@ test("API and MCP failures emit one sanitized operation event and fixed API log"
       },
     } as any;
     const platforms = createPlatforms({ "sample/internal": { operation } });
-    const request = () =>
+    const request = (headers: Record<string, string> = {}) =>
       new Request(
         `https://example.test/api/sample/operation?private=${secret}`,
         {
@@ -51,13 +51,16 @@ test("API and MCP failures emit one sanitized operation event and fixed API log"
           headers: {
             "Content-Type": "application/json",
             "X-Disposabl-Source": "sdk",
+            ...headers,
           },
           body: JSON.stringify({ value: secret }),
         },
       );
     const response = await platforms.handleApi(
       ctx,
-      request(),
+      request({
+        traceparent: "00-aabbccddeeff00112233445566778899-aabbccddeeff0011-01",
+      }),
       async () => user,
     );
     assert.equal(response.status, 500);
@@ -69,6 +72,8 @@ test("API and MCP failures emit one sanitized operation event and fixed API log"
       operation: "sample/internal:operation",
       outcome: "error",
       duration_ms: (jobs[0] as any[])[2].properties.duration_ms,
+      started_at_ms: (jobs[0] as any[])[2].properties.started_at_ms,
+      traceparent: "00-aabbccddeeff00112233445566778899-aabbccddeeff0011-01",
     });
     assert.doesNotMatch(JSON.stringify({ jobs, logs }), new RegExp(secret));
     jobs.length = 0;
@@ -101,6 +106,8 @@ test("API and MCP failures emit one sanitized operation event and fixed API log"
     assert.deepEqual(logs, []);
     assert.doesNotMatch(JSON.stringify(jobs), new RegExp(secret));
     jobs.length = 0;
+    await platforms.handleApi(ctx, request({ DNT: "1" }), async () => user);
+    assert.equal(jobs.length, 0);
     process.env.E2E_TELEMETRY_DISABLED = "1";
     await platforms.handleApi(ctx, request(), async () => {
       throw new Error(secret);

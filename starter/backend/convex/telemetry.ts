@@ -40,6 +40,8 @@ const properties = v.object({
   outcome: v.optional(v.union(v.literal("success"), v.literal("error"))),
   page: v.optional(pageValidator),
   duration_ms: v.optional(v.number()),
+  started_at_ms: v.optional(v.number()),
+  traceparent: v.optional(v.string()),
 });
 export const send = internalAction({
   args: {

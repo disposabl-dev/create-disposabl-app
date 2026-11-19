@@ -38,7 +38,6 @@ const events = [];
 const instances = [];
 let initialized = 0;
 let saved = null;
-const alerts = [];
 let finishRead;
 const readPreference = mock(
   () =>
@@ -70,7 +69,7 @@ mock.module("expo-secure-store", () => ({
   },
 }));
 mock.module("react-native", () => ({
-  Alert: { alert: (...args) => alerts.push(args) },
+  Platform: { OS: "android" },
 }));
 mock.module("posthog-react-native", () => ({
   default: class {
@@ -107,14 +106,18 @@ mock.module(
     PreferenceRow: "PreferenceRow",
   }),
 );
-const { ProductTelemetry, AnalyticsPreference, captureProductAction } =
-  await import("../../../apps/mobile/src/features/product-telemetry");
+const {
+  ProductTelemetry,
+  AnalyticsPreference,
+  captureProductAction,
+  captureProductError,
+} = await import("../../../apps/mobile/src/features/product-telemetry");
 let renderer;
 afterEach(async () => {
   await act(async () => renderer?.unmount());
 });
 
-test("analytics stays off without consent and concurrent consumers share one read", async () => {
+test("analytics defaults on after the shared preference read", async () => {
   process.env.EXPO_PUBLIC_E2E = "false";
   await act(async () => {
     renderer = create(
@@ -137,16 +140,9 @@ test("analytics stays off without consent and concurrent consumers share one rea
   captureProductAction("agent_stop_attempt");
   expect(events).toHaveLength(0);
   await act(async () => finishRead(null));
-  expect(renderer.root.findByType("PreferenceRow").props.value).toBe("No");
-  expect(requests).toHaveBeenCalledTimes(0);
-  expect(alerts).toHaveLength(1);
-  expect(alerts[0][0]).toBe("Allow usage analytics?");
-  await act(async () => {
-    alerts[0][2].find((button) => button.text === "Allow").onPress();
-    await Promise.resolve();
-  });
-  expect(saved).toBe("allow");
   expect(renderer.root.findByType("PreferenceRow").props.value).toBe("Yes");
+  expect(requests).toHaveBeenCalledTimes(0);
+  expect(saved).toBeNull();
   expect(readPreference).toHaveBeenCalledTimes(1);
   expect(initialized).toBe(0);
   expect(requests).toHaveBeenCalledTimes(0);
@@ -206,6 +202,9 @@ test("production waits for bootstrap, sanitizes screen and stops on local opt-ou
     $geoip_disable: true,
     $screen_name: "app_detail",
     platform: "mobile",
+    source: "mobile",
+    os: "android",
+    environment: "production",
   });
   captureProductAction("open_create");
   expect(events[1].properties.action).toBe("open_create");
@@ -312,4 +311,11 @@ test("a validated same-session token refresh resumes actions without recreating 
   expect(initialized).toBe(count);
   captureProductAction("open_settings");
   expect(events).toHaveLength(before + 2);
+  captureProductError();
+  expect(events.at(-1)).toMatchObject({
+    event: "$exception",
+    properties: {
+      $exception_list: [{ type: "ScreenError", value: "Screen render failed" }],
+    },
+  });
 });

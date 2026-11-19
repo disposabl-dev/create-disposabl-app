@@ -1,7 +1,7 @@
 import PostHog from "posthog-react-native";
 import * as SecureStore from "expo-secure-store";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Alert } from "react-native";
+import { Platform } from "react-native";
 import {
   PreferenceRow,
   PreferenceSection,
@@ -15,18 +15,24 @@ import { createTelemetryLeaseController } from "../../../../packages/disposabl-k
 
 const key = "disposabl.product.analytics.consent.v1";
 let allowed: boolean | null = null;
-let undecided = false;
-let prompted = false;
 let preferencePending = false;
 let preferenceLoad: Promise<void> | undefined;
 const listeners = new Set<() => void>();
 let stopActive: (() => void) | undefined;
 let sendAction: ((action: MobileAction) => void) | undefined;
+let sendError: (() => void) | undefined;
 export function captureProductAction(action: MobileAction) {
   try {
     if (isMobileAction(action)) sendAction?.(action);
   } catch {
     // Analytics must not interrupt navigation or an acquired billing transaction.
+  }
+}
+export function captureProductError() {
+  try {
+    sendError?.();
+  } catch {
+    // Analytics must not interrupt recovery from a screen error.
   }
 }
 function notify() {
@@ -39,8 +45,7 @@ function loadPreference() {
   return (preferenceLoad ??= (async () => {
     try {
       const stored = await SecureStore.getItemAsync(key);
-      undecided = stored !== "allow" && stored !== "deny";
-      allowed = stored === "allow";
+      allowed = stored !== "deny";
     } catch {
       allowed = false;
     }
@@ -56,7 +61,6 @@ async function savePreference(next: boolean) {
   try {
     await SecureStore.setItemAsync(key, next ? "allow" : "deny");
     allowed = next;
-    undecided = false;
     return true;
   } catch {
     allowed = false;
@@ -118,28 +122,6 @@ export function ProductTelemetry({
   ready: boolean;
 }) {
   const preference = usePreference();
-  useEffect(() => {
-    if (
-      preference === null ||
-      !undecided ||
-      prompted ||
-      __DEV__ ||
-      ["true", "1"].includes(process.env.EXPO_PUBLIC_E2E ?? "") ||
-      process.env.EXPO_PUBLIC_DO_NOT_TRACK === "1" ||
-      process.env.EXPO_PUBLIC_DISPOSABL_ANALYTICS_ENABLED !== "true"
-    )
-      return;
-    prompted = true;
-    Alert.alert(
-      "Allow usage analytics?",
-      "Disposabl uses PostHog to understand which screens and actions are used. You can change this choice in Settings. Your prompts and files are not sent as analytics.",
-      [
-        { text: "No thanks", onPress: () => void savePreference(false) },
-        { text: "Allow", onPress: () => void savePreference(true) },
-      ],
-      { cancelable: false },
-    );
-  }, [preference]);
   const page = useRef(pathname);
   const identity = useRef({ token, ready, preference });
   const send = useRef<(() => void) | undefined>(undefined);
@@ -202,7 +184,9 @@ export function ProductTelemetry({
                 identity.current.preference !== true ||
                 identity.current.token !== activeToken ||
                 Date.now() >= deadline ||
-                (event.event !== "$screen" && event.event !== "product_action")
+                !["$screen", "product_action", "$exception"].includes(
+                  event.event,
+                )
               )
                 return null;
               const action = event.properties?.action;
@@ -216,10 +200,20 @@ export function ProductTelemetry({
                   token: lease.projectToken,
                   distinct_id: lease.distinctId,
                   $geoip_disable: true,
-                  ...(event.event === "$screen"
-                    ? { $screen_name: screenCategory(page.current) }
-                    : { action: String(action) }),
+                  ...(event.event === "$screen" && {
+                    $screen_name: screenCategory(page.current),
+                  }),
+                  ...(event.event === "product_action" && { action }),
+                  ...(event.event === "$exception" && {
+                    $exception_list: [
+                      { type: "ScreenError", value: "Screen render failed" },
+                    ],
+                    $exception_fingerprint: "disposabl-mobile-screen-error",
+                  }),
                   platform: "mobile",
+                  source: "mobile",
+                  os: Platform.OS === "ios" ? "ios" : "android",
+                  environment: "production",
                 },
               };
             },
@@ -231,6 +225,7 @@ export function ProductTelemetry({
             lastView = current;
           };
           send.current = capture;
+          sendError = () => sdk?.capture("$exception");
           sendAction = (action) => {
             if (
               live &&
@@ -248,6 +243,7 @@ export function ProductTelemetry({
           live = false;
           send.current = undefined;
           sendAction = undefined;
+          sendError = undefined;
           void sdk?.optOut();
           // reset() clears opt-out. The next lease creates a fresh memory-only instance.
           sdk = undefined;

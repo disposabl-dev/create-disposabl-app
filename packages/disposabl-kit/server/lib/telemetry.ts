@@ -1,6 +1,7 @@
 import config from "../../../../disposabl.json";
 import { makeFunctionReference } from "convex/server";
 import { v } from "convex/values";
+import { exportOperation, startSpan } from "../../lib/observability";
 import {
   internalMutation,
   internalAction,
@@ -31,6 +32,8 @@ export type TelemetryProperties = {
     | "account"
     | "other";
   duration_ms?: number;
+  started_at_ms?: number;
+  traceparent?: string;
   /** Server-owned app identity; hashed before leaving the backend. */
   app_id?: string;
   time_since_app_creation_ms?: number;
@@ -57,9 +60,11 @@ type AnalyticsConfig = {
 };
 const settings: AnalyticsConfig = config;
 export function telemetryEnabled(settingsOverride: AnalyticsConfig = settings) {
+  const environment = process.env.DISPOSABL_ENVIRONMENT;
   const production =
-    process.env.DISPOSABL_ENVIRONMENT === "production" ||
-    (!!settingsOverride.productionConvexSiteUrl &&
+    environment === "production" ||
+    (!environment &&
+      !!settingsOverride.productionConvexSiteUrl &&
       process.env.CONVEX_SITE_URL === settingsOverride.productionConvexSiteUrl);
   const token =
     settingsOverride.analytics?.projectToken ??
@@ -498,7 +503,8 @@ export async function captureTelemetry(
   settingsOverride: AnalyticsConfig = settings,
   anonymousId?: string,
 ) {
-  if (!telemetryEnabled(settingsOverride)) return;
+  if (properties.channel === "preview" || !telemetryEnabled(settingsOverride))
+    return;
   try {
     const token =
       settingsOverride.analytics?.projectToken ??
@@ -563,7 +569,18 @@ export async function captureTelemetry(
           .map((key) => [key, properties[key]]),
       ),
     };
-    await fetch(`${host}/capture/`, {
+    const start = properties.started_at_ms;
+    const trace =
+      (event === "api_operation" || event === "mcp_operation") &&
+      safe.operation &&
+      safe.source &&
+      safe.outcome &&
+      safe.duration_ms !== undefined &&
+      Number.isSafeInteger(start) &&
+      start! > 0
+        ? startSpan(properties.traceparent)
+        : undefined;
+    const capture = fetch(`${host}/capture/`, {
       method: "POST",
       signal: AbortSignal.timeout(2000),
       headers: { "Content-Type": "application/json" },
@@ -573,6 +590,7 @@ export async function captureTelemetry(
         properties: {
           distinct_id: identity,
           ...safe,
+          ...(trace && { trace_id: trace.traceId }),
           environment: "production",
           ...(!userId || !anonymousId
             ? { $process_person_profile: false }
@@ -581,6 +599,28 @@ export async function captureTelemetry(
         },
       }),
     });
+    await Promise.allSettled([
+      capture,
+      ...(trace
+        ? [
+            exportOperation(
+              { host, token },
+              {
+                service:
+                  event === "mcp_operation" ? "disposabl-mcp" : "disposabl-api",
+                name: safe.operation!,
+                source: safe.source!,
+                startedAt: start!,
+                endedAt: start! + safe.duration_ms!,
+                failed: safe.outcome === "error",
+                distinctId: userId ? identity : undefined,
+                span: trace,
+              },
+              2000,
+            ),
+          ]
+        : []),
+    ]);
   } catch {
     // Analytics never interrupts the product.
   }
@@ -596,7 +636,7 @@ export async function scheduleTelemetry(
   properties: TelemetryProperties,
   userId?: string,
 ) {
-  if (!telemetryEnabled()) return;
+  if (properties.channel === "preview" || !telemetryEnabled()) return;
   try {
     await ctx.scheduler.runAfter(0, send, {
       event,

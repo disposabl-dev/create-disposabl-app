@@ -51,7 +51,8 @@ let sdkOptions;
 const events = [];
 const stops = mock();
 let validReceivers = 0;
-const requests = mock(async function () {
+let identifyLease = true;
+const requests = mock(async function (_url, init) {
   if (this !== window) throw new TypeError("Illegal invocation");
   validReceivers++;
   return new Response(
@@ -61,7 +62,7 @@ const requests = mock(async function () {
       host: "https://us.i.posthog.com",
       anonymousId: "00000000-0000-4000-8000-000000000001",
       distinctId: "server-id",
-      identified: false,
+      identified: !!init?.headers.Authorization && identifyLease,
       expiresAt: Date.now() + 30_000,
     }),
     { status: 200 },
@@ -86,10 +87,9 @@ mock.module("posthog-js", () => ({
       });
       if (result) events.push(result);
     }
-    opt_out_capturing() {
+    reset() {
       stops();
     }
-    reset() {}
     startSessionRecording() {}
     stopSessionRecording() {}
   },
@@ -149,7 +149,7 @@ test("Do Not Track prevents web bootstrap and SDK initialization", async () => {
 test("web denies analytics before explicit consent", async () => {
   process.env.VITE_E2E = "false";
   values.clear();
-  values.set("disposabl.product.analytics.optout.v1", "0");
+  setAnalyticsConsent(null);
   accepted = false;
   await act(async () => {
     renderer = create(
@@ -189,6 +189,8 @@ test("web bootstraps, strips URL and stops immediately on opt-out", async () => 
     $geoip_disable: true,
     page: "connections",
     platform: "web",
+    source: "web",
+    environment: "production",
     $current_url: "https://www.disposabl.dev/dashboard/connections",
   });
   window.clickTarget(new TestElement(undefined, new TestElement("copy_setup")));
@@ -242,4 +244,34 @@ test("web bootstraps, strips URL and stops immediately on opt-out", async () => 
   ).toHaveLength(2);
   expect(values.get("disposabl.product.analytics.optout.v1")).toBe("1");
   expect(sdkOptions.before_send(snapshot)).toBeNull();
+});
+
+test("signed-in web analytics defaults on with an identified lease and no stored preference", async () => {
+  values.clear();
+  const baseline = initialized;
+  const previous = events.length;
+  setAnalyticsConsent(null);
+  const token = `x.${btoa(JSON.stringify({ sub: "session" }))}.`;
+  const tree = (accessToken = token) =>
+    createElement(ProductTelemetry, {
+      pathname: "/dashboard",
+      token: accessToken,
+      ready: true,
+    });
+  identifyLease = false;
+  await act(async () => {
+    renderer = create(tree());
+  });
+  expect(initialized).toBe(baseline);
+  expect(events).toHaveLength(previous);
+  identifyLease = true;
+  await act(async () => setAnalyticsConsent(null));
+  expect(initialized).toBe(baseline + 1);
+  expect(events.at(-1).properties.distinct_id).toBe("server-id");
+  expect(sdkOptions.persistence).toBe("memory");
+  expect(sdkOptions.disable_session_recording).toBe(true);
+  expect(values.size).toBe(0);
+  await act(async () => renderer.update(tree(null)));
+  window.clickTarget(new TestElement("copy_setup"));
+  expect(events).toHaveLength(previous + 1);
 });

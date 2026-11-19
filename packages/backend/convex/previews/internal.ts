@@ -253,14 +253,14 @@ export const report = internalMutation({
         origin,
       );
     }
-    if (transition)
+    if (args.production && transition)
       await scheduleTelemetry(
         ctx,
         "platform_deployment",
         {
           app_id: app.appId,
           platform: args.platform,
-          channel: args.production ? "production" : "preview",
+          channel: "production",
           outcome: args.status === "ready" ? "success" : "error",
           time_since_app_creation_ms: Date.now() - app._creationTime,
           run_number: args.run.number,

@@ -13,7 +13,7 @@ export function CookieConsentBanner({
   onAnalyticsChange,
   onInvalidate,
 }: {
-  onAnalyticsChange: (allowed: boolean) => void;
+  onAnalyticsChange: (allowed: boolean | null) => void;
   onInvalidate: () => void;
 }) {
   const root = useRef<HTMLDivElement>(null);
@@ -22,7 +22,12 @@ export function CookieConsentBanner({
     const isCancelled = () => cancelled;
     let started = false;
     const container = root.current;
-    const update = () => onAnalyticsChange(acceptedCookieCategory("analytics"));
+    const update = () =>
+      onAnalyticsChange(
+        CookieConsent.validConsent()
+          ? acceptedCookieCategory("analytics")
+          : null,
+      );
     lifecycle = lifecycle
       .then(async () => {
         if (isCancelled() || !container) return;
@@ -48,7 +53,7 @@ export function CookieConsentBanner({
                 consentModal: {
                   title: "Cookie preferences",
                   description:
-                    "We use necessary cookies and, with your permission, analytics to improve Disposabl.",
+                    "We use necessary cookies. Signed-in usage analytics are on by default. You can reject analytics here.",
                   acceptAllBtn: "Accept all",
                   acceptNecessaryBtn: "Reject analytics",
                   showPreferencesBtn: "Preferences",
@@ -69,7 +74,7 @@ export function CookieConsentBanner({
                     {
                       title: "Analytics",
                       description:
-                        "Optional usage information helps improve Disposabl.",
+                        "Allow anonymous usage analytics too. Reject analytics to turn off usage analytics entirely.",
                       linkedCategory: "analytics",
                     },
                   ],
@@ -84,7 +89,7 @@ export function CookieConsentBanner({
       })
       .catch((error) => {
         console.error("Cookie preferences unavailable", error);
-        onAnalyticsChange(false);
+        onInvalidate();
       });
     return () => {
       cancelled = true;

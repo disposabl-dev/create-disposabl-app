@@ -1,5 +1,6 @@
 import { Component, type ReactNode } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { captureProductError } from "../product-telemetry";
 
 export function Button({
   title,
@@ -35,6 +36,9 @@ export class ErrorBoundary extends Component<
   state = { error: "", attempt: 0 };
   static getDerivedStateFromError(error: Error) {
     return { error: error.message };
+  }
+  componentDidCatch() {
+    captureProductError();
   }
   render() {
     if (this.state.error)

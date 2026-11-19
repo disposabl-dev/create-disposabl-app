@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import { apiError } from "./errors";
 import manifest from "./package.json";
+import { exportOperation, startSpan } from "../disposabl-kit/lib/observability";
 import {
   identify,
   installedRelease,
@@ -8,6 +9,7 @@ import {
   telemetryStatePath,
   resetIdentity,
   telemetryConfig,
+  telemetryOptedOut,
 } from "./telemetry";
 import {
   NotAuthenticated,
@@ -194,6 +196,7 @@ export function createProgram(
           headers: {
             Authorization: `Bearer ${token}`,
             "X-Disposabl-Source": "cli",
+            ...(telemetryOptedOut() && { DNT: "1" }),
           },
           redirect: "error",
           signal: AbortSignal.timeout(30_000),
@@ -308,7 +311,7 @@ export function requestOperation(
   if (method === "get")
     for (const [name, value] of Object.entries(input))
       target.searchParams.set(name, JSON.stringify(value));
-  const send = async (refresh = false) =>
+  const send = async (traceparent?: string, refresh = false) =>
     fetch(target, {
       method: method.toUpperCase(),
       redirect: "error",
@@ -317,14 +320,39 @@ export function requestOperation(
         Authorization: `Bearer ${await accessToken(base, refresh)}`,
         "Content-Type": "application/json",
         "X-Disposabl-Source": "cli",
+        ...(telemetryOptedOut() && { DNT: "1" }),
+        ...(traceparent && { traceparent }),
       },
       body: method === "post" ? JSON.stringify(input) : undefined,
     });
   return async () => {
-    const response = await send();
-    return response.status === 401 && !process.env.DISPOSABL_API_KEY
-      ? send(true)
-      : response;
+    const config =
+      base === "https://www.disposabl.dev" && telemetryConfig(manifest.version);
+    const span = config && startSpan();
+    const startedAt = Date.now();
+    let failed = true;
+    try {
+      let response = await send(span ? span.traceparent : undefined);
+      if (response.status === 401 && !process.env.DISPOSABL_API_KEY)
+        response = await send(span ? span.traceparent : undefined, true);
+      failed = !response.ok;
+      return response;
+    } finally {
+      if (config && span)
+        await exportOperation(
+          config,
+          {
+            service: "disposabl-cli",
+            name: "cli_api_request",
+            source: "cli",
+            startedAt,
+            endedAt: Date.now(),
+            failed,
+            span,
+          },
+          500,
+        ).catch(() => {});
+    }
   };
 }
 

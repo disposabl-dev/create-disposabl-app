@@ -11,16 +11,22 @@ import {
 const preferenceKey = "disposabl.product.analytics.optout.v1";
 const preferenceEvent = "disposabl-product-analytics-preference";
 let storageFailed = false;
-let consentReady = false;
-function allowed() {
+let consent: boolean | null | undefined;
+function allowed(token: string | null) {
   try {
     return (
-      consentReady &&
-      acceptedCookieCategory("analytics") &&
+      consent !== undefined &&
+      consent !== false &&
       !storageFailed &&
+      !(
+        "globalPrivacyControl" in navigator &&
+        navigator.globalPrivacyControl === true
+      ) &&
       navigator.doNotTrack !== "1" &&
       navigator.doNotTrack !== "yes" &&
-      localStorage.getItem(preferenceKey) === "0"
+      localStorage.getItem(preferenceKey) !== "1" &&
+      (token !== null ||
+        (consent === true && acceptedCookieCategory("analytics")))
     );
   } catch {
     return false;
@@ -44,15 +50,16 @@ export function productTelemetrySource(): "web" | "desktop" {
     : "web";
 }
 export function invalidateAnalyticsConsent() {
-  consentReady = false;
+  consent = undefined;
   stopActive?.();
 }
 
-export function setAnalyticsConsent(enabled: boolean) {
-  consentReady = enabled;
+export function setAnalyticsConsent(enabled: boolean | null) {
+  consent = enabled;
   try {
-    if (!enabled) stopActive?.();
-    localStorage.setItem(preferenceKey, enabled ? "0" : "1");
+    if (enabled === false) stopActive?.();
+    if (enabled !== null)
+      localStorage.setItem(preferenceKey, enabled ? "0" : "1");
     storageFailed = false;
   } catch {
     storageFailed = true;
@@ -68,10 +75,12 @@ export function createWebTelemetryAdapter(options: {
   page: () => string;
   allowed: () => boolean;
   source: "web" | "desktop";
+  token?: () => string | null;
 }) {
   let sdk: PostHog | undefined;
   let deadline = 0;
   let live = false;
+  let activeToken: string | null | undefined;
   let lastView = "";
   let capture: (() => void) | undefined;
   const controller = createTelemetryLeaseController({
@@ -79,15 +88,20 @@ export function createWebTelemetryAdapter(options: {
     transport: options.transport,
     adapter: {
       renew(lease) {
+        activeToken = options.token?.();
         deadline = Math.min(lease.expiresAt, Date.now() + 30_000);
       },
       start(lease) {
+        activeToken = options.token?.();
+        if (activeToken && !lease.identified)
+          throw new Error("Unidentified telemetry lease");
         live = true;
         deadline = Math.min(lease.expiresAt, Date.now() + 30_000);
         sdk = new PostHog();
         sdk.init(lease.projectToken, {
           api_host: lease.host,
           persistence: "memory",
+          consent_persistence_name: "disposabl-product-usage-consent",
           bootstrap: {
             distinctID: lease.distinctId,
             isIdentifiedID: lease.identified,
@@ -108,7 +122,8 @@ export function createWebTelemetryAdapter(options: {
           request_batching: false,
           before_send(event) {
             const properties = safeTelemetryEvent(event.event, {
-              active: live && options.allowed(),
+              active:
+                live && activeToken === options.token?.() && options.allowed(),
               deadline,
               now: Date.now(),
               page: options.page(),
@@ -145,7 +160,6 @@ export function createWebTelemetryAdapter(options: {
         live = false;
         capture = undefined;
         lastView = "";
-        sdk?.opt_out_capturing();
         sdk?.reset(true);
         sdk = undefined;
       },
@@ -192,12 +206,13 @@ export function ProductTelemetry({
       origin,
       transport: fetch.bind<typeof fetch>(window),
       page: () => page.current,
-      allowed,
+      allowed: () => identity.current.ready && allowed(identity.current.token),
+      token: () => identity.current.token,
       source: productTelemetrySource(),
     });
     const update = () =>
       adapter.update({
-        enabled: allowed() && identity.current.ready,
+        enabled: identity.current.ready && allowed(identity.current.token),
         token: identity.current.token,
       });
     stopActive = adapter.stop;
