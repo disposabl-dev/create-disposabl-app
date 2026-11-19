@@ -15,6 +15,7 @@ process.env.EXPO_PUBLIC_DISPOSABL_ANALYTICS_ENABLED = "true";
 process.env.EXPO_PUBLIC_E2E = "false";
 const events = [];
 const pushes = [];
+const share = mock(async () => {});
 const scrolls = [];
 let captureThrows = false;
 let id = "secret-marker-id";
@@ -109,7 +110,8 @@ mock.module("react-native", () => ({
     },
   },
   Linking: { openURL: async () => {} },
-  Modal: "Modal",
+  Share: { share },
+  Text: "Text",
   View: "View",
   ScrollView: "ScrollView",
   FlatList,
@@ -117,7 +119,7 @@ mock.module("react-native", () => ({
 }));
 mock.module("react-native-safe-area-context", () => ({
   SafeAreaView: "SafeAreaView",
-  useSafeAreaInsets: () => ({ top: 24, bottom: 0 }),
+  useSafeAreaInsets: () => ({ top: 24, right: 0, bottom: 0, left: 0 }),
 }));
 mock.module("expo", () => ({
   useEventListener: (player, _event, callback) => {
@@ -129,11 +131,13 @@ mock.module("nativewind", () => ({
   styled: (component) => component,
 }));
 mock.module("expo-image", () => ({ Image: "Image" }));
+const router = {
+  push: (value) => pushes.push(value),
+  back: () => pushes.push("back"),
+};
 mock.module("expo-router", () => ({
-  useRouter: () => ({
-    push: (value) => pushes.push(value),
-    back: () => pushes.push("back"),
-  }),
+  router,
+  useRouter: () => router,
   useLocalSearchParams: () => ({ id }),
   Stack: { Screen: "StackScreen" },
   useFocusEffect: (callback) =>
@@ -182,6 +186,11 @@ mock.module("../../../apps/mobile/src/features/studio/ui", () => ({
   Icon: "Icon",
   Action: "Action",
   GlassSurface: "GlassSurface",
+}));
+mock.module("convex/react", () => ({
+  useConvexAuth: () => ({ isAuthenticated: false }),
+  useQuery: () => ({ liked: false, likes: 0 }),
+  useMutation: () => async () => {},
 }));
 mock.module("expo-secure-store", () => ({
   getItemAsync: async () => "allow",
@@ -266,6 +275,7 @@ afterEach(async () => {
   await act(async () => renderer?.unmount());
   events.length = 0;
   pushes.length = 0;
+  share.mockClear();
   scrolls.length = 0;
   captureThrows = false;
   id = "secret-marker-id";
@@ -390,29 +400,39 @@ test("rotation keeps the selected reel and temporary interruption preserves manu
   expect(videos.get("other.mp4").playing).toBe(false);
 });
 
-test("description pauses the reel and shows the summary rather than the transcript", async () => {
+const descriptionFor = (index, summary) =>
+  pageFor(index)
+    .findAllByType("Text")
+    .find((item) => item.children.includes(summary));
+
+test("the guide summary expands inline while the reel keeps playing", async () => {
   await mount(GuideDetailScreen);
   await layout();
-  expect(renderer.root.findByType("Modal").props.visible).toBe(false);
+  expect(descriptionFor(1, "First").props.numberOfLines).toBe(1);
   await act(async () =>
-    pageTouch(1, "Show description for secret-marker-title").props.onPress(),
+    pageTouch(1, "Expand description for secret-marker-title").props.onPress(),
   );
-  expect(renderer.root.findByType("Modal").props.visible).toBe(true);
-  expect(videos.get("first.mp4").playing).toBe(false);
-  const labels = renderer.root
-    .findByType("Modal")
-    .findAllByType("Label")
-    .flatMap((item) => item.children);
-  expect(labels).toContain("First");
-  expect(labels).not.toContain("First transcript");
-  await act(async () =>
-    renderer.root
-      .findAllByType("Touch")
-      .find((item) => item.props.label === "Close description")
-      .props.onPress(),
-  );
-  expect(renderer.root.findByType("Modal").props.visible).toBe(false);
+  expect(descriptionFor(1, "First").props.numberOfLines).toBeUndefined();
   expect(videos.get("first.mp4").playing).toBe(true);
+  await act(async () =>
+    pageTouch(
+      1,
+      "Collapse description for secret-marker-title",
+    ).props.onPress(),
+  );
+  expect(descriptionFor(1, "First").props.numberOfLines).toBe(1);
+});
+
+test("a guest can share the current guide and playback pauses", async () => {
+  await mount(GuideDetailScreen);
+  await layout();
+  expect(videos.get("first.mp4").playing).toBe(true);
+  await act(async () => pageTouch(1, "Share guide").props.onPress());
+  expect(share).toHaveBeenCalledWith({
+    message: "secret-marker-title",
+    url: "https://disposabl.dev/guides?lesson=secret-marker-id",
+  });
+  expect(videos.get("first.mp4").playing).toBe(false);
 });
 
 test("tap toggles playback and close returns to the library", async () => {
@@ -432,21 +452,16 @@ test("tap toggles playback and close returns to the library", async () => {
   expect(pushes).toEqual(["back"]);
 });
 
-test("text-only lessons offer their description without pretending video is available", async () => {
+test("text-only lessons offer their description without a play control", async () => {
   id = "third";
   await mount(GuideDetailScreen);
   await layout();
   expect(pageFor(3).findAllByType("VideoView")).toHaveLength(0);
+  expect(pageTouch(3, "Play video")).toBeUndefined();
   await act(async () =>
-    pageTouch(3, "Show description for Third").props.onPress(),
+    pageTouch(3, "Expand description for Third").props.onPress(),
   );
-  expect(renderer.root.findByType("Modal").props.visible).toBe(true);
-  expect(
-    renderer.root
-      .findByType("Modal")
-      .findAllByType("Label")
-      .flatMap((item) => item.children),
-  ).toContain("Last");
+  expect(descriptionFor(3, "Last").props.numberOfLines).toBeUndefined();
 });
 
 test("only the visible video is loaded and a failed video can retry", async () => {
@@ -454,7 +469,6 @@ test("only the visible video is loaded and a failed video can retry", async () =
   await layout();
   expect(renderer.root.findAllByType("VideoView")).toHaveLength(1);
   expect(videos.get("other.mp4")).toBeUndefined();
-  expect(renderer.root.findByType("Modal").props.visible).toBe(false);
   expect(videos.get("first.mp4").playing).toBe(true);
   await act(async () => statusListeners.get("first.mp4")({ status: "error" }));
   expect(pageTouch(1, "Video unavailable. Retry")).toBeDefined();
