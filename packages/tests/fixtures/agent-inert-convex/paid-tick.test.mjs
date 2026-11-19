@@ -54,11 +54,6 @@ mock.module(paths("boat.ts"), () => ({
       state.calls.stop++;
       return { sandboxId: "synthetic", state: "ready" };
     },
-    prompt: async () => {
-      state.calls.prompt++;
-      if (state.changeAt === "prompt") state.change();
-      return { promptId: "prompt", conversationId: "conversation" };
-    },
     promptStatus: async () => {
       state.calls.promptStatus++;
       return { done: true };
@@ -67,7 +62,22 @@ mock.module(paths("boat.ts"), () => ({
   BoatError: class BoatError extends Error {},
   sandboxRef: (userId) => ({ ownerId: userId, key: "workspace" }),
   object: (value) => value ?? {},
-  request: async (_sandbox, path) => {
+  request: async (sandbox, path, body) => {
+    if (path === "/prompt") {
+      expect(sandbox).toBe("synthetic");
+      expect(body).toEqual({
+        provider: "codex",
+        model: "gpt-6.2-sol",
+        fast: true,
+        prompt: "Disposabl delivery message\nsynthetic",
+        ...(state.app.agent.conversationId
+          ? { conversationId: state.app.agent.conversationId }
+          : { new: true }),
+      });
+      state.calls.prompt++;
+      if (state.changeAt === "prompt") state.change();
+      return { promptId: "prompt", conversationId: "conversation" };
+    }
     state.calls.request++;
     if (!state.stopRequests) throw new Error("unexpected provider request");
     state.remotePaths.push(path);
@@ -481,6 +491,7 @@ test("active paid work reaches create, resume and prompt through real access che
   for (const options of [
     { sandbox: false, activation: "fresh" },
     { sandbox: true, archived: true, activation: "fresh" },
+    { sandbox: true, agent: { conversationId: "conversation" } },
   ]) {
     const f = make(options);
     await f.run();

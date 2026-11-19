@@ -416,19 +416,27 @@ export const tick = internalAction({
           await authorizeSandbox(ctx, current, lease);
           phase = "send-prompt";
           if (!(await canWork())) return null;
-          sent = await boat.prompt(ctx, {
-            ...ref,
+          // The Boat component does not expose the prompt speed option.
+          const result = await request(sandbox.sandboxId, "/prompt", {
             provider: "codex",
             model: "gpt-6.2-sol",
+            fast: true,
             prompt:
               `Disposabl delivery ${queued.messageId}\n` +
               credentialInstructions(current.appId) +
               (conversationId ? "" : instructions(current.appId, app)) +
               prompt,
-            ...(conversationId
-              ? { conversationId }
-              : { newConversation: true }),
+            ...(conversationId ? { conversationId } : { new: true }),
           });
+          if (typeof result.promptId !== "string" || !result.promptId)
+            throw new Error("Boat did not return a prompt ID.");
+          sent = {
+            promptId: result.promptId,
+            conversationId:
+              typeof result.conversationId === "string"
+                ? result.conversationId
+                : null,
+          };
         }
         if (!sent.conversationId)
           throw new Error("Boat did not return a conversation ID.");
