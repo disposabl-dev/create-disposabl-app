@@ -16,6 +16,7 @@ import { Route as DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesBillin
 import { Route as BuildRouteImport } from './router/build'
 import { Route as DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesConsentRouteImport } from './../../../packages/disposabl-kit/client/routes/consent'
 import { Route as DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesForgotPasswordRouteImport } from './../../../packages/disposabl-kit/client/routes/_auth-pages/forgot-password'
+import { Route as GuidesRouteImport } from './router/guides'
 import { Route as DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalIndexRouteImport } from './../../../packages/disposabl-kit/client/routes/legal/index'
 import { Route as DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesLoginRouteImport } from './../../../packages/disposabl-kit/client/routes/_auth-pages/login'
 import { Route as MobileLoginRouteImport } from './router/mobile-login'
@@ -90,6 +91,12 @@ const DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesForgotPas
         DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRoute,
     } as any,
   )
+const GuidesRoute = GuidesRouteImport.update({
+  id: '/guides',
+  path: '/guides',
+  getParentRoute: () =>
+    DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRoute,
+} as any)
 const DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalIndexRoute =
   DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalIndexRouteImport.update(
     {
@@ -244,6 +251,7 @@ export interface FileRoutesByFullPath {
   '/build': typeof BuildRoute
   '/consent': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesConsentRoute
   '/forgot-password': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesForgotPasswordRoute
+  '/guides': typeof GuidesRoute
   '/login': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesLoginRoute
   '/mobile-login': typeof MobileLoginRoute
   '/pricing': typeof PricingRoute
@@ -270,6 +278,7 @@ export interface FileRoutesByTo {
   '/build': typeof BuildRoute
   '/consent': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesConsentRoute
   '/forgot-password': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesForgotPasswordRoute
+  '/guides': typeof GuidesRoute
   '/login': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesLoginRoute
   '/mobile-login': typeof MobileLoginRoute
   '/pricing': typeof PricingRoute
@@ -298,6 +307,7 @@ export interface FileRoutesById {
   '/_providers/build': typeof BuildRoute
   '/_providers/consent': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesConsentRoute
   '/_providers/forgot-password': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesForgotPasswordRoute
+  '/_providers/guides': typeof GuidesRoute
   '/_providers/login': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesLoginRoute
   '/_providers/mobile-login': typeof MobileLoginRoute
   '/_providers/pricing': typeof PricingRoute
@@ -327,6 +337,7 @@ export interface FileRouteTypes {
     | '/build'
     | '/consent'
     | '/forgot-password'
+    | '/guides'
     | '/login'
     | '/mobile-login'
     | '/pricing'
@@ -353,6 +364,7 @@ export interface FileRouteTypes {
     | '/build'
     | '/consent'
     | '/forgot-password'
+    | '/guides'
     | '/login'
     | '/mobile-login'
     | '/pricing'
@@ -380,6 +392,7 @@ export interface FileRouteTypes {
     | '/_providers/build'
     | '/_providers/consent'
     | '/_providers/forgot-password'
+    | '/_providers/guides'
     | '/_providers/login'
     | '/_providers/mobile-login'
     | '/_providers/pricing'
@@ -455,6 +468,13 @@ declare module '@tanstack/react-router' {
       path: '/forgot-password'
       fullPath: '/forgot-password'
       preLoaderRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesForgotPasswordRouteImport
+      parentRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRoute
+    }
+    '/_providers/guides': {
+      id: '/_providers/guides'
+      path: '/guides'
+      fullPath: '/guides'
+      preLoaderRoute: typeof GuidesRouteImport
       parentRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRoute
     }
     '/_providers/legal': {
@@ -637,6 +657,7 @@ interface DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRouteChil
   BuildRoute: typeof BuildRoute
   DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesConsentRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesConsentRoute
   DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesForgotPasswordRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesForgotPasswordRoute
+  GuidesRoute: typeof GuidesRoute
   DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesLoginRoute: typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesLoginRoute
   MobileLoginRoute: typeof MobileLoginRoute
   PricingRoute: typeof PricingRoute
@@ -665,6 +686,7 @@ const DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRouteChildren
       DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesConsentRoute,
     DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesForgotPasswordRoute:
       DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesForgotPasswordRoute,
+    GuidesRoute: GuidesRoute,
     DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesLoginRoute:
       DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesAuthPagesLoginRoute,
     MobileLoginRoute: MobileLoginRoute,

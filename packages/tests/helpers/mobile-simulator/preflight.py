@@ -14,6 +14,17 @@ def run(*args):
     return subprocess.run(args, check=True, capture_output=True, text=True).stdout
 
 
+def decode_otool_section(output):
+    raw = bytearray()
+    for line in output.splitlines():
+        parts = line.split()
+        if parts and re.fullmatch(r'[0-9a-fA-F]{16}', parts[0]):
+            for word in parts[1:]:
+                if not re.fullmatch(r'(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{2})', word):
+                    raise ValueError('unexpected entitlement section format')
+                raw.extend(bytes.fromhex(word)[::-1])
+    return raw
+
 def inspect(app, record, source, app_id, group, backend, site, hermesc):
     for url in (backend, site):
         parsed = urlsplit(url)
@@ -31,14 +42,7 @@ def inspect(app, record, source, app_id, group, backend, site, hermesc):
     if not all('sectname ' + name in sections for name in ('__entitlements', '__ents_der')):
         raise ValueError('missing simulated entitlement sections')
     output = run('otool', '-arch', 'arm64', '-s', '__TEXT', '__entitlements', str(binary))
-    raw = bytearray()
-    for line in output.splitlines():
-        parts = line.split()
-        if parts and re.fullmatch(r'[0-9a-fA-F]{16}', parts[0]):
-            for word in parts[1:]:
-                if not re.fullmatch(r'[0-9a-fA-F]{8}', word):
-                    raise ValueError('unexpected entitlement section format')
-                raw.extend(bytes.fromhex(word)[::-1])
+    raw = decode_otool_section(output)
     start, end = raw.find(b'<?xml'), raw.find(b'</plist>')
     if start < 0 or end < 0:
         raise ValueError('missing simulator entitlement plist')

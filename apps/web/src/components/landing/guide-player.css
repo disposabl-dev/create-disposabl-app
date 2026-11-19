@@ -1,0 +1,151 @@
+.guide-player {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  color: white;
+  background: #08090d;
+  font-family: Manrope, sans-serif;
+}
+.guide-player::backdrop {
+  background: #08090d;
+}
+.reel-scroll {
+  height: 100%;
+  overflow-y: auto;
+  scroll-snap-type: y mandatory;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+.reel-scroll::-webkit-scrollbar {
+  display: none;
+}
+.reel {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  background: #151927;
+}
+.reel video,
+.reel-poster,
+.reel-poster img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.reel-poster {
+  background: linear-gradient(155deg, #415fbd, #151b34);
+}
+.reel-play-area {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  color: white;
+  background: transparent;
+  cursor: pointer;
+}
+.reel-play-area svg {
+  filter: drop-shadow(0 2px 8px #000);
+}
+.reel-shade {
+  position: absolute;
+  inset: 50% 0 0;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
+}
+.reel-description {
+  position: absolute;
+  z-index: 2;
+  left: max(24px, env(safe-area-inset-left));
+  bottom: max(30px, env(safe-area-inset-bottom));
+  max-width: min(75%, 520px);
+  padding: 0;
+  border: 0;
+  color: white;
+  background: transparent;
+  font:
+    700 18px/1.35 Manrope,
+    sans-serif;
+  text-align: left;
+  cursor: pointer;
+  text-shadow: 0 1px 8px #000;
+}
+.reel-actions {
+  position: absolute;
+  z-index: 3;
+  top: max(18px, env(safe-area-inset-top));
+  right: max(18px, env(safe-area-inset-right));
+  display: flex;
+  gap: 10px;
+}
+.reel-actions button,
+.reel-sheet button {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: white;
+  background: rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+}
+.reel-sheet-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: flex;
+  align-items: end;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+}
+.reel-sheet {
+  position: relative;
+  width: min(100%, 640px);
+  padding: 32px 24px max(32px, env(safe-area-inset-bottom));
+  border-radius: 22px 22px 0 0;
+  color: #f7f7f9;
+  background: #1c1e27;
+}
+.reel-sheet button {
+  position: absolute;
+  right: 18px;
+  top: 18px;
+}
+.reel-sheet h2 {
+  margin: 0 50px 12px 0;
+  font-size: 22px;
+  line-height: 1.25;
+}
+.reel-sheet p {
+  margin: 0;
+  color: #d5d6dd;
+  font-size: 16px;
+  line-height: 1.6;
+}
+@media (min-aspect-ratio: 3/4) {
+  .reel video {
+    object-fit: contain;
+  }
+  .reel-description {
+    left: max(24px, calc(50% - 28.125dvh + 24px));
+    max-width: min(520px, calc(56.25dvh - 48px));
+  }
+}

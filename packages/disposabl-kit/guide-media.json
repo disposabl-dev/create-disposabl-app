@@ -1,0 +1,102 @@
+{
+  "welcome": {
+    "uri": "https://stream.mux.com/yw00Z1QwtTW7028MKN4E01uGp02Mfn3PRM2s6IAQl01oRQNE.m3u8",
+    "posterUri": "https://image.mux.com/yw00Z1QwtTW7028MKN4E01uGp02Mfn3PRM2s6IAQl01oRQNE/thumbnail.jpg?time=2.25&width=540",
+    "captionsUri": "https://stream.mux.com/yw00Z1QwtTW7028MKN4E01uGp02Mfn3PRM2s6IAQl01oRQNE/text/XDh2KHzfIxJuFZ02gcfZ48UqjSct8w3calFlDMEQdsZOsfJz55zWyQA.vtt"
+  },
+  "first-workflow": {
+    "uri": "https://stream.mux.com/uncs8xqCmQJIVtEpG6rE7RghrsnFGLlIYmTyFT6THzA.m3u8",
+    "posterUri": "https://image.mux.com/uncs8xqCmQJIVtEpG6rE7RghrsnFGLlIYmTyFT6THzA/thumbnail.jpg?time=4&width=540",
+    "captionsUri": "https://stream.mux.com/uncs8xqCmQJIVtEpG6rE7RghrsnFGLlIYmTyFT6THzA/text/yYggdr4iyxJ1HEke1uQGGlMXrnhSlYZVTGV3Eo43HDQfCk00exfuU01A.vtt"
+  },
+  "test-real-user": {
+    "uri": "https://stream.mux.com/aTi01Qo7XtH02OwppAf00vLHj87dddfj00XDnfaTgl1tWSY.m3u8",
+    "posterUri": "https://image.mux.com/aTi01Qo7XtH02OwppAf00vLHj87dddfj00XDnfaTgl1tWSY/thumbnail.jpg?time=2&width=540",
+    "captionsUri": "https://stream.mux.com/aTi01Qo7XtH02OwppAf00vLHj87dddfj00XDnfaTgl1tWSY/text/ZvJcK402AzT33mMVFyqK24J0064CLSfWypwdd49x6C00tyXu56Uo4SdjQ.vtt"
+  },
+  "safe-release": {
+    "uri": "https://stream.mux.com/g01qcbivtnf87YZZCCQ7DM1DbA021J01Sj5KWdd9j7fZ5Q.m3u8",
+    "posterUri": "https://image.mux.com/g01qcbivtnf87YZZCCQ7DM1DbA021J01Sj5KWdd9j7fZ5Q/thumbnail.jpg?time=35.6&width=540",
+    "captionsUri": "https://stream.mux.com/g01qcbivtnf87YZZCCQ7DM1DbA021J01Sj5KWdd9j7fZ5Q/text/ovM9sEMjRF376w01CyJrKjHU5wTx200tutMaVDVPlhZQpKwzEWUEWCFQ.vtt"
+  },
+  "web-start": {
+    "uri": "https://stream.mux.com/fLp7qNuKiAetClJYB00ZmVVPicIcTi6lU01V1W48TsQmc.m3u8",
+    "posterUri": "https://image.mux.com/fLp7qNuKiAetClJYB00ZmVVPicIcTi6lU01V1W48TsQmc/thumbnail.jpg?time=3&width=540",
+    "captionsUri": "https://stream.mux.com/fLp7qNuKiAetClJYB00ZmVVPicIcTi6lU01V1W48TsQmc/text/P5uEp1eh800u02pW1YBMyoiKEl2PTuvPuCk6zX02Z1hofX01vE8601MDO1Q.vtt"
+  },
+  "web-publish": {
+    "uri": "https://stream.mux.com/dSWYyiAtZAcxiKLgucU4Y37lqdbGYtURq1dJ6jXf011E.m3u8",
+    "posterUri": "https://image.mux.com/dSWYyiAtZAcxiKLgucU4Y37lqdbGYtURq1dJ6jXf011E/thumbnail.jpg?time=2.75&width=540",
+    "captionsUri": "https://stream.mux.com/dSWYyiAtZAcxiKLgucU4Y37lqdbGYtURq1dJ6jXf011E/text/9ccI7jWklaApKtbTR02jlGFReXdukDBTdMdDaR9cQS9AnilRo0181GzA.vtt"
+  },
+  "web-run": {
+    "uri": "https://stream.mux.com/kLWJS5ReHMsrISE9Ga7GxIT01JTl5Gqs01xMOTkmzaTr8.m3u8",
+    "posterUri": "https://image.mux.com/kLWJS5ReHMsrISE9Ga7GxIT01JTl5Gqs01xMOTkmzaTr8/thumbnail.jpg?time=2.5&width=540",
+    "captionsUri": "https://stream.mux.com/kLWJS5ReHMsrISE9Ga7GxIT01JTl5Gqs01xMOTkmzaTr8/text/DY1sU01VKnJN4A4cUq401zIKTHAYkYvOuvPglFMN8KjHEFQaUVu8C900Q.vtt"
+  },
+  "android-start": {
+    "uri": "https://stream.mux.com/XCO4iNGq1Tcqpv7i901qICwIlQ8zb55dlcqFpzwUrr01s.m3u8",
+    "posterUri": "https://image.mux.com/XCO4iNGq1Tcqpv7i901qICwIlQ8zb55dlcqFpzwUrr01s/thumbnail.jpg?time=32.4&width=540",
+    "captionsUri": "https://stream.mux.com/XCO4iNGq1Tcqpv7i901qICwIlQ8zb55dlcqFpzwUrr01s/text/rDlcC10055jtMKsGG4PECjzU6xsV00rhgkIxX7yDAgku292KWoxaB100Q.vtt"
+  },
+  "android-publish": {
+    "uri": "https://stream.mux.com/8uONl5eMoDDCVSf00EQXu00701KfKSmP2DJBStTc00KqrRI.m3u8",
+    "posterUri": "https://image.mux.com/8uONl5eMoDDCVSf00EQXu00701KfKSmP2DJBStTc00KqrRI/thumbnail.jpg?time=2.25&width=540",
+    "captionsUri": "https://stream.mux.com/8uONl5eMoDDCVSf00EQXu00701KfKSmP2DJBStTc00KqrRI/text/s3SHTGMrQzZVrVpV1XR2CbP1oj4yi01YxMY26CkpDquGo02HoUGoDLlQ.vtt"
+  },
+  "ios-start": {
+    "uri": "https://stream.mux.com/2hi100wqdEOyX67YQxfO2n1vA73TuSabU01IuiWkHAn6w.m3u8",
+    "posterUri": "https://image.mux.com/2hi100wqdEOyX67YQxfO2n1vA73TuSabU01IuiWkHAn6w/thumbnail.jpg?time=33.1&width=540",
+    "captionsUri": "https://stream.mux.com/2hi100wqdEOyX67YQxfO2n1vA73TuSabU01IuiWkHAn6w/text/KGtjTGyl02ZN02Mv5R8inxqg01ERdfMon4qaftG3bM1HY29dt9yrfo2fQ.vtt"
+  },
+  "ios-publish": {
+    "uri": "https://stream.mux.com/73QGhYCooG7FNtMn7kaSlk4V9KwGgJQJaMhkpz36DgQ.m3u8",
+    "posterUri": "https://image.mux.com/73QGhYCooG7FNtMn7kaSlk4V9KwGgJQJaMhkpz36DgQ/thumbnail.jpg?time=4.5&width=540",
+    "captionsUri": "https://stream.mux.com/73QGhYCooG7FNtMn7kaSlk4V9KwGgJQJaMhkpz36DgQ/text/DLLAicOxJLgj01RYHepJaKa1PxCVC4MgHAHFqzAuDlohGuX29eXCZtA.vtt"
+  },
+  "desktop-start": {
+    "uri": "https://stream.mux.com/AQ5hEzJlUNSky7hrogIwVzZzpcwcSP101mzdsqjxux00c.m3u8",
+    "posterUri": "https://image.mux.com/AQ5hEzJlUNSky7hrogIwVzZzpcwcSP101mzdsqjxux00c/thumbnail.jpg?time=10&width=540",
+    "captionsUri": "https://stream.mux.com/AQ5hEzJlUNSky7hrogIwVzZzpcwcSP101mzdsqjxux00c/text/ZRmGrljRxiiInY2lTOfVDLiwVwCuz2duIF5Tqd9mZzzFfufk02k02AcA.vtt"
+  },
+  "desktop-publish": {
+    "uri": "https://stream.mux.com/itDFupMD402RXJTpHIBQL019fvljLl6wcpF8fcXb52PxU.m3u8",
+    "posterUri": "https://image.mux.com/itDFupMD402RXJTpHIBQL019fvljLl6wcpF8fcXb52PxU/thumbnail.jpg?time=4.5&width=540",
+    "captionsUri": "https://stream.mux.com/itDFupMD402RXJTpHIBQL019fvljLl6wcpF8fcXb52PxU/text/myP4uItAs00XfUw9ChgwLdHUkZWPJ7eDc201FsRo8hUdOeR8GrvZlZFQ.vtt"
+  },
+  "api": {
+    "uri": "https://stream.mux.com/IkIr2S00NsXTPYESgKkAm021VMTzrXhucisV9gtskCh3U.m3u8",
+    "posterUri": "https://image.mux.com/IkIr2S00NsXTPYESgKkAm021VMTzrXhucisV9gtskCh3U/thumbnail.jpg?time=2.75&width=540",
+    "captionsUri": "https://stream.mux.com/IkIr2S00NsXTPYESgKkAm021VMTzrXhucisV9gtskCh3U/text/eorrW002DzSueZT4S01xiIMFxMTQomLEZ28j81fk2vKvi5PPwcXsAWVw.vtt"
+  },
+  "mcp": {
+    "uri": "https://stream.mux.com/8EQF25pMRX51lpBiX76rpdGH79FvQFvpBQIw01EOqXZU.m3u8",
+    "posterUri": "https://image.mux.com/8EQF25pMRX51lpBiX76rpdGH79FvQFvpBQIw01EOqXZU/thumbnail.jpg?time=3&width=540",
+    "captionsUri": "https://stream.mux.com/8EQF25pMRX51lpBiX76rpdGH79FvQFvpBQIw01EOqXZU/text/bZsZmR6bRyY6In1Ug7QAqsTyRMphMej7s3NDzkRBc1HI6fAV00CFAsA.vtt"
+  },
+  "cli": {
+    "uri": "https://stream.mux.com/63mZUOnBAlDh1wgPUE02gjCcnn017PFP1Py6njJzvf2FU.m3u8",
+    "posterUri": "https://image.mux.com/63mZUOnBAlDh1wgPUE02gjCcnn017PFP1Py6njJzvf2FU/thumbnail.jpg?time=5&width=540",
+    "captionsUri": "https://stream.mux.com/63mZUOnBAlDh1wgPUE02gjCcnn017PFP1Py6njJzvf2FU/text/02i32s02oMh3LLO00JUvIb7CL3XiEbb8Wa5y900t023JI3AukPQ9SSf6mRg.vtt"
+  },
+  "sdk": {
+    "uri": "https://stream.mux.com/nkhHF9vjrVyBFBnpCtjg6CImOzFsJGrANIfDSUDc5kA.m3u8",
+    "posterUri": "https://image.mux.com/nkhHF9vjrVyBFBnpCtjg6CImOzFsJGrANIfDSUDc5kA/thumbnail.jpg?time=41.166667&width=540",
+    "captionsUri": "https://stream.mux.com/nkhHF9vjrVyBFBnpCtjg6CImOzFsJGrANIfDSUDc5kA/text/a18Uty3J02gw3J02GpNITCkqhdz7nGzBRZVhiMjSu9T02CKk4lOZiiPoA.vtt"
+  },
+  "chatgpt": {
+    "uri": "https://stream.mux.com/zY3gsW02TLBUle01wF8MzeqtlA44cqcW66GDAEqK63mJQ.m3u8",
+    "posterUri": "https://image.mux.com/zY3gsW02TLBUle01wF8MzeqtlA44cqcW66GDAEqK63mJQ/thumbnail.jpg?time=2.25&width=540",
+    "captionsUri": "https://stream.mux.com/zY3gsW02TLBUle01wF8MzeqtlA44cqcW66GDAEqK63mJQ/text/9j6cKU00wKORRw1lu4aDyp1Wvroi01GkvQsiQntXp00Y8N7zofmimN00ow.vtt"
+  },
+  "codex": {
+    "uri": "https://stream.mux.com/V02FjFbwUgutfbkGlvuIimVgUKhTMShkrm2gYDE3XL48.m3u8",
+    "posterUri": "https://image.mux.com/V02FjFbwUgutfbkGlvuIimVgUKhTMShkrm2gYDE3XL48/thumbnail.jpg?time=2&width=540",
+    "captionsUri": "https://stream.mux.com/V02FjFbwUgutfbkGlvuIimVgUKhTMShkrm2gYDE3XL48/text/9AgcrM3ffoel600eIQBbsAXTJQiao6Uo7TrDMIjwvj5POaUxCcKd8sw.vtt"
+  },
+  "operations": {
+    "uri": "https://stream.mux.com/LAflxpz33BkFTWV01fdSl2gZvzMywtjcl2FOBD9wNA2Y.m3u8",
+    "posterUri": "https://image.mux.com/LAflxpz33BkFTWV01fdSl2gZvzMywtjcl2FOBD9wNA2Y/thumbnail.jpg?time=10&width=540",
+    "captionsUri": "https://stream.mux.com/LAflxpz33BkFTWV01fdSl2gZvzMywtjcl2FOBD9wNA2Y/text/01tXSKjX02Zy01JaqSEgUthUVerw4V63en9anayJMfF1hfdHujFVMxTGg.vtt"
+  }
+}

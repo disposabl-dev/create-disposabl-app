@@ -20,6 +20,10 @@
     "authenticated": false
   },
   {
+    "path": "/guides",
+    "authenticated": false
+  },
+  {
     "path": "/legal",
     "authenticated": false
   },
