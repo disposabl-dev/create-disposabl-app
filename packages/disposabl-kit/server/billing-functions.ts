@@ -26,13 +26,24 @@ import {
 } from "./billing";
 
 export const setup = internalAction({
-  args: {},
+  args: {
+    expectedEnvironment: v.optional(
+      v.union(v.literal("test"), v.literal("live")),
+    ),
+  },
   returns: v.object({
     enabled: v.boolean(),
     created: v.array(v.string()),
     preserved: v.array(v.string()),
   }),
-  handler: async () => setupBilling(paymentsEnabled, process.env),
+  handler: async (_ctx, args) =>
+    setupBilling(
+      paymentsEnabled,
+      process.env,
+      undefined,
+      undefined,
+      args.expectedEnvironment,
+    ),
 });
 
 async function context(ctx: { auth: Auth }) {

@@ -15,7 +15,11 @@ test("catalog setup is internal, validated and runs on the dev deployment's firs
   assert.equal(setup.isInternal, true);
   assert.ok("args" in setup);
   assert.ok("returns" in setup);
-  assert.deepEqual(setup.args, {});
+  assert.deepEqual(setup.args, {
+    expectedEnvironment: v.optional(
+      v.union(v.literal("test"), v.literal("live")),
+    ),
+  });
   assert.deepEqual(
     setup.returns,
     v.object({
@@ -89,7 +93,7 @@ case "$*" in *'convex run '*) exit "$SETUP_EXIT";; esac
           channel === "production" ? "--prod" : "--preview-name pr-42";
         assert.equal(
           calls[1],
-          `x --no-install convex run ${target} billing:setup {}`,
+          `x --no-install convex run ${target} billing:setup {"expectedEnvironment":"${channel === "production" ? "live" : "test"}"}`,
         );
         assert.equal(calls.length, setupExit === "0" ? 3 : 2);
         if (setupExit === "0")

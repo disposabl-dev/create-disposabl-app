@@ -35,19 +35,20 @@ test("payments-off setup neither reads credentials nor configures deployments", 
       throw new Error("Unexpected credential read");
     },
   };
-  await provisionPayments(
-    ctx as never,
-    "owner",
-    [],
-    "unused",
-    {
+  await provisionPayments(ctx as never, "owner", [], {
+    token: "unused",
+    projectId: 42,
+    development: {
       name: "dev-app",
       convexUrl: "https://dev-app.convex.cloud",
       deployKey: "dev:dev-app|fixture",
       kind: "dev",
     },
-    { name: "prod-app", deploymentUrl: "https://prod-app.convex.cloud" },
-  );
+    production: {
+      name: "prod-app",
+      deploymentUrl: "https://prod-app.convex.cloud",
+    },
+  });
 });
 
 test("deployment provisioning separates live and sandbox keys and chooses its own return URL", async () => {
@@ -192,7 +193,7 @@ test("saved Autumn credentials are encrypted for the authenticated owner", async
   }
 });
 
-test("payments setup skips production without a live key and retries partial failures", async () => {
+test("connected sandbox keys reach CI previews without production and retries keep the keys separate", async () => {
   const { seal } =
     await import("../backend/convex/connections/actions/credentials");
   const previousKey = process.env.CONNECTIONS_ENCRYPTION_KEY;
@@ -201,14 +202,36 @@ test("payments setup skips production without a live key and retries partial fai
     "base64",
   );
   const calls: string[] = [];
+  const previewDefaults: unknown[] = [];
+  const deploymentSecrets: { target: string; key: string }[] = [];
   let failProduction = true;
-  globalThis.fetch = (async (url: string) => {
+  let failPreview = false;
+  globalThis.fetch = (async (url: string, init: RequestInit) => {
     calls.push(url);
     if (url.includes("plans.list")) return Response.json({ list: [] });
+    if (url.endsWith("update_default_environment_variables")) {
+      assert.equal(
+        url,
+        "https://api.convex.dev/v1/projects/42/update_default_environment_variables",
+      );
+      assert.equal(
+        new Headers(init.headers).get("Authorization"),
+        "Bearer management",
+      );
+      previewDefaults.push(JSON.parse(String(init.body)));
+      return new Response(null, { status: failPreview ? 503 : 200 });
+    }
     if (url.includes("create_deploy_key"))
       return Response.json({ deployKey: "prod:prod-app|fixture" });
     if (url.endsWith("/api/query"))
       return Response.json({ status: "success", value: null });
+    const { changes } = JSON.parse(String(init.body));
+    deploymentSecrets.push({
+      target: new URL(url).hostname,
+      key: changes.find(
+        ({ name }: { name: string }) => name === "AUTUMN_SECRET_KEY",
+      ).value,
+    });
     return new Response(null, {
       status: failProduction && url.includes("prod-app") ? 500 : 200,
     });
@@ -230,22 +253,42 @@ test("payments setup skips production without a live key and retries partial fai
     }),
   };
   const run = () =>
-    provisionPayments(
-      ctx as never,
-      "owner",
-      ["payments"],
-      "management",
+    provisionPayments(ctx as never, "owner", ["payments"], {
+      token: "management",
+      projectId: 42,
       development,
       production,
-    );
+    });
+  const expectedPreview = {
+    changes: [
+      {
+        name: "AUTUMN_SECRET_KEY",
+        deploymentType: "preview",
+        value: sandbox,
+        applyToExistingDeployments: true,
+      },
+    ],
+  };
   try {
     await run();
+    assert.deepEqual(previewDefaults, [expectedPreview]);
+    assert.deepEqual(deploymentSecrets, [
+      { target: "dev-app.convex.cloud", key: sandbox },
+    ]);
     assert.equal(
       calls.some((url) => url.includes("prod-app")),
       false,
     );
     keys = { sandbox, live };
     calls.length = 0;
+    failPreview = true;
+    await assert.rejects(run(), /Convex management request failed \(503\)/);
+    assert.equal(
+      calls.some((url) => url.includes("prod-app")),
+      false,
+    );
+    calls.length = 0;
+    failPreview = false;
     await assert.rejects(run(), /Could not configure payments/);
     assert.equal(
       calls.filter((url) => url.endsWith("update_environment_variables"))
@@ -254,12 +297,13 @@ test("payments setup skips production without a live key and retries partial fai
     );
     failProduction = false;
     calls.length = 0;
+    deploymentSecrets.length = 0;
     await run();
-    assert.equal(
-      calls.filter((url) => url.endsWith("update_environment_variables"))
-        .length,
-      2,
-    );
+    assert.deepEqual(previewDefaults, Array(4).fill(expectedPreview));
+    assert.deepEqual(deploymentSecrets, [
+      { target: "dev-app.convex.cloud", key: sandbox },
+      { target: "prod-app.convex.cloud", key: live },
+    ]);
   } finally {
     globalThis.fetch = originalFetch;
     if (previousKey === undefined)

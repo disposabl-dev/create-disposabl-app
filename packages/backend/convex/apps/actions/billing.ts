@@ -86,9 +86,12 @@ export async function provisionPayments(
   ctx: ActionCtx,
   userId: string,
   features: readonly string[],
-  managementToken: string,
-  development: Target,
-  production: { name: string; deploymentUrl: string; publicSiteUrl?: string },
+  convex: {
+    token: string;
+    projectId: number;
+    development: Target;
+    production: { name: string; deploymentUrl: string; publicSiteUrl?: string };
+  },
 ) {
   if (!features.includes("payments")) return;
   const connection = await ctx.runQuery(internal.connections.internal.get, {
@@ -102,10 +105,27 @@ export async function provisionPayments(
   ) as AutumnKeys;
   await validateAutumnKey(keys.sandbox, "test");
   if (keys.live) await validateAutumnKey(keys.live, "live");
-  await configureBillingDeployment(development, keys.sandbox);
+  await configureBillingDeployment(convex.development, keys.sandbox);
+  // GitHub previews are separate from named development deployments.
+  // Rerunning an existing pull request can reuse its preview.
+  await management<void>(
+    convex.token,
+    `/projects/${convex.projectId}/update_default_environment_variables`,
+    {
+      changes: [
+        {
+          name: "AUTUMN_SECRET_KEY",
+          deploymentType: "preview",
+          value: keys.sandbox,
+          applyToExistingDeployments: true,
+        },
+      ],
+    },
+  );
   if (keys.live) {
+    const { production } = convex;
     const { deployKey } = await management<{ deployKey: string }>(
-      managementToken,
+      convex.token,
       `/deployments/${encodeURIComponent(production.name)}/create_deploy_key`,
       { name: "disposabl-billing-setup" },
     );

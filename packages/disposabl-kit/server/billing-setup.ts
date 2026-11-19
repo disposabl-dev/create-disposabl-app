@@ -7,6 +7,7 @@ export async function setupBilling(
   env: Record<string, string | undefined>,
   config: Pricing = pricing,
   fetcher = fetch,
+  expectedEnvironment?: "test" | "live",
 ) {
   const result = {
     enabled,
@@ -15,9 +16,24 @@ export async function setupBilling(
   };
   if (!enabled) return result;
   const key = env.AUTUMN_SECRET_KEY?.trim();
-  if (!key)
+  if (!key) {
+    const instruction =
+      expectedEnvironment === "live"
+        ? "Connect live Stripe in Autumn, add the live Autumn key, and rerun app setup."
+        : "Connect an Autumn sandbox key and rerun app setup.";
     throw new Error(
-      "Payments setup requires AUTUMN_SECRET_KEY on this Convex deployment. Configure this app's Autumn connection and retry.",
+      `Payments setup requires AUTUMN_SECRET_KEY on this Convex deployment. ${instruction}`,
+    );
+  }
+  if (
+    expectedEnvironment &&
+    (!key.startsWith(`am_sk_${expectedEnvironment}_`) ||
+      key.length > 4096 ||
+      /\s/.test(key) ||
+      key.length === `am_sk_${expectedEnvironment}_`.length)
+  )
+    throw new Error(
+      `Payments setup requires an Autumn ${expectedEnvironment === "test" ? "sandbox" : "live"} key for this deployment.`,
     );
   if (
     !config.featureId.trim() ||

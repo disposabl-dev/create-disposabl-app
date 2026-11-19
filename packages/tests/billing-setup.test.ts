@@ -6,6 +6,30 @@ import { pricing, type Pricing } from "../disposabl-kit/payments/config";
 type Entry = { id: string; [key: string]: unknown };
 type Call = { method: string; body: Record<string, unknown> };
 const env = { AUTUMN_SECRET_KEY: "fixture-key" };
+
+test("deployment setup verifies expected key mode before contacting Autumn", async () => {
+  const p = provider();
+  for (const [key, expected] of [
+    ["am_sk_live_fixture", "test"],
+    ["am_sk_test_fixture", "live"],
+    ["am_sk_test_", "test"],
+    ["", "test"],
+  ] as const)
+    await assert.rejects(
+      setupBilling(
+        true,
+        { AUTUMN_SECRET_KEY: key },
+        pricing,
+        p.fetcher,
+        expected,
+      ),
+    );
+  assert.equal(p.calls.length, 0);
+  assert.equal(
+    (await setupBilling(false, {}, pricing, p.fetcher, "live")).enabled,
+    false,
+  );
+});
 function provider() {
   const features = new Map<string, Entry>();
   const plans = new Map<string, Entry>();
