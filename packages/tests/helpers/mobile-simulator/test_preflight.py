@@ -54,4 +54,12 @@ class TestPreflight(unittest.TestCase):
                     return fake(*cmd)
                 with patch.object(preflight, 'run', failure), self.assertRaises(ValueError): preflight.inspect(*args)
 
+class TestEntitlementSectionDecoding(unittest.TestCase):
+    def test_full_words_and_tail_bytes(self):
+        self.assertEqual(preflight.decode_otool_section('0000000100000000  04030201 08 09\n'), bytes([1, 2, 3, 4, 8, 9]))
+
+    def test_rejects_unexpected_word(self):
+        with self.assertRaises(ValueError):
+            preflight.decode_otool_section('0000000100000000  04030201 invalid\n')
+
 if __name__ == '__main__': unittest.main()

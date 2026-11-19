@@ -9,6 +9,7 @@ import staticHosting from "@convex-dev/static-hosting/convex.config";
 import workflow from "@convex-dev/workflow/convex.config";
 import agent from "@convex-dev/agent/convex.config";
 import boat from "@boatdev/convex/convex.config.js";
+import reactions from "./guides/reactions/convex.config";
 import { defineApp } from "convex/server";
 import { v } from "convex/values";
 
@@ -62,6 +63,7 @@ const app = defineApp({
 });
 
 app.use(auth);
+app.use(reactions);
 app.use(google, {
   httpPrefix: "/oauth/google",
   env: {

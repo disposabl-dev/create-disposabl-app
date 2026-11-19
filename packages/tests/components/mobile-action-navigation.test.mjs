@@ -68,7 +68,7 @@ mock.module("@disposabl/disposabl-kit/features", () => ({
 }));
 mock.module("@disposabl/disposabl-kit/platforms", () => ({
   platforms: [
-    { id: "web", label: "Web" },
+    { id: "web", label: "Website" },
     { id: "mcp", label: "MCP" },
   ],
   resolvePlatforms: (value) => value,

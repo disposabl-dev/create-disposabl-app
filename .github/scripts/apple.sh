@@ -14,16 +14,24 @@ case "${1:?operation required}" in
     product_payments
     check_source
     RUNTIME=$(runtime)
-    identifier=$(bun x --no-install expo config --json | jq -er --arg project "$EXPO_PROJECT_ID" 'select(.extra.eas.projectId == $project) | .ios.bundleIdentifier | select(type == "string" and length > 0)')
+    config=$(bun x --no-install expo config --json)
+    identifier=$(jq -er --arg project "$EXPO_PROJECT_ID" 'select(.extra.eas.projectId == $project) | .ios.bundleIdentifier | select(type == "string" and length > 0)' <<< "$config")
+    version=$(jq -er '([.ios.version, .version, "1.0.0"] | map(select(type == "string" and length > 0)) | first)' <<< "$config")
+    if [[ "$GH_REPO" == disposabl-dev/create-disposabl-app ]]; then
+      [[ "$version" =~ ^[0-9]+(\.[0-9]+){1,2}$ ]] || { echo 'Invalid iOS version' >&2; exit 1; }
+      printf 'version=%s\nruntime=%s\nidentifier=%s\n' "$version" "$RUNTIME" "$identifier" >> "$GITHUB_OUTPUT"
+      exit 0
+    fi
     # Only the latest finished production binary is a reuse baseline. A query
     # failure must fail the job, not silently spend on a replacement build.
     bun x "$EAS_CLI" build:list --platform ios --status finished --distribution store --build-profile ios-production --channel "$CHANNEL" --app-identifier "$identifier" --limit 1 --json --non-interactive > "$RUNNER_TEMP/ios-builds.json"
     jq -e 'type == "array"' "$RUNNER_TEMP/ios-builds.json" > /dev/null
-    if jq -e --arg runtime "$RUNTIME" --arg project "$EXPO_PROJECT_ID" --arg channel "$CHANNEL" --arg identifier "$identifier" '
+    if jq -e --arg runtime "$RUNTIME" --arg project "$EXPO_PROJECT_ID" --arg channel "$CHANNEL" --arg identifier "$identifier" --arg version "$version" '
       .[0] | .status == "FINISHED" and .platform == "IOS" and .distribution == "STORE"
       and .isForIosSimulator == false and .app.id == $project and .appIdentifier == $identifier
       and .buildProfile == "ios-production" and .updateChannel.name == $channel
-      and .runtime.version == $runtime and ((.artifacts.applicationArchiveUrl // .artifacts.buildUrl // "") | length > 0)
+      and .runtime.version == $runtime and .appVersion == $version
+      and ((.artifacts.applicationArchiveUrl // .artifacts.buildUrl // "") | length > 0)
     ' "$RUNNER_TEMP/ios-builds.json" > /dev/null; then
       printf 'build_id=%s\n' "$(jq -er '.[0].id | select(type == "string" and length > 0)' "$RUNNER_TEMP/ios-builds.json")" >> "$GITHUB_OUTPUT"
       echo 'action=update' >> "$GITHUB_OUTPUT"
@@ -102,6 +110,33 @@ case "${1:?operation required}" in
       --arg project "$EXPO_PROJECT_ID" --arg owner "${EXPO_OWNER:-}" --arg slug "${EXPO_SLUG:-}" \
       '.build["ios-production"].env += {DISPOSABL_MOBILE_CHANNEL: $channel, DISPOSABL_IOS_BUILD_NUMBER: $number, CONVEX_URL: $url, CONVEX_SITE_URL: $site, PUBLIC_SITE_URL: $publicSite, EXPO_PUBLIC_CONVEX_URL: $url, EXPO_PUBLIC_CONVEX_SITE_URL: $publicSite, EXPO_PROJECT_ID: $project, EXPO_OWNER: $owner, EXPO_SLUG: $slug}' eas.json > "$RUNNER_TEMP/eas-production.json"
     mv "$RUNNER_TEMP/eas-production.json" eas.json
+    if [[ "$GH_REPO" == disposabl-dev/create-disposabl-app ]]; then
+      : "${ASC_APP_ID:?ASC app ID required}" "${APP_VERSION:?App version required}" "${RUNTIME:?Runtime required}"
+      ipa="$RUNNER_TEMP/disposabl.ipa"
+      check_source
+      EAS_NO_VCS=1 bun x "$EAS_CLI" build --platform ios --profile ios-production --local --output "$ipa" --non-interactive --freeze-credentials
+      test -s "$ipa"
+      mkdir -p "$RUNNER_TEMP/ios-ipa"
+      unzip -q "$ipa" -d "$RUNNER_TEMP/ios-ipa"
+      app=$(find "$RUNNER_TEMP/ios-ipa/Payload" -maxdepth 1 -name '*.app' -type d -print -quit)
+      test -n "$app"
+      codesign --verify --deep --strict "$app"
+      test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Info.plist")" = "$IOS_IDENTIFIER"
+      test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Info.plist")" = "$APP_VERSION"
+      test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$app/Info.plist")" = "$DISPOSABL_IOS_BUILD_NUMBER"
+      test "$(/usr/libexec/PlistBuddy -c 'Print :EXUpdatesRuntimeVersion' "$app/Expo.plist")" = "$RUNTIME"
+      test "$(/usr/libexec/PlistBuddy -c 'Print :EXUpdatesRequestHeaders:expo-channel-name' "$app/Expo.plist")" = "$CHANNEL"
+      jq --arg id "$ASC_APP_ID" '.submit["ios-production"].ios.ascAppId = $id' eas.json > "$RUNNER_TEMP/eas-submit.json"
+      mv "$RUNNER_TEMP/eas-submit.json" eas.json
+      check_source
+      bun x "$EAS_CLI" submit --platform ios --path "$ipa" --profile ios-production --non-interactive --wait
+      mkdir -p "$GITHUB_WORKSPACE/.ios-provenance"
+      jq -n --arg version "$APP_VERSION" --arg runtime "$RUNTIME" --arg build "$DISPOSABL_IOS_BUILD_NUMBER" --arg app "$ASC_APP_ID" --arg project "$EXPO_PROJECT_ID" --arg identifier "$IOS_IDENTIFIER" --arg digest "$(shasum -a 256 "$ipa" | cut -d' ' -f1)" --arg source "$SOURCE" '{version:$version,runtime:$runtime,build:$build,app:$app,project:$project,identifier:$identifier,digest:$digest,source:$source}' > "$GITHUB_WORKSPACE/.ios-provenance/build.json"
+      report ready "EAS uploaded iOS $APP_VERSION ($DISPOSABL_IOS_BUILD_NUMBER) to TestFlight. App Review is a separate step."
+      echo '### Submit for Store Review' >> "$GITHUB_STEP_SUMMARY"
+      printf 'After Apple processes the upload, run `bun run store:review ios %s %s` with the local App Store Connect key.\n' "$APP_VERSION" "$DISPOSABL_IOS_BUILD_NUMBER" >> "$GITHUB_STEP_SUMMARY"
+      exit 0
+    fi
     if [[ -n "${ASC_APP_ID:-}" ]]; then
       jq --arg id "$ASC_APP_ID" '.submit["ios-production"].ios.ascAppId = $id' eas.json > "$RUNNER_TEMP/eas-submit.json"
       mv "$RUNNER_TEMP/eas-submit.json" eas.json

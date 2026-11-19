@@ -39,12 +39,12 @@ type Options = {
 };
 const jsonOutput = process.argv.slice(2).includes("--json");
 const program = new Command("create-disposabl-app")
-  .description("Create a Disposabl starter. Web is always included.")
+  .description("Create a Disposabl starter. A website is always included.")
   .version(version, "-v, --version")
   .argument("[appname]", "App name and new directory")
   .option(
     "--platforms <ids>",
-    "Comma-separated platform IDs; Web is always included",
+    "Comma-separated platform IDs. A website is always included",
   )
   .option(
     "--features <ids>",
@@ -56,7 +56,7 @@ const program = new Command("create-disposabl-app")
   )
   .option(
     "-y, --yes",
-    "Skip app options prompts; include Web and authentication by default",
+    "Skip app options prompts and include the website and authentication by default",
   )
   .option("--skip-install", "Create files without running bun install")
   .option(
@@ -135,7 +135,7 @@ function showOptions(json: boolean) {
   for (const option of features)
     console.log("  " + option.id.padEnd(21) + option.hint);
   console.log(
-    "\nWeb is always included. Authentication is enabled by default. Use --platforms and --features with the IDs above.",
+    "\nA website is always included. Authentication is enabled by default. Use --platforms and --features with the IDs above.",
   );
 }
 

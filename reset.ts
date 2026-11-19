@@ -141,11 +141,30 @@ const productProofTests = [
   "packages/tests/fixtures/low-credit-convex",
 ];
 
+const productGuides = [
+  // Reserved product media directories; other app assets are untouched.
+  "apps/web/public/disposabl-guides",
+  "apps/mobile/assets/disposabl-guides",
+  "apps/web/src/router/guides.tsx",
+  "apps/web/scripts/publish-guides.ts",
+  "apps/web/src/components/landing/guide-library.tsx",
+  "apps/web/src/components/landing/guide-library.css",
+  "apps/web/src/components/landing/guide-player.tsx",
+  "apps/web/src/components/landing/guide-social.tsx",
+  "apps/web/src/components/landing/guide-player.css",
+  "packages/disposabl-kit/guides.ts",
+  "packages/disposabl-kit/guide-media.json",
+  "packages/tests/flows/guides.e2e.ts",
+  "packages/tests/flows/guide-engagement.e2e.ts",
+  "packages/tests/flows/mobile-guides.e2e.ts",
+];
+
 // Validate every required input before removing anything. Unrelated skill
 // symlinks may be packaged, but reset must never read or write through a link.
 const touched = [
   ...productReleaseFiles,
   ...productProofTests,
+  ...productGuides,
   "packages/backend/convex/users/receipts.ts",
   "packages/backend/convex/users/authDeletion.ts",
   "packages/backend/convex/users/fileDeletion.ts",
@@ -485,6 +504,7 @@ for (const entry of await readdir(convex)) {
 for (const path of [
   ...productReleaseFiles,
   ...productProofTests,
+  ...productGuides,
   "packages/backend/convex/users/receipts.ts",
   "packages/backend/convex/users/authDeletion.ts",
   "packages/backend/convex/users/fileDeletion.ts",
@@ -598,11 +618,13 @@ delete turbo.tasks["create-disposabl-app#build"];
 const mobile = await json("apps/mobile/package.json");
 const web = await json("apps/web/package.json");
 delete web.dependencies["posthog-js"];
+delete web.dependencies["hls.js"];
 for (const name of [
   "posthog-react-native",
   "@posthog/react-native-plugin",
   "expo-application",
   "expo-localization",
+  "expo-video",
 ])
   delete mobile.dependencies[name];
 const mobileConfig = await json("apps/mobile/app.json");

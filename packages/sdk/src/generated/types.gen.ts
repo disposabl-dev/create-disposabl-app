@@ -1026,6 +1026,93 @@ export type ReleasesGetResponses = {
 export type ReleasesGetResponse =
   ReleasesGetResponses[keyof ReleasesGetResponses];
 
+export type ReleasesReviewRequestData = {
+  body: {
+    appId: string;
+    commit: string;
+    platforms: Array<"ios" | "android">;
+  };
+  path?: never;
+  query?: never;
+  url: "/api/releases/review/request";
+};
+
+export type ReleasesReviewRequestErrors = {
+  /**
+   * Invalid arguments
+   */
+  400: unknown;
+  /**
+   * Authentication required
+   */
+  401: unknown;
+  /**
+   * Insufficient scope
+   */
+  403: unknown;
+  /**
+   * Internal error
+   */
+  500: unknown;
+};
+
+export type ReleasesReviewRequestResponses = {
+  /**
+   * Success
+   */
+  200: {
+    requestId: string;
+    commit: string;
+    url: string;
+  };
+};
+
+export type ReleasesReviewRequestResponse =
+  ReleasesReviewRequestResponses[keyof ReleasesReviewRequestResponses];
+
+export type ReleasesReviewStatusData = {
+  body: {
+    appId: string;
+    requestId: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/api/releases/review/status";
+};
+
+export type ReleasesReviewStatusErrors = {
+  /**
+   * Invalid arguments
+   */
+  400: unknown;
+  /**
+   * Authentication required
+   */
+  401: unknown;
+  /**
+   * Insufficient scope
+   */
+  403: unknown;
+  /**
+   * Internal error
+   */
+  500: unknown;
+};
+
+export type ReleasesReviewStatusResponses = {
+  /**
+   * Success
+   */
+  200: null | {
+    status: string;
+    conclusion: null | string;
+    url: string;
+  };
+};
+
+export type ReleasesReviewStatusResponse =
+  ReleasesReviewStatusResponses[keyof ReleasesReviewStatusResponses];
+
 export type UsersCurrentData = {
   body?: never;
   path?: never;

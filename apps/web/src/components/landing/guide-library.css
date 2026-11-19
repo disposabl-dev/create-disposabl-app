@@ -1,0 +1,76 @@
+.guide-library {
+  padding-top: clamp(48px, 7vw, 90px);
+  padding-bottom: 100px;
+}
+.guide-library h1 {
+  font-size: clamp(44px, 5vw, 64px);
+}
+.library-shelf {
+  margin-top: 52px;
+}
+.library-shelf h2 {
+  margin-bottom: 22px;
+  font-size: clamp(27px, 3vw, 36px);
+}
+.library-cards {
+  display: grid;
+  grid-auto-columns: clamp(180px, 19vw, 240px);
+  grid-auto-flow: column;
+  gap: 18px;
+  overflow-x: auto;
+  padding: 0 0 16px;
+  scroll-snap-type: x proximity;
+}
+.library-card {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  text-align: left;
+  scroll-snap-align: start;
+}
+.library-card-art {
+  display: block;
+  overflow: hidden;
+  aspect-ratio: 9 / 14;
+  border-radius: 18px;
+  background: linear-gradient(145deg, #416dec, #182863);
+}
+.library-art-practice {
+  background: linear-gradient(145deg, #7359aa, #25244b);
+}
+.library-art-application {
+  background: linear-gradient(145deg, #298c9c, #153f57);
+}
+.library-art-agent {
+  background: linear-gradient(145deg, #665e82, #28263c);
+}
+.library-card-art img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.library-card strong {
+  display: block;
+  margin-top: 12px;
+  font-size: 16px;
+  line-height: 1.35;
+}
+.library-card:focus-visible,
+.guide-player button:focus-visible {
+  outline: 3px solid #a9bdff;
+  outline-offset: 3px;
+}
+@media (max-width: 650px) {
+  .guide-library {
+    padding-top: 48px;
+  }
+  .library-shelf {
+    margin-top: 38px;
+  }
+  .library-cards {
+    grid-auto-columns: 44%;
+    gap: 12px;
+  }
+}

@@ -2,10 +2,10 @@ const run =
   "https://github.com/disposabl-dev/create-disposabl-app/actions/runs/41811672883";
 const observations = [
   {
-    label: "Web workflow",
+    label: "Website workflow",
     time: "1m 40s",
     job: "126559557967",
-    detail: "Checks, client build, backend deployment, and web build.",
+    detail: "Checks, client build, backend deployment, and website build.",
   },
   {
     label: "Android native",

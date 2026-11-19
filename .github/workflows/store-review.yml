@@ -1,0 +1,47 @@
+name: Submit for Store Review
+run-name: Store review ${{ github.event.client_payload.requestId }}
+on:
+  repository_dispatch:
+    types: [disposabl-store-review]
+permissions:
+  contents: read
+concurrency:
+  group: store-review
+  cancel-in-progress: false
+jobs:
+  submit:
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [ios, android]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Verify release source
+        env:
+          EXPECTED_COMMIT: ${{ github.event.client_payload.commit }}
+        run: test "$GITHUB_REF" = "refs/heads/main" && test "$GITHUB_SHA" = "$EXPECTED_COMMIT"
+      - uses: actions/checkout@v6
+        if: contains(github.event.client_payload.platforms, matrix.platform)
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        if: contains(github.event.client_payload.platforms, matrix.platform)
+        with:
+          node-version: "24"
+          package-manager-cache: false
+      - name: Send iOS version to App Review
+        if: matrix.platform == 'ios' && contains(github.event.client_payload.platforms, 'ios')
+        env:
+          ASC_APP_ID: ${{ secrets.ASC_APP_ID || vars.ASC_APP_ID }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+        run: node .github/scripts/store-review.mjs ios
+      - name: Send Android version to Google Play review
+        if: matrix.platform == 'android' && contains(github.event.client_payload.platforms, 'android')
+        env:
+          ANDROID_PLAY_SERVICE_ACCOUNT: ${{ secrets.ANDROID_PLAY_SERVICE_ACCOUNT }}
+          ANDROID_PLAY_TRACK: ${{ vars.ANDROID_PLAY_TRACK }}
+        run: node .github/scripts/store-review.mjs android

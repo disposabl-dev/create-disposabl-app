@@ -239,7 +239,7 @@ test(
 );
 
 test(
-  "mobile guides retain their illustrated catalogue",
+  "mobile guides show the introduction and learning paths",
   { platforms: ["ios", "android"] },
   async ({ app, screen, device }) => {
     await openMobile({ app, device, screen });
@@ -248,10 +248,12 @@ test(
       .or(screen.getByRole("button", "Guides", { exact: true }))
       .tap();
     await expect(
-      screen.getByRole("button", "Read What is an API?", { exact: true }),
+      screen.getByRole("button", "Watch Welcome to Disposabl", {
+        exact: true,
+      }),
     ).toBeVisible();
     await expect(
-      screen.getByText("Fundamentals", { exact: true }),
+      screen.getByText("Best practices", { exact: true }),
     ).toBeVisible();
     await screen
       .getByRole("tab", "Discover", { exact: true })

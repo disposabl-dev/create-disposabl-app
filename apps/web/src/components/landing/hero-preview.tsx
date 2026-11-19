@@ -24,7 +24,7 @@ export function HeroPreview() {
           [
             ["Desktop", "Windows"],
             ["Mobile", "Apple"],
-            ["Web", "Web"],
+            ["Website", "Website"],
           ] as const
         ).map(([name, icon]) => (
           <button

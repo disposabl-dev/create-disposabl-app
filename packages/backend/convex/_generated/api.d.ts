@@ -88,6 +88,8 @@ import type * as github_actions_site from "../github/actions/site.js";
 import type * as github_actions_tokens from "../github/actions/tokens.js";
 import type * as github_identityCache from "../github/identityCache.js";
 import type * as github_internal from "../github/internal.js";
+import type * as guides_model from "../guides/model.js";
+import type * as guides_social from "../guides/social.js";
 import type * as http from "../http.js";
 import type * as mcp from "../mcp.js";
 import type * as previews_index from "../previews/index.js";
@@ -96,8 +98,10 @@ import type * as previews_token_actions_create from "../previews/token/actions/c
 import type * as previews_token_actions_management from "../previews/token/actions/management.js";
 import type * as previews_token_internal from "../previews/token/internal.js";
 import type * as product_lowCreditEmail from "../product/lowCreditEmail.js";
+import type * as releases_actions_storeReview from "../releases/actions/storeReview.js";
 import type * as releases_index from "../releases/index.js";
 import type * as releases_internal from "../releases/internal.js";
+import type * as releases_review from "../releases/review.js";
 import type * as revenuecat from "../revenuecat.js";
 import type * as telemetry from "../telemetry.js";
 import type * as users_actions_fulfillment from "../users/actions/fulfillment.js";
@@ -202,6 +206,8 @@ declare const fullApi: ApiFromModules<{
   "github/actions/tokens": typeof github_actions_tokens;
   "github/identityCache": typeof github_identityCache;
   "github/internal": typeof github_internal;
+  "guides/model": typeof guides_model;
+  "guides/social": typeof guides_social;
   http: typeof http;
   mcp: typeof mcp;
   "previews/index": typeof previews_index;
@@ -210,8 +216,10 @@ declare const fullApi: ApiFromModules<{
   "previews/token/actions/management": typeof previews_token_actions_management;
   "previews/token/internal": typeof previews_token_internal;
   "product/lowCreditEmail": typeof product_lowCreditEmail;
+  "releases/actions/storeReview": typeof releases_actions_storeReview;
   "releases/index": typeof releases_index;
   "releases/internal": typeof releases_internal;
+  "releases/review": typeof releases_review;
   revenuecat: typeof revenuecat;
   telemetry: typeof telemetry;
   "users/actions/fulfillment": typeof users_actions_fulfillment;
@@ -258,6 +266,7 @@ export declare const internal: FilterApi<
 
 export declare const components: {
   auth: import("@convex-dev/auth/_generated/component.js").ComponentApi<"auth">;
+  reactions: import("../guides/reactions/_generated/component.js").ComponentApi<"reactions">;
   authGoogle: import("@convex-dev/auth/components/google/_generated/component.js").ComponentApi<"authGoogle">;
   authEmail: import("@convex-dev/auth/components/email/_generated/component.js").ComponentApi<"authEmail">;
   resend: import("@convex-dev/resend/_generated/component.js").ComponentApi<"resend">;

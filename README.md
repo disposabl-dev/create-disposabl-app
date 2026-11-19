@@ -61,7 +61,7 @@ Choose one of these commands. All create the same project, which uses Bun to ins
 
 | Build for     | Options                                       |
 | ------------- | --------------------------------------------- |
-| Web           | A website, always included                    |
+| Website       | Always included                               |
 | Mobile        | iOS and Android                               |
 | Desktop       | macOS, Windows, and Linux                     |
 | AI assistants | MCP tools that let agents work with your app  |
@@ -90,7 +90,7 @@ These are the main tools behind the starter. You do not need to learn all of the
 | Project tools   | Bun and Turborepo                      | Installs dependencies and runs commands across the project     |
 | Publishing      | GitHub Actions and Expo EAS            | Builds previews and releases for the selected platforms        |
 
-Web and the backend are always included. Other apps and features follow your selections in `disposabl.json`.
+The website and backend are always included. Other apps and features follow your selections in `disposabl.json`.
 
 ## Where things live
 

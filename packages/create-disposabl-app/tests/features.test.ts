@@ -137,3 +137,44 @@ test("auth-disabled output omits frontend auth routes while retaining backend au
     await rm(temporary, { recursive: true, force: true });
   }
 });
+
+test("packaged starter excludes product guides and their native dependency", async () => {
+  const { spawnSync } = await import("node:child_process");
+  const { existsSync, readFileSync } = await import("node:fs");
+  const root = join(import.meta.dirname, "../../..");
+  const build = spawnSync(
+    process.execPath,
+    ["run", "packages/create-disposabl-app/build.ts"],
+    {
+      cwd: root,
+      encoding: "utf8",
+    },
+  );
+  expect(build.status).toBe(0);
+  const template = join(
+    root,
+    "packages/create-disposabl-app/dist/templates/default",
+  );
+  for (const path of [
+    "apps/mobile/src/features/studio",
+    "apps/web/src/router/guides.tsx",
+    "apps/web/src/components/landing/guide-player.tsx",
+    "apps/web/public/disposabl-guides",
+    "apps/mobile/assets/disposabl-guides",
+    "packages/disposabl-kit/guides.ts",
+    "packages/disposabl-kit/guide-media.json",
+    "packages/tests/flows/guides.e2e.ts",
+  ])
+    expect(existsSync(join(template, path))).toBe(false);
+  const mobile = JSON.parse(
+    readFileSync(join(template, "apps/mobile/package.json"), "utf8"),
+  );
+  expect(mobile.dependencies["expo-video"]).toBeUndefined();
+  const web = JSON.parse(
+    readFileSync(join(template, "apps/web/package.json"), "utf8"),
+  );
+  expect(web.dependencies["hls.js"]).toBeUndefined();
+  expect(existsSync(join(template, "apps/web/src/router/index.tsx"))).toBe(
+    true,
+  );
+});

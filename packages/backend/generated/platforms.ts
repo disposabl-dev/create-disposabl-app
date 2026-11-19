@@ -10,7 +10,8 @@ import * as m7 from "../convex/github/internal";
 import * as m8 from "../convex/previews/internal";
 import * as m9 from "../convex/previews/token/internal";
 import * as m10 from "../convex/releases/internal";
-import * as m11 from "../convex/users/internal";
+import * as m11 from "../convex/releases/review";
+import * as m12 from "../convex/users/internal";
 export default {
   "agent/internal": m0,
   "apps/internal": m1,
@@ -23,5 +24,6 @@ export default {
   "previews/internal": m8,
   "previews/token/internal": m9,
   "releases/internal": m10,
-  "users/internal": m11,
+  "releases/review": m11,
+  "users/internal": m12,
 };

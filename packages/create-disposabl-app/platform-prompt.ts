@@ -32,7 +32,7 @@ export function createPlatformPrompt(
         const labels = this.options
           .filter((option) => selected.includes(option.value))
           .map((option) => option.label.trim());
-        return `${title}\n${bar}  ${color.dim(labels.join(", ") || "Web only")}`;
+        return `${title}\n${bar}  ${color.dim(labels.join(", ") || "Website only")}`;
       }
       if (this.state === "cancel")
         return `${title}\n${bar}  ${color.dim("Cancelled")}`;

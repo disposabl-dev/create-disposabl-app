@@ -12,7 +12,10 @@ export default function HomeScreen() {
   const c = useTheme();
   const { width } = useWindowDimensions();
   const [shelfWidth, setShelfWidth] = useState(width - 48);
-  const featureWidth = Math.max(180, Math.min(shelfWidth - 16, 560));
+  const showBothFeatures = shelfWidth >= 500;
+  const featureWidth = showBothFeatures
+    ? Math.floor((shelfWidth - 12) / 2)
+    : Math.max(180, shelfWidth - 16);
   const features = [
     {
       title: "What will you build?",
@@ -32,7 +35,8 @@ export default function HomeScreen() {
       <FlatList
         horizontal
         onLayout={(event) => setShelfWidth(event.nativeEvent.layout.width)}
-        snapToInterval={featureWidth + 12}
+        scrollEnabled={!showBothFeatures}
+        snapToInterval={showBothFeatures ? undefined : featureWidth + 12}
         decelerationRate="fast"
         showsHorizontalScrollIndicator={false}
         data={features}
@@ -41,7 +45,7 @@ export default function HomeScreen() {
         renderItem={({ item }) => (
           <VariableContextProvider
             value={{
-              "--layout-width": featureWidth ?? "auto",
+              "--layout-width": featureWidth,
               "--layout-background-color": item.color,
             }}
           >

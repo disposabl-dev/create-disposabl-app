@@ -75,7 +75,16 @@ export function registerPageRoutes(http: HttpRouter) {
           status: 404,
           headers: { "Cache-Control": "no-store" },
         });
-      const contentType = asset.contentType;
+      // The static uploader's MIME table does not include video or caption files.
+      const mediaType = file.endsWith(".mp4")
+        ? "video/mp4"
+        : file.endsWith(".vtt")
+          ? "text/vtt; charset=utf-8"
+          : asset.contentType;
+      const contentType =
+        asset.contentType === "application/octet-stream"
+          ? mediaType
+          : asset.contentType;
       const headers = {
         "Content-Type": contentType,
         "Cache-Control":
@@ -97,10 +106,44 @@ export function registerPageRoutes(http: HttpRouter) {
           : {}),
       };
       if (asset.storageUrl) {
-        const response = await fetch(asset.storageUrl);
-        return response.ok
-          ? new Response(response.body, { headers })
-          : new Response("Asset unavailable", { status: 502 });
+        const video = contentType.startsWith("video/");
+        const range = video ? request.headers.get("Range") : null;
+        const response = await fetch(asset.storageUrl, {
+          ...(range ? { headers: { Range: range } } : {}),
+        });
+        if (!response.ok && !(video && response.status === 416))
+          return new Response("Asset unavailable", { status: 502 });
+        const resultHeaders = new Headers(headers);
+        if (video)
+          for (const name of [
+            "Accept-Ranges",
+            "Content-Range",
+            "Content-Length",
+          ]) {
+            const value = response.headers.get(name);
+            if (value) resultHeaders.set(name, value);
+          }
+        const [, start, end, size] =
+          response.headers
+            .get("Content-Range")
+            ?.match(/^bytes (\d+)-(\d+)\/(\d+)$/) ?? [];
+        if (
+          video &&
+          response.status === 206 &&
+          start &&
+          end &&
+          size &&
+          (+start > +end || +end >= +size)
+        ) {
+          await response.body?.cancel();
+          resultHeaders.set("Content-Range", `bytes */${size}`);
+          resultHeaders.set("Content-Length", "0");
+          return new Response(null, { status: 416, headers: resultHeaders });
+        }
+        return new Response(response.body, {
+          status: video ? response.status : 200,
+          headers: resultHeaders,
+        });
       }
       return new Response("Asset unavailable", { status: 502 });
     }),

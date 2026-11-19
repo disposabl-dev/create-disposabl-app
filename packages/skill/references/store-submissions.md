@@ -2,6 +2,62 @@
 
 Use this workflow when the user requests store submission or release. Follow their chosen platforms, accounts, distribution timing, and build constraints. Prior authorization to submit or release remains effective; ask only for information, access, or a decision that is actually missing, or when a tool or legal boundary requires it.
 
+## Walk the owner through the first release
+
+1. Ask which stores and countries the user wants. Verify the app's platform selection, its existing store listing, and its signed production build. Test the top user journeys on each selected device. Remove placeholders, make support and privacy links reachable, and capture screenshots of the actual build.
+2. Guide the owner through any first-time developer registration, identity verification, agreements, API access, or Play testing gate the provider requires. Ask the owner to complete only those steps that need their account or legal attestations. Configure the review workflow with the app owner's store credentials in its repository secrets. The first Play release may require an initial upload through Play Console. [Expo iOS setup](https://docs.expo.dev/submit/ios/) · [Expo Play setup](https://docs.expo.dev/submit/android/)
+3. Prepare the listing in the owner's language. Explain what the app does in the first two lines, use accurate screenshots, and keep release notes about changes users can see. Record the selected build and any instructions a reviewer needs. [Apple product pages](https://developer.apple.com/app-store/product-page/) · [Google Play store listings](https://support.google.com/googleplay/android-developer/answer/9859152)
+
+## Submit a published build from the CLI
+
+For a Disposabl-managed app with a production build uploaded to TestFlight or a Google Play draft release, record the exact build in `.disposabl/store/release.json` on `main`. Store screenshots alongside it. Include only the platforms the user wants to submit. Example for a published update:
+
+```json
+{
+  "ios": {
+    "version": "1.1.0",
+    "buildNumber": "42",
+    "notes": { "en-US": "Adds a video guide to getting started." },
+    "reviewNotes": "Open Guides from the home screen to try the new video.",
+    "screenshots": [
+      {
+        "locale": "en-US",
+        "displayType": "APP_IPHONE_67",
+        "path": "ios/guides.png"
+      }
+    ]
+  },
+  "android": {
+    "versionCode": "42",
+    "notes": [
+      { "language": "en-US", "text": "Adds a video guide to getting started." }
+    ],
+    "screenshots": [
+      {
+        "language": "en-US",
+        "imageType": "phoneScreenshots",
+        "path": "android/guides.png"
+      }
+    ]
+  }
+}
+```
+
+Use the same app records, signing teams, and production track established for the first release. The workflow uses `ASC_APP_ID`, `ASC_KEY_ID`, `ASC_ISSUER_ID`, and `ASC_PRIVATE_KEY` for Apple and `ANDROID_PLAY_TRACK` plus `ANDROID_PLAY_SERVICE_ACCOUNT` for Google. Never put private keys or reviewer passwords in the release file. Verify that the live CLI contract includes the commands, then send the intended commit and selected platforms.
+
+```sh
+disposabl releases review request --appId <appId> --commit <main-full-sha> --platforms '["ios","android"]'
+disposabl releases review status --appId <appId> --requestId <requestId>
+```
+
+Keep the store-specific receipts. A request ID confirms GitHub accepted the request. The workflow confirms whether it submitted, encountered an existing release, or needs a specific fix. Apple reviews the exact build and releases it after approval. Google controls review and publication for the configured Play track. An existing Play review blocks a new submission until it finishes. [Apple release options](https://developer.apple.com/help/app-store-connect/manage-your-apps-availability/select-an-app-store-version-release-option/) · [Play review safety](https://developers.google.com/android-publisher/api-ref/rest/v3/edits/commit)
+
+## Check review readiness and resolve a rejection
+
+- Open the actual app from a clean install, exercise its main flows, and check sign-in, reviewer access, working purchase and restore flows if enabled, privacy disclosures, and account deletion where required. Check data collection against the shipped SDKs and backend. [Apple common review issues](https://developer.apple.com/app-store/review/) · [Google Play Developer Program Policy](https://support.google.com/googleplay/android-developer/answer/18265346)
+- Use Expo's store skill for build, signing, and upload commands. For a deeper iOS audit, the community App Store Review skill indexes the Apple guidelines by feature. Confirm any policy finding against Apple's current guidance and the actual app before changing code or metadata. [Expo store skill](https://github.com/expo/skills/blob/main/plugins/expo/skills/eas-app-stores/SKILL.md) · [App Store Review skill](https://skills.sh/safaiyeh/app-store-review-skill/app-store-review) · [Apple review guidelines](https://developer.apple.com/app-store/review/guidelines/)
+- If a store rejects a submission, read its exact message, reproduce the issue with the submitted build or reviewer account, and fix the smallest relevant issue. Test the fix. Build and upload a new binary for a binary fix, or update the editable listing for a metadata fix. Explain what changed and how to verify it in the review notes. [Apple review status](https://developer.apple.com/help/app-review/after-submitting-for-review/review-status/) · [Google Play enforcement](https://support.google.com/googleplay/android-developer/answer/9899234)
+
 ## Match the existing app
 
 Identify the exact App Store Connect (ASC) app record and Apple ID, bundle ID, team, and current release; identify the Play Console app record, package name, track, version code, and signing configuration. Reuse the existing listing when the identifiers and ownership match. Do not infer identity from the display name or an Expo project. If no matching record exists, create a new record only within the requested scope; explain that it is a new listing, not an update or migration of the existing app.
@@ -15,6 +71,15 @@ Use the user's required build path. When local iOS builds are requested, create 
 If review requires login, provision a dedicated reviewer account for the actual app and review backend using a login method supported by the submitted build and backend. Give it only the permissions and resources needed to exercise the real submitted features; include any required roles, reachable backend, purchase access, and steps. Prepared credentials alone are not an account: register it, then verify login and those features on the submitted build, relaunch, and verify session and data before calling reviewer access ready. Keep credentials out of source, Git, skill files, logs, screenshots, and public chat; enter them only in the store's designated review-access fields via an authorized secure channel. Keep the account and backend usable through review. If Apple requires a subscription flow, follow its current guidance for a review account that can demonstrate it. Explain genuine limits and setup in review notes rather than presenting a mock as a working feature. See [Apple review information](https://developer.apple.com/help/app-review/before-submitting-for-review/complete-review) and [Google review access](https://support.google.com/googleplay/android-developer/answer/15191715).
 
 Use truthful screenshots from the submitted app and supported devices; ensure metadata, privacy policy, age/content ratings, Apple privacy declarations, and Play Data safety reflect the actual app, backend, SDKs, and regional behavior. Do not invent data practices or claim unavailable features. Check [Apple screenshot specifications](https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications), [Apple privacy details](https://developer.apple.com/app-store/submitting/), and [Play Data safety](https://support.google.com/googleplay/android-developer/answer/10787469).
+
+## Preview, updates, and unattended CI
+
+For Disposabl itself, the main-branch iOS job builds on GitHub and uploads to TestFlight. Its **Submit for Store Review** summary shows the exact version and build number. Once the user gives the go-ahead and Apple has processed the build, run `bun run store:review ios <version> <build-number>` with local `ASC_APP_ID`, `ASC_KEY_ID`, `ASC_ISSUER_ID`, and `ASC_PRIVATE_KEY_FILE`. The workflow uses Expo's configured signing and upload credentials. The separate review command uses the local Apple key and confirms which build Apple received.
+
+- Use the release's preview channel for preview QA. An EAS Update can deliver JavaScript and assets only to installed builds with the matching channel and runtime fingerprint. A new native dependency such as `expo-video` requires a new binary. A new store marketing version also needs a binary with that version. An update on a channel named `production` does not create a store release. [Expo runtime versions](https://docs.expo.dev/eas-update/runtime-versions/)
+- A Linux development environment can trigger GitHub Actions. Run the signed iOS build on a macOS runner with Xcode and the app's existing distribution identity. `eas build --local` runs on that runner and can use Expo-managed credentials. Select and verify an Xcode and iOS SDK that support the target devices. For iPhone Duo, use Xcode 27.1 or newer and verify the outer, half-open, and fully open layouts with the actual feature before qualifying the release. [Expo local builds](https://docs.expo.dev/build-reference/local-builds/) · [Apple iPhone Duo guidance](https://developer.apple.com/iphone-duo/prepare/)
+- Upload the signed `.ipa` with `eas submit --path` or Apple's supported upload tools. Wait for processing and match the exact binary to the intended App Store version before submitting that version to App Review. Automate review via an authorized App Store Connect credential and honor the selected release mode. On retries, reconcile the existing upload and review submission before taking another action. [Expo Submit](https://docs.expo.dev/submit/introduction/) · [Expo store skill](https://github.com/expo/skills/blob/main/plugins/expo/skills/eas-app-stores/SKILL.md) · [App Store Connect review](https://developer.apple.com/help/app-store-connect/manage-submissions-to-app-review/submit-an-app/)
+- Keep the Play build and submission independent. First releases may require Play Console setup. Leave an in-flight first review in place and use the existing package, verified signing key, and intended track for later releases. Google Play API callers should refuse to replace an existing review with `ERROR_IF_IN_REVIEW`. [Expo Play submission](https://docs.expo.dev/submit/android/) · [Google Play edit commit](https://developers.google.com/android-publisher/api-ref/rest/v3/edits/commit)
 
 ## Payments and release states
 

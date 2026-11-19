@@ -18,6 +18,8 @@ export {
   previewsTokenComplete,
   previewsTokenCreate,
   releasesGet,
+  releasesReviewRequest,
+  releasesReviewStatus,
   usersCurrent,
 } from "./sdk.gen.js";
 export type {
@@ -86,6 +88,14 @@ export type {
   ReleasesGetErrors,
   ReleasesGetResponse,
   ReleasesGetResponses,
+  ReleasesReviewRequestData,
+  ReleasesReviewRequestErrors,
+  ReleasesReviewRequestResponse,
+  ReleasesReviewRequestResponses,
+  ReleasesReviewStatusData,
+  ReleasesReviewStatusErrors,
+  ReleasesReviewStatusResponse,
+  ReleasesReviewStatusResponses,
   UsersCurrentData,
   UsersCurrentErrors,
   UsersCurrentResponse,

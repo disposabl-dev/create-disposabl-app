@@ -1,9 +1,15 @@
 const traceparentPattern = /^00-([0-9a-f]{32})-([0-9a-f]{16})-01$/;
 
 export function parseTraceparent(value: string | null | undefined) {
-  const match = traceparentPattern.exec(value ?? "");
-  if (!match || /^0+$/.test(match[1]) || /^0+$/.test(match[2])) return null;
-  return { traceId: match[1], parentSpanId: match[2] };
+  const [, traceId, parentSpanId] = traceparentPattern.exec(value ?? "") ?? [];
+  if (
+    !traceId ||
+    !parentSpanId ||
+    /^0+$/.test(traceId) ||
+    /^0+$/.test(parentSpanId)
+  )
+    return null;
+  return { traceId, parentSpanId };
 }
 
 export function startSpan(parent?: string) {

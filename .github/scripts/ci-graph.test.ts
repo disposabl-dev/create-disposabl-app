@@ -408,3 +408,24 @@ test("meaningful workflow mutations are rejected", () => {
   requiresChecks(publish.jobs.publish);
   expect(() => requiresChecks(badPublish)).toThrow();
 });
+
+test("product iOS uploads to TestFlight and keeps App Review on demand", () => {
+  const job = pipeline.jobs["ios-production"];
+  expect(job["runs-on"]).toContain("xcode-27");
+  expect(step(job, "Restore TestFlight upload provenance").with.path).toBe(
+    ".ios-provenance/build.json",
+  );
+  expect(
+    step(job, "Build product iOS and upload to TestFlight").env.DEVELOPER_DIR,
+  ).toContain("Xcode_27.2");
+  expect(JSON.stringify(job)).not.toMatch(/ASC_PRIVATE_KEY|apple-review.mjs/);
+  expect(step(job, "Check existing TestFlight upload").run).toContain(
+    "bun run store:review ios",
+  );
+  expect(step(job, "Publish compatible iOS production update").if).toContain(
+    "ios-baseline.outputs.available == 'true'",
+  );
+  expect(step(job, "Build and submit to TestFlight").if).toContain(
+    "github.repository != 'disposabl-dev/create-disposabl-app'",
+  );
+});

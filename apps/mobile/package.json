@@ -30,6 +30,7 @@
     "expo-symbols": "~58.0.5",
     "expo-system-ui": "~58.0.7",
     "expo-updates": "~58.0.22",
+    "expo-video": "~58.0.14",
     "expo-web-browser": "~58.0.8",
     "nativewind": "5.0.0-rc.1",
     "react": "19.3.0",

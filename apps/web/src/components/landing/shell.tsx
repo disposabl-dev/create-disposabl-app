@@ -110,6 +110,7 @@ export function MarketingShell({
             }}
           >
             <a href="/build">How it works</a>
+            <a href="/guides">Guides</a>
             <a href="/why-disposabl">Why Disposabl</a>
             <a href="/pricing">Pricing</a>
             <a href="/stack">Tech stack</a>
@@ -174,6 +175,7 @@ export function MarketingShell({
           <div className="footer-directory">
             <nav aria-label="Explore Disposabl">
               <a href="/build">How it works</a>
+              <a href="/guides">Guides</a>
               <a href="/stack">Tech stack</a>
               <a href="/why-disposabl">Why Disposabl</a>
               <a href="/pricing">Pricing</a>

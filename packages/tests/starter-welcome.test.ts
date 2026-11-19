@@ -129,7 +129,7 @@ test(
           stdout,
           /disposabl-logo\.svg|Your Disposabl account/,
         );
-        assert.match(stdout, />Web</);
+        assert.match(stdout, />Website</);
         assert.match(stdout, />Android</);
         assert.doesNotMatch(
           stdout,
