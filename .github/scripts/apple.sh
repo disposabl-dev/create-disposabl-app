@@ -121,11 +121,7 @@ case "${1:?operation required}" in
       app=$(find "$RUNNER_TEMP/ios-ipa/Payload" -maxdepth 1 -name '*.app' -type d -print -quit)
       test -n "$app"
       codesign --verify --deep --strict "$app"
-      test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Info.plist")" = "$IOS_IDENTIFIER"
-      test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Info.plist")" = "$APP_VERSION"
-      test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$app/Info.plist")" = "$DISPOSABL_IOS_BUILD_NUMBER"
-      test "$(/usr/libexec/PlistBuddy -c 'Print :EXUpdatesRuntimeVersion' "$app/Expo.plist")" = "$RUNTIME"
-      test "$(/usr/libexec/PlistBuddy -c 'Print :EXUpdatesRequestHeaders:expo-channel-name' "$app/Expo.plist")" = "$CHANNEL"
+      bash "$GITHUB_WORKSPACE/.github/scripts/validate-ios-ipa.sh" "$app"
       jq --arg id "$ASC_APP_ID" '.submit["ios-production"].ios.ascAppId = $id' eas.json > "$RUNNER_TEMP/eas-submit.json"
       mv "$RUNNER_TEMP/eas-submit.json" eas.json
       check_source
