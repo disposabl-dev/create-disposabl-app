@@ -8,6 +8,7 @@ const features = {
   paymentsEnabled: false,
 };
 let authenticated = false;
+let platform = "ios";
 let renderer;
 const replace = mock();
 const authState = mock(() => {
@@ -25,9 +26,12 @@ mock.module("@convex-dev/auth/react", () => ({
   useAuthActions: () => ({ signOut: async () => {} }),
 }));
 mock.module("expo-router", () => ({ router: { push: mock(), replace } }));
-mock.module("react-native", () => ({ View: "View" }));
+mock.module("react-native", () => ({
+  Platform: { select: (values) => values[platform] },
+  View: "View",
+}));
 mock.module("expo-constants", () => ({
-  default: { expoConfig: { version: "1" } },
+  default: { expoConfig: { version: "1.0.0", ios: { version: "1.1.0" } } },
 }));
 mock.module("expo-clipboard", () => ({ setStringAsync: async () => true }));
 mock.module("../../disposabl-kit/mobile/components/settings-page", () => ({
@@ -70,9 +74,24 @@ const mount = () =>
 afterEach(async () => {
   await act(async () => renderer?.unmount());
   authenticated = false;
+  platform = "ios";
   query.mockClear();
   authState.mockClear();
   replace.mockClear();
+});
+
+test("settings show the platform release version with a common fallback", async () => {
+  await mount();
+  expect(renderer.root.findByType("Text").children).toEqual([
+    "Version ",
+    "1.1.0",
+  ]);
+  platform = "android";
+  await act(async () => renderer.update(createElement(AccountScreen)));
+  expect(renderer.root.findByType("Text").children).toEqual([
+    "Version ",
+    "1.0.0",
+  ]);
 });
 
 test.skipIf(features.authenticationEnabled)(
