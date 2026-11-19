@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { AppState, FlatList, Modal, View } from "react-native";
+import { AppState, FlatList, Text, View } from "react-native";
 import { styled, VariableContextProvider } from "nativewind";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
@@ -17,7 +17,7 @@ import {
   type GuideLesson,
 } from "../../../../../packages/disposabl-kit/guides";
 import { Label, Touch } from "./ui";
-import { useTheme } from "../../../../../packages/disposabl-kit/mobile/design/use-theme";
+import { GuideSocial } from "./guide-social";
 import { guideAssetUri } from "./guide-media";
 
 const VideoView = styled(ExpoVideoView);
@@ -27,12 +27,14 @@ function LessonVideo({
   lesson,
   active,
   paused,
+  muted,
   setPaused,
   onError,
 }: {
   lesson: GuideLesson;
   active: boolean;
   paused: boolean;
+  muted: boolean;
   setPaused: React.Dispatch<React.SetStateAction<boolean>>;
   onError: () => void;
 }) {
@@ -42,6 +44,11 @@ function LessonVideo({
       instance.loop = true;
     },
   );
+  useEffect(() => {
+    // The Expo player is a native object whose muted property controls playback.
+    // eslint-disable-next-line react-hooks/immutability
+    player.muted = muted;
+  }, [player, muted]);
   useEventListener(player, "statusChange", ({ status }) => {
     if (status === "error") onError();
   });
@@ -91,7 +98,11 @@ function LessonPage({
   active,
   paused,
   setPaused,
-  openDescription,
+  expanded,
+  toggleDescription,
+  muted,
+  setMuted,
+  onCommentsChange,
 }: {
   lesson: GuideLesson;
   height: number;
@@ -99,7 +110,11 @@ function LessonPage({
   active: boolean;
   paused: boolean;
   setPaused: React.Dispatch<React.SetStateAction<boolean>>;
-  openDescription: () => void;
+  expanded: boolean;
+  toggleDescription: () => void;
+  muted: boolean;
+  setMuted: React.Dispatch<React.SetStateAction<boolean>>;
+  onCommentsChange: (open: boolean) => void;
 }) {
   const insets = useSafeAreaInsets();
   const [failed, setFailed] = useState(false);
@@ -125,6 +140,7 @@ function LessonPage({
             lesson={lesson}
             active={active}
             paused={paused}
+            muted={muted}
             setPaused={setPaused}
             onError={() => setFailed(true)}
           />
@@ -143,17 +159,40 @@ function LessonPage({
             </Touch>
           </View>
         )}
-        <Touch
-          label={`Show description for ${lesson.title}`}
-          onPress={openDescription}
-          className="absolute bottom-[var(--guide-bottom)] left-[20px] right-[20px] justify-center"
-        >
-          <View className="self-start rounded-[16px] bg-black/60 px-[14px] py-[10px]">
-            <Label color="white" variant="label" inline>
-              {lesson.title}
-            </Label>
-          </View>
-        </Touch>
+        {selected && (
+          <>
+            <Touch
+              label={`${expanded ? "Collapse" : "Expand"} description for ${lesson.title}`}
+              onPress={toggleDescription}
+              className="absolute bottom-[var(--guide-bottom)] left-[20px] right-[86px] justify-center"
+            >
+              <View className="self-start rounded-[18px] bg-black/65 px-[14px] py-[12px] gap-[4px]">
+                <Text className="text-white text-[13px] font-bold">
+                  @disposabl
+                </Text>
+                <Label color="white" variant="label" inline>
+                  {lesson.title}
+                </Label>
+                <Text
+                  className="text-white text-[14px] leading-[20px]"
+                  numberOfLines={expanded ? undefined : 1}
+                >
+                  {lesson.summary}
+                </Text>
+                <Text className="text-white/75 text-[12px]">
+                  {expanded ? "Less" : "More"}
+                </Text>
+              </View>
+            </Touch>
+            <GuideSocial
+              lessonId={lesson.id}
+              title={lesson.title}
+              muted={muted}
+              setMuted={setMuted}
+              onCommentsChange={onCommentsChange}
+            />
+          </>
+        )}
       </View>
     </VariableContextProvider>
   );
@@ -173,7 +212,6 @@ const legacyLessonIds: Record<string, string> = {
 export function GuideDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const c = useTheme();
   const insets = useSafeAreaInsets();
   const lessonId = legacyLessonIds[id] ?? id;
   const first = Math.max(
@@ -184,14 +222,15 @@ export function GuideDetailScreen() {
   const [paused, setPaused] = useState(false);
   const [height, setHeight] = useState(0);
   const [focused, setFocused] = useState(false);
-  const [description, setDescription] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [muted, setMuted] = useState(false);
   useFocusEffect(
     useCallback(() => {
       setFocused(true);
       return () => setFocused(false);
     }, []),
   );
-  const current = guideLessons[index];
   return (
     <VariableContextProvider
       value={{
@@ -230,6 +269,7 @@ export function GuideDetailScreen() {
               );
               if (next !== index) {
                 setPaused(false);
+                setExpanded(false);
                 setIndex(next);
               }
             }}
@@ -239,12 +279,14 @@ export function GuideDetailScreen() {
                 lesson={item}
                 height={height}
                 selected={i === index}
-                active={focused && i === index && !description}
+                active={focused && i === index && !commentsOpen}
                 paused={paused}
                 setPaused={setPaused}
-                openDescription={() => {
-                  if (i === index) setDescription(true);
-                }}
+                expanded={expanded}
+                toggleDescription={() => setExpanded((value) => !value)}
+                muted={muted}
+                setMuted={setMuted}
+                onCommentsChange={setCommentsOpen}
               />
             )}
           />
@@ -256,30 +298,6 @@ export function GuideDetailScreen() {
         >
           <MaterialIcons name="close" size={24} color="white" />
         </Touch>
-        <Modal
-          visible={description}
-          transparent
-          animationType="slide"
-          onRequestClose={() => setDescription(false)}
-        >
-          <View className="flex-1 justify-end bg-black/60">
-            <View className="rounded-t-[28px] bg-background px-[24px] pt-[20px] pb-[var(--guide-bottom)] gap-[16px]">
-              <View className="flex-row items-center justify-between gap-[12px]">
-                <View className="flex-1">
-                  <Label variant="heading">{current?.title ?? ""}</Label>
-                </View>
-                <Touch
-                  label="Close description"
-                  onPress={() => setDescription(false)}
-                  className="h-[48px] w-[48px] items-center justify-center"
-                >
-                  <MaterialIcons name="close" size={24} color={c.foreground} />
-                </Touch>
-              </View>
-              <Label>{current?.summary ?? ""}</Label>
-            </View>
-          </View>
-        </Modal>
       </View>
     </VariableContextProvider>
   );
