@@ -18,7 +18,7 @@ test("product privacy policy names connected and configured providers", () => {
   assert.equal(rendered.status, 0, rendered.stderr);
   const html = rendered.stdout;
   assert.doesNotMatch(html, /Draft documents/);
-  assert.match(html, /Effective 2026-11-16/);
+  assert.match(html, /Effective 2026-11-19/);
   for (const name of ["GitHub", "Expo", "Boat", "OpenAI", "Vercel", "Stripe"])
     assert.match(html, new RegExp(`${name}:`));
   const disclosure = privacy.sections.find(
@@ -55,7 +55,22 @@ test("product policy renders AI, retention and deletion instructions", () => {
   for (const [slug, expected] of [
     [
       "privacy",
-      ["OpenAI", "18 or older", "no fixed deletion date", "United States"],
+      [
+        "OpenAI",
+        "at least 13",
+        "permission from a parent or legal guardian",
+        "no fixed deletion date",
+        "United States",
+      ],
+    ],
+    [
+      "terms",
+      [
+        "watch public Guides without an account",
+        "at least 13",
+        "permission from a parent or legal guardian",
+        "additional age requirements",
+      ],
     ],
     [
       "delete-account",

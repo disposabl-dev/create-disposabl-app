@@ -9,9 +9,9 @@ export const publisher: Publisher = {
     reviewed: true,
     dataNotice:
       "We handle information about purchases, credit balances and compute use to provide billing, reconcile transactions and operate Agent Mode. If you connect a provider, we handle the account and authorization information needed for the connection. We store Guides likes to save your choices and count likes. In production, optional usage analytics are sent to PostHog only when you opt in; you can change your analytics choice in the app.",
-    effectiveDate: "2026-11-16",
+    effectiveDate: "2026-11-19",
     audience:
-      "Disposabl is intended for adults aged 18 or older. You must be at least 18 to create an account or use the service.",
+      "You can watch public Guides without an account. To create an account, you must be at least 13 and meet the minimum age requirements where you live. If you are under 18, you need permission from a parent or legal guardian. Connected providers and purchases may have additional age requirements.",
     retention:
       "We keep account and project information while your account is active and as needed to provide the service. When you request deletion, we schedule cleanup of your account, associated content, known files, connected credentials and identified managed sandbox. Requests may remain pending when external work or historical records need investigation. Your own GitHub, Convex, Vercel and Expo projects are not deleted. We retain transaction and compute records for reconciliation and applicable obligations, and pseudonymous identity and abuse-prevention fences to prevent reuse and protect the service. These fences currently have no fixed deletion date. Contact us for information about retention and unresolved records.",
     internationalTransfers:
