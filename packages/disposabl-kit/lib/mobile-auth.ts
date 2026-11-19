@@ -6,10 +6,25 @@ export const mobileAuthPath = "/oauth/mobile";
 
 export function mobileAuthCallback(url: string) {
   const callback = new URL(url);
-  const destination = new URL(callback.href);
-  destination.search = "";
-  if (destination.href !== mobileAuthReturnUrl)
-    throw new Error("Invalid sign-in return URL");
+  const expected = new URL(mobileAuthReturnUrl);
+  // Validate the destination, not URL serialization: native browsers can
+  // normalize an empty path to "/" or retain an empty fragment delimiter.
+  const mismatch = (
+    [
+      [callback.protocol === expected.protocol, "scheme"],
+      [
+        callback.hostname !== "" &&
+          callback.hostname.toLowerCase() === expected.hostname.toLowerCase(),
+        "host",
+      ],
+      [callback.port === "", "port"],
+      [callback.pathname === "" || callback.pathname === "/", "path"],
+      [callback.username === "" && callback.password === "", "credentials"],
+      [callback.hash === "", "fragment"],
+    ] as const
+  ).find(([matches]) => !matches)?.[1];
+  if (mismatch)
+    throw new Error("Invalid sign-in return URL", { cause: mismatch });
   return {
     code: callback.searchParams.get("convexAuthCode"),
     error: callback.searchParams.get("convexAuthError"),
