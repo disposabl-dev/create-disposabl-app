@@ -10,7 +10,7 @@ Install [Bun](https://bun.sh) 1.4.4 or newer, [Git](https://git-scm.com), and [N
 bunx create-disposabl-app@latest
 ```
 
-Choose your app's name and platforms. Web is always included, and app sign-in is enabled by default.
+Choose your app's name and platforms. A website is always included, and app sign-in is enabled by default.
 
 Setup asks you to sign in to [Disposabl](https://www.disposabl.dev) and connect GitHub and Convex. Mobile apps also need an Expo account. It creates your project and configures its development environment.
 
@@ -50,15 +50,15 @@ For example, create a web and mobile app with sign-in:
 bunx create-disposabl-app@latest my-app --platforms web,ios,android --yes
 ```
 
-| Option                          | What it does                                                                                                                                                          |
-| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--platforms <ids>`             | Choose `web`, `ios`, `android`, `macos`, `windows`, `linux`, `mcp`, `api`, `cli`, or `typescript-sdk`. Separate multiple choices with commas. Web is always included. |
-| `--android-architectures <ids>` | Choose Android ABIs for one APK. Defaults to `arm64-v8a,x86_64`; `armeabi-v7a` and `x86` are also supported.                                                          |
-| `--features <ids>`              | Choose features from `--list-options`, such as `authentication` and `docs`. The default is `authentication`. Use `--features none` to omit optional features.         |
-| `--yes`                         | Skip the name, platform, and feature questions. Supply an app name in the command.                                                                                    |
-| `--list-options`                | Show available platforms and features without creating an app.                                                                                                        |
-| `--skip-install`                | Create files without installing dependencies. Account setup still runs.                                                                                               |
-| `--json`                        | Return a result coding agents can read. Supply an app name. Account setup still runs.                                                                                 |
+| Option                          | What it does                                                                                                                                                                |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--platforms <ids>`             | Choose `web`, `ios`, `android`, `macos`, `windows`, `linux`, `mcp`, `api`, `cli`, or `typescript-sdk`. Separate multiple choices with commas. A website is always included. |
+| `--android-architectures <ids>` | Choose Android ABIs for one APK. Defaults to `arm64-v8a,x86_64`; `armeabi-v7a` and `x86` are also supported.                                                                |
+| `--features <ids>`              | Choose features from `--list-options`, such as `authentication` and `docs`. The default is `authentication`. Use `--features none` to omit optional features.               |
+| `--yes`                         | Skip the name, platform, and feature questions. Supply an app name in the command.                                                                                          |
+| `--list-options`                | Show available platforms and features without creating an app.                                                                                                              |
+| `--skip-install`                | Create files without installing dependencies. Account setup still runs.                                                                                                     |
+| `--json`                        | Return a result coding agents can read. Supply an app name. Account setup still runs.                                                                                       |
 
 CLI and TypeScript SDK include API support automatically. Backend authentication and access checks remain installed even with `--features none`.
 
@@ -112,7 +112,7 @@ Faster CI selects an eight-vCPU Linux runner for universal Android builds and a 
 
 ## Generator release checks
 
-Before publishing the generator, `bun run --cwd packages/create-disposabl-app build && bun run --cwd packages/create-disposabl-app verify:starter` creates fresh minimal-web, Web + Android, mobile-without-authentication, and all-platform projects. Each follows the CLI's formatting and installation steps, then runs the first CI frozen install, `bun run check`, its retained unit tests, and web and selected CLI/SDK builds. Pass `web-minimal`, `web-android`, `mobile-minimal`, or `all-platforms` after `verify:starter` to check one selection. These checks use no provider credentials and do not provision or deploy resources. Native builds and installed-app behavior still need the platform checks below.
+Before publishing the generator, `bun run --cwd packages/create-disposabl-app build && bun run --cwd packages/create-disposabl-app verify:starter` creates fresh projects for four configurations: website only, website with Android, mobile without authentication, and all platforms. Each follows the CLI's formatting and installation steps, then runs the first CI frozen install, `bun run check`, its retained unit tests, and web and selected CLI/SDK builds. Pass `web-minimal`, `web-android`, `mobile-minimal`, or `all-platforms` after `verify:starter` to check one selection. These checks use no provider credentials and do not provision or deploy resources. Native builds and installed-app behavior still need the platform checks below.
 
 Published generator releases can collect limited Disposabl usage analytics when centrally configured. They record the generator version, operating system, package-manager category and outcome, using a random ID that can be linked to your Disposabl user ID after login. They do not collect prompts, arguments, paths, error messages, credentials or email. Set `DO_NOT_TRACK=1` or `DISPOSABL_TELEMETRY_DISABLED=1` to opt out. Local source, development, CI and E2E runs do not send events. This is separate from analytics you configure for your own app.
 
