@@ -28,7 +28,7 @@ Setup uses the existing REST helper with API version `2.6.0`. It reads `features
 
 Any read error, including unauthorized or 404, stops setup without writes. A failed or uncertain create stops the invocation without an automatic retry. Rerun setup after checking the provider: the next run reads provider state and resumes from entries already created. Concurrent runs may collide and one may fail; rerunning preserves the winning entries. There is no cross-provider transaction, rollback or automatic reconciliation.
 
-`bun run dev` starts the backend with `convex dev --run billing:setup`. The Convex CLI runs it after the first successful push in each dev process. CI runs setup against the deployed target before uploading the web app. CI initializes the sandbox catalog for pull requests. Production can deploy while billing is pending, and checkout becomes available after live setup.
+`bun run dev` starts the backend with `convex dev --run billing:setup`. The Convex CLI runs it after the first successful push in each dev process. CI runs setup against the deployed target before uploading the web app. CI initializes the sandbox catalog for managed app pull requests. Disposabl’s own PR previews can deploy with checkout unavailable while a sandbox key is absent. Production can deploy while billing is pending, and checkout becomes available after live setup.
 
 For a manual retry, run from `packages/backend` with an explicit target: `bun x --no-install convex run --preview-name <channel> billing:setup '{"expectedEnvironment":"test"}'` for an existing preview, or `bun x --no-install convex run --prod billing:setup '{"expectedEnvironment":"live"}'` for production. For development, restart the existing dev process.
 

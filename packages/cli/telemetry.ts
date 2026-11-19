@@ -114,7 +114,7 @@ async function send(
   const response = await fetch(`${config.host}/i/v0/e/`, {
     method: "POST",
     redirect: "error",
-    signal: AbortSignal.timeout(500),
+    signal: AbortSignal.timeout(2000),
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       api_key: config.token,

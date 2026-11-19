@@ -31,6 +31,7 @@ export const setup = internalAction({
     expectedEnvironment: v.optional(
       v.union(v.literal("test"), v.literal("live")),
     ),
+    allowUnconfiguredPreview: v.optional(v.literal(true)),
   },
   returns: v.object({
     enabled: v.boolean(),
@@ -38,14 +39,23 @@ export const setup = internalAction({
     created: v.array(v.string()),
     preserved: v.array(v.string()),
   }),
-  handler: async (_ctx, args) =>
-    setupBilling(
+  handler: async (_ctx, args) => {
+    if (
+      paymentsEnabled &&
+      args.expectedEnvironment === "test" &&
+      args.allowUnconfiguredPreview &&
+      !process.env.AUTUMN_SECRET_KEY?.trim()
+    ) {
+      return { enabled: true, pending: true, created: [], preserved: [] };
+    }
+    return setupBilling(
       paymentsEnabled,
       process.env,
       undefined,
       undefined,
       args.expectedEnvironment,
-    ),
+    );
+  },
 });
 
 async function context(ctx: { auth: Auth }) {

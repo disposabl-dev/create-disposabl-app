@@ -19,6 +19,7 @@ test("catalog setup is internal, validated and runs on the dev deployment's firs
     expectedEnvironment: v.optional(
       v.union(v.literal("test"), v.literal("live")),
     ),
+    allowUnconfiguredPreview: v.optional(v.literal(true)),
   });
   assert.deepEqual(
     setup.returns,
@@ -71,7 +72,19 @@ case "$*" in *'convex run '*) exit "$SETUP_EXIT";; esac
       { mode: 0o755 },
     );
     const callsFile = join(temp, "calls");
-    for (const channel of ["production", "pr-42"]) {
+    for (const [channel, repository, setupArgs] of [
+      [
+        "production",
+        "disposabl-dev/create-disposabl-app",
+        '{"expectedEnvironment":"live"}',
+      ],
+      [
+        "pr-42",
+        "disposabl-dev/create-disposabl-app",
+        '{"expectedEnvironment":"test","allowUnconfiguredPreview":true}',
+      ],
+      ["pr-42", "owner/generated-app", '{"expectedEnvironment":"test"}'],
+    ]) {
       for (const setupExit of ["0", "1"]) {
         await writeFile(callsFile, "");
         const run = exec("bash", ["-e", "-c", deploy], {
@@ -82,6 +95,7 @@ case "$*" in *'convex run '*) exit "$SETUP_EXIT";; esac
             TRUSTED: "true",
             CONVEX_DEPLOY_KEY: "fixture",
             CHANNEL: channel,
+            GH_REPO: repository,
             CALLS: callsFile,
             SETUP_EXIT: setupExit,
           },
@@ -100,7 +114,7 @@ case "$*" in *'convex run '*) exit "$SETUP_EXIT";; esac
           channel === "production" ? "--prod" : "--preview-name pr-42";
         assert.equal(
           calls[offset + 1],
-          `x --no-install convex run ${target} billing:setup {"expectedEnvironment":"${channel === "production" ? "live" : "test"}"}`,
+          `x --no-install convex run ${target} billing:setup ${setupArgs}`,
         );
         assert.equal(calls.length, offset + (setupExit === "0" ? 3 : 2));
         if (setupExit === "0")
