@@ -5,6 +5,7 @@ export const provider = v.union(
   v.literal("convex"),
   v.literal("expo"),
   v.literal("posthog"),
+  v.literal("autumn"),
 );
 export const oauthProvider = v.union(
   v.literal("github"),
@@ -29,6 +30,7 @@ export const analyticsConfig = v.object({
   projectToken: v.string(),
   host: v.string(),
 });
+export const autumnPlatformAccount = "autumn-platform";
 export const connectionState = v.object({
   provider: oauthProvider,
   hash: v.string(),
@@ -54,6 +56,7 @@ export const connectionStatus = v.object({
   convex: v.union(v.object({ name: v.string() }), v.null()),
   expo: v.union(v.object({ name: v.string() }), v.null()),
   posthog: v.union(v.object({ name: v.string() }), v.null()),
+  autumn: v.boolean(),
   posthogPending: v.boolean(),
   ready: v.boolean(),
   missing: v.array(provider),
@@ -63,6 +66,7 @@ export const connectionStatus = v.object({
     convex: v.boolean(),
     expo: v.boolean(),
     posthog: v.boolean(),
+    autumn: v.boolean(),
   }),
   githubInstallUrl: v.union(v.string(), v.null()),
 });

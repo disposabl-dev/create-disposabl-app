@@ -676,15 +676,17 @@ export type ConnectionsStatusResponses = {
     posthog: {
       name: string;
     } | null;
+    autumn: boolean;
     posthogPending: boolean;
     ready: boolean;
-    missing: Array<"github" | "convex" | "expo" | "posthog">;
+    missing: Array<"github" | "convex" | "expo" | "posthog" | "autumn">;
     connectionsUrl: string;
     available: {
       github: boolean;
       convex: boolean;
       expo: boolean;
       posthog: boolean;
+      autumn: boolean;
     };
     githubInstallUrl: string | null;
   };

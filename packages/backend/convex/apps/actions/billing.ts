@@ -17,6 +17,7 @@ import {
   management,
   productionDeployment,
 } from "../../previews/token/actions/management";
+import { autumnPlatformKey } from "../../connections/actions/autumn";
 import {
   createTenant,
   requireLiveStripe,
@@ -111,7 +112,11 @@ export async function provisionPayments(
   const context = autumnContext(setup);
   const keys: AutumnKeys = tenant.encryptedKeys
     ? JSON.parse(unseal(tenant.encryptedKeys, context))
-    : await createTenant(setup.appId, tenant.ownerEmail);
+    : await createTenant(
+        await autumnPlatformKey(ctx, setup.userId),
+        setup.appId,
+        tenant.ownerEmail,
+      );
   if (!tenant.encryptedKeys)
     await ctx.runMutation(internal.apps.autumn.saveKeys, {
       ...setup,
@@ -148,7 +153,11 @@ export const beginStripe = internalAction({
     await ctx.runQuery(internal.apps.autumn.target, args);
     const redirect = new URL("/dashboard/billing", connectionsUrl());
     redirect.searchParams.set("appId", args.appId);
-    return stripeUrl(args.appId, redirect.href);
+    return stripeUrl(
+      await autumnPlatformKey(ctx, args.userId),
+      args.appId,
+      redirect.href,
+    );
   },
 });
 
@@ -168,7 +177,10 @@ export const enableLivePayments = internalAction({
         internal.apps.autumn.target,
         args,
       );
-      await requireLiveStripe(args.appId);
+      await requireLiveStripe(
+        await autumnPlatformKey(ctx, args.userId),
+        args.appId,
+      );
       const { token } = await credential(ctx, args.userId, "convex");
       const production = await productionDeployment(token, projectId);
       const convexUrl = new URL(production.deploymentUrl).origin;

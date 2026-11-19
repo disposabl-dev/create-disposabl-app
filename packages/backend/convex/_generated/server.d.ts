@@ -37,7 +37,6 @@ type Env = {
   readonly AUTH_GOOGLE_RELAY_SECRET: string | undefined;
   readonly AUTH_GOOGLE_RELAY_URL: string | undefined;
   readonly AUTH_REDIRECT_ORIGINS: string | undefined;
-  readonly AUTUMN_PLATFORM_KEY: string | undefined;
   readonly AUTUMN_SECRET_KEY: string | undefined;
   readonly BILLING_ENVIRONMENT: string | undefined;
   readonly BILLING_IOS_RETURN_CHANNELS: string | undefined;

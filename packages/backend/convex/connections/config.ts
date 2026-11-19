@@ -8,8 +8,10 @@ export const connectionsUrl = (features: readonly string[] = []) => {
     "/dashboard/connections",
     env.CONNECTIONS_ORIGIN || env.CONVEX_SITE_URL,
   );
-  if (features.includes("analytics"))
-    url.searchParams.set("features", "analytics");
+  const selected = features.filter(
+    (feature) => feature === "analytics" || feature === "payments",
+  );
+  if (selected.length) url.searchParams.set("features", selected.join(","));
   return url.href;
 };
 
@@ -32,7 +34,7 @@ export function requireConnections(
       code: "connections_required",
       missing,
       connectionsUrl: url.href,
-      message: `Connect ${missing.map((provider) => ({ github: "GitHub", convex: "Convex", posthog: "PostHog", expo: "Expo" })[provider]).join(" and ")} to continue setup. Your app choices and login are saved.`,
+      message: `Connect ${missing.map((provider) => ({ github: "GitHub", convex: "Convex", posthog: "PostHog", expo: "Expo", autumn: "Autumn" })[provider]).join(" and ")} to continue setup. Your app choices and login are saved.`,
     });
 }
 

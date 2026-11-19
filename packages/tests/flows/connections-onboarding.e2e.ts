@@ -82,7 +82,7 @@ test(
       await browser.evaluate(() =>
         [...document.querySelectorAll("main h2")].map((e) => e.textContent),
       ),
-    ).toEqual(["GitHub", "Convex", "Expo", "PostHog"]);
+    ).toEqual(["GitHub", "Convex", "Autumn", "Expo", "PostHog"]);
     await expect(
       screen.getByRole("button", "Continue", { exact: true }),
     ).toBeDisabled();
@@ -100,8 +100,8 @@ test(
     await expect(screen.getByText("Required for mobile")).toBeVisible();
     await expect(screen.getByText(/Required.*analytics/i)).toBeVisible();
     await expect(
-      screen.getByRole("button", "Connect Autumn", { exact: true }),
-    ).not.toBeVisible();
+      screen.getByText("Required for payments", { exact: true }),
+    ).toBeVisible();
     // A denied OAuth callback is safe to exercise without contacting a provider.
     await app.open(
       "/dashboard/connections?error=access_denied&code=discard&state=discard",
@@ -112,8 +112,24 @@ test(
     await expect(screen.getByText("Required for mobile")).toBeVisible();
     await expect(screen.getByText(/Required.*analytics/i)).toBeVisible();
     await expect(
-      screen.getByRole("button", "Connect Autumn", { exact: true }),
-    ).not.toBeVisible();
+      screen.getByText("Required for payments", { exact: true }),
+    ).toBeVisible();
+    if (process.env.E2E_CONNECTIONS_ENABLED === "1") {
+      await screen.getByRole("button", "Connect Autumn", { exact: true }).tap();
+      await expect(
+        screen.getByRole("link", "Open Autumn", { exact: true }),
+      ).toHaveAttribute("href", "https://app.useautumn.com");
+      await screen
+        .getByLabel("Platform API key", { exact: true })
+        .fill("invalid-key");
+      await screen
+        .getByRole("button", "Verify and connect", { exact: true })
+        .tap();
+      await expect(screen.getByRole("alert")).toContainText(
+        "Enter an Autumn API key",
+      );
+      await screen.getByRole("button", "Cancel", { exact: true }).tap();
+    }
     await app.open("/dashboard/billing");
     await expect(screen.getByRole("heading", "App billing")).toBeVisible();
     await expect(

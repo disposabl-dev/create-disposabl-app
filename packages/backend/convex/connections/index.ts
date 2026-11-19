@@ -33,6 +33,15 @@ export const status = query({
     });
   },
 });
+export const connectAutumn = action({
+  args: { platformKey: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args): Promise<null> =>
+    ctx.runAction(internal.connections.actions.autumn.connect, {
+      ...args,
+      userId: await requireUser(ctx),
+    }),
+});
 export const start = action({
   args: {
     provider: oauthProvider,

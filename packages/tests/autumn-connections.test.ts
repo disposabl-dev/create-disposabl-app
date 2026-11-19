@@ -5,6 +5,7 @@ import {
   createTenant,
   requireLiveStripe,
   stripeUrl,
+  validatePlatformKey,
 } from "../backend/convex/apps/actions/autumn";
 import {
   configureBillingDeployment,
@@ -15,10 +16,16 @@ import {
   seal,
   unseal,
 } from "../backend/convex/connections/actions/credentials";
+import {
+  connect,
+  autumnPlatformKey,
+} from "../backend/convex/connections/actions/autumn";
+import { autumnPlatformAccount } from "../backend/convex/connections/validator";
 import { connectionsUrl } from "../backend/convex/connections/config";
 
 const appId = "93299405-1234-4321-8d59-efdf91c9d828";
 const slug = "app-93299405123443218d59efdf91c9d828";
+const masterKey = "am_sk_test_platform_fixture";
 const sandbox = "am_sk_test_fixture";
 const live = "am_sk_live_fixture";
 const setup = { userId: "owner", appId, until: Date.now() + 60_000 };
@@ -35,8 +42,7 @@ const convex = {
 
 async function fixture(fetcher: typeof fetch, run: () => Promise<void>) {
   const originalFetch = globalThis.fetch;
-  const previous = { ...process.env };
-  process.env.AUTUMN_PLATFORM_KEY = "am_sk_test_platform_fixture";
+  const previous = process.env.CONNECTIONS_ENCRYPTION_KEY;
   process.env.CONNECTIONS_ENCRYPTION_KEY = Buffer.alloc(32, 8).toString(
     "base64",
   );
@@ -45,14 +51,12 @@ async function fixture(fetcher: typeof fetch, run: () => Promise<void>) {
     await run();
   } finally {
     globalThis.fetch = originalFetch;
-    for (const name of ["AUTUMN_PLATFORM_KEY", "CONNECTIONS_ENCRYPTION_KEY"]) {
-      if (previous[name] === undefined) delete process.env[name];
-      else process.env[name] = previous[name];
-    }
+    if (previous === undefined) delete process.env.CONNECTIONS_ENCRYPTION_KEY;
+    else process.env.CONNECTIONS_ENCRYPTION_KEY = previous;
   }
 }
 
-test("payments-off setup bypasses the managed tenant and payment setup asks for no Autumn connection", async () => {
+test("payments-off setup bypasses the managed tenant and setup links to Autumn only for payments", async () => {
   await provisionPayments(
     { runMutation: () => assert.fail("Unexpected tenant access") } as never,
     setup,
@@ -62,12 +66,16 @@ test("payments-off setup bypasses the managed tenant and payment setup asks for 
   const original = process.env.CONNECTIONS_ORIGIN;
   process.env.CONNECTIONS_ORIGIN = "https://disposabl.example";
   try {
-    assert.equal(new URL(connectionsUrl(["payments"])).search, "");
+    assert.equal(new URL(connectionsUrl([])).search, "");
+    assert.equal(
+      new URL(connectionsUrl(["payments"])).searchParams.get("features"),
+      "payments",
+    );
     assert.equal(
       new URL(connectionsUrl(["analytics", "payments"])).searchParams.get(
         "features",
       ),
-      "analytics",
+      "analytics,payments",
     );
   } finally {
     if (original === undefined) delete process.env.CONNECTIONS_ORIGIN;
@@ -85,6 +93,14 @@ test("managed app provisioning creates one tenant, saves scoped keys, and instal
     applyToExistingDeployments?: boolean;
   }> = [];
   const ctx = {
+    runQuery(ref: Parameters<typeof getFunctionName>[0], args: unknown) {
+      assert.equal(getFunctionName(ref), "connections/internal:get");
+      assert.deepEqual(args, { userId: "owner", provider: "autumn" });
+      return {
+        accountId: autumnPlatformAccount,
+        token: seal(masterKey, `owner:${autumnPlatformAccount}`),
+      };
+    },
     runMutation: (
       ref: Parameters<typeof getFunctionName>[0],
       args: typeof setup & { encryptedKeys?: string },
@@ -187,18 +203,25 @@ test("Stripe activation checks this tenant's live connection and validates OAuth
       });
     }) as typeof fetch,
     async () => {
-      await assert.rejects(requireLiveStripe(appId), /Connect live Stripe/);
+      await assert.rejects(
+        requireLiveStripe(masterKey, appId),
+        /Connect live Stripe/,
+      );
       assert.equal(
-        await stripeUrl(appId, "https://example.test/dashboard/billing"),
+        await stripeUrl(
+          masterKey,
+          appId,
+          "https://example.test/dashboard/billing",
+        ),
         url,
       );
       url = "https://unsafe.example/oauth";
       await assert.rejects(
-        stripeUrl(appId, "https://example.test/dashboard/billing"),
+        stripeUrl(masterKey, appId, "https://example.test/dashboard/billing"),
         /valid Stripe/,
       );
       connected = true;
-      await requireLiveStripe(appId);
+      await requireLiveStripe(masterKey, appId);
     },
   );
 });
@@ -212,7 +235,7 @@ test("Autumn's private preview denial is actionable and never leaks provider res
       )) as typeof fetch,
     async () => {
       await assert.rejects(
-        createTenant(appId, "owner@example.test"),
+        createTenant(masterKey, appId, "owner@example.test"),
         (error: unknown) => {
           assert.match(String(error), /Autumn denied Platform API access/);
           assert.doesNotMatch(String(error), /private provider response/);
@@ -326,7 +349,10 @@ test("live activation waits for Stripe and initializes only this app's productio
           finished++;
           return null;
         },
-        runQuery(ref: Parameters<typeof getFunctionName>[0]) {
+        runQuery(
+          ref: Parameters<typeof getFunctionName>[0],
+          args: { provider?: string },
+        ) {
           switch (getFunctionName(ref)) {
             case "apps/autumn:target":
               return {
@@ -340,6 +366,11 @@ test("live activation waits for Stripe and initializes only this app's productio
             case "users/internal:deletionPending":
               return false;
             case "connections/internal:get":
+              if (args.provider === "autumn")
+                return {
+                  accountId: autumnPlatformAccount,
+                  token: seal(masterKey, `${userId}:${autumnPlatformAccount}`),
+                };
               return { token: seal(convex.token, `${userId}:convex`) };
             default:
               return assert.fail("Unexpected query");
@@ -369,6 +400,84 @@ test("live activation waits for Stripe and initializes only this app's productio
         `${cloud}/api/function`,
       ]);
       assert.equal(finished, 2);
+    },
+  );
+});
+
+test("Connections verifies platform permission before saving an encrypted key for this user", async () => {
+  const userId = "owner";
+  let allowed = false;
+  const saved: Array<{
+    userId: string;
+    provider: string;
+    accountId: string;
+    token: string;
+  }> = [];
+  await fixture(
+    (async (url: string, init: RequestInit) => {
+      assert.equal(
+        url,
+        "https://api.useautumn.com/v1/platform/organizations?limit=1",
+      );
+      assert.equal(init.method, "GET");
+      assert.equal(
+        new Headers(init.headers).get("Authorization"),
+        `Bearer ${masterKey}`,
+      );
+      return allowed
+        ? Response.json({ list: [] })
+        : Response.json({}, { status: 403 });
+    }) as typeof fetch,
+    async () => {
+      const ctx = {
+        runMutation(
+          ref: Parameters<typeof getFunctionName>[0],
+          args: (typeof saved)[number],
+        ) {
+          assert.equal(getFunctionName(ref), "connections/internal:save");
+          saved.push(args);
+          return null;
+        },
+        runQuery(
+          ref: Parameters<typeof getFunctionName>[0],
+          args: { userId: string; provider: string },
+        ) {
+          assert.equal(getFunctionName(ref), "connections/internal:get");
+          assert.equal(args.provider, "autumn");
+          return saved.find((record) => record.userId === args.userId) ?? null;
+        },
+      };
+      const handler = (
+        connect as unknown as {
+          _handler: (
+            context: typeof ctx,
+            args: { userId: string; platformKey: string },
+          ) => Promise<null>;
+        }
+      )._handler;
+      await assert.rejects(
+        validatePlatformKey("ordinary"),
+        /Enter an Autumn API key/,
+      );
+      await assert.rejects(
+        handler(ctx, { userId, platformKey: masterKey }),
+        /approved for the Platform API/,
+      );
+      assert.equal(saved.length, 0);
+      allowed = true;
+      assert.equal(
+        await handler(ctx, { userId, platformKey: masterKey }),
+        null,
+      );
+      const record = saved[0];
+      assert.ok(record);
+      assert.equal(record.accountId, autumnPlatformAccount);
+      assert.notEqual(record.token, masterKey);
+      assert.equal(await autumnPlatformKey(ctx as never, userId), masterKey);
+      await assert.rejects(
+        autumnPlatformKey(ctx as never, "other-user"),
+        /Connect Autumn/,
+      );
     },
   );
 });

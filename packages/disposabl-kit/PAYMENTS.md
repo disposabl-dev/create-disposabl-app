@@ -82,7 +82,7 @@ Autumn documents a caller-supplied `balance_id`, not its atomic uniqueness and r
 
 ## Platform connection and starter packaging
 
-Disposabl uses a single Platform API credential to create a dedicated Autumn organization per managed app. Set `AUTUMN_PLATFORM_KEY` on the Disposabl backend using an Autumn master credential with Platform API access. This is separate from Disposabl’s own billing key. Disposabl stores each app’s credentials encrypted, installs its sandbox key in the named Convex development deployment, and applies it as the Preview default, including existing previews. The GitHub workflow initializes billing against that backend, so it needs no Autumn secret of its own.
+Connect your approved Autumn master organization once in **Dashboard → Connections**. Disposabl verifies Platform API access and stores the key encrypted on your account. New apps with Payments enabled get a dedicated Autumn organization. Disposabl installs each app’s sandbox key in Convex development and Preview defaults, including existing previews. The GitHub workflow reads billing configuration from that backend.
 
 To launch live web payments, open **Dashboard → App billing**, choose the app, and connect live Stripe. Finish setup after returning. Disposabl verifies the live Stripe connection, installs the app’s live key in its production Convex deployment, initializes the checkout return URL if needed, and sets up the live catalog.
 
