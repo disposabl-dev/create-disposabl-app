@@ -419,6 +419,7 @@ export const tick = internalAction({
           sent = await boat.prompt(ctx, {
             ...ref,
             provider: "codex",
+            model: "gpt-6.2-sol",
             prompt:
               `Disposabl delivery ${queued.messageId}\n` +
               credentialInstructions(current.appId) +
