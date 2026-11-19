@@ -1,6 +1,9 @@
 import { test } from "@e2e-dev/web";
 import { expect } from "e2e";
 
+const appStoreUrl =
+  "https://apps.apple.com/app/disposabl-build-apps-agents/id6805446871";
+
 // Marketing-only flows are removed from generated apps by reset.ts.
 test(
   "dedicated stack page preserves dependencies and carries choices into setup",
@@ -54,10 +57,13 @@ test(
 );
 
 test(
-  "coming soon downloads are inert and explain their status on focus",
+  "App Store download links work and Google Play explains its coming soon status",
   { platforms: ["web"], tags: ["landing"] },
   async ({ app, browser, screen }) => {
     await app.open("/");
+    await expect(
+      browser.locator('.maker-hero a[aria-label="Download on the App Store"]'),
+    ).toHaveAttribute("href", appStoreUrl);
     for (const width of [320, 390]) {
       await browser.setViewport({ width, height: 844 });
       const aligned = await browser.evaluate(() =>
@@ -77,25 +83,20 @@ test(
       );
       expect(aligned).toBe(true);
     }
-    for (const [index, name] of [
-      "Download on the App Store",
-      "Get it on Google Play",
-    ].entries()) {
-      await expect(
-        browser.locator(`.maker-hero .store-button`).nth(index),
-      ).toHaveAttribute("aria-disabled", "true");
-      await browser.evaluate((i) => {
-        document
-          .querySelectorAll<HTMLButtonElement>(".maker-hero .store-button")
-          [i].focus();
-        return true;
-      }, index);
-      await expect(
-        browser.locator(".maker-hero .store-tooltip").nth(index),
-      ).toBeVisible();
-      await browser.keyboard.press("Enter");
-      expect(new URL(await browser.url()).pathname).toBe("/");
-    }
+    await expect(
+      browser.locator('.maker-hero [aria-label="Get it on Google Play"]'),
+    ).toHaveAttribute("aria-disabled", "true");
+    await browser.evaluate(() => {
+      document
+        .querySelector<HTMLButtonElement>(
+          '.maker-hero [aria-label="Get it on Google Play"]',
+        )
+        ?.focus();
+      return true;
+    });
+    await expect(browser.locator(".maker-hero .store-tooltip")).toBeVisible();
+    await browser.keyboard.press("Enter");
+    expect(new URL(await browser.url()).pathname).toBe("/");
   },
 );
 
@@ -809,8 +810,8 @@ test(
     await expect(browser.locator(".maker-hero .command-start")).toHaveCount(0);
     await expect(browser.locator("footer .store-button")).toHaveCount(2);
     await expect(
-      browser.locator("footer .store-button").nth(0),
-    ).toHaveAttribute("aria-disabled", "true");
+      browser.locator('footer a[aria-label="Download on the App Store"]'),
+    ).toHaveAttribute("href", appStoreUrl);
     await expect(
       browser.locator("footer .store-button").nth(1),
     ).toHaveAttribute("aria-disabled", "true");
@@ -972,20 +973,19 @@ test(
       await expect(browser.locator(".start-dialog .store-button")).toHaveCount(
         2,
       );
-      for (const index of [0, 1]) {
-        await expect(
-          browser.locator(".start-dialog .store-button").nth(index),
-        ).toHaveAttribute("aria-disabled", "true");
-        await browser.evaluate((i) => {
-          document
-            .querySelectorAll<HTMLButtonElement>(".start-dialog .store-button")
-            [i]!.focus();
-          return true;
-        }, index);
-        await expect(
-          browser.locator(".start-dialog .store-tooltip").nth(index),
-        ).toBeVisible();
-      }
+      await expect(
+        browser.locator(
+          '.start-dialog a[aria-label="Download on the App Store"]',
+        ),
+      ).toHaveAttribute("href", appStoreUrl);
+      const play = browser.locator(
+        '.start-dialog button[aria-label="Get it on Google Play"]',
+      );
+      await expect(play).toHaveAttribute("aria-disabled", "true");
+      await play.focus();
+      await expect(
+        browser.locator(".start-dialog .store-tooltip"),
+      ).toBeVisible();
       const layout = await browser.evaluate(() => {
         const dialog = document
           .querySelector(".start-dialog")!

@@ -2,7 +2,7 @@ import { useAuthActions } from "@convex-dev/auth/react";
 import { useConvexAuth, useQuery } from "convex/react";
 import { router } from "expo-router";
 import { useState, type ReactNode } from "react";
-import { View } from "react-native";
+import { Platform, View } from "react-native";
 import Constants from "expo-constants";
 import * as Clipboard from "expo-clipboard";
 import { SettingsLinks } from "../components/settings-links";
@@ -194,9 +194,15 @@ function SignedInSettings({
 }
 
 function Version() {
-  return Constants.expoConfig?.version ? (
+  const config = Constants.expoConfig;
+  const version =
+    Platform.select({
+      ios: config?.ios?.version,
+      android: config?.android?.version,
+    }) || config?.version;
+  return version ? (
     <ThemedText className="mt-7 text-center text-[#71717a] dark:text-[#a1a1aa] text-[13px]">
-      Version {Constants.expoConfig.version}
+      Version {version}
     </ThemedText>
   ) : null;
 }

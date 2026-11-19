@@ -300,14 +300,14 @@ export function GuidePlayer({
         <button type="button" onClick={onClose} aria-label="Close guide player">
           <X size={23} />
         </button>
-        {failed.has(lessons[active]?.id) && (
+        {current && failedCurrent && (
           <button
             type="button"
             aria-label="Retry video"
             onClick={() =>
               setFailed((previous) => {
                 const next = new Set(previous);
-                next.delete(lessons[active].id);
+                next.delete(current.id);
                 return next;
               })
             }
@@ -315,7 +315,7 @@ export function GuidePlayer({
             <RotateCcw size={22} />
           </button>
         )}
-        {lessons[active]?.video?.uri && !failed.has(lessons[active].id) && (
+        {stream && !failedCurrent && (
           <>
             <button
               type="button"

@@ -123,17 +123,20 @@ export function registerPageRoutes(http: HttpRouter) {
             const value = response.headers.get(name);
             if (value) resultHeaders.set(name, value);
           }
-        const partial = response.headers
-          .get("Content-Range")
-          ?.match(/^bytes (\d+)-(\d+)\/(\d+)$/);
+        const [, start, end, size] =
+          response.headers
+            .get("Content-Range")
+            ?.match(/^bytes (\d+)-(\d+)\/(\d+)$/) ?? [];
         if (
           video &&
           response.status === 206 &&
-          partial &&
-          (+partial[1] > +partial[2] || +partial[2] >= +partial[3])
+          start &&
+          end &&
+          size &&
+          (+start > +end || +end >= +size)
         ) {
           await response.body?.cancel();
-          resultHeaders.set("Content-Range", `bytes */${partial[3]}`);
+          resultHeaders.set("Content-Range", `bytes */${size}`);
           resultHeaders.set("Content-Length", "0");
           return new Response(null, { status: 416, headers: resultHeaders });
         }

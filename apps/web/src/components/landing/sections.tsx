@@ -118,7 +118,7 @@ export const faqs = [
   ],
   [
     "Are the mobile builder and 85+ languages available now?",
-    "Not yet. The Disposabl mobile builder's App Store and Google Play links are placeholders marked Coming soon. Support for 85+ languages is also coming soon. You can already create iOS and Android app projects from your computer.",
+    "The Disposabl mobile builder is available on the App Store. Google Play and support for 85+ languages are coming soon. You can also create iOS and Android app projects from your computer.",
   ],
 ];
 
