@@ -52,60 +52,28 @@ export function ConnectionPanel({
   const c = useTheme();
   if (!connections)
     return <ActivityIndicator accessibilityLabel="Loading connections" />;
-  const completed =
-    Number(!!connections.github) +
-    Number(!!connections.convex) +
-    Number(expoRequired && !!connections.expo);
-  const total = expoRequired ? 3 : 2;
   const rows = [
     {
       id: "github",
       name: "GitHub",
-      detail: "A home for your code",
       account: connections.github?.owner,
     },
     {
       id: "convex",
       name: "Convex",
-      detail: "Your app’s data and backend",
       account: connections.convex?.name,
     },
     {
       id: "expo",
       name: "Expo",
-      detail: "For iOS and Android apps",
       account: connections.expo?.name,
     },
   ] as const;
   return (
     <View className="gap-[28px]">
-      <View className="gap-[12px]">
-        <Label variant="eyebrow" color={c.primaryText}>
-          {connections.ready ? "READY TO CREATE" : "YOUR WORKSPACE"}
-        </Label>
-        <Label variant="display">
-          {connections.ready
-            ? "You’re ready to build."
-            : "Your idea.\nYour accounts."}
-        </Label>
-        <Label color={c.mutedForeground}>
-          Connect once. Every app you create stays yours.
-        </Label>
-      </View>
-      <View className="gap-[10px]">
-        <View className="flex-row gap-[6px]">
-          {[0, 1].map((step) => (
-            <View
-              key={step}
-              className={`h-[4px] flex-1 rounded-[4px] ${completed > step ? "bg-primary-text" : "bg-border"}`}
-            />
-          ))}
-        </View>
-        <Label
-          variant="caption"
-          color={c.mutedForeground}
-        >{`${completed} of ${total} essentials connected`}</Label>
-      </View>
+      <Label color={c.mutedForeground}>
+        Connect once. Every app you create stays yours.
+      </Label>
       <View className="bg-card rounded-[24px] px-[20px]">
         {rows.map((row, index) => (
           <Pressable
@@ -121,7 +89,9 @@ export function ConnectionPanel({
               <Label variant="heading">{row.name}</Label>
               <Label variant="caption" color={c.mutedForeground}>
                 {row.account ??
-                  `${row.id === "expo" && !expoRequired ? "Optional" : "Required"} · ${row.detail}`}
+                  (row.id === "expo" && !expoRequired
+                    ? "Optional"
+                    : "Required")}
               </Label>
             </View>
             {row.account ? (
@@ -146,11 +116,6 @@ export function ConnectionPanel({
         </Text>
         <Icon name="arrow" color={c.background} size={18} />
       </Pressable>
-      {!connections.ready && (
-        <Label variant="caption" center color={c.mutedForeground}>
-          Secure setup opens in your browser.
-        </Label>
-      )}
       {connections.ready && (
         <Pressable
           accessibilityRole="button"

@@ -43,6 +43,63 @@ const step = (job: any, name: string) =>
 const hasRootCheck = (job: any) =>
   job.steps.some((item: any) => item.run === "bun run check");
 
+test("deployment exports public client origins for subsequent Expo steps", () => {
+  const command = step(pipeline.jobs.web, "Deploy").run.match(
+    /--cmd '([^']*)'/,
+  )[1];
+  for (const appId of [undefined, "fixture-app"]) {
+    const dir = mkdtempSync(join(tmpdir(), "deployment-origins-"));
+    try {
+      for (const path of ["bin", "packages/backend", ".github/scripts"])
+        mkdirSync(join(dir, path), { recursive: true });
+      writeFileSync(join(dir, "disposabl.json"), JSON.stringify({ appId }));
+      writeFileSync(
+        join(dir, "bin/bun"),
+        '#!/usr/bin/env bash\nif [[ "$1" == run ]]; then printf "%s\\n%s\\n" "$VITE_CONVEX_URL" "$VITE_CONVEX_SITE_URL" > "$BUILD_VARS"; fi\n',
+        { mode: 0o755 },
+      );
+      writeFileSync(
+        join(dir, ".github/scripts/disposabl.mjs"),
+        `import {appendFileSync} from "node:fs"; for (const file of [process.env.GITHUB_ENV, process.env.GITHUB_OUTPUT]) appendFileSync(file, "PUBLIC_SITE_URL=https://fixture.disposabl.xyz\\n");`,
+      );
+      const envFile = join(dir, "environment");
+      const output = join(dir, "output");
+      execFileSync("bash", ["-c", command], {
+        cwd: join(dir, "packages/backend"),
+        env: {
+          ...process.env,
+          PATH: `${join(dir, "bin")}:${process.env.PATH}`,
+          CONVEX_URL: "https://fixture.convex.cloud",
+          CONVEX_SITE_URL: "https://fixture.convex.site",
+          PUBLIC_SITE_URL: "",
+          GITHUB_ENV: envFile,
+          GITHUB_OUTPUT: output,
+          BUILD_VARS: join(dir, "build-vars"),
+          AUTH_TARGET: "--prod",
+        },
+      });
+      const expectedSite = appId
+        ? "https://fixture.disposabl.xyz"
+        : "https://fixture.convex.site";
+      const env = Object.fromEntries(
+        readFileSync(envFile, "utf8")
+          .trim()
+          .split("\n")
+          .map((line) => line.split("=")),
+      );
+      expect(env.CONVEX_SITE_URL).toBe("https://fixture.convex.site");
+      expect(env.PUBLIC_SITE_URL).toBe(expectedSite);
+      expect(env.EXPO_PUBLIC_CONVEX_URL).toBe("https://fixture.convex.cloud");
+      expect(env.EXPO_PUBLIC_CONVEX_SITE_URL).toBe(expectedSite);
+      expect(readFileSync(join(dir, "build-vars"), "utf8")).toBe(
+        `https://fixture.convex.cloud\n${expectedSite}\n`,
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+});
+
 function allowed(job: any, context: any, needs: any, cancelled = false) {
   const dependencies = Array.isArray(job.needs)
     ? job.needs

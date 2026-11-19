@@ -74,10 +74,11 @@ bun -e '
     // Web and mobile use the same backend from this deployment.
     const backend = /^(?:EXPO_PUBLIC_|VITE_)?(CONVEX_(?:URL|SITE_URL))$/.exec(key);
     if (backend) {
-      if (value !== process.env[backend[1]]) throw new Error(`EAS overrides the deployed backend: ${key}`);
+      const expected = backend[1] === "CONVEX_SITE_URL" ? process.env.PUBLIC_SITE_URL || process.env.CONVEX_SITE_URL : process.env.CONVEX_URL;
+      if (![process.env[backend[1]], expected].includes(value)) throw new Error(`EAS overrides the deployed backend: ${key}`);
       continue;
     }
-    if (/^(GITHUB_|RUNNER_|GH_|DISPOSABL_|ANDROID_|UPDATE_POLICY$|BUN_|CI$|NODE_OPTIONS$|PATH$|HOME$|SOURCE(_PATH)?$|CHANNEL$|PLATFORM$|RELEASE_PREFIX$|MACOS_|EAS_(ENVIRONMENT|CLI)$|EXPO_(TOKEN|PROJECT_ID|OWNER|SLUG|NO_DOTENV)$)/.test(key)) throw new Error(`Reserved EAS variable: ${key}`);
+    if (/^(GITHUB_|RUNNER_|GH_|DISPOSABL_|ANDROID_|UPDATE_POLICY$|PUBLIC_SITE_URL$|BUN_|CI$|NODE_OPTIONS$|PATH$|HOME$|SOURCE(_PATH)?$|CHANNEL$|PLATFORM$|RELEASE_PREFIX$|MACOS_|EAS_(ENVIRONMENT|CLI)$|EXPO_(TOKEN|PROJECT_ID|OWNER|SLUG|NO_DOTENV)$)/.test(key)) throw new Error(`Reserved EAS variable: ${key}`);
     if (key === "EXPO_PUBLIC_DISPOSABL_ANALYTICS_ENABLED") continue;
     effectiveEnv[key] = value;
     const delimiter = crypto.randomUUID();

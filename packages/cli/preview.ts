@@ -32,6 +32,8 @@ type Development = {
   convexSiteUrl: string;
   deployKey: string;
   productionConvexSiteUrl?: string;
+  publicSiteUrl?: string;
+  productionSiteUrl?: string;
   repositoryUrl?: string;
   analytics?: { projectId: number; projectToken: string; host: string };
 };
@@ -94,6 +96,13 @@ export async function configureDevelopment(
     !/^https:\/\/[a-z0-9-]+\.convex\.site$/.test(value.productionConvexSiteUrl)
   )
     throw new Error("Unexpected production Convex site URL.");
+  for (const url of [value.publicSiteUrl, value.productionSiteUrl]) {
+    if (
+      url !== undefined &&
+      !/^https:\/\/[a-z0-9]+(?:[a-z0-9-]*[a-z0-9])?\.disposabl\.xyz$/.test(url)
+    )
+      throw new Error("Unexpected public site URL.");
+  }
   if (config.features?.includes("analytics") && !value.analytics)
     throw new Error(
       "Analytics setup is incomplete. Connect PostHog and retry app setup.",
@@ -156,7 +165,14 @@ export async function configureDevelopment(
     if (ignored.status !== 0 || tracked.status !== 1)
       throw new Error(`${file} must be untracked and ignored by Git.`);
   }
-  if (value.productionConvexSiteUrl || value.analytics || config.analytics) {
+  if (
+    value.productionConvexSiteUrl ||
+    value.productionSiteUrl ||
+    value.analytics ||
+    config.analytics
+  ) {
+    if (value.productionSiteUrl)
+      config.productionSiteUrl = value.productionSiteUrl;
     if (value.productionConvexSiteUrl)
       config.productionConvexSiteUrl = value.productionConvexSiteUrl;
     // Project tokens are public ingestion configuration. OAuth credentials stay in Disposabl.
@@ -182,17 +198,18 @@ export async function configureDevelopment(
       CONVEX_DEPLOY_KEY: value.deployKey,
       CONVEX_URL: value.convexUrl,
       CONVEX_SITE_URL: value.convexSiteUrl,
+      ...(value.publicSiteUrl ? { PUBLIC_SITE_URL: value.publicSiteUrl } : {}),
     },
-    ["CONVEX_DEPLOYMENT"],
+    ["CONVEX_DEPLOYMENT", "PUBLIC_SITE_URL"],
   );
   await updateEnv(join(root, files[1]!), {
     VITE_CONVEX_URL: value.convexUrl,
-    VITE_CONVEX_SITE_URL: value.convexSiteUrl,
+    VITE_CONVEX_SITE_URL: value.publicSiteUrl ?? value.convexSiteUrl,
   });
   if (files[2])
     await updateEnv(join(root, files[2]), {
       EXPO_PUBLIC_CONVEX_URL: value.convexUrl,
-      EXPO_PUBLIC_CONVEX_SITE_URL: value.convexSiteUrl,
+      EXPO_PUBLIC_CONVEX_SITE_URL: value.publicSiteUrl ?? value.convexSiteUrl,
     });
 }
 

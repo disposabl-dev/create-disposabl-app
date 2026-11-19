@@ -11,11 +11,13 @@ import { defineApp } from "convex/server";
 
 const app = defineApp({
   env: {
+    PUBLIC_SITE_URL: v.optional(v.string()),
     R2_ACCOUNT_ID: v.optional(v.string()),
     R2_BUCKET_NAME: v.optional(v.string()),
     R2_ACCESS_KEY_ID: v.optional(v.string()),
     R2_SECRET_ACCESS_KEY: v.optional(v.string()),
     AUTUMN_SECRET_KEY: v.optional(v.string()),
+    BILLING_ENVIRONMENT: v.optional(v.string()),
     BILLING_RETURN_URL: v.optional(v.string()),
     MOBILE_WEB_CHECKOUT_ENABLED: v.optional(v.string()),
     BILLING_IOS_RETURN_CHANNELS: v.optional(v.string()),

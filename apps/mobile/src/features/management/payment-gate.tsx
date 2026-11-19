@@ -3,14 +3,13 @@ import { api } from "../../../../../packages/backend/convex/_generated/api";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState, Platform, Text, View } from "react-native";
 import { billingSession } from "../../../../../packages/disposabl-kit/mobile/billing/session";
-import { useWebCheckout } from "../../../../../packages/disposabl-kit/mobile/billing/web-checkout";
 import { useTopup } from "../../../../../packages/disposabl-kit/mobile/billing/use-topup";
 import { creditQuantity } from "../../../../../packages/disposabl-kit/payments/config";
 import { Action } from "../studio/ui";
 import { captureProductAction } from "../product-telemetry";
 import {
   monthlyOfferingId,
-  presentMonthlyPaywall,
+  purchaseMonthlySubscription,
   selectMonthlyOffering,
   type BillingSnapshot,
 } from "../../../../../packages/disposabl-kit/mobile/billing/paywall";
@@ -55,9 +54,12 @@ export function PaymentGate({
     Platform.OS === "ios"
       ? process.env.EXPO_PUBLIC_REVENUECAT_IOS_MONTHLY_PRODUCT
       : process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_MONTHLY_PRODUCT;
-  const [monthlyReadyFor, setMonthlyReadyFor] = useState<string | null>(null);
+  const [monthlyReadyFor, setMonthlyReadyFor] = useState<{
+    customerId: string;
+    price: string;
+  } | null>(null);
   useEffect(() => {
-    if (!monthlyOfferingId?.trim() || !key || !productId) return;
+    if (!key || !productId) return;
     let active = true;
     let sequence = 0;
     const update = async () => {
@@ -71,14 +73,18 @@ export function PaymentGate({
           async (sdk) => {
             const canPay = await sdk.canMakePayments();
             const offerings = await sdk.getOfferings();
-            return (
-              canPay &&
-              !!selectMonthlyOffering(offerings, productId, monthlyOfferingId)
+            const offering = selectMonthlyOffering(
+              offerings,
+              productId,
+              monthlyOfferingId,
             );
+            return canPay
+              ? offering?.availablePackages[0]?.product.priceString
+              : undefined;
           },
         );
         if (active && request === sequence && ready)
-          setMonthlyReadyFor(customerId);
+          setMonthlyReadyFor({ customerId, price: ready });
       } catch {
         // The selected offering remains unavailable until a successful refresh.
       }
@@ -92,11 +98,9 @@ export function PaymentGate({
       listener.remove();
     };
   }, [customerId, key, productId]);
-  const monthlyReady =
-    !monthlyOfferingId?.trim() || monthlyReadyFor === customerId;
-  const webSnapshot = useCallback(() => snapshot({}), [snapshot]);
-  const web = useWebCheckout(customerId, version, key, productId, webSnapshot);
-  const topup = useTopup(customerId, version, key, webSnapshot, refresh);
+  const monthlyReady = monthlyReadyFor?.customerId === customerId;
+  const fetchSnapshot = useCallback(() => snapshot({}), [snapshot]);
+  const topup = useTopup(customerId, version, key, fetchSnapshot, refresh);
   async function purchase() {
     if (
       !key ||
@@ -106,7 +110,6 @@ export function PaymentGate({
       data.hasMonthlyPlan !== false ||
       data.monthlyCheckoutPending !== false ||
       busy ||
-      web.busy ||
       !billingSession.current(customerId, version.current) ||
       topup.busy
     )
@@ -119,18 +122,17 @@ export function PaymentGate({
     setError("");
     try {
       await billingSession.run(customerId, generation, key, (sdk) =>
-        presentMonthlyPaywall(
+        purchaseMonthlySubscription(
           sdk,
           () => snapshot({}),
           current,
           productId,
-          undefined,
           monthlyOfferingId,
         ),
       );
       if (current()) await refresh();
     } catch (error) {
-      if (current())
+      if (current() && !(error as { userCancelled?: boolean })?.userCancelled)
         setError(
           error instanceof Error &&
             error.message ===
@@ -143,26 +145,17 @@ export function PaymentGate({
       if (current()) setBusy(false);
     }
   }
-  function checkout(
-    kind: "native_topup" | "website_monthly" | "website_topup",
-  ) {
+  function checkout() {
     if (
       !key ||
       busy ||
-      web.busy ||
       topup.busy ||
       !billingSession.current(customerId, version.current)
     )
       return;
-    if (kind === "native_topup" && topup.product) {
+    if (topup.product) {
       captureProductAction("billing_native_topup_attempt");
       void topup.purchase();
-    } else if (kind === "website_monthly" && web.available && productId) {
-      captureProductAction("billing_website_monthly_attempt");
-      void web.open();
-    } else if (kind === "website_topup" && web.topupAvailable) {
-      captureProductAction("billing_website_topup_attempt");
-      void web.open("topup");
     }
   }
   return (
@@ -192,39 +185,16 @@ export function PaymentGate({
       productId &&
       monthlyReady ? (
         <Action
-          label="View subscription"
+          label={`${creditQuantity("monthly")} credits · ${monthlyReadyFor?.price}/month`}
           onPress={() => void purchase()}
-          disabled={
-            busy ||
-            web.busy ||
-            topup.busy ||
-            data.monthlyCheckoutPending !== false
-          }
+          disabled={busy || topup.busy || data.monthlyCheckoutPending !== false}
         />
-      ) : (
-        <Text className="text-muted-foreground">
-          Store purchases are unavailable for this account.
-        </Text>
-      )}
-      {web.available && (
-        <Action
-          label="Buy monthly on website"
-          onPress={() => checkout("website_monthly")}
-          disabled={busy || web.busy || topup.busy}
-        />
-      )}
+      ) : null}
       {topup.product && (
         <Action
           label={`Buy ${creditQuantity("topup")} credits · ${topup.product.priceString}`}
-          onPress={() => checkout("native_topup")}
-          disabled={busy || web.busy || topup.busy}
-        />
-      )}
-      {web.topupAvailable && (
-        <Action
-          label="Buy top-up on website"
-          disabled={busy || web.busy || topup.busy}
-          onPress={() => checkout("website_topup")}
+          onPress={checkout}
+          disabled={busy || topup.busy}
         />
       )}
       {!!topup.message && (
@@ -248,11 +218,6 @@ export function PaymentGate({
       {!!error && (
         <Text accessibilityRole="alert" className="text-destructive">
           {error}
-        </Text>
-      )}
-      {!!web.error && (
-        <Text accessibilityRole="alert" className="text-muted-foreground">
-          {web.error}
         </Text>
       )}
     </View>

@@ -24,7 +24,13 @@ import { AuthButton, AuthScreen, authClasses } from "./auth-ui";
 import { GoogleSignIn } from "./google-sign-in";
 import { BrandMark } from "../design/brand-mark";
 
-export function AuthForm({ mode }: { mode: "login" | "signup" }) {
+export function AuthForm({
+  mode,
+  initialGoogleEnabled = false,
+}: {
+  mode: "login" | "signup";
+  initialGoogleEnabled?: boolean;
+}) {
   const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
   const { signIn, pending: signingIn } = useSignInWithUsernamePassword(
     api.auth,
@@ -105,7 +111,9 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
               : "Choose a username and password."
             : "Use the same account as the website."}
       </Text>
-      {providers?.google && <GoogleSignIn disabled={pending} />}
+      {(providers?.google ?? initialGoogleEnabled) && (
+        <GoogleSignIn disabled={pending} />
+      )}
       {providers?.googleOnly && !providers.google && (
         <Text className={authClasses.error}>
           Sign-in is temporarily unavailable. Please try again later.

@@ -22,6 +22,7 @@ import { validateReference } from "../../internal";
 import { ensureDevelopment, productionDeployment } from "./management";
 import { provisionPayments } from "../../../apps/actions/billing";
 import { analyticsConfig } from "../../../connections/validator";
+import { configurePublicOrigin } from "../../../gateway/actions/origin";
 
 export const create = internalAction({
   args: {
@@ -35,6 +36,8 @@ export const create = internalAction({
     ...deployment.fields,
     deployKey: v.string(),
     productionConvexSiteUrl: v.optional(v.string()),
+    publicSiteUrl: v.optional(v.string()),
+    productionSiteUrl: v.optional(v.string()),
     repositoryUrl: v.optional(v.string()),
     analytics: v.optional(analyticsConfig),
     configurationLeaseUntil: v.optional(v.number()),
@@ -50,6 +53,8 @@ export const create = internalAction({
     convexSiteUrl: string;
     deployKey: string;
     productionConvexSiteUrl?: string;
+    publicSiteUrl?: string;
+    productionSiteUrl?: string;
     repositoryUrl?: string;
     analytics?: { projectId: number; projectToken: string; host: string };
     configurationLeaseUntil?: number;
@@ -94,14 +99,33 @@ export const create = internalAction({
         projectId,
         args.reference,
       );
-      await provisionPayments(
-        ctx,
-        args.userId,
-        features,
-        token,
-        { ...deployment, deployKey, kind: "dev" },
-        production,
+      const productionSiteUrl = await ctx.runMutation(
+        internal.gateway.internal.register,
+        {
+          ...identity,
+          origin: production.deploymentUrl.replace(
+            /\.convex\.cloud\/?$/,
+            ".convex.site",
+          ),
+        },
       );
+      const publicSiteUrl = await ctx.runMutation(
+        internal.gateway.internal.register,
+        {
+          ...preview,
+          origin: deployment.convexSiteUrl,
+        },
+      );
+      await configurePublicOrigin(
+        deployment.convexUrl,
+        deployKey,
+        publicSiteUrl,
+      );
+      await provisionPayments(ctx, { ...identity, until }, features, {
+        token,
+        projectId,
+        development: { ...deployment, deployKey, kind: "dev", publicSiteUrl },
+      });
       await ctx.runMutation(internal.previews.internal.finish, {
         ...preview,
         deployment,
@@ -125,6 +149,8 @@ export const create = internalAction({
         ...(retainLease ? { configurationLeaseUntil: until } : {}),
         ...deployment,
         deployKey,
+        publicSiteUrl,
+        productionSiteUrl,
         productionConvexSiteUrl: production.deploymentUrl.replace(
           /\.convex\.cloud\/?$/,
           ".convex.site",

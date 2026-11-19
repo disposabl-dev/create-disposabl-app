@@ -29,6 +29,8 @@ export const create = internalAction({
     ...deployment.fields,
     deployKey: v.string(),
     productionConvexSiteUrl: v.optional(v.string()),
+    publicSiteUrl: v.optional(v.string()),
+    productionSiteUrl: v.optional(v.string()),
     repositoryUrl: v.optional(v.string()),
     analytics: v.optional(analyticsConfig),
     configurationLeaseUntil: v.optional(v.number()),
@@ -44,6 +46,8 @@ export const create = internalAction({
     convexSiteUrl: string;
     deployKey: string;
     productionConvexSiteUrl?: string;
+    publicSiteUrl?: string;
+    productionSiteUrl?: string;
     repositoryUrl?: string;
     analytics?: { projectId: number; projectToken: string; host: string };
     configurationLeaseUntil?: number;

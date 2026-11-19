@@ -19,6 +19,7 @@ import {
   balanceFromCustomer,
   monthlyPlanFromCustomer,
   billingContext,
+  billingKey,
   billingRequest,
   purchaseRequest,
   mobileWebCheckoutConfigured,
@@ -26,20 +27,34 @@ import {
 } from "./billing";
 
 export const setup = internalAction({
-  args: { preview: v.optional(v.literal(true)) },
+  args: {
+    expectedEnvironment: v.optional(
+      v.union(v.literal("test"), v.literal("live")),
+    ),
+    allowUnconfiguredPreview: v.optional(v.literal(true)),
+  },
   returns: v.object({
     enabled: v.boolean(),
+    pending: v.boolean(),
     created: v.array(v.string()),
     preserved: v.array(v.string()),
   }),
-  handler: async (_ctx, { preview }) => {
-    if (!paymentsEnabled || !preview)
-      return setupBilling(paymentsEnabled, process.env);
-
-    const key = process.env.AUTUMN_SECRET_KEY?.trim();
-    if (key && !key.startsWith("am_sk_test_"))
-      throw new Error("Preview billing requires an Autumn sandbox key.");
-    return setupBilling(Boolean(key), process.env);
+  handler: async (_ctx, args) => {
+    if (
+      paymentsEnabled &&
+      args.expectedEnvironment === "test" &&
+      args.allowUnconfiguredPreview &&
+      !process.env.AUTUMN_SECRET_KEY?.trim()
+    ) {
+      return { enabled: true, pending: true, created: [], preserved: [] };
+    }
+    return setupBilling(
+      paymentsEnabled,
+      process.env,
+      undefined,
+      undefined,
+      args.expectedEnvironment,
+    );
   },
 });
 
@@ -241,8 +256,25 @@ export const createSnapshot = (eligibility?: BillingEligibility) =>
       checkoutNeedsReview: v.boolean(),
       monthlyCheckoutPending: v.boolean(),
       customerId: v.string(),
+      billingPending: v.optional(v.boolean()),
     }),
     handler: async (ctx) => {
+      if (paymentsEnabled && !billingKey(process.env)) {
+        const userId = await getSessionUserId(ctx);
+        if (!userId) throw new Error("Please sign in to use payments.");
+        await eligibility?.(ctx, userId);
+        return {
+          balance: null,
+          hasMonthlyPlan: null,
+          nativeSubscriptionsEnabled: false,
+          nativeTopupRoutes: [],
+          mobileWebCheckoutEnabled: false,
+          checkoutNeedsReview: false,
+          monthlyCheckoutPending: false,
+          customerId: userId,
+          billingPending: true,
+        };
+      }
       const { key, userId } = await context(ctx);
       await eligibility?.(ctx, userId);
       try {

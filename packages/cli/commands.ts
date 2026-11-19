@@ -210,7 +210,12 @@ export async function runCli(
               );
             } else if (tokenCreate && options.configure) {
               await configureDevelopment(options.configure, value);
-              const { deployKey: _secret, ...details } = value;
+              const {
+                deployKey: _secret,
+                convexSiteUrl: _provider,
+                productionConvexSiteUrl: _productionProvider,
+                ...details
+              } = value;
               console.log(
                 JSON.stringify({ ...details, configured: true }, null, 2),
               );

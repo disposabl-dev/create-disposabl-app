@@ -13,7 +13,6 @@ export default function Settings() {
       sections={<AnalyticsPreference />}
       accountRows={
         <>
-          <AiConsentPreference />
           <PreferenceRow
             icon={{ ios: "link", android: "link" }}
             label="Manage connections"
@@ -22,6 +21,7 @@ export default function Settings() {
               router.push("/connections");
             }}
           />
+          <AiConsentPreference />
         </>
       }
     />

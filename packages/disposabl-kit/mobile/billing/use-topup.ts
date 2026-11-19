@@ -100,12 +100,8 @@ export function useTopup(
       if (current())
         setMessage("Purchase received. Credits appear after payment sync.");
     } catch (error) {
-      if (current())
-        setMessage(
-          (error as { userCancelled?: boolean })?.userCancelled
-            ? "Purchase cancelled."
-            : "Store purchase unavailable. Refresh before trying again.",
-        );
+      if (current() && !(error as { userCancelled?: boolean })?.userCancelled)
+        setMessage("Store purchase unavailable. Refresh before trying again.");
     } finally {
       billingSession.endTransaction();
       if (current()) setBusy(false);

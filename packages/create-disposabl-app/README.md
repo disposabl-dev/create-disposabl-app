@@ -19,7 +19,7 @@ When setup finishes:
 ```sh
 cd my-app
 bun run dev
-bun run disposabl login status # installed management CLI
+bunx --package create-disposabl-app@latest disposabl login status
 ```
 
 Use the app name you chose instead of `my-app`. Your website opens automatically. Mobile apps need a development build before you can open them on a device; they do not use Expo Go. See the generated `apps/mobile/README.md` for the next steps.
@@ -101,6 +101,8 @@ bunx --package create-disposabl-app disposabl previews token create --configure 
 ```
 
 Push the generated initial commit to `main` before opening feature pull requests. A same-repository pull request to `main` starts a CI preview; changes pushed to `main` start the production workflow. A feature branch push by itself does not deploy. Desktop installers build only on pushes to `main`, when their inputs change; PRs retain web and mobile previews. Build and delivery requirements depend on the selected platforms.
+
+Before pushing implementation commits, run `bun run check:preview` from a clean checkout of the intended commit with the app's development web URLs configured. It runs the pipeline checks and a production web build locally. When you change Convex functions or schemas, run `bun run dev` to regenerate the bindings and commit the changes under `packages/backend/convex/_generated` with the source.
 
 See the [coding-agent guide](https://github.com/disposabl-dev/create-disposabl-app/blob/main/packages/skill/SKILL.md) for the full delivery workflow, or [report a problem](https://github.com/disposabl-dev/create-disposabl-app/issues).
 

@@ -33,6 +33,7 @@ import { Route as DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalP
 import { Route as DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalPrivacyRequestRouteImport } from './../../../packages/disposabl-kit/client/routes/legal/privacy-request'
 import { Route as DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalTermsRouteImport } from './../../../packages/disposabl-kit/client/routes/legal/terms'
 import { Route as AuthenticatedDashboardDotapiKeysRouteImport } from './router/_authenticated/dashboard.api-keys'
+import { Route as AuthenticatedDashboardDotbillingRouteImport } from './router/_authenticated/dashboard.billing'
 import { Route as AuthenticatedDashboardDotconnectionsRouteImport } from './router/_authenticated/dashboard.connections'
 
 const DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesRouteRoute =
@@ -224,6 +225,12 @@ const AuthenticatedDashboardDotapiKeysRoute =
     path: '/api-keys',
     getParentRoute: () => AuthenticatedDashboardRoute,
   } as any)
+const AuthenticatedDashboardDotbillingRoute =
+  AuthenticatedDashboardDotbillingRouteImport.update({
+    id: '/billing',
+    path: '/billing',
+    getParentRoute: () => AuthenticatedDashboardRoute,
+  } as any)
 const AuthenticatedDashboardDotconnectionsRoute =
   AuthenticatedDashboardDotconnectionsRouteImport.update({
     id: '/connections',
@@ -254,6 +261,7 @@ export interface FileRoutesByFullPath {
   '/legal/privacy-request': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalPrivacyRequestRoute
   '/legal/terms': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalTermsRoute
   '/dashboard/api-keys': typeof AuthenticatedDashboardDotapiKeysRoute
+  '/dashboard/billing': typeof AuthenticatedDashboardDotbillingRoute
   '/dashboard/connections': typeof AuthenticatedDashboardDotconnectionsRoute
 }
 export interface FileRoutesByTo {
@@ -279,6 +287,7 @@ export interface FileRoutesByTo {
   '/legal/privacy-request': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalPrivacyRequestRoute
   '/legal/terms': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalTermsRoute
   '/dashboard/api-keys': typeof AuthenticatedDashboardDotapiKeysRoute
+  '/dashboard/billing': typeof AuthenticatedDashboardDotbillingRoute
   '/dashboard/connections': typeof AuthenticatedDashboardDotconnectionsRoute
 }
 export interface FileRoutesById {
@@ -307,6 +316,7 @@ export interface FileRoutesById {
   '/_providers/legal/privacy-request': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalPrivacyRequestRoute
   '/_providers/legal/terms': typeof DotDotDotDotDotDotDotDotPackagesDisposablKitClientRoutesLegalTermsRoute
   '/_providers/_authenticated/dashboard/api-keys': typeof AuthenticatedDashboardDotapiKeysRoute
+  '/_providers/_authenticated/dashboard/billing': typeof AuthenticatedDashboardDotbillingRoute
   '/_providers/_authenticated/dashboard/connections': typeof AuthenticatedDashboardDotconnectionsRoute
 }
 export interface FileRouteTypes {
@@ -334,6 +344,7 @@ export interface FileRouteTypes {
     | '/legal/privacy-request'
     | '/legal/terms'
     | '/dashboard/api-keys'
+    | '/dashboard/billing'
     | '/dashboard/connections'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -359,6 +370,7 @@ export interface FileRouteTypes {
     | '/legal/privacy-request'
     | '/legal/terms'
     | '/dashboard/api-keys'
+    | '/dashboard/billing'
     | '/dashboard/connections'
   id:
     | '__root__'
@@ -386,6 +398,7 @@ export interface FileRouteTypes {
     | '/_providers/legal/privacy-request'
     | '/_providers/legal/terms'
     | '/_providers/_authenticated/dashboard/api-keys'
+    | '/_providers/_authenticated/dashboard/billing'
     | '/_providers/_authenticated/dashboard/connections'
   fileRoutesById: FileRoutesById
 }
@@ -563,6 +576,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardDotapiKeysRouteImport
       parentRoute: typeof AuthenticatedDashboardRoute
     }
+    '/_providers/_authenticated/dashboard/billing': {
+      id: '/_providers/_authenticated/dashboard/billing'
+      path: '/billing'
+      fullPath: '/dashboard/billing'
+      preLoaderRoute: typeof AuthenticatedDashboardDotbillingRouteImport
+      parentRoute: typeof AuthenticatedDashboardRoute
+    }
     '/_providers/_authenticated/dashboard/connections': {
       id: '/_providers/_authenticated/dashboard/connections'
       path: '/connections'
@@ -575,6 +595,7 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedDashboardRouteChildren {
   AuthenticatedDashboardDotapiKeysRoute: typeof AuthenticatedDashboardDotapiKeysRoute
+  AuthenticatedDashboardDotbillingRoute: typeof AuthenticatedDashboardDotbillingRoute
   AuthenticatedDashboardDotconnectionsRoute: typeof AuthenticatedDashboardDotconnectionsRoute
 }
 
@@ -582,6 +603,8 @@ const AuthenticatedDashboardRouteChildren: AuthenticatedDashboardRouteChildren =
   {
     AuthenticatedDashboardDotapiKeysRoute:
       AuthenticatedDashboardDotapiKeysRoute,
+    AuthenticatedDashboardDotbillingRoute:
+      AuthenticatedDashboardDotbillingRoute,
     AuthenticatedDashboardDotconnectionsRoute:
       AuthenticatedDashboardDotconnectionsRoute,
   }

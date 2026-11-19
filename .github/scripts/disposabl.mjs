@@ -67,6 +67,18 @@ if (config.appId) {
     const result = await call("/github/token", {});
     console.log(`::add-mask::${result.token}`);
     await appendFile(process.env.GITHUB_ENV, `GH_TOKEN=${result.token}\n`);
+  } else if (command === "site") {
+    const { url } = await call("/github/site", {
+      convexSiteUrl: process.env.CONVEX_SITE_URL,
+    });
+    if (
+      typeof url !== "string" ||
+      !/^https:\/\/[a-z0-9]+(?:[a-z0-9-]*[a-z0-9])?\.disposabl\.xyz$/.test(url)
+    )
+      throw new Error("Unexpected public site URL.");
+    await appendFile(process.env.GITHUB_ENV, `PUBLIC_SITE_URL=${url}\n`);
+    await appendFile(process.env.GITHUB_OUTPUT, `PUBLIC_SITE_URL=${url}\n`);
+    console.log(`Public site: ${url}`);
   } else if (command === "report") {
     for (const name of platform
       .split(",")

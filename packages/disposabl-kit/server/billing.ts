@@ -2,17 +2,31 @@ import { pricing, creditQuantity, type Pricing } from "../payments/config";
 
 export type { Purchase } from "../payments/config";
 
+export function billingKey(env: Record<string, string | undefined>) {
+  const key = env.AUTUMN_SECRET_KEY?.trim();
+  if (
+    !key ||
+    (env.BILLING_ENVIRONMENT === "live" && !/^am_sk_live_\S+$/.test(key))
+  )
+    return undefined;
+  return key;
+}
+
 export function billingConfig(
   enabled: boolean,
   env: Record<string, string | undefined>,
 ) {
   if (!enabled) return null;
-  const key = env.AUTUMN_SECRET_KEY?.trim();
+  const key = billingKey(env);
+  if (!key) throw new Error("Payments are not configured.");
   const returnUrl = env.BILLING_RETURN_URL?.trim();
-  if (!key || !returnUrl) throw new Error("Payments are not configured.");
+  const useSandboxOrigin = !returnUrl && key.startsWith("am_sk_test_");
+  const target = useSandboxOrigin
+    ? env.PUBLIC_SITE_URL?.trim() || env.CONVEX_SITE_URL?.trim()
+    : returnUrl;
   let url: URL;
   try {
-    url = new URL(returnUrl);
+    url = new URL(target ?? "");
   } catch {
     throw new Error("Payments are not configured.");
   }
@@ -21,6 +35,7 @@ export function billingConfig(
     url.password ||
     url.search ||
     url.hash ||
+    (useSandboxOrigin && url.pathname !== "/") ||
     (url.protocol !== "https:" &&
       !(
         url.protocol === "http:" &&
@@ -28,6 +43,7 @@ export function billingConfig(
       ))
   )
     throw new Error("Payments are not configured.");
+  if (useSandboxOrigin) url.pathname = "/pricing";
   return { key, returnUrl: url.toString() };
 }
 

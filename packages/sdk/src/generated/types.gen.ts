@@ -676,19 +676,15 @@ export type ConnectionsStatusResponses = {
     posthog: {
       name: string;
     } | null;
-    autumn: {
-      name: string;
-    } | null;
     posthogPending: boolean;
     ready: boolean;
-    missing: Array<"github" | "convex" | "expo" | "posthog" | "autumn">;
+    missing: Array<"github" | "convex" | "expo" | "posthog">;
     connectionsUrl: string;
     available: {
       github: boolean;
       convex: boolean;
       expo: boolean;
       posthog: boolean;
-      autumn: boolean;
     };
     githubInstallUrl: string | null;
   };
@@ -951,6 +947,8 @@ export type PreviewsTokenCreateResponses = {
     convexSiteUrl: string;
     deployKey: string;
     productionConvexSiteUrl?: string;
+    publicSiteUrl?: string;
+    productionSiteUrl?: string;
     repositoryUrl?: string;
     analytics?: {
       projectId: number;

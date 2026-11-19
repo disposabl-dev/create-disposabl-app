@@ -108,6 +108,8 @@ test(
             reference: "main",
             convexUrl: "https://fixture-dev.convex.cloud",
             convexSiteUrl: "https://fixture-dev.convex.site",
+            publicSiteUrl: "https://fixture-main.disposabl.xyz",
+            productionSiteUrl: "https://fixture.disposabl.xyz",
             deployKey: failConfig ? "invalid" : "dev:fixture-dev|fixture",
             ...(missingReceipt ? {} : { configurationLeaseUntil: 12345 }),
           }),
@@ -194,6 +196,27 @@ test(
         if (scenario === "success") {
           assert.equal(code, 0, output);
           assert.equal(complete.length, 1);
+          assert.match(
+            readFileSync(join(app, "apps/web/.env.local"), "utf8"),
+            /VITE_CONVEX_SITE_URL="https:\/\/fixture-main\.disposabl\.xyz"/,
+          );
+          assert.match(
+            readFileSync(join(app, "packages/backend/.env.local"), "utf8"),
+            /CONVEX_SITE_URL="https:\/\/fixture-dev\.convex\.site"/,
+          );
+          execFileSync(process.execPath, ["dev.ts"], {
+            cwd: app,
+            stdio: "pipe",
+          });
+          assert.match(
+            readFileSync(join(app, "apps/web/.env.local"), "utf8"),
+            /VITE_CONVEX_SITE_URL=https:\/\/fixture-main\.disposabl\.xyz/,
+          );
+          assert.equal(
+            JSON.parse(readFileSync(join(app, "disposabl.json"), "utf8"))
+              .productionSiteUrl,
+            "https://fixture.disposabl.xyz",
+          );
           assert.equal(complete[0]!.configured, true);
           assert.deepEqual(complete[0]!.body, {
             appId: "fixture-app",

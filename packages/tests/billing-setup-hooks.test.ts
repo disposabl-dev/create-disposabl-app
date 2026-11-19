@@ -7,7 +7,6 @@ import { join, resolve } from "node:path";
 import { promisify } from "node:util";
 import { v } from "convex/values";
 import { setup } from "../disposabl-kit/server/billing-functions";
-import { pricing } from "../disposabl-kit/payments/config";
 
 const root = resolve(import.meta.dirname, "../..");
 const exec = promisify(execFile);
@@ -16,11 +15,17 @@ test("catalog setup is internal, validated and runs on the dev deployment's firs
   assert.equal(setup.isInternal, true);
   assert.ok("args" in setup);
   assert.ok("returns" in setup);
-  assert.deepEqual(setup.args, { preview: v.optional(v.literal(true)) });
+  assert.deepEqual(setup.args, {
+    expectedEnvironment: v.optional(
+      v.union(v.literal("test"), v.literal("live")),
+    ),
+    allowUnconfiguredPreview: v.optional(v.literal(true)),
+  });
   assert.deepEqual(
     setup.returns,
     v.object({
       enabled: v.boolean(),
+      pending: v.boolean(),
       created: v.array(v.string()),
       preserved: v.array(v.string()),
     }),
@@ -29,60 +34,6 @@ test("catalog setup is internal, validated and runs on the dev deployment's firs
     await readFile(join(root, "packages/backend/package.json"), "utf8"),
   );
   assert.equal(manifest.scripts.dev, "convex dev --run billing:setup");
-});
-
-test("preview billing is optional and accepts sandbox keys only", async () => {
-  const run = (
-    setup as unknown as {
-      _handler: (_ctx: object, args: { preview?: true }) => Promise<unknown>;
-    }
-  )._handler;
-  const priorKey = process.env.AUTUMN_SECRET_KEY;
-  const priorFetch = globalThis.fetch;
-  const requests: Array<string | null> = [];
-  try {
-    globalThis.fetch = (async (_url, init) => {
-      requests.push(new Headers(init?.headers).get("Authorization"));
-      return Response.json({
-        list: [
-          pricing.featureId,
-          pricing.monthly.planId,
-          pricing.topup.planId,
-        ].map((id) => ({ id })),
-      });
-    }) as typeof fetch;
-    delete process.env.AUTUMN_SECRET_KEY;
-    assert.deepEqual(await run({}, { preview: true }), {
-      enabled: false,
-      created: [],
-      preserved: [],
-    });
-    await assert.rejects(run({}, {}), /requires AUTUMN_SECRET_KEY/);
-    process.env.AUTUMN_SECRET_KEY = "am_sk_live_fixture";
-    await assert.rejects(
-      run({}, { preview: true }),
-      /requires an Autumn sandbox key/,
-    );
-    assert.equal(requests.length, 0);
-    process.env.AUTUMN_SECRET_KEY = "am_sk_test_fixture";
-    assert.deepEqual(await run({}, { preview: true }), {
-      enabled: true,
-      created: [],
-      preserved: [
-        `features:${pricing.featureId}`,
-        `plans:${pricing.monthly.planId}`,
-        `plans:${pricing.topup.planId}`,
-      ],
-    });
-    assert.deepEqual(requests, [
-      "Bearer am_sk_test_fixture",
-      "Bearer am_sk_test_fixture",
-    ]);
-  } finally {
-    if (priorKey === undefined) delete process.env.AUTUMN_SECRET_KEY;
-    else process.env.AUTUMN_SECRET_KEY = priorKey;
-    globalThis.fetch = priorFetch;
-  }
 });
 
 test("CI uses the deployed target, runs setup before upload and stops on setup failure", async () => {
@@ -121,7 +72,19 @@ case "$*" in *'convex run '*) exit "$SETUP_EXIT";; esac
       { mode: 0o755 },
     );
     const callsFile = join(temp, "calls");
-    for (const channel of ["production", "pr-42"]) {
+    for (const [channel, repository, setupArgs] of [
+      [
+        "production",
+        "disposabl-dev/create-disposabl-app",
+        '{"expectedEnvironment":"live"}',
+      ],
+      [
+        "pr-42",
+        "disposabl-dev/create-disposabl-app",
+        '{"expectedEnvironment":"test","allowUnconfiguredPreview":true}',
+      ],
+      ["pr-42", "owner/generated-app", '{"expectedEnvironment":"test"}'],
+    ]) {
       for (const setupExit of ["0", "1"]) {
         await writeFile(callsFile, "");
         const run = exec("bash", ["-e", "-c", deploy], {
@@ -132,6 +95,7 @@ case "$*" in *'convex run '*) exit "$SETUP_EXIT";; esac
             TRUSTED: "true",
             CONVEX_DEPLOY_KEY: "fixture",
             CHANNEL: channel,
+            GH_REPO: repository,
             CALLS: callsFile,
             SETUP_EXIT: setupExit,
           },
@@ -139,17 +103,24 @@ case "$*" in *'convex run '*) exit "$SETUP_EXIT";; esac
         if (setupExit === "0") await run;
         else await assert.rejects(run);
         const calls = (await readFile(callsFile, "utf8")).trim().split("\n");
-        assert.match(calls[0], /convex deploy --yes/);
+        const offset = channel === "production" ? 1 : 0;
+        if (offset)
+          assert.equal(
+            calls[0],
+            "x --no-install convex env set --prod BILLING_ENVIRONMENT live",
+          );
+        assert.match(calls[offset], /convex deploy --yes/);
         const target =
           channel === "production" ? "--prod" : "--preview-name pr-42";
-        const args = channel === "production" ? "{}" : '{"preview":true}';
         assert.equal(
-          calls[1],
-          `x --no-install convex run ${target} billing:setup ${args}`,
+          calls[offset + 1],
+          `x --no-install convex run ${target} billing:setup ${setupArgs}`,
         );
-        assert.equal(calls.length, setupExit === "0" ? 3 : 2);
+        assert.equal(calls.length, offset + (setupExit === "0" ? 3 : 2));
         if (setupExit === "0")
-          assert.ok(calls[2].includes(`static-hosting upload ${target}`));
+          assert.ok(
+            calls[offset + 2].includes(`static-hosting upload ${target}`),
+          );
       }
     }
   } finally {

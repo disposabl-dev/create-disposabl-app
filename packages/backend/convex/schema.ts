@@ -20,7 +20,7 @@ import {
   computeSessionFields,
   computeDebitFields,
 } from "./agent/computeValidator";
-import { pendingDelete } from "./apps/validator";
+import { autumnTenant, pendingDelete } from "./apps/validator";
 import {
   deployment,
   platform,
@@ -35,6 +35,14 @@ import {
 } from "./connections/validator";
 
 export default defineSchema({
+  appHosts: defineTable({
+    appId: v.string(),
+    reference: v.optional(v.string()),
+    slug: v.string(),
+    origin: v.optional(v.string()),
+  })
+    .index("by_slug", ["slug"])
+    .index("by_appId_reference", ["appId", "reference"]),
   aiConsents: defineTable({
     userId: v.string(),
     version: v.string(),
@@ -217,6 +225,7 @@ export default defineSchema({
     agentRemoteUnresolved: v.optional(v.boolean()),
     agentResumeBusy: v.optional(v.boolean()),
     posthogProject: v.optional(posthogProject),
+    autumn: v.optional(autumnTenant),
     githubOwner: v.optional(v.string()),
     githubRepo: v.optional(v.string()),
     convexProjectId: v.optional(v.number()),

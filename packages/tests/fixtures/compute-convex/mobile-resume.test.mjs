@@ -136,7 +136,7 @@ mock.module(
 mock.module(
   "../../../../apps/mobile/src/features/management/ai-safety",
   () => ({
-    useAiConsent: () => ({ allowed: true, request() {} }),
+    useAiConsent: () => ({ allowed: true, confirm: async () => true }),
     reportRef: {},
   }),
 );

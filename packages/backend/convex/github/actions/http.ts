@@ -2,6 +2,37 @@ import { httpAction } from "../../_generated/server";
 import { internal } from "../../_generated/api";
 import { ConvexError } from "convex/values";
 
+export const site = httpAction(async (ctx, request) => {
+  try {
+    const body: unknown = await request.json();
+    const token = request.headers.get("Authorization")?.replace(/^Bearer /, "");
+    if (!token) return new Response("Unauthorized", { status: 401 });
+    if (
+      !body ||
+      typeof body !== "object" ||
+      !("appId" in body) ||
+      typeof body.appId !== "string" ||
+      !("convexSiteUrl" in body) ||
+      typeof body.convexSiteUrl !== "string"
+    )
+      return new Response("Invalid request", { status: 400 });
+    const result = await ctx.runAction(internal.github.actions.site.register, {
+      appId: body.appId,
+      convexSiteUrl: body.convexSiteUrl,
+      token,
+    });
+    return Response.json(result, { headers: { "Cache-Control": "no-store" } });
+  } catch (error) {
+    return (
+      retryResponse(error) ??
+      Response.json(
+        { error: "Actions site registration rejected." },
+        { status: 403 },
+      )
+    );
+  }
+});
+
 function retryResponse(error: unknown) {
   const data = error instanceof ConvexError ? error.data : undefined;
   if (

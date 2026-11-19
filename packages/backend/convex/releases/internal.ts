@@ -6,6 +6,7 @@ import { v } from "convex/values";
 import { releasesResult } from "../validator";
 import { ownedApp } from "../apps/internal";
 import { presentPlatforms } from "../previews/internal";
+import { siteFor } from "../gateway/model";
 
 export const get = internalQuery({
   platforms: true,
@@ -20,7 +21,11 @@ export const get = internalQuery({
     return release
       ? {
           appId,
-          platforms: presentPlatforms(app, release.releases),
+          platforms: presentPlatforms(
+            app,
+            release.releases,
+            await siteFor(ctx, appId),
+          ),
           updatedAt: release.updatedAt,
         }
       : null;

@@ -77,6 +77,20 @@ test("Google browser return redeems once and opens home", async () => {
   await act(async () => renderer.update(createElement(GoogleSignIn)));
   expect(signIn).toHaveBeenCalledTimes(2);
 });
+
+test("a normalized iOS callback redeems the ticket and completes sign-in", async () => {
+  openBrowser.mockResolvedValue({
+    type: "success",
+    url: `${mobileAuthReturnUrl}/?convexAuthCode=ticket#`,
+  });
+  await mount();
+  await press();
+  expect(signIn.mock.calls).toEqual([
+    [{ redirectTo: "https://example.convex.site/oauth/mobile" }],
+    [{ code: "ticket" }],
+  ]);
+  expect(replace).toHaveBeenCalledWith("/");
+});
 test("cancelling the browser allows another attempt without redeeming", async () => {
   openBrowser.mockResolvedValue({ type: "cancel" });
   await mount();
@@ -139,4 +153,43 @@ test("Google sign-in returns to the selected creation example", async () => {
   await mount();
   await press();
   expect(replace).toHaveBeenCalledWith("/compose?exampleSlug=field");
+});
+
+test("an unexpected browser return reports the stage without exposing the ticket", async () => {
+  openBrowser.mockResolvedValue({
+    type: "success",
+    url: "other-app://login?convexAuthCode=private-ticket",
+  });
+  await mount();
+  await press();
+  expect(
+    renderer.root.findByProps({ accessibilityRole: "alert" }).props.children,
+  ).toBe(
+    "Couldn't connect to Google. Please try again. (callback-destination-scheme)",
+  );
+  expect(signIn).toHaveBeenCalledTimes(1);
+  expect(replace).not.toHaveBeenCalled();
+});
+
+test("native browser failures report their stage without exception text", async () => {
+  openBrowser.mockRejectedValue(new TypeError("private-ticket"));
+  await mount();
+  await press();
+  expect(
+    renderer.root.findByProps({ accessibilityRole: "alert" }).props.children,
+  ).toBe("Couldn't connect to Google. Please try again. (browser-type)");
+  expect(replace).not.toHaveBeenCalled();
+});
+
+test("authorization failures retain the failure type without exposing provider details", async () => {
+  signIn.mockResolvedValue({
+    status: "error",
+    userError: { error: "OTHER_ERROR", cause: new TypeError("private-state") },
+  });
+  await mount();
+  await press();
+  expect(
+    renderer.root.findByProps({ accessibilityRole: "alert" }).props.children,
+  ).toBe("Couldn't connect to Google. Please try again. (authorization-type)");
+  expect(openBrowser).not.toHaveBeenCalled();
 });

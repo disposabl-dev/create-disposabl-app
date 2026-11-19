@@ -23,6 +23,18 @@ test("mobile Google browser lifecycle", () => {
   assert.equal(result.status, 0, result.stdout + result.stderr);
 });
 
+test("mobile Google visibility during provider discovery", () => {
+  const result = spawnSync(
+    process.execPath,
+    [
+      "test",
+      join(import.meta.dirname, "components/mobile-auth-providers.test.mjs"),
+    ],
+    { encoding: "utf8" },
+  );
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+});
+
 test("native OAuth forwards a one-time ticket to the app's fixed scheme only", () => {
   const response = mobileAuthRedirect(
     new Request(
@@ -52,6 +64,11 @@ test("native OAuth rejects empty responses and untrusted return destinations", (
     "https://attacker.test/login?convexAuthCode=ticket",
     `${mobileAuthReturnUrl}/other?convexAuthCode=ticket`,
     `${mobileAuthReturnUrl}?convexAuthCode=ticket#extra`,
+    "disposabl-other-app://login?convexAuthCode=ticket",
+    `${mobileAuthReturnUrl.replace("://login", "://other")}?convexAuthCode=ticket`,
+    `${mobileAuthReturnUrl.replace("://login", "://user@login")}?convexAuthCode=ticket`,
+    `${mobileAuthReturnUrl.replace("://login", "://login:123")}?convexAuthCode=ticket`,
+    `${mobileAuthReturnUrl}/login?convexAuthCode=ticket`,
   ])
     assert.throws(() => mobileAuthCallback(url));
   const denied = mobileAuthRedirect(
@@ -63,6 +80,32 @@ test("native OAuth rejects empty responses and untrusted return destinations", (
     code: null,
     error: "access_denied",
   });
+});
+
+test("native OAuth accepts equivalent empty-path and empty-fragment returns", () => {
+  for (const url of [
+    `${mobileAuthReturnUrl}/?convexAuthCode=ticket`,
+    `${mobileAuthReturnUrl}?convexAuthCode=ticket#`,
+    `${mobileAuthReturnUrl}/?convexAuthCode=ticket#`,
+    `${mobileAuthReturnUrl.replace("://login", "://LOGIN")}?convexAuthCode=ticket`,
+  ])
+    assert.deepEqual(mobileAuthCallback(url), { code: "ticket", error: null });
+});
+
+test("native OAuth fails closed when a URL implementation cannot read custom-scheme hosts", () => {
+  const original = globalThis.URL;
+  try {
+    globalThis.URL = class extends original {
+      get hostname() {
+        return "";
+      }
+    };
+    assert.throws(() =>
+      mobileAuthCallback(`${mobileAuthReturnUrl}?convexAuthCode=ticket`),
+    );
+  } finally {
+    globalThis.URL = original;
+  }
 });
 
 test(

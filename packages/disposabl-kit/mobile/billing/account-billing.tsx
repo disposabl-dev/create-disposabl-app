@@ -1,24 +1,15 @@
 import { useAction } from "convex/react";
 import { makeFunctionReference } from "convex/server";
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  AppState,
-  Linking,
-  Platform,
-  Pressable,
-  Text,
-  View,
-} from "react-native";
+import { AppState, Platform, Pressable, Text, View } from "react-native";
 import type { PurchasesPackage } from "react-native-purchases";
 import { billingSession } from "./session";
 import {
   monthlyOfferingId,
-  presentMonthlyPaywall,
+  purchaseMonthlySubscription,
   selectMonthlyOffering,
 } from "./paywall";
 import { creditQuantity } from "../../payments/config";
-import { paymentOptions, storeEligibility } from "./policy";
-import { useWebCheckout } from "./web-checkout";
 import { useTopup } from "./use-topup";
 import type { TopupRoute } from "./topup";
 
@@ -28,7 +19,6 @@ type Snapshot = {
   monthlyCheckoutPending: boolean;
   nativeSubscriptionsEnabled: boolean;
   nativeTopupRoutes: TopupRoute[];
-  mobileWebCheckoutEnabled: boolean;
   customerId: string;
 };
 const snapshot = makeFunctionReference<
@@ -83,31 +73,20 @@ export function AccountBilling({ customerId }: { customerId: string }) {
       setData(result);
       try {
         if (key && productId && result.nativeSubscriptionsEnabled) {
-          const store = await billingSession.run(
+          const offering = await billingSession.run(
             customerId,
             version,
             key,
-            async (sdk) => ({
-              eligibility: await storeEligibility(sdk, Platform.OS),
-              offerings: await sdk.getOfferings(),
-            }),
+            async (sdk) =>
+              (await sdk.canMakePayments())
+                ? selectMonthlyOffering(
+                    await sdk.getOfferings(),
+                    productId,
+                    monthlyOfferingId,
+                  )
+                : null,
           );
-          const options = paymentOptions({
-            platform: Platform.OS,
-            ...store.eligibility,
-            paymentsEnabled: true,
-            nativeReady: result.nativeSubscriptionsEnabled,
-            webCheckoutEnabled: result.mobileWebCheckoutEnabled,
-          });
-          const offering = selectMonthlyOffering(
-            store.offerings,
-            productId,
-            monthlyOfferingId,
-          );
-          if (latest())
-            setMonthly(
-              options.native ? (offering?.availablePackages[0] ?? null) : null,
-            );
+          if (latest()) setMonthly(offering?.availablePackages[0] ?? null);
         } else setMonthly(null);
         if (latest()) setRefreshError("");
       } catch {
@@ -134,15 +113,7 @@ export function AccountBilling({ customerId }: { customerId: string }) {
     };
   }, [customerId, current, refresh]);
 
-  const webSnapshot = useCallback(() => getSnapshot({}), [getSnapshot]);
-  const web = useWebCheckout(
-    customerId,
-    generation,
-    key,
-    productId,
-    webSnapshot,
-  );
-
+  const fetchSnapshot = useCallback(() => getSnapshot({}), [getSnapshot]);
   const refreshBalance = useCallback(
     () => refresh(generation.current),
     [refresh],
@@ -151,7 +122,7 @@ export function AccountBilling({ customerId }: { customerId: string }) {
     customerId,
     generation,
     key,
-    webSnapshot,
+    fetchSnapshot,
     refreshBalance,
   );
 
@@ -183,32 +154,31 @@ export function AccountBilling({ customerId }: { customerId: string }) {
             return "restored" as const;
           }
           if (!monthly || !productId) throw new Error("Product unavailable.");
-          return presentMonthlyPaywall(
+          await purchaseMonthlySubscription(
             sdk,
             () => getSnapshot({}),
             () => current(version),
             productId,
-            undefined,
             monthlyOfferingId,
           );
+          return "purchased" as const;
         },
       );
-      completed = outcome === "cancelled" ? null : outcome;
-      if (outcome === "cancelled" && current(version))
-        setMessage("Purchase cancelled.");
+      completed = outcome;
     } catch (error) {
-      if (current(version))
+      if (
+        current(version) &&
+        !(error as { userCancelled?: boolean })?.userCancelled
+      )
         setMessage(
-          (error as { userCancelled?: boolean })?.userCancelled
-            ? "Purchase cancelled."
+          error instanceof Error &&
+            error.message ===
+              "Finish or cancel your website checkout before subscribing here."
+            ? error.message
             : error instanceof Error &&
-                error.message ===
-                  "Finish or cancel your website checkout before subscribing here."
-              ? error.message
-              : error instanceof Error &&
-                  error.message === "existing_subscription"
-                ? "You already have a subscription. Manage it where you purchased it."
-                : "Could not complete the store request. Refresh before trying again.",
+                error.message === "existing_subscription"
+              ? "You already have a subscription. Manage it where you purchased it."
+              : "Could not complete the store request. Refresh before trying again.",
         );
     } finally {
       operation.current = false;
@@ -225,12 +195,7 @@ export function AccountBilling({ customerId }: { customerId: string }) {
     }
   }
 
-  const disabled = busy || web.busy || topup.busy;
-  const openManagement = (url: string) => {
-    void Linking.openURL(url).catch(() =>
-      setMessage("Could not open subscription settings."),
-    );
-  };
+  const disabled = busy || topup.busy;
 
   return (
     <View className="gap-4">
@@ -240,7 +205,9 @@ export function AccountBilling({ customerId }: { customerId: string }) {
         </Text>
         <Text className="text-[28px] font-bold tracking-[-0.5px] text-foreground">
           {data?.balance == null
-            ? "Unavailable"
+            ? data || refreshError
+              ? "Unavailable"
+              : "Loading…"
             : `${new Intl.NumberFormat().format(data.balance)} credits`}
         </Text>
       </View>
@@ -283,11 +250,7 @@ export function AccountBilling({ customerId }: { customerId: string }) {
             Unused credits expire monthly
           </Text>
         </Pressable>
-      ) : (
-        <Text className="text-[14px] text-muted-foreground">
-          Store subscriptions unavailable.
-        </Text>
-      )}
+      ) : null}
       {topup.product && (
         <Pressable
           accessibilityRole="button"
@@ -310,20 +273,6 @@ export function AccountBilling({ customerId }: { customerId: string }) {
         </Pressable>
       )}
       <View className="flex-row flex-wrap gap-x-5 gap-y-2">
-        {web.available && (
-          <BillingLink
-            title="Monthly on website"
-            disabled={disabled}
-            onPress={() => void web.open()}
-          />
-        )}
-        {web.topupAvailable && (
-          <BillingLink
-            title="Top-up on website"
-            disabled={disabled}
-            onPress={() => void web.open("topup")}
-          />
-        )}
         <BillingLink
           title="Refresh"
           disabled={busy}
@@ -337,29 +286,8 @@ export function AccountBilling({ customerId }: { customerId: string }) {
           />
         )}
       </View>
-      <Text className="text-[13px] leading-[18px] text-muted-foreground">
-        Manage or cancel where you subscribed:
-      </Text>
-      <View className="flex-row flex-wrap gap-x-5 gap-y-2">
-        <BillingLink
-          title="Apple"
-          onPress={() =>
-            openManagement("https://apps.apple.com/account/subscriptions")
-          }
-        />
-        <BillingLink
-          title="Google Play"
-          onPress={() =>
-            openManagement(
-              "https://play.google.com/store/account/subscriptions",
-            )
-          }
-        />
-        <Text className="py-1 text-[13px] text-muted-foreground">
-          Website: pricing page
-        </Text>
-      </View>
-      {[topup.message, refreshError, message, web.error]
+
+      {[topup.message, refreshError, message]
         .filter(Boolean)
         .map((text, index) => (
           <Text

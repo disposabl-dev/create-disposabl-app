@@ -308,6 +308,7 @@ test("EAS environment cannot replace Android signing or submission policy", asyn
     "ANDROID_PLAY_SUBMIT",
     "ANDROID_PLAY_UPLOAD_CERT_SHA256",
     "UPDATE_POLICY",
+    "PUBLIC_SITE_URL",
   ]) {
     const result = await run("expo-env", {
       EAS_VARS: JSON.stringify({ [key]: "fixture-override" }),

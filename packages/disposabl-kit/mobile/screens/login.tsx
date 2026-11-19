@@ -1,5 +1,9 @@
 import { AuthForm } from "../components/auth-form";
 
-export function LoginScreen() {
-  return <AuthForm mode="login" />;
+export function LoginScreen({
+  initialGoogleEnabled = false,
+}: {
+  initialGoogleEnabled?: boolean;
+}) {
+  return <AuthForm mode="login" initialGoogleEnabled={initialGoogleEnabled} />;
 }

@@ -215,6 +215,7 @@ def main():
     selected.verify_selected_auth(source, ROOT / 'node_modules/@convex-dev/auth')
     if shutil.disk_usage('/tmp').free < MIN_FREE:
         raise RuntimeError('Insufficient free space after snapshot')
+    command(['bun', 'run', 'build'], cwd=source / 'packages/create-disposabl-app', log='generator.log')
     name, secret = 'product-browser-fixture', secrets.token_hex(32)
     key = command([str(binary), 'keygen', 'admin-key', '--instance-name', name, '--instance-secret', secret], cwd=source, sensitive=True).strip()
     if not key:

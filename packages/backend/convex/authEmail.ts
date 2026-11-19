@@ -4,7 +4,8 @@ import { components, internal } from "./_generated/api";
 import { env } from "./_generated/server";
 import { auth } from "./authSetup";
 
-const origin = env.AUTH_EMAIL_ORIGIN || env.CONVEX_SITE_URL;
+const origin =
+  env.AUTH_EMAIL_ORIGIN || env.PUBLIC_SITE_URL || env.CONVEX_SITE_URL;
 
 // Auth v2 reads these only inside a transaction. A missing sender rolls the
 // transaction back rather than creating an account or claiming an email was sent.

@@ -1,5 +1,10 @@
 import { v } from "convex/values";
 
+export const autumnTenant = v.object({
+  ownerEmail: v.string(),
+  encryptedKeys: v.optional(v.string()),
+});
+
 export const deleteArgs = {
   appId: v.string(),
   dangerouslyDeleteApp: v.literal(true),
