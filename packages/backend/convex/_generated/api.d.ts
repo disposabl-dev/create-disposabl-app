@@ -52,6 +52,7 @@ import type * as authSetup from "../authSetup.js";
 import type * as billing from "../billing.js";
 import type * as billingHandoff from "../billingHandoff.js";
 import type * as browserHandoff from "../browserHandoff.js";
+import type * as connections_actions_autumn from "../connections/actions/autumn.js";
 import type * as connections_actions_credentials from "../connections/actions/credentials.js";
 import type * as connections_actions_expo from "../connections/actions/expo.js";
 import type * as connections_actions_github from "../connections/actions/github.js";
@@ -165,6 +166,7 @@ declare const fullApi: ApiFromModules<{
   billing: typeof billing;
   billingHandoff: typeof billingHandoff;
   browserHandoff: typeof browserHandoff;
+  "connections/actions/autumn": typeof connections_actions_autumn;
   "connections/actions/credentials": typeof connections_actions_credentials;
   "connections/actions/expo": typeof connections_actions_expo;
   "connections/actions/github": typeof connections_actions_github;

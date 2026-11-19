@@ -7,6 +7,7 @@ const ready = {
   convex: { name: "convex" },
   expo: null,
   posthog: null,
+  autumn: false,
   posthogPending: false,
   ready: true,
   missing: [],
@@ -16,6 +17,7 @@ const ready = {
     convex: true,
     expo: true,
     posthog: true,
+    autumn: true,
   },
   githubInstallUrl: null,
 } as const;
