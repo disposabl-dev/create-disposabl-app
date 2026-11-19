@@ -21,16 +21,12 @@ export function useConnectionSetup() {
   const [fromCli, setFromCli] = useState(false);
   const [fromMobile, setFromMobile] = useState(false);
   const [analyticsRequired, setAnalyticsRequired] = useState(false);
-  const [paymentsRequired, setPaymentsRequired] = useState(false);
   const [initialized, setInitialized] = useState(false);
   const status = useQuery(
     api.connections.index.status,
     isAuthenticated
       ? {
-          features: [
-            ...(analyticsRequired ? ["analytics" as const] : []),
-            ...(paymentsRequired ? ["payments" as const] : []),
-          ],
+          features: [...(analyticsRequired ? ["analytics" as const] : [])],
         }
       : "skip",
   );
@@ -64,7 +60,6 @@ export function useConnectionSetup() {
     setFromCli(context.fromCli);
     setFromMobile(context.fromMobile);
     setAnalyticsRequired(context.analytics);
-    setPaymentsRequired(context.payments);
     setMobile(context.mobile);
     setInitialized(true);
     const queryProvider = url.searchParams.get("provider");
@@ -264,7 +259,6 @@ export function useConnectionSetup() {
     githubPending,
     mobile,
     analyticsRequired,
-    paymentsRequired,
     fromCli,
     fromMobile,
     initialized,

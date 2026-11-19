@@ -53,6 +53,24 @@ export const get = query({
     });
   },
 });
+export const beginStripe = action({
+  args: { appId: v.string() },
+  returns: v.string(),
+  handler: async (ctx, args): Promise<string> =>
+    ctx.runAction(internal.apps.actions.billing.beginStripe, {
+      ...args,
+      userId: await requireUser(ctx),
+    }),
+});
+export const enableLivePayments = action({
+  args: { appId: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args): Promise<null> =>
+    ctx.runAction(internal.apps.actions.billing.enableLivePayments, {
+      ...args,
+      userId: await requireUser(ctx),
+    }),
+});
 export const requestConfigurationChecked = action({
   args: {
     appId: v.string(),

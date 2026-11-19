@@ -1,6 +1,7 @@
 import { paymentsEnabled } from "@disposabl/disposabl-kit/features";
 import {
   balanceFromCustomer,
+  billingKey,
   billingRequest,
 } from "@disposabl/disposabl-kit/server/billing";
 import { ConvexError } from "convex/values";
@@ -9,7 +10,7 @@ import { env } from "../_generated/server";
 export async function requireCredits(
   userId: string,
   enabled = paymentsEnabled,
-  key = env.AUTUMN_SECRET_KEY,
+  key = billingKey(env),
   request = billingRequest,
 ) {
   if (!enabled) return;

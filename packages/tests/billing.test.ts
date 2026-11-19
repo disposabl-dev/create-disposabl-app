@@ -20,6 +20,53 @@ import {
 import { resolveFeatures } from "../disposabl-kit/feature-options";
 
 describe("billing boundary", () => {
+  test("sandbox checkout derives a safe preview pricing URL and live requires explicit configuration", () => {
+    const sandbox = {
+      AUTUMN_SECRET_KEY: "am_sk_test_fixture",
+      PUBLIC_SITE_URL: "https://preview.example",
+    };
+    assert.equal(
+      billingConfig(true, sandbox)?.returnUrl,
+      "https://preview.example/pricing",
+    );
+    assert.equal(
+      billingConfig(true, {
+        ...sandbox,
+        PUBLIC_SITE_URL: "",
+        CONVEX_SITE_URL: "https://preview.convex.site",
+      })?.returnUrl,
+      "https://preview.convex.site/pricing",
+    );
+    assert.equal(
+      billingConfig(true, {
+        ...sandbox,
+        BILLING_RETURN_URL: "https://explicit.example/pricing",
+      })?.returnUrl,
+      "https://explicit.example/pricing",
+    );
+    for (const origin of [
+      "https://user@example.com",
+      "https://example.com/path",
+      "https://example.com/?x=1",
+      "http://example.com",
+    ])
+      assert.throws(() =>
+        billingConfig(true, { ...sandbox, PUBLIC_SITE_URL: origin }),
+      );
+    assert.throws(() =>
+      billingConfig(true, {
+        ...sandbox,
+        AUTUMN_SECRET_KEY: "am_sk_live_fixture",
+      }),
+    );
+    assert.throws(() =>
+      billingConfig(true, {
+        ...sandbox,
+        BILLING_ENVIRONMENT: "live",
+        BILLING_RETURN_URL: "https://example.com/pricing",
+      }),
+    );
+  });
   test("unusable checkout responses are treated as unknown", () => {
     assert.equal(
       checkoutUrl({ payment_url: "https://checkout.example/pay" }),

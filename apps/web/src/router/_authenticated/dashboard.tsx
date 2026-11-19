@@ -67,6 +67,9 @@ function Dashboard() {
         >
           Connections
         </Link>
+        <Link to="/dashboard/billing" search={{ appId: undefined }}>
+          App billing
+        </Link>
         {config.platforms.includes("api") && (
           <Link to="/dashboard/api-keys" data-telemetry-action="open_api_keys">
             API keys

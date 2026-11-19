@@ -19,6 +19,7 @@ import {
   balanceFromCustomer,
   monthlyPlanFromCustomer,
   billingContext,
+  billingKey,
   billingRequest,
   purchaseRequest,
   mobileWebCheckoutConfigured,
@@ -26,13 +27,25 @@ import {
 } from "./billing";
 
 export const setup = internalAction({
-  args: {},
+  args: {
+    expectedEnvironment: v.optional(
+      v.union(v.literal("test"), v.literal("live")),
+    ),
+  },
   returns: v.object({
     enabled: v.boolean(),
+    pending: v.boolean(),
     created: v.array(v.string()),
     preserved: v.array(v.string()),
   }),
-  handler: async () => setupBilling(paymentsEnabled, process.env),
+  handler: async (_ctx, args) =>
+    setupBilling(
+      paymentsEnabled,
+      process.env,
+      undefined,
+      undefined,
+      args.expectedEnvironment,
+    ),
 });
 
 async function context(ctx: { auth: Auth }) {
@@ -233,8 +246,25 @@ export const createSnapshot = (eligibility?: BillingEligibility) =>
       checkoutNeedsReview: v.boolean(),
       monthlyCheckoutPending: v.boolean(),
       customerId: v.string(),
+      billingPending: v.optional(v.boolean()),
     }),
     handler: async (ctx) => {
+      if (paymentsEnabled && !billingKey(process.env)) {
+        const userId = await getSessionUserId(ctx);
+        if (!userId) throw new Error("Please sign in to use payments.");
+        await eligibility?.(ctx, userId);
+        return {
+          balance: null,
+          hasMonthlyPlan: null,
+          nativeSubscriptionsEnabled: false,
+          nativeTopupRoutes: [],
+          mobileWebCheckoutEnabled: false,
+          checkoutNeedsReview: false,
+          monthlyCheckoutPending: false,
+          customerId: userId,
+          billingPending: true,
+        };
+      }
       const { key, userId } = await context(ctx);
       await eligibility?.(ctx, userId);
       try {

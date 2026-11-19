@@ -41,6 +41,7 @@ const snapshot = makeFunctionReference<
     balance: number | null;
     hasMonthlyPlan: boolean | null;
     checkoutNeedsReview: boolean;
+    billingPending?: boolean;
     customerId: string;
   }
 >("billing:snapshot");
@@ -159,6 +160,7 @@ function PurchasePage({
   const [balance, setBalance] = useState<number | null>(null);
   const [hasMonthlyPlan, setHasMonthlyPlan] = useState<boolean | null>(null);
   const [checkoutNeedsReview, setCheckoutNeedsReview] = useState(false);
+  const [billingPending, setBillingPending] = useState(false);
   const [customerId, setCustomerId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [refreshError, setRefreshError] = useState("");
@@ -186,6 +188,7 @@ function PurchasePage({
       setBalance(result.balance);
       setHasMonthlyPlan(result.hasMonthlyPlan);
       setCheckoutNeedsReview(result.checkoutNeedsReview);
+      setBillingPending(result.billingPending === true);
       setCustomerId(result.customerId);
       setRefreshError("");
     } catch {
@@ -205,6 +208,7 @@ function PurchasePage({
     if (
       !session ||
       !customerId ||
+      billingPending ||
       busy ||
       inFlight.current ||
       (kind === "monthly" && hasMonthlyPlan !== false) ||
@@ -258,7 +262,7 @@ function PurchasePage({
     }
   }
   async function manage() {
-    if (!session || busy || inFlight.current) return;
+    if (!session || billingPending || busy || inFlight.current) return;
     const version = generation.current;
     inFlight.current = true;
     setBusy(true);
@@ -315,10 +319,14 @@ function PurchasePage({
               Refresh
             </button>
           </p>
-          <p>
-            After checkout, credits appear when payment is confirmed. Refresh if
-            the balance has not updated yet.
-          </p>
+          {billingPending ? (
+            <p role="status">Payments aren’t available yet.</p>
+          ) : (
+            <p>
+              After checkout, credits appear when payment is confirmed. Refresh
+              if the balance has not updated yet.
+            </p>
+          )}
           {fromIos && (
             <p>
               After checkout, return to the app and refresh your credits.{" "}
@@ -344,7 +352,7 @@ function PurchasePage({
           )}
           <button
             className="underline"
-            disabled={busy}
+            disabled={billingPending || busy}
             onClick={() => void manage()}
           >
             Manage website billing
@@ -365,6 +373,7 @@ function PurchasePage({
               disabled={
                 !session ||
                 !customerId ||
+                billingPending ||
                 busy ||
                 hasMonthlyPlan !== false ||
                 !handoffAllows(fromIos, handoff, customerId, "monthly")
@@ -384,7 +393,7 @@ function PurchasePage({
             <p>{creditQuantity("topup")} credits that do not expire.</p>
             <button
               className="mt-4 rounded bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50"
-              disabled={!session || !customerId || busy}
+              disabled={!session || !customerId || billingPending || busy}
               onClick={() => void purchase("topup")}
             >
               Buy top-up

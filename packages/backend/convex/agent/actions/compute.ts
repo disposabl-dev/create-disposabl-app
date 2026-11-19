@@ -1,4 +1,5 @@
 import { paymentsEnabled } from "@disposabl/disposabl-kit/features";
+import { billingKey } from "@disposabl/disposabl-kit/server/billing";
 import { internalAction } from "@disposabl/disposabl-kit/server/lib/functions";
 import { v } from "convex/values";
 import { components, internal } from "../../_generated/api";
@@ -14,7 +15,7 @@ export async function fund(
   sessionId: Id<"computeSessions">,
   expectedDebit?: Id<"computeDebits">,
   performDebit = (userId: string) =>
-    debitCompute(userId, paymentsEnabled, env.AUTUMN_SECRET_KEY),
+    debitCompute(userId, paymentsEnabled, billingKey(env)),
 ) {
   const debit: Doc<"computeDebits"> | null = await ctx.runMutation(
     internal.agent.compute.claim,
@@ -144,7 +145,7 @@ export async function deliverNotice(
     environment: env.DISPOSABL_ENVIRONMENT,
     // eslint-disable-next-line @convex-dev/no-process-env
     e2e: process.env.E2E_TELEMETRY_DISABLED,
-    key: env.AUTUMN_SECRET_KEY,
+    key: billingKey(env),
     observe: observeNoticeBalance,
   },
 ) {

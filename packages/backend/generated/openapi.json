@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Application API",
-    "version": "14.0.0"
+    "version": "15.0.0"
   },
   "security": [
     {
@@ -1338,23 +1338,6 @@
                         }
                       ]
                     },
-                    "autumn": {
-                      "anyOf": [
-                        {
-                          "type": "object",
-                          "properties": {
-                            "name": {
-                              "type": "string"
-                            }
-                          },
-                          "required": ["name"],
-                          "additionalProperties": false
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
-                    },
                     "posthogPending": {
                       "type": "boolean"
                     },
@@ -1364,13 +1347,7 @@
                     "missing": {
                       "type": "array",
                       "items": {
-                        "enum": [
-                          "github",
-                          "convex",
-                          "expo",
-                          "posthog",
-                          "autumn"
-                        ]
+                        "enum": ["github", "convex", "expo", "posthog"]
                       }
                     },
                     "connectionsUrl": {
@@ -1390,18 +1367,9 @@
                         },
                         "posthog": {
                           "type": "boolean"
-                        },
-                        "autumn": {
-                          "type": "boolean"
                         }
                       },
-                      "required": [
-                        "github",
-                        "convex",
-                        "expo",
-                        "posthog",
-                        "autumn"
-                      ],
+                      "required": ["github", "convex", "expo", "posthog"],
                       "additionalProperties": false
                     },
                     "githubInstallUrl": {
@@ -1420,7 +1388,6 @@
                     "convex",
                     "expo",
                     "posthog",
-                    "autumn",
                     "posthogPending",
                     "ready",
                     "missing",

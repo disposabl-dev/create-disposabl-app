@@ -82,7 +82,7 @@ test(
       await browser.evaluate(() =>
         [...document.querySelectorAll("main h2")].map((e) => e.textContent),
       ),
-    ).toEqual(["GitHub", "Convex", "Autumn", "Expo", "PostHog"]);
+    ).toEqual(["GitHub", "Convex", "Expo", "PostHog"]);
     await expect(
       screen.getByRole("button", "Continue", { exact: true }),
     ).toBeDisabled();
@@ -100,8 +100,8 @@ test(
     await expect(screen.getByText("Required for mobile")).toBeVisible();
     await expect(screen.getByText(/Required.*analytics/i)).toBeVisible();
     await expect(
-      screen.getByText("Required for payments", { exact: true }),
-    ).toBeVisible();
+      screen.getByRole("button", "Connect Autumn", { exact: true }),
+    ).not.toBeVisible();
     // A denied OAuth callback is safe to exercise without contacting a provider.
     await app.open(
       "/dashboard/connections?error=access_denied&code=discard&state=discard",
@@ -112,21 +112,13 @@ test(
     await expect(screen.getByText("Required for mobile")).toBeVisible();
     await expect(screen.getByText(/Required.*analytics/i)).toBeVisible();
     await expect(
-      screen.getByText("Required for payments", { exact: true }),
+      screen.getByRole("button", "Connect Autumn", { exact: true }),
+    ).not.toBeVisible();
+    await app.open("/dashboard/billing");
+    await expect(screen.getByRole("heading", "App billing")).toBeVisible();
+    await expect(
+      screen.getByText("No apps with payments enabled."),
     ).toBeVisible();
-    if (process.env.E2E_CONNECTIONS_ENABLED === "1") {
-      await screen.getByRole("button", "Connect Autumn", { exact: true }).tap();
-      await screen
-        .getByLabel("Sandbox secret key", { exact: true })
-        .fill("invalid-test-input");
-      await screen
-        .getByRole("button", "Verify and save keys", { exact: true })
-        .tap();
-      await expect(screen.getByRole("alert")).toContainText(
-        "Enter an Autumn sandbox secret key",
-      );
-      await screen.getByRole("button", "Cancel", { exact: true }).tap();
-    }
     await screen.getByRole("button", "Logout", { exact: true }).tap();
   },
 );

@@ -121,14 +121,11 @@ export const create = internalAction({
         deployKey,
         publicSiteUrl,
       );
-      await provisionPayments(
-        ctx,
-        args.userId,
-        features,
+      await provisionPayments(ctx, { ...identity, until }, features, {
         token,
-        { ...deployment, deployKey, kind: "dev", publicSiteUrl },
-        { ...production, publicSiteUrl: productionSiteUrl },
-      );
+        projectId,
+        development: { ...deployment, deployKey, kind: "dev", publicSiteUrl },
+      });
       await ctx.runMutation(internal.previews.internal.finish, {
         ...preview,
         deployment,
