@@ -98,12 +98,6 @@ jobs:
       - &node
         uses: actions/setup-node@v6
         with: { node-version: *node-version, package-manager-cache: false }
-      - name: Check product release guards
-        if: github.repository == 'disposabl-dev/create-disposabl-app'
-        run: |
-          python3 .github/scripts/play-bundle.test.py
-          python3 .github/scripts/android-release.test.py
-          node --test .github/scripts/android-bundle-verify.test.mjs .github/scripts/{store-review,apple-review,play-review}.test.mjs
       - &bun
         uses: oven-sh/setup-bun@v2
         with: { bun-version: *bun-version }

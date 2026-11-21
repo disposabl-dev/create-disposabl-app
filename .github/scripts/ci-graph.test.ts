@@ -186,6 +186,10 @@ function assertGraph(p: any) {
     "bun run generate",
   );
   expect(step(j.web, "Fingerprint")).toBeUndefined();
+  expect(step(j.web, "Check product release guards")).toBeUndefined();
+  expect(
+    step({ steps: action.runs.steps }, "Check product release guards").if,
+  ).toBe("inputs.lane == 'source'");
   expect(allowed(j.web, context("push"), needs("success", "failure"))).toBe(
     false,
   );
@@ -328,9 +332,16 @@ test("product and recovery gates remain independent of root and native release j
   );
   expect(JSON.stringify(action)).not.toContain("secrets.");
   expect(
-    action.runs.steps.find((s: any) => s.uses === "actions/checkout@v6").with
-      .ref,
+    product.jobs.check.steps.find((s: any) => s.uses === "actions/checkout@v6")
+      .with.ref,
   ).toBe("${{ inputs.source_sha }}");
+  expect(
+    product.jobs.check.steps.find((s: any) => s.uses === "actions/checkout@v6")
+      .with["fetch-depth"],
+  ).toContain("inputs.recovery_version != ''");
+  expect(
+    action.runs.steps.filter((s: any) => s.uses === "actions/checkout@v6"),
+  ).toHaveLength(0);
   expect(publish.jobs.checks.uses).toBe(
     "./.github/workflows/product-checks.yml",
   );

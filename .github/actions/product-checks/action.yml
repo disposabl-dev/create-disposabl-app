@@ -23,18 +23,6 @@ outputs:
 runs:
   using: composite
   steps:
-    - name: Validate immutable source
-      env:
-        EXPECTED_SOURCE: "${{ inputs.source_sha }}"
-      run: '[[ "$EXPECTED_SOURCE" =~ ^[0-9a-f]{40}$ ]]'
-      shell: bash
-    - uses: actions/checkout@v6
-      with:
-        ref: "${{ inputs.source_sha }}"
-        fetch-depth:
-          "${{ github.workflow_ref == format('{0}/.github/workflows/publish.yml@refs/heads/main',
-          github.repository) && '0' || '1' }}"
-        persist-credentials: false
     - name: Test source resolution
       run: python3 .github/scripts/product-check-source-test.py
       shell: bash
@@ -62,16 +50,23 @@ runs:
       if: inputs.lane == 'source'
       run: bun fmt --check
       shell: bash
+    - name: Check product release guards
+      if: inputs.lane == 'source'
+      shell: bash
+      run: |
+        python3 .github/scripts/play-bundle.test.py
+        python3 .github/scripts/android-release.test.py
+        node --test .github/scripts/android-bundle-verify.test.mjs .github/scripts/{store-review,apple-review,play-review}.test.mjs
     - name: Verify CI graph
       if: inputs.lane == 'unit' && inputs.cli_recovery_version == '' && inputs.recovery_version == ''
       run: bun test ./.github/scripts/ci-graph.test.ts
       shell: bash
-    - uses: actions/cache@v4
+    - name: Restore dependencies
+      id: deps
+      uses: actions/cache/restore@v4
       with:
-        path: "~/.bun/install/cache"
-        key:
-          bun-${{ runner.os }}-${{ runner.arch }}-1.4.5-${{ hashFiles('bun.lock')
-          }}
+        path: ~/.bun/install/cache
+        key: bun-${{ runner.os }}-${{ runner.arch }}-1.4.5-${{ hashFiles('bun.lock') }}
         restore-keys: bun-${{ runner.os }}-${{ runner.arch }}-1.4.5-
     - name: Restore source task cache
       if: inputs.lane == 'source'
@@ -92,6 +87,12 @@ runs:
       if: inputs.lane == 'source'
       run: bun run check:ci
       shell: bash
+    - name: Save dependencies
+      if: inputs.lane == 'source' && steps.deps.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: ~/.bun/install/cache
+        key: ${{ steps.deps.outputs.cache-primary-key }}
     - name: Build current generator template
       if: inputs.lane != 'browser' && inputs.lane != 'source'
       run: bun run --cwd packages/create-disposabl-app build
@@ -123,7 +124,7 @@ runs:
         path: |
           ${{ runner.temp }}/product-convex/backend.zip
           ${{ runner.temp }}/product-browser-cache
-        key: product-browser-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock', '.github/actions/product-checks/action.yml') }}
+        key: product-browser-v2-1447815-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}
     - name: Prepare isolated browser test dependencies
       if: inputs.lane == 'browser'
       shell: bash

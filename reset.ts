@@ -328,11 +328,7 @@ delete pipeline.jobs["product-checks"];
 pipeline.jobs.web.needs = "changes";
 pipeline.jobs.web.if = "needs.changes.outputs.changed == 'true'";
 pipeline.jobs.web.steps = pipeline.jobs.web.steps?.filter(
-  (step) =>
-    ![
-      "Check product release guards",
-      "Generate checked release inputs",
-    ].includes(step.name ?? ""),
+  (step) => step.name !== "Generate checked release inputs",
 );
 for (const step of pipeline.jobs.web.steps ?? []) {
   if (

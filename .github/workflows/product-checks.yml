@@ -37,8 +37,15 @@ jobs:
       EXPO_PUBLIC_DISPOSABL_ANALYTICS_ENABLED: "false"
       VITE_DISPOSABL_ANALYTICS_ENABLED: "false"
     steps:
+      - name: Validate immutable source
+        env:
+          EXPECTED_SOURCE: ${{ inputs.source_sha }}
+        run: '[[ "$EXPECTED_SOURCE" =~ ^[0-9a-f]{40}$ ]]'
       - uses: actions/checkout@v6
-        with: { ref: "${{ inputs.source_sha }}", persist-credentials: false }
+        with:
+          ref: ${{ inputs.source_sha }}
+          fetch-depth: ${{ (inputs.cli_recovery_version != '' || inputs.recovery_version != '') && '0' || '1' }}
+          persist-credentials: false
       - name: Product checks
         id: checks
         uses: ./.github/actions/product-checks
