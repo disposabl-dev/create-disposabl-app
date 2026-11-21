@@ -1,0 +1,112 @@
+name: Benchmark Web setup (manual)
+on:
+  push:
+    branches: [benchmark/web-setup-cache-ab-20261121]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  prime:
+    if: github.ref == 'refs/heads/benchmark/web-setup-cache-ab-20261121'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.5
+      - name: Populate an isolated dependency cache
+        run: |
+          rm -rf "$HOME/.bun/install/cache"
+          bun install --frozen-lockfile
+      - uses: actions/cache/save@v4
+        with:
+          path: ~/.bun/install/cache
+          key: benchmark-web-ab-${{ github.run_id }}-${{ github.run_attempt }}-${{ hashFiles('bun.lock') }}
+  compare:
+    needs: prime
+    name: ${{ matrix.cache }} / ${{ matrix.node }} / ${{ matrix.repeat }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        cache: [restore, cold]
+        node: [setup, preinstalled]
+        repeat: [1, 2]
+    env:
+      DO_NOT_TRACK: "1"
+      EXPO_NO_TELEMETRY: "1"
+      VITE_CONVEX_URL: https://benchmark.invalid
+      VITE_CONVEX_SITE_URL: https://benchmark.invalid
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Select preinstalled Node
+        if: matrix.node == 'preinstalled'
+        id: node
+        shell: bash
+        run: bash .github/benchmarks/select-node24.sh
+      - uses: actions/setup-node@v6
+        if: matrix.node == 'setup' || steps.node.outputs.ready != 'true'
+        with:
+          node-version: "24"
+          package-manager-cache: false
+      - name: Verify Node version and source
+        shell: bash
+        run: |
+          node -e 'const [major, minor] = process.versions.node.split(".").map(Number); if (major !== 24 || minor < 8) process.exit(1); console.log("Node", process.version, process.arch)'
+          git rev-parse HEAD
+          sha256sum bun.lock
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.5
+      - name: Start with an empty Bun dependency cache
+        run: rm -rf "$HOME/.bun/install/cache"
+      - name: Restore Bun dependency cache
+        id: cache
+        if: matrix.cache == 'restore'
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.bun/install/cache
+          key: benchmark-web-ab-${{ github.run_id }}-${{ github.run_attempt }}-${{ hashFiles('bun.lock') }}
+      - name: Require an actual restored cache
+        if: matrix.cache == 'restore'
+        env:
+          MATCHED_CACHE: ${{ steps.cache.outputs.cache-matched-key }}
+        run: test -n "$MATCHED_CACHE"
+      - name: Install the full frozen graph
+        run: bun install --frozen-lockfile
+      - name: Generate release inputs
+        run: bun run generate
+      - name: Build clients
+        run: bun x --no-install turbo run build --filter ./packages/cli --filter ./packages/sdk
+      - name: Build web and docs
+        run: bun x --no-install turbo run build --filter=@disposabl/web
+  runtime:
+    name: Bun runtime / ${{ matrix.mode }} / ${{ matrix.repeat }}
+    needs: prime
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [cached, direct]
+        repeat: [1, 2]
+    steps:
+      - uses: oven-sh/setup-bun@v2
+        id: bun
+        with:
+          bun-version: 1.4.5
+          no-cache: ${{ matrix.mode == 'direct' }}
+      - name: Verify runtime and cache mode
+        shell: bash
+        env:
+          MODE: ${{ matrix.mode }}
+          CACHE_HIT: ${{ steps.bun.outputs.cache-hit }}
+        run: |
+          test "$(bun --revision)" = '1.4.5+a7733435c'
+          if [[ "$MODE" == cached ]]; then test "$CACHE_HIT" = true; fi
