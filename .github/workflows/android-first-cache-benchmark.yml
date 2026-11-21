@@ -1,0 +1,149 @@
+name: Shared Android cache for a first build
+on:
+  push:
+    branches: [benchmark/ci-android-seed-20261121]
+permissions:
+  contents: read
+env:
+  EXPO_NO_DOTENV: "1"
+  EXPO_NO_TELEMETRY: "1"
+  E2E_TELEMETRY_DISABLED: "1"
+  EXPO_PROJECT_ID: 00000000-0000-4000-8000-000000000001
+  EXPO_PUBLIC_CONVEX_URL: https://ci.invalid
+  EXPO_PUBLIC_CONVEX_SITE_URL: https://ci.invalid
+  DISPOSABL_MOBILE_CHANNEL: native-benchmark
+  CMAKE_C_COMPILER_LAUNCHER: ccache
+  CMAKE_CXX_COMPILER_LAUNCHER: ccache
+  CCACHE_COMPILERCHECK: content
+  CCACHE_MAXSIZE: 512M
+jobs:
+  seed:
+    if: github.repository == 'disposabl-dev/create-disposabl-app'
+    name: Produce a credential-free cache seed
+    runs-on: ubuntu-24.04
+    timeout-minutes: 28
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - &node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - &bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.5
+      - name: Generate distinct producer and consumer apps from this source
+        run: |
+          bun install --frozen-lockfile
+          bun run --cwd packages/create-disposabl-app build
+          bun -e '
+            import {createApp} from "./packages/create-disposabl-app/scaffold";
+            for (const name of ["cache-producer", "cache-consumer"]) {
+              await createApp("packages/create-disposabl-app/dist/templates/default", name, name, {
+                version: "test", desktopId: "00000000000000000000000000000001",
+                platforms: ["web", "android", "ios"], features: ["authentication"],
+                androidArchitectures: ["arm64-v8a", "x86_64"],
+              });
+            }
+          '
+          (cd cache-producer && bun install --lockfile-only)
+          (cd cache-consumer && bun install --lockfile-only)
+      - &java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+      - &sdk
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - &ccache
+        name: Install ccache
+        run: command -v ccache || { sudo apt-get update -qq && sudo apt-get install -y ccache; }
+      - name: Compile shared native sources without signing or store credentials
+        working-directory: cache-producer
+        run: |
+          export CCACHE_DIR="$RUNNER_TEMP/ccache" CCACHE_BASEDIR="$PWD" GRADLE_USER_HOME="$RUNNER_TEMP/gradle"
+          bash .github/scripts/android-runner.sh prepare
+          bun install --frozen-lockfile --filter @disposabl/mobile
+          (
+            cd apps/mobile
+            bun x --no-install expo prebuild --platform android --no-install
+            cd android
+            bash ../../../.github/scripts/android-runner.sh build :app:externalNativeBuildRelease
+          )
+          test -n "$(find "$CCACHE_DIR" -name '*R' -type f -size +0c -print -quit)"
+          test -d "$GRADLE_USER_HOME/caches/modules-2/files-2.1"
+          test -d "$GRADLE_USER_HOME/caches/modules-2"
+      - name: Archive only native objects and Gradle dependency downloads
+        run: |
+          seed="$RUNNER_TEMP/cache-seed"
+          mkdir "$seed"
+          tar -I 'zstd -T0 -1' -cf "$seed/gradle-deps.tar.zst" -C "$RUNNER_TEMP/gradle/caches" --exclude='*.lock' --exclude=gc.properties modules-2
+          tar -I 'zstd -T0 -1' -cf "$seed/ccache.tar.zst" -C "$RUNNER_TEMP/ccache" .
+          tar -czf "$seed/app.tar.gz" -C cache-consumer --exclude=.git .
+          (cd "$seed" && sha256sum gradle-deps.tar.zst ccache.tar.zst app.tar.gz > SHA256SUMS)
+          du -h "$seed"/*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-first-cache
+          path: ${{ runner.temp }}/cache-seed
+          retention-days: 1
+          compression-level: 0
+          if-no-files-found: error
+  consumer:
+    needs: seed
+    name: First native build / ${{ matrix.cache }}
+    strategy:
+      fail-fast: false
+      matrix:
+        cache: [empty, seeded]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      CACHE_MODE: ${{ matrix.cache }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: android-first-cache
+          path: seed
+      - name: Prepare a new app with no previous Gradle user home
+        run: |
+          (cd seed && sha256sum --check SHA256SUMS)
+          mkdir cache-consumer
+          tar -xzf seed/app.tar.gz -C cache-consumer
+          test ! -d cache-consumer/apps/mobile/android
+          test ! -d "$RUNNER_TEMP/gradle"
+          if [[ "$CACHE_MODE" == seeded ]]; then
+            mkdir "$RUNNER_TEMP/readonly-gradle" "$RUNNER_TEMP/ccache"
+            /usr/bin/time -f 'Seed extraction: %e s' env SEED_DIR="$PWD/seed" bash -e -c '
+              tar --zstd -xf "$SEED_DIR/gradle-deps.tar.zst" -C "$RUNNER_TEMP/readonly-gradle"
+              tar --zstd -xf "$SEED_DIR/ccache.tar.zst" -C "$RUNNER_TEMP/ccache"
+            '
+            printf 'GRADLE_RO_DEP_CACHE=%s\n' "$RUNNER_TEMP/readonly-gradle" >> "$GITHUB_ENV"
+          fi
+      - *node
+      - *bun
+      - *java
+      - *sdk
+      - *ccache
+      - name: Compile and validate the first APK
+        working-directory: cache-consumer
+        run: |
+          export CCACHE_DIR="$RUNNER_TEMP/ccache" CCACHE_BASEDIR="$PWD" GRADLE_USER_HOME="$RUNNER_TEMP/gradle"
+          bash .github/scripts/android-runner.sh prepare
+          ccache --zero-stats
+          bun install --frozen-lockfile --filter @disposabl/mobile
+          cd apps/mobile
+          bun x --no-install expo prebuild --platform android --no-install
+          (cd android && bash ../../../.github/scripts/android-runner.sh build :app:assembleRelease --profile)
+          apk=android/app/build/outputs/apk/release/app-release.apk
+          unzip -tq "$apk"
+          jq '{androidArchitectures}' ../../disposabl.json > "$RUNNER_TEMP/abi.json"
+          node ../../.github/scripts/verify-android-abis.mjs "$apk" "$RUNNER_TEMP/abi.json"
+          signer=$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -1)
+          "$signer" verify --print-certs "$apk"
+          shasum -a 256 "$apk"
