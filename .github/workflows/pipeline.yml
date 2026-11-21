@@ -477,9 +477,7 @@ jobs:
         env:
           NATIVE_INPUT_HASH: ${{ hashFiles('bun.lock', 'apps/mobile/app.*', 'apps/mobile/package.json', 'apps/mobile/plugins/**', 'patches/**', '.github/scripts/apple.sh') }}
         working-directory: apps/mobile
-        run: |
-          echo "NATIVE_INPUT_HASH=$NATIVE_INPUT_HASH" >> "$GITHUB_ENV"
-          bash "$GITHUB_WORKSPACE/.github/scripts/ios-preview-repack.sh" identity
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/ios-preview-repack.sh" identity
       - name: Restore exact same-PR native simulator cache
         id: simulator-native-cache
         if: steps.simulator-identity.outputs.key != ''

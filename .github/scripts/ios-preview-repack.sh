@@ -51,7 +51,7 @@ case "${1:?}" in
     ;;
   manifest)
     check_source
-    identity
+    test -s "$work/identity.json" && test -s "$work/current-build"
     archive="$out/ios-simulator.zip"
     test -s "$archive"
     mkdir "$work/native"
@@ -82,7 +82,7 @@ case "${1:?}" in
     ;;
   repack)
     check_source
-    identity
+    test -s "$work/identity.json" && test -s "$work/current-build"
     m="$cache/ios-simulator-provenance.json"
     archive="$cache/ios-simulator.zip"
     python3 "$GITHUB_WORKSPACE/.github/scripts/ios-preview-cache-validate.py" "$work/identity.json" "$m" "$archive"
