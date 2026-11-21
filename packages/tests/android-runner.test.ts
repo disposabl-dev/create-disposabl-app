@@ -1,9 +1,62 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync, readFileSync, rmSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  writeFileSync,
+  readFileSync,
+  rmSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { execFileSync, spawnSync } from "node:child_process";
+
+test("installed SDK is used only after the hosted image accepts its licenses", () => {
+  const dir = mkdtempSync(join(tmpdir(), "android-sdk-"));
+  try {
+    mkdirSync(join(dir, "cmdline-tools/latest/bin"), { recursive: true });
+    mkdirSync(join(dir, "platform-tools"));
+    writeFileSync(join(dir, "platform-tools/adb"), "#!/bin/sh\n", {
+      mode: 0o755,
+    });
+    writeFileSync(
+      join(dir, "cmdline-tools/latest/bin/sdkmanager"),
+      '#!/bin/sh\ntest "$1" = --licenses && read accept && test "$accept" = y || exit 1\necho "$FIXTURE_LICENSES"\nexit "$FIXTURE_STATUS"\n',
+      { mode: 0o755 },
+    );
+    const script = resolve(
+      import.meta.dirname,
+      "../../.github/scripts/android-runner.sh",
+    );
+    const output = join(dir, "output");
+    for (const [runner, status, licenses, expected] of [
+      [
+        "github-hosted",
+        "0",
+        "All SDK package licenses accepted",
+        "ready=true\n",
+      ],
+      ["github-hosted", "1", "", ""],
+      ["github-hosted", "0", "License not accepted", ""],
+      ["self-hosted", "0", "All SDK package licenses accepted", ""],
+    ]) {
+      writeFileSync(output, "");
+      execFileSync("bash", [script, "sdk"], {
+        env: {
+          ...process.env,
+          ANDROID_HOME: dir,
+          RUNNER_ENVIRONMENT: runner,
+          GITHUB_OUTPUT: output,
+          FIXTURE_STATUS: status,
+          FIXTURE_LICENSES: licenses,
+        },
+      });
+      assert.equal(readFileSync(output, "utf8"), expected);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
 
 test("Android build diagnostics preserve Gradle arguments and failure status", () => {
   const dir = mkdtempSync(join(tmpdir(), "android-build-"));

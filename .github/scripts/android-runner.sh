@@ -2,6 +2,18 @@
 set -euo pipefail
 
 case "${1:?operation required}" in
+  sdk)
+    sdk=${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}
+    manager="$sdk/cmdline-tools/latest/bin/sdkmanager"
+    if [[ "${RUNNER_ENVIRONMENT:-}" == github-hosted && -n "$sdk" && -x "$manager" && -x "$sdk/platform-tools/adb" ]]; then
+      # The hosted image already has platform-tools. Let the installed CLI accept
+      # the same licenses before Gradle checks or installs project-specific components.
+      if licenses=$(set +o pipefail; yes | LC_ALL=C timeout --kill-after=2s 8s "$manager" --licenses) &&
+        [[ "$licenses" == *'All SDK package licenses accepted'* ]]; then
+        echo 'ready=true' >> "$GITHUB_OUTPUT"
+      fi
+    fi
+    ;;
   prepare)
     df -Pk .
     available=$(df -Pk . | awk 'END {print $4}')

@@ -253,8 +253,12 @@ jobs:
         if: steps.fingerprint.outputs.build == 'true' || (github.event_name == 'push' && github.repository == 'disposabl-dev/create-disposabl-app')
         id: native
         run: bash .github/scripts/android-runner.sh prepare
-      - name: SDK
+      - name: Prepare the installed Android SDK
         if: steps.native.outcome == 'success'
+        id: installed-sdk
+        run: bash .github/scripts/android-runner.sh sdk
+      - name: SDK
+        if: steps.native.outcome == 'success' && steps.installed-sdk.outputs.ready != 'true'
         uses: android-actions/setup-android@v3
         with: { packages: platform-tools }
       - name: Gradle

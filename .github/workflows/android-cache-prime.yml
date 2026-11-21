@@ -36,7 +36,11 @@ jobs:
       - run: bun install --frozen-lockfile --filter @disposabl/mobile
       - uses: actions/setup-java@v5
         with: { distribution: temurin, java-version: "17" }
+      - name: Prepare the installed Android SDK
+        id: installed-sdk
+        run: bash .github/scripts/android-runner.sh sdk
       - uses: android-actions/setup-android@v3
+        if: steps.installed-sdk.outputs.ready != 'true'
         with: { packages: platform-tools }
       - uses: gradle/actions/setup-gradle@v4
         with: { cache-read-only: false }
