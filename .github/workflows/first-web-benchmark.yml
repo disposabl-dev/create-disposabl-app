@@ -1,0 +1,111 @@
+name: First generated Web build and validation
+on:
+  push:
+    branches: [benchmark/ci-first-web-20261121]
+permissions:
+  contents: read
+jobs:
+  fixture:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.5
+      - run: bun install --frozen-lockfile
+      - run: bun run --cwd packages/create-disposabl-app build
+      - name: Generate the same Web and API fixture for every lane
+        run: |
+          export FIRST_WEB_APP="$RUNNER_TEMP/first-web"
+          bun -e '
+            import {createApp} from "./packages/create-disposabl-app/scaffold";
+            await createApp("packages/create-disposabl-app/dist/templates/default", process.env.FIRST_WEB_APP, "first-web", {
+              version: "test",
+              desktopId: "00000000000000000000000000000001",
+              platforms: ["web", "api"],
+              features: ["authentication"],
+            });
+          '
+          (cd "$FIRST_WEB_APP" && bun install --lockfile-only)
+          tar --exclude=.git -czf "$RUNNER_TEMP/first-web.tgz" -C "$FIRST_WEB_APP" .
+          (cd "$RUNNER_TEMP" && shasum -a 256 first-web.tgz > first-web.sha256)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: first-web
+          path: |
+            ${{ runner.temp }}/first-web.tgz
+            ${{ runner.temp }}/first-web.sha256
+          retention-days: 1
+          compression-level: 0
+  web:
+    needs: fixture
+    name: Web and backend / ${{ matrix.order }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        order: [sequential, parallel-checks]
+    timeout-minutes: 8
+    env:
+      E2E_TELEMETRY_DISABLED: "1"
+      VITE_CONVEX_URL: https://ci.invalid
+      VITE_CONVEX_SITE_URL: https://ci.invalid
+      CI_ORDER: ${{ matrix.order }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: first-web
+      - run: |
+          shasum -a 256 --check first-web.sha256
+          tar -xzf first-web.tgz
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.5
+      - name: Run locked install, format, typecheck, lint, tests and build
+        run: |
+          started=$SECONDS
+          bun fmt --check
+          /usr/bin/time -f 'Frozen install: %e s' bun install --frozen-lockfile
+          check_started=$SECONDS
+          if [[ "$CI_ORDER" == sequential ]]; then
+            bun run check:ci
+            bun run test:unit --parallel=4 --bail=1
+          else
+            bun run generate
+            (bun x --no-install turbo run typecheck lint && bun fmt --check) &
+            checks=$!
+            bun run test:unit --parallel=2 --bail=1 &
+            unit=$!
+            wait "$checks"
+            wait "$unit"
+          fi
+          printf 'Typecheck, lint and test wall seconds: %s\n' "$((SECONDS - check_started))"
+          /usr/bin/time -f 'Web build: %e s' bun x --no-install turbo run build --filter=@disposabl/web
+          test -s apps/web/dist/client/_shell.html
+          test -s packages/backend/generated/pages.json
+          printf 'Install, checks, tests and build: %s s\n' "$((SECONDS - started))"
+  fail-fast:
+    name: Malformed source fails before dependencies
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.5
+      - name: Verify the formatting check fails
+        run: |
+          printf 'export const invalid = ;\n' > apps/web/src/ci-malformed-fixture.ts
+          if /usr/bin/time -f 'Malformed source rejected in: %e s' bun fmt --check; then
+            echo 'The malformed file incorrectly passed CI formatting.'
+            exit 1
+          fi
