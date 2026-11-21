@@ -1,0 +1,56 @@
+name: Stock stable lint scheduling benchmark
+on:
+  push:
+    branches: [benchmark/stable-lint-graph-20261121]
+permissions:
+  contents: read
+jobs:
+  source:
+    name: ${{ matrix.scope }} / ${{ matrix.graph }} / ${{ matrix.repeat }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      matrix:
+        scope: [product, all-platforms]
+        graph: [ordered, independent]
+        repeat: [1, 2]
+    env:
+      CI: "1"
+      DO_NOT_TRACK: "1"
+      EXPO_NO_TELEMETRY: "1"
+      E2E_TELEMETRY_DISABLED: "1"
+      GRAPH: ${{ matrix.graph }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          {
+            ref: "${{ github.sha }}",
+            fetch-depth: 2,
+            persist-credentials: false,
+          }
+      - uses: actions/setup-node@v6
+        with: { node-version: "24", package-manager-cache: false }
+      - uses: oven-sh/setup-bun@v2
+        with: { bun-version: "1.4.5" }
+      - run: bun install --frozen-lockfile
+      - name: Verify original task command graph
+        run: |
+          git diff --exit-code 48630a83 "$GITHUB_SHA" -- apps packages bun.lock turbo.json
+          bun x --no-install turbo run typecheck lint --dry=json | jq -cer '[.tasks[] | [.taskId,.command]] | sort' > "$RUNNER_TEMP/tasks-original.json"
+      - name: Remove ordering for read-only lint tasks
+        if: matrix.graph == 'independent'
+        run: |
+          jq 'del(.tasks.lint.dependsOn, .tasks["@disposabl/disposabl-kit#lint"].dependsOn)' turbo.json > "$RUNNER_TEMP/turbo.json"
+          mv "$RUNNER_TEMP/turbo.json" turbo.json
+          test "$(git diff --name-only)" = turbo.json
+          bun x --no-install turbo run typecheck lint --dry=json | jq -cer '[.tasks[] | [.taskId,.command]] | sort' > "$RUNNER_TEMP/tasks-modified.json"
+          cmp "$RUNNER_TEMP/tasks-original.json" "$RUNNER_TEMP/tasks-modified.json"
+      - name: Run product checks
+        if: matrix.scope == 'product'
+        run: /usr/bin/time -p bun run check:ci
+      - name: Generate and verify full starter
+        if: matrix.scope == 'all-platforms'
+        run: |
+          bun run --cwd packages/create-disposabl-app build
+          /usr/bin/time -p bun run --cwd packages/create-disposabl-app verify:starter all-platforms
