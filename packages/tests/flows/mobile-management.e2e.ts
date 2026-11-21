@@ -164,6 +164,9 @@ test(
       await expect(
         screen.getByRole("button", "Connect accounts"),
       ).toBeVisible();
+      await expect(
+        screen.getByText("Connect once. Every app you create stays yours."),
+      ).toBeVisible();
       await screen.getByRole("button", "Back to idea").tap();
       await expect(idea).toHaveValue(draft);
       await screen.getByRole("button", "Send message", { exact: true }).tap();
@@ -174,17 +177,9 @@ test(
       await expect(idea).toHaveValue(draft);
       await screen.getByRole("button", "Close create app").tap();
     }
-    await expect(
-      screen.getByRole("button", "Set up your workspace"),
-    ).toBeVisible();
-    await screen.getByRole("button", "Set up your workspace").tap();
-    await expect(screen.getByRole("button", "Connect accounts")).toBeVisible();
-    await expect(
-      screen.getByText("Connect once. Every app you create stays yours."),
-    ).toBeVisible();
     await openMobile({ app, device, screen }, true);
     await expect(
-      screen.getByRole("button", "Set up your workspace"),
+      screen.getByRole("button", "Create app", { exact: true }),
     ).toBeVisible();
     await screen.getByRole("button", "Settings", { exact: true }).tap();
     await expect(
