@@ -6,8 +6,10 @@ runs:
     - shell: bash
       run: |
         prefix="$RUNNER_TEMP/disposabl-bun-lint"
-        if npm install --prefix "$prefix" --no-save --no-audit --no-fund 'bun@1.4.5-canary.20261120.1+7bb427f'; then
-          linter="$prefix/node_modules/.bin/bun"
+        tool=$(node -p '["@oven/bun", process.platform === "win32" ? "windows" : process.platform, process.arch === "arm64" ? "aarch64" : process.arch].join("-")')
+        linter="$prefix/node_modules/$tool/bin/bun"
+        if [[ "${RUNNER_OS:-}" == Windows ]]; then linter="$linter.exe"; fi
+        if npm install --prefix "$prefix" --no-save --no-audit --no-fund --ignore-scripts "$tool@1.4.5-canary.20261120.1+7bb427f"; then
           if [[ "$("$linter" --revision)" == '1.4.6-canary.1+7bb427f3b' ]]; then
             printf 'DISPOSABL_BUN_LINT=%s\n' "$linter" >> "$GITHUB_ENV"
           else
