@@ -1,7 +1,7 @@
-name: Product simulator native archive cache pilot
+name: Product simulator cache and boot overlap pilot
 on:
   push:
-    branches: [benchmark/ios-preview-native-cache-20261121]
+    branches: [benchmark/ios-cache-overlap-20261121]
 permissions:
   actions: read
   contents: read
@@ -86,13 +86,10 @@ jobs:
         with:
           key: bench-${{ github.run_id }}-${{ steps.key.outputs.key }}
           path: ${{ runner.temp }}/ios-preview-native-cache
-      - name: Reject corrupt cache and repack current source
+      - name: Verify cached base and overlap simulator boot with repack
         if: github.run_attempt > 1
-        run: bash .github/scripts/ios-native-cache-pilot.sh replay
-      - name: Boot an owned simulator
-        if: github.run_attempt > 1
-        timeout-minutes: 5
-        run: bash .github/scripts/ios-repack-launch.sh boot
+        timeout-minutes: 7
+        run: bash .github/scripts/ios-native-cache-overlap.sh
       - name: Verify current marker and build number on first launch
         if: github.run_attempt > 1
         timeout-minutes: 6
