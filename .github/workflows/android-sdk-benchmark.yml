@@ -1,0 +1,40 @@
+name: Android SDK initialization benchmark
+on:
+  push:
+    branches: [benchmark/ci-android-sdk-20261121]
+permissions:
+  contents: read
+jobs:
+  measure:
+    name: SDK / ${{ matrix.setup }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    strategy:
+      fail-fast: false
+      matrix:
+        setup: [action, preinstalled]
+    steps:
+      - uses: actions/setup-java@v5
+        with: { distribution: temurin, java-version: "17" }
+      - uses: android-actions/setup-android@v3
+        if: matrix.setup == 'action'
+        with: { packages: platform-tools }
+      - name: Accept licenses with the preinstalled toolchain
+        if: matrix.setup == 'preinstalled'
+        run: |
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          test -x "$ANDROID_HOME/platform-tools/adb"
+          test -x "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          (
+            set +o pipefail
+            yes | timeout --kill-after=2s 20s "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses
+          )
+      - name: Verify executable tools and accepted licenses
+        run: |
+          "$ANDROID_HOME/platform-tools/adb" version
+          tool=$(command -v sdkmanager || printf '%s' "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager")
+          "$tool" --version
+          timeout --kill-after=2s 20s "$tool" --licenses < /dev/null | tee "$RUNNER_TEMP/licenses"
+          grep -F 'All SDK package licenses accepted.' "$RUNNER_TEMP/licenses"
+          find "$ANDROID_HOME/platforms" -maxdepth 2 -name android.jar -type f -print -quit | grep .
+          find "$ANDROID_HOME/build-tools" -maxdepth 2 -name apksigner -type f -print -quit | grep .
