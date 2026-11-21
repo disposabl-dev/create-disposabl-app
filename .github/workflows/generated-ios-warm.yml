@@ -1,0 +1,133 @@
+name: Generated iOS warm repack benchmark
+on:
+  push:
+    branches: [benchmark/generated-ios-warm-20261121]
+permissions:
+  actions: read
+  contents: read
+env:
+  CI: "1"
+  DO_NOT_TRACK: "1"
+  EXPO_NO_TELEMETRY: "1"
+  EXPO_NO_DOTENV: "1"
+  E2E_TELEMETRY_DISABLED: "1"
+  EXPO_PROJECT_ID: 00000000-0000-4000-8000-000000000001
+  CONVEX_URL: https://ci.invalid
+  CONVEX_SITE_URL: https://ci.invalid
+  PUBLIC_SITE_URL: https://ci.invalid
+  EXPO_PUBLIC_CONVEX_URL: https://ci.invalid
+  EXPO_PUBLIC_CONVEX_SITE_URL: https://ci.invalid
+  CHANNEL: native-benchmark
+  DISPOSABL_MOBILE_CHANNEL: native-benchmark
+  DISPOSABL_ANDROID_CHANNEL: native-benchmark
+  GH_REPO: ${{ github.repository }}
+  SOURCE: fdfcacb916e1c914462f894313ad4f6d45e800c7
+  SOURCE_PATH: pulls/0
+  PR_NUMBER: "0"
+jobs:
+  seed:
+    if: github.repository == 'disposabl-dev/create-disposabl-app'
+    runs-on: macos-26
+    timeout-minutes: 20
+    env:
+      DISPOSABL_IOS_BUILD_NUMBER: "1"
+      DISPOSABL_ANDROID_VERSION_CODE: "1"
+    outputs:
+      key: ${{ steps.identity.outputs.key }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.5
+      - name: Fetch and attest exact generated fixture and cold app
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: /usr/bin/time -p bash .github/scripts/generated-ios-warm.sh fetch
+      - name: Install frozen generated dependencies
+        working-directory: generated
+        run: /usr/bin/time -p bun install --frozen-lockfile --filter @disposabl/mobile
+      - name: Compute generated compatibility identity
+        id: identity
+        env:
+          NATIVE_INPUT_HASH: ${{ hashFiles('generated/bun.lock', 'generated/apps/mobile/app.*', 'generated/apps/mobile/package.json', 'generated/apps/mobile/plugins/**', 'generated/patches/**', 'generated/.github/scripts/apple.sh') }}
+        run: /usr/bin/time -p bash .github/scripts/generated-ios-warm.sh identity
+      - name: Validate and stage exact cold native app
+        run: bash .github/scripts/generated-ios-warm.sh seed
+      - uses: actions/cache/save@v6
+        with:
+          key: generated-ios-${{ github.run_id }}-${{ steps.identity.outputs.key }}
+          path: ${{ runner.temp }}/ios-preview-native-cache
+  warm:
+    needs: seed
+    runs-on: macos-26
+    timeout-minutes: 25
+    env:
+      DISPOSABL_IOS_BUILD_NUMBER: "42"
+      DISPOSABL_ANDROID_VERSION_CODE: "42"
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.5
+      - name: Fetch and attest exact generated fixture and cold app
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: /usr/bin/time -p bash .github/scripts/generated-ios-warm.sh fetch
+      - name: Install frozen generated dependencies
+        working-directory: generated
+        run: /usr/bin/time -p bun install --frozen-lockfile --filter @disposabl/mobile
+      - name: Compute generated compatibility identity
+        id: identity
+        env:
+          NATIVE_INPUT_HASH: ${{ hashFiles('generated/bun.lock', 'generated/apps/mobile/app.*', 'generated/apps/mobile/package.json', 'generated/apps/mobile/plugins/**', 'generated/patches/**', 'generated/.github/scripts/apple.sh') }}
+        run: /usr/bin/time -p bash .github/scripts/generated-ios-warm.sh identity
+      - name: Check seed and current identity match
+        env:
+          SEED_KEY: ${{ needs.seed.outputs.key }}
+          CURRENT_KEY: ${{ steps.identity.outputs.key }}
+        run: test -n "$SEED_KEY" && test "$SEED_KEY" = "$CURRENT_KEY"
+      - name: Restore exact native app
+        id: native
+        uses: actions/cache/restore@v6
+        with:
+          key: generated-ios-${{ github.run_id }}-${{ needs.seed.outputs.key }}
+          path: ${{ runner.temp }}/ios-preview-native-cache
+          fail-on-cache-miss: true
+      - name: Require an exact hit
+        env:
+          HIT: ${{ steps.native.outputs.cache-hit }}
+        run: test "$HIT" = true
+      - name: Repack current JS and counters
+        run: bash .github/scripts/generated-ios-warm.sh warm
+      - name: Boot owned simulator
+        timeout-minutes: 5
+        run: bash .github/scripts/generated-ios-simulator.sh boot
+      - name: Verify first launch and current counters
+        timeout-minutes: 5
+        run: bash .github/scripts/generated-ios-warm.sh launch
+      - name: Remove owned simulator
+        if: always()
+        timeout-minutes: 2
+        run: bash .github/scripts/generated-ios-simulator.sh cleanup
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: generated-ios-warm-${{ github.run_attempt }}
+          path: |
+            dist/apple/ios-simulator.zip
+            ${{ runner.temp }}/ios-repack-evidence/
+          if-no-files-found: warn
+          retention-days: 1
+          compression-level: 0
