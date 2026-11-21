@@ -25,8 +25,12 @@ bundle=$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$plist")
 executable=$(/usr/libexec/PlistBuddy -c 'Print CFBundleExecutable' "$plist")
 minimum=$(/usr/libexec/PlistBuddy -c 'Print MinimumOSVersion' "$plist")
 lipo -archs "$app/$executable" | tee "$evidence/architectures.txt"
-lipo -archs "$app/$executable" | grep -qw arm64
+arches=$(lipo -archs "$app/$executable")
+[[ " $arches " == *' arm64 '* && " $arches " == *' x86_64 '* ]]
 codesign --verify --strict --deep "$app"
+codesign -dv "$app" 2>&1 | grep -q 'Signature=adhoc'
+[[ "$bundle" == dev.disposabl.mobile.preview ]]
+[[ $(/usr/libexec/PlistBuddy -c 'Print CFBundleVersion' "$plist") == "$EXPECTED_BUILD" ]]
 printf '%s\n' "$app" > "$work/app"
 printf '%s\n' "$bundle" > "$work/bundle"
 printf '%s\n' "$minimum" > "$work/minimum"
@@ -66,9 +70,15 @@ app=$(cat "$work/app")
 bundle=$(cat "$work/bundle")
 udid=$(cat "$work/owned-udid")
 xcrun simctl install "$udid" "$app"
+installed=$(xcrun simctl get_app_container "$udid" "$bundle" app)
+[[ $(/usr/libexec/PlistBuddy -c 'Print CFBundleVersion' "$installed/Info.plist") == "$EXPECTED_BUILD" ]]
+[[ $(jq -er '.ios.buildNumber' "$installed/EXConstants.bundle/app.config") == "$EXPECTED_BUILD" ]]
+printf '%s\n' "$EXPECTED_BUILD" > "$evidence/installed-build.txt"
 xcrun simctl launch "$udid" "$bundle" | tee "$evidence/launch.txt"
 sleep 20
 xcrun simctl io "$udid" screenshot "$evidence/screen.png"
+swift "$GITHUB_WORKSPACE/.github/scripts/ios-final-ocr.swift" "$evidence/screen.png" > "$evidence/screen-ocr.txt"
+grep -Fx 'What will you build?' "$evidence/screen-ocr.txt"
 echo 'Inspect screen.png to establish what rendered; launch and screenshot capture alone do not prove behavior.' >> "$GITHUB_STEP_SUMMARY"
  ;;
   test)
@@ -80,6 +90,13 @@ udid=$(cat "$work/owned-udid")
   export E2E_IOS_DEVICE="$udid" E2E_IOS_APP_ID="$bundle" DISPOSABL_MOBILE_CHANNEL=pr-92
   export E2E_TELEMETRY_DISABLED=1 DO_NOT_TRACK=1 EXPO_NO_TELEMETRY=1
   bun run --cwd packages/tests e2e run --target ios --retries 0 2>&1 | tee "$evidence/product-ios-checks.log"
+  python3 - "$evidence/product-ios-checks.log" <<'PY'
+import re, sys
+from pathlib import Path
+log = re.sub(r'\x1b\[[0-9;]*m', '', Path(sys.argv[1]).read_text())
+if not re.search(r'✓[^\n]*mobile home renders', log) or not re.search(r'Tests\s+[1-9][0-9]* passed', log):
+    raise SystemExit('Guest home test was not observed passing')
+PY
  ;;
   cleanup)
 if [[ -f "$work/owned-udid" ]]; then

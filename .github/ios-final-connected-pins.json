@@ -1,0 +1,25 @@
+{
+  "test_sha": "REPLACE_WITH_40_HEX_COMMIT",
+  "include": [
+    {
+      "label": "cold",
+      "run": "REPLACE",
+      "attempt": "REPLACE",
+      "job": "REPLACE",
+      "artifact": "REPLACE",
+      "digest": "REPLACE",
+      "sha": "REPLACE",
+      "build": "REPLACE"
+    },
+    {
+      "label": "warm",
+      "run": "REPLACE",
+      "attempt": "REPLACE",
+      "job": "REPLACE",
+      "artifact": "REPLACE",
+      "digest": "REPLACE",
+      "sha": "REPLACE",
+      "build": "REPLACE"
+    }
+  ]
+}
