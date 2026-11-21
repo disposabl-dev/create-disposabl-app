@@ -1,0 +1,72 @@
+name: Original product Web cold and warm benchmark
+on:
+  push:
+    branches: [benchmark/web-original-cold-warm-20261121]
+permissions:
+  contents: read
+jobs:
+  web:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      VITE_CONVEX_URL: https://ci.invalid
+      VITE_CONVEX_SITE_URL: https://ci.invalid
+      E2E_TELEMETRY_DISABLED: "1"
+      DO_NOT_TRACK: "1"
+      EXPO_NO_TELEMETRY: "1"
+      DISPOSABL_ANALYTICS_ENABLED: "false"
+      EXPO_PUBLIC_DISPOSABL_ANALYTICS_ENABLED: "false"
+      VITE_DISPOSABL_ANALYTICS_ENABLED: "false"
+      TURBO_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          package-manager-cache: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.4"
+      - name: Set isolated Bun cache
+        run: echo "BUN_INSTALL_CACHE_DIR=$RUNNER_TEMP/web-bun-cache" >> "$GITHUB_ENV"
+      - name: Run cold then warm on the same runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test ! -e "$BUN_INSTALL_CACHE_DIR"
+          echo 'Both passes use an empty checkout build state. The warm pass retains the first pass Bun package cache and OS caches.'
+          for pass in cold warm; do
+            echo "::group::$pass pass"
+            git reset --hard "$GITHUB_SHA"
+            git clean -ffdx
+            start=$(date +%s%N)
+            echo "--- $pass frozen workspace install ---"
+            /usr/bin/time -p bun install --frozen-lockfile
+            echo "--- $pass generation ---"
+            /usr/bin/time -p bun run check
+            git diff --exit-code -- packages/backend/generated
+            echo "--- $pass build generator fixture required by product unit tests ---"
+            /usr/bin/time -p bun run --cwd packages/create-disposabl-app build
+            echo "--- $pass complete source and unit gates ---"
+            /usr/bin/time -p bun run --cwd packages/tests test:unit
+            echo "--- $pass Vite build, fresh outputs and no Turbo cache ---"
+            /usr/bin/time -p bun x --no-install turbo run build --filter=@disposabl/web --force
+            test -s apps/web/dist/client/index.html
+            test -s apps/web/dist/client/sitemap.xml
+            test -s apps/web/dist/client/docs/index.html
+            (cd apps/web/dist/client && find . -type f -print0 | sort -z | xargs -0 sha256sum) > "$RUNNER_TEMP/$pass-web.sha256"
+            count=$(wc -l < "$RUNNER_TEMP/$pass-web.sha256")
+            elapsed=$(( ($(date +%s%N) - start) / 1000000 ))
+            printf '%s pass: %s ms from install start through static output sanity; %s static files\n' "$pass" "$elapsed" "$count" | tee -a "$GITHUB_STEP_SUMMARY"
+            echo '::endgroup::'
+          done
+      - name: Preserve static output manifests
+        uses: actions/upload-artifact@v7
+        with:
+          name: web-static-manifests
+          path: ${{ runner.temp }}/*-web.sha256
+          retention-days: 1
+          if-no-files-found: error
