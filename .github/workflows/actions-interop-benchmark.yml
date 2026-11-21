@@ -1,0 +1,80 @@
+name: Test Actions cache and artifact interoperability
+on:
+  push:
+    branches: [benchmark/ci-actions-interop-20261121]
+permissions:
+  contents: read
+jobs:
+  interop:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, macos-26, windows-2025]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 6
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Create fixture bytes
+        run: |
+          mkdir -p cache/current payload
+          python -c 'from pathlib import Path; from hashlib import shake_256; Path("cache/current/data").write_bytes(shake_256(b"cache").digest(2**20)); Path("payload/archive.zip").write_bytes(shake_256(b"payload").digest(32*2**20))'
+      - uses: actions/cache/save@v4
+        with:
+          key: interop-v4-${{ github.run_id }}-${{ github.run_attempt }}-${{ runner.os }}
+          path: cache/current
+      - name: Remove local fixture cache
+        run: rm -rf cache/current
+      - uses: actions/cache/restore@v6
+        id: old
+        with:
+          key: interop-v4-${{ github.run_id }}-${{ github.run_attempt }}-${{ runner.os }}
+          path: cache/current
+          fail-on-cache-miss: true
+      - name: Verify older exact cache contents and output
+        env:
+          HIT: ${{ steps.old.outputs.cache-hit }}
+          MATCH: ${{ steps.old.outputs.cache-matched-key }}
+          EXPECTED: interop-v4-${{ github.run_id }}-${{ github.run_attempt }}-${{ runner.os }}
+        run: |
+          [[ "$HIT" == true && "$MATCH" == "$EXPECTED" ]]
+          python -c 'from pathlib import Path; from hashlib import shake_256; assert Path("cache/current/data").read_bytes() == shake_256(b"cache").digest(2**20)'
+      - uses: actions/cache/save@v6
+        with:
+          key: interop-v6-${{ github.run_id }}-${{ github.run_attempt }}-${{ runner.os }}
+          path: cache/current
+      - run: rm -rf cache/current
+      - uses: actions/cache/restore@v4
+        id: newer
+        with:
+          key: interop-v6-${{ github.run_id }}-${{ github.run_attempt }}-${{ runner.os }}
+          path: cache/current
+          fail-on-cache-miss: true
+      - name: Verify newer exact cache contents and output
+        env:
+          HIT: ${{ steps.newer.outputs.cache-hit }}
+        run: |
+          [[ "$HIT" == true ]]
+          python -c 'from pathlib import Path; from hashlib import shake_256; assert Path("cache/current/data").read_bytes() == shake_256(b"cache").digest(2**20)'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-old-${{ runner.os }}
+          path: payload/
+          retention-days: 1
+          compression-level: 0
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-new-${{ runner.os }}
+          path: payload/
+          retention-days: 1
+          compression-level: 0
+          if-no-files-found: error
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: release-*-${{ runner.os }}
+          path: downloaded
+      - name: Verify release pattern layout and exact bytes
+        run: |
+          python -c 'import os; from pathlib import Path; label=os.environ["RUNNER_OS"]; fixture=Path("payload/archive.zip").read_bytes(); assert all((Path("downloaded") / f"release-{version}-{label}" / "archive.zip").read_bytes() == fixture for version in ["old", "new"])'
