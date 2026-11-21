@@ -49,13 +49,22 @@ case "$platform" in
     cd apps/mobile
     timed 'Expo prebuild' bun x --no-install expo prebuild --platform android --no-install
     cd android
-    timed 'Android APK and AAB build' bash "$root/.github/scripts/android-runner.sh" build :app:assembleRelease :app:bundleRelease
+    flags=(--profile)
+    if [[ "${CI_PEAK_HEAP:-}" == 4g ]]; then
+      flags+=("-Dorg.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=512m")
+    fi
+    timed 'Android APK and AAB build' bash "$root/.github/scripts/android-runner.sh" build :app:assembleRelease :app:bundleRelease "${flags[@]}"
+    ccache --show-stats --verbose
     apk=app/build/outputs/apk/release/app-release.apk
     aab=app/build/outputs/bundle/release/app-release.aab
     test -s "$apk" && test -s "$aab"
     architectures=$(jq -c '.androidArchitectures // ["arm64-v8a", "x86_64"]' "$root/disposabl.json")
     manifest=$(jq -nc --argjson architectures "$architectures" '{androidArchitectures:$architectures}')
     node "$root/.github/scripts/verify-android-abis.mjs" "$apk" "$manifest"
+    unzip -tq "$apk"
+    unzip -tq "$aab"
+    cert=$(node "$root/.github/scripts/android-signatures.mjs" "$apk" fallback)
+    node "$root/.github/scripts/android-signatures.mjs" "$aab" "$cert"
     wc -c "$apk" "$aab"
     ;;
   ios)

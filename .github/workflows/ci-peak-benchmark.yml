@@ -14,12 +14,13 @@ concurrency:
 jobs:
   measure:
     if: github.repository == 'disposabl-dev/create-disposabl-app' && github.ref == 'refs/heads/benchmark/ci-peak-20261121'
-    name: ${{ matrix.platform }} / ${{ matrix.runner }}
+    name: Android warm profile / ${{ matrix.heap }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { platform: android, runner: ubuntu-24.04 }
+          - { platform: android, runner: ubuntu-24.04, heap: default }
+          - { platform: android, runner: ubuntu-24.04, heap: 4g }
     runs-on: ${{ matrix.runner }}
     timeout-minutes: ${{ (matrix.platform == 'android' || matrix.platform == 'ios') && 75 || 12 }}
     defaults:
@@ -27,6 +28,7 @@ jobs:
         shell: bash
     env:
       CI_PEAK_PLATFORM: ${{ matrix.platform }}
+      CI_PEAK_HEAP: ${{ matrix.heap }}
       SEGMENT_DOWNLOAD_TIMEOUT_MINS: 1
       E2E_TELEMETRY_DISABLED: 1
       DO_NOT_TRACK: 1
@@ -100,5 +102,14 @@ jobs:
       - name: Record cache hits
         run: |
           printf 'Bun cache exact hit: %s\nBuild cache exact hit: %s\n' '${{ steps.dependencies.outputs.cache-hit }}' '${{ steps.build-cache.outputs.cache-hit }}' >> "$GITHUB_STEP_SUMMARY"
+          test '${{ steps.dependencies.outputs.cache-hit }}' = true
+          test '${{ steps.build-cache.outputs.cache-hit }}' = true
       - name: Build and verify
         run: bash .github/scripts/ci-peak-benchmark.sh build
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: full-product-android-warm-profile-${{ matrix.heap }}-${{ github.run_attempt }}
+          path: apps/mobile/android/build/reports/profile/
+          retention-days: 1
+          if-no-files-found: warn
