@@ -316,7 +316,7 @@ test("native warmup shares release cache keys and PRs only seed a missing cache"
     save?.if ?? "",
     /github\.event_name == 'pull_request' && github\.event\.pull_request\.head\.repo\.full_name == github\.repository\s+&&\s+steps\.native-cache\.outputs\.cache-matched-key == ''/,
   );
-  assert.match(primeText, /actions\/cache\/save@v4/);
-  assert.match(pipelineText, /actions\/cache\/restore@v4/);
+  assert.match(primeText, /actions\/cache\/save@v6/);
+  assert.match(pipelineText, /actions\/cache\/restore@v6/);
   assert.doesNotMatch(primeText + pipelineText, /CCACHE_SLOPPINESS/);
 });
