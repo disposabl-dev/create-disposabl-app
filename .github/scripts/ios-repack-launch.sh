@@ -28,9 +28,9 @@ PY
     python3 - "$udid" <<'PY' 2>&1 | tee "$evidence/simulator-boot.log"
 import subprocess, sys
 try:
-    subprocess.run(['xcrun', 'simctl', 'bootstatus', sys.argv[1], '-b'], check=True, timeout=180)
+    subprocess.run(['xcrun', 'simctl', 'bootstatus', sys.argv[1], '-b'], check=True, timeout=300)
 except subprocess.TimeoutExpired:
-    raise SystemExit('Simulator boot timed out after 180 seconds')
+    raise SystemExit('Simulator boot timed out after 300 seconds')
 PY
     ;;
   launch)

@@ -1,4 +1,4 @@
-name: Product simulator cache and boot overlap pilot
+name: Product simulator cache across commits
 on:
   push:
     branches: [benchmark/ios-distinct-source-20261121]
@@ -91,20 +91,48 @@ jobs:
         if: env.REPLAY == 'true'
         timeout-minutes: 6
         run: bash .github/scripts/ios-native-cache-pilot.sh replay
-      - name: Boot simulator after repack is complete
+      - uses: actions/upload-artifact@v7
         if: env.REPLAY == 'true'
+        with:
+          name: current-simulator
+          path: dist/apple/ios-simulator.zip
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 1
+  smoke:
+    needs: cache
+    if: github.repository == 'disposabl-dev/create-disposabl-app'
+    runs-on: macos-26
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          name: current-simulator
+          path: ${{ runner.temp }}/ios-repack-input
+      - name: Verify repacked simulator app
+        run: |
+          unzip -tq "$RUNNER_TEMP/ios-repack-input/ios-simulator.zip"
+          mkdir "$RUNNER_TEMP/verified-app"
+          unzip -q "$RUNNER_TEMP/ios-repack-input/ios-simulator.zip" -d "$RUNNER_TEMP/verified-app"
+          app="$RUNNER_TEMP/verified-app/Disposabl.app"
+          codesign --verify --deep --strict "$app"
+          printf 'IOS_REPACK_CACHE_APP=%s\n' "$app" >> "$GITHUB_ENV"
+      - name: Boot simulator on a separate runner
         timeout-minutes: 6
         run: bash .github/scripts/ios-repack-launch.sh boot
       - name: Verify current marker and build number on first launch
-        if: env.REPLAY == 'true'
         timeout-minutes: 6
         run: bash .github/scripts/ios-native-cache-pilot.sh launch
       - name: Remove owned simulator
-        if: always() && env.REPLAY == 'true'
+        if: always()
         timeout-minutes: 2
         run: bash .github/scripts/ios-repack-launch.sh cleanup
       - uses: actions/upload-artifact@v7
-        if: always() && env.REPLAY == 'true'
+        if: always()
         with:
           name: native-cache-replay-${{ github.run_attempt }}
           path: ${{ runner.temp }}/ios-repack-evidence/
