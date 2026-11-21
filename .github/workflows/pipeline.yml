@@ -458,9 +458,15 @@ jobs:
         working-directory: apps/mobile
         run: bash "$GITHUB_WORKSPACE/.github/scripts/mobile.sh" expo-env
       - name: Xcode toolchain
+        id: xcode
         run: |
-          xcodebuild -version
+          version=$(xcodebuild -version)
+          printf '%s\n' "$version"
           xcrun swift --version
+          if [[ "$version" =~ ^Xcode[[:space:]]([0-9]+) && "${BASH_REMATCH[1]}" -ge 26 ]]; then
+            id=$({ printf '%s\n' "$version" "$GITHUB_WORKSPACE" "$RUNNER_TEMP"; xcrun --sdk iphonesimulator --show-sdk-build-version; } | shasum -a 256 | cut -d' ' -f1)
+            printf 'cas_key=%s\n' "$id" >> "$GITHUB_OUTPUT"
+          fi
       - name: Restore CocoaPods downloads and specifications
         uses: actions/cache@v4
         with:
@@ -468,8 +474,15 @@ jobs:
             ~/Library/Caches/CocoaPods
             ~/.cocoapods/repos/trunk
           key: cocoapods-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}
+      - name: Restore Xcode compilation cache
+        if: steps.xcode.outputs.cas_key != ''
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/ios-cas
+          key: ios-simulator-cas-v1-${{ runner.arch }}-${{ steps.xcode.outputs.cas_key }}-${{ hashFiles('bun.lock', 'apps/mobile/app.*', 'apps/mobile/package.json', 'apps/mobile/plugins/**', 'patches/**') }}
       - name: Enable simulator compiler cache
         id: simulator-cache
+        if: steps.xcode.outputs.cas_key == ''
         timeout-minutes: 2
         continue-on-error: true
         run: bash .github/scripts/apple.sh prepare-cache
@@ -482,6 +495,7 @@ jobs:
           restore-keys: ios-simulator-ccache-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}-
       - name: Build simulator archive
         env:
+          XCODE_COMPILATION_CACHE_DIR: ${{ steps.xcode.outputs.cas_key != '' && format('{0}/ios-cas', runner.temp) || '' }}
           CCACHE_DIR: ${{ runner.temp }}/ios-ccache
           CCACHE_BASEDIR: ${{ github.workspace }}
           CCACHE_COMPILERCHECK: content

@@ -101,7 +101,13 @@ case "${1:?operation required}" in
   simulator)
     check_source
     bun x --no-install expo prebuild --platform ios --no-install
-    use_compiler_cache
+    xcode_settings=(COMPILER_INDEX_STORE_ENABLE=NO CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=-)
+    if [[ -n "${XCODE_COMPILATION_CACHE_DIR:-}" ]]; then
+      export USE_CCACHE=0
+      xcode_settings+=(COMPILATION_CACHE_ENABLE_CACHING=YES "COMPILATION_CACHE_CAS_PATH=$XCODE_COMPILATION_CACHE_DIR")
+    else
+      use_compiler_cache
+    fi
     (cd ios && pod install)
     workspace=$(find ios -maxdepth 1 -name '*.xcworkspace' -print -quit)
     test -n "$workspace"
@@ -110,8 +116,7 @@ case "${1:?operation required}" in
     /usr/bin/time -p xcodebuild -quiet -showBuildTimingSummary \
       -workspace "$workspace" -scheme "$(basename "$workspace" .xcworkspace)" \
       -configuration Release -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
-      -derivedDataPath "$RUNNER_TEMP/ios-build" COMPILER_INDEX_STORE_ENABLE=NO \
-      CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- build
+      -derivedDataPath "$RUNNER_TEMP/ios-build" "${xcode_settings[@]}" build
     if [[ "${USE_CCACHE:-}" == 1 ]]; then ccache --show-stats; fi
     app=$(find "$RUNNER_TEMP/ios-build/Build/Products/Release-iphonesimulator" -maxdepth 1 -name '*.app' -type d -print -quit)
     test -n "$app"
