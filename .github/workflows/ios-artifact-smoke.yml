@@ -1,0 +1,53 @@
+name: Benchmark iOS artifact smoke
+on:
+  push:
+    branches: [benchmark/ios-artifact-smoke-*]
+  workflow_dispatch:
+permissions:
+  actions: read
+  contents: read
+jobs:
+  smoke:
+    name: Smoke ${{ matrix.label }}
+    runs-on: macos-26
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: product
+            run: "44899216086"
+            sha: cd5ddf7e3a70743b5e12c652b7667d04e3fe067b
+            job: "136832362469"
+            name: ios-simulator
+          - label: generated
+            run: "44900751287"
+            sha: ff387a33827f9b19dd4fa241f6085296c8b94b2b
+            job: "136836017366"
+            name: first-ios-1
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify origin and locate artifact
+        id: origin
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN: ${{ matrix.run }}
+          EXPECTED_SHA: ${{ matrix.sha }}
+          JOB: ${{ matrix.job }}
+          ARTIFACT: ${{ matrix.name }}
+        run: bash .github/scripts/ios-artifact-origin.sh
+      - name: Download and smoke simulator app
+        if: steps.origin.outputs.ready == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_ID: ${{ steps.origin.outputs.id }}
+        run: bash .github/scripts/ios-artifact-smoke.sh
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.origin.outputs.ready == 'true'
+        with:
+          name: ios-smoke-${{ matrix.label }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ios-smoke-evidence/
+          if-no-files-found: warn
+          retention-days: 3
