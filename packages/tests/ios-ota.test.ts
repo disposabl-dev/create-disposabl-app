@@ -201,13 +201,17 @@ test("iOS build lookup errors do not trigger a replacement build", async () => {
 });
 
 test("iOS OTA exports once and publishes the checked runtime and channel", async () => {
-  const result = await run("ota");
+  const result = await run("ota", { RUNTIME: undefined });
   assert.equal(result.status, 0, result.stderr);
   const commands = result.trace
     .trim()
     .split("\n")
     .map((line) => JSON.parse(line) as string[]);
   assert.equal(commands.filter((args) => args.includes("export")).length, 1);
+  assert.equal(
+    commands.filter((args) => args.includes("runtimeversion:resolve")).length,
+    2,
+  );
   const publish = commands.find((args) => args.includes("update"));
   assert.ok(publish);
   assert.deepEqual(publish.slice(0, 8), [
@@ -224,7 +228,11 @@ test("iOS OTA exports once and publishes the checked runtime and channel", async
 });
 
 test("stale source or runtime drift prevents iOS OTA publication", async () => {
-  for (const values of [{ STALE: "1" }, { DRIFT: "1" }]) {
+  for (const values of [
+    { STALE: "1" },
+    { DRIFT: "1" },
+    { RUNTIME: "b".repeat(40) },
+  ]) {
     const result = await run("ota", values);
     assert.notEqual(result.status, 0);
     assert.doesNotMatch(result.trace, /"update",/);

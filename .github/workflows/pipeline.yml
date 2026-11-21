@@ -165,7 +165,7 @@ jobs:
             fi
           fi
           bun x --no-install convex run "${setup_target[@]}" billing:setup "$setup_args"
-          bun x --no-install static-hosting upload $AUTH_TARGET --no-spa --dist ../../apps/web/dist/client
+          bun x --no-install static-hosting upload $AUTH_TARGET --concurrency 12 --no-spa --dist ../../apps/web/dist/client
       - name: Report web result
         if: always()
         run: node .github/scripts/disposabl.mjs report web,api,mcp ${{ steps.deploy.outcome == 'success' && 'ready' || 'failed' }}

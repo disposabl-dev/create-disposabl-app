@@ -1,7 +1,6 @@
 import type { E2EConfig } from "e2e";
 import { web } from "@e2e-dev/web";
 import { createRequire } from "node:module";
-import { availableParallelism } from "node:os";
 import { join } from "node:path";
 import { project, root } from "./project.ts";
 
@@ -85,17 +84,9 @@ if (native.length) {
 if (project.platforms.includes("api"))
   targets.push({ name: "api", platform: "api" });
 
-// The product CI fixture owns its loopback backend and only runs Web, backend,
-// and API tests. Device runs and shared development backends stay serial.
-const isolatedProductCi =
-  process.env.CI === "1" &&
-  process.env.DISPOSABL_TELEMETRY_DISABLED === "1" &&
-  process.env.E2E_CONVEX_URL === "http://127.0.0.1:3520" &&
-  process.env.E2E_CONVEX_SITE_URL === "http://127.0.0.1:3521";
-
 export default {
   tests: ["flows/**/*.e2e.ts"],
   targets,
-  workers: isolatedProductCi ? Math.min(4, availableParallelism()) : 1,
+  workers: 1,
   reporters: ["list", "junit"],
 } satisfies E2EConfig;

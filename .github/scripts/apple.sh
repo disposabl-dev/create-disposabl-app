@@ -60,8 +60,9 @@ case "${1:?operation required}" in
     ;;
   ota)
     check_source
-    expected=${RUNTIME:-$(runtime)}
-    test "$(runtime)" = "$expected"
+    actual=$(runtime)
+    expected=${RUNTIME:-$actual}
+    test "$actual" = "$expected"
     bun x --no-install expo export --platform ios --output-dir dist/update-ios
     test "$(runtime)" = "$expected"
     check_source
