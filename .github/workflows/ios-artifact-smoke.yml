@@ -10,7 +10,7 @@ jobs:
   smoke:
     name: Smoke ${{ matrix.label }}
     runs-on: macos-26
-    timeout-minutes: 20
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -59,14 +59,32 @@ jobs:
         if: matrix.label == 'product' && steps.origin.outputs.ready == 'true'
         working-directory: product
         run: bun install --frozen-lockfile --filter @disposabl/tests
-      - name: Download and smoke simulator app
+      - name: Download and verify simulator artifact
         if: steps.origin.outputs.ready == 'true'
+        timeout-minutes: 5
         env:
           GH_TOKEN: ${{ github.token }}
           ARTIFACT_ID: ${{ steps.origin.outputs.id }}
           ARTIFACT_DIGEST: ${{ steps.origin.outputs.digest }}
+        run: bash .github/scripts/ios-artifact-smoke.sh prepare
+      - name: Create and boot simulator
+        if: steps.origin.outputs.ready == 'true'
+        timeout-minutes: 5
+        run: bash .github/scripts/ios-artifact-smoke.sh boot
+      - name: Install, launch and capture screenshot
+        if: steps.origin.outputs.ready == 'true'
+        timeout-minutes: 4
+        run: bash .github/scripts/ios-artifact-smoke.sh launch
+      - name: Run product TesterArmy checks
+        if: matrix.label == 'product' && steps.origin.outputs.ready == 'true'
+        timeout-minutes: 8
+        env:
           PRODUCT_SOURCE: ${{ matrix.test_sha || '' }}
-        run: bash .github/scripts/ios-artifact-smoke.sh
+        run: bash .github/scripts/ios-artifact-smoke.sh test
+      - name: Remove owned simulator
+        if: always() && steps.origin.outputs.ready == 'true'
+        timeout-minutes: 2
+        run: bash .github/scripts/ios-artifact-smoke.sh cleanup
       - uses: actions/upload-artifact@v4
         if: always() && steps.origin.outputs.ready == 'true'
         with:
