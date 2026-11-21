@@ -1,0 +1,97 @@
+name: Shared CocoaPods downloads for a first iOS build
+on:
+  push:
+    branches: [benchmark/ci-ios-pod-seed-20261121]
+permissions:
+  contents: read
+  actions: read
+env:
+  EXPO_NO_TELEMETRY: "1"
+  EXPO_NO_DOTENV: "1"
+  E2E_TELEMETRY_DISABLED: "1"
+  EXPO_PROJECT_ID: 00000000-0000-4000-8000-000000000001
+  EXPO_PUBLIC_CONVEX_URL: https://ci.invalid
+  EXPO_PUBLIC_CONVEX_SITE_URL: https://ci.invalid
+  DISPOSABL_MOBILE_CHANNEL: native-benchmark
+jobs:
+  seed:
+    if: github.repository == 'disposabl-dev/create-disposabl-app'
+    name: Collect CocoaPods downloads and specifications
+    runs-on: macos-26
+    timeout-minutes: 12
+    steps:
+      - &source
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: 44900751287
+          name: native-starter-1
+          path: .fixture
+      - &bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.5
+      - &prepare
+        name: Prepare the same generated iOS source
+        run: |
+          (cd .fixture && shasum -a 256 --check native-starter.sha256)
+          mkdir generated
+          tar -xzf .fixture/native-starter.tgz -C generated
+          cd generated
+          bun install --frozen-lockfile --filter @disposabl/mobile
+          cd apps/mobile
+          bun x --no-install expo prebuild --platform ios --no-install
+      - name: Install and extract only reusable CocoaPods downloads
+        working-directory: generated/apps/mobile/ios
+        run: |
+          export CP_HOME_DIR="$RUNNER_TEMP/isolated-pods"
+          test ! -e "$CP_HOME_DIR"
+          /usr/bin/time -p pod install
+          seed="$RUNNER_TEMP/pod-seed"
+          mkdir "$seed"
+          pod --version > "$seed/cocoapods.version"
+          shasum -a 256 Pods/Manifest.lock | cut -d' ' -f1 > "$seed/manifest.sha"
+          tar -czf "$seed/pods.tgz" -C "$CP_HOME_DIR" cache repos
+          (cd "$seed" && shasum -a 256 pods.tgz > SHA256SUMS)
+          du -h "$seed/pods.tgz"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: first-ios-pod-seed
+          path: ${{ runner.temp }}/pod-seed/
+          retention-days: 1
+          compression-level: 0
+          if-no-files-found: error
+  compare:
+    needs: seed
+    name: CocoaPods first install / ${{ matrix.cache }}
+    runs-on: macos-26
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        cache: [empty, seeded]
+    env:
+      CACHE_MODE: ${{ matrix.cache }}
+    steps:
+      - *source
+      - *bun
+      - *prepare
+      - uses: actions/download-artifact@v4
+        with:
+          name: first-ios-pod-seed
+          path: seed
+      - name: Measure pod install and verify the resolved dependency manifest
+        working-directory: generated/apps/mobile/ios
+        run: |
+          export CP_HOME_DIR="$RUNNER_TEMP/isolated-pods"
+          test ! -e "$CP_HOME_DIR"
+          test ! -e Pods
+          seed="$GITHUB_WORKSPACE/seed"
+          [[ "$(pod --version)" == "$(cat "$seed/cocoapods.version")" ]]
+          if [[ "$CACHE_MODE" == seeded ]]; then
+            (cd "$seed" && shasum -a 256 --check SHA256SUMS)
+            mkdir "$CP_HOME_DIR"
+            /usr/bin/time -p tar -xzf "$seed/pods.tgz" -C "$CP_HOME_DIR"
+          fi
+          /usr/bin/time -p pod install
+          [[ "$(shasum -a 256 Pods/Manifest.lock | cut -d' ' -f1)" == "$(cat "$seed/manifest.sha")" ]]
