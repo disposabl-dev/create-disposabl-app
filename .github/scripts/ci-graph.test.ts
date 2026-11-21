@@ -314,9 +314,28 @@ test("product and recovery gates remain independent of root and native release j
   expect(product.jobs.check.env.GH_TOKEN).toBe("");
   const reusable = step(product.jobs.check, "Product checks");
   expect(reusable.with.lane).toBe("${{ matrix.lane }}");
-  expect(product.jobs.check.strategy.matrix.lane).toContain(
-    '["source","unit","browser","web-minimal","web-android","mobile-minimal","all-platforms"]',
-  );
+  expect(reusable.with.browser_shard).toBe("${{ matrix.shard || '' }}");
+  const [recovery, regular] = product.jobs.check.strategy.matrix.include
+    .match(/\[[^\]]+\]/g)
+    .map((value: string) => JSON.parse(value));
+  expect(recovery).toEqual([{ lane: "unit" }, { lane: "browser" }]);
+  expect(regular.map((job: { lane: string }) => job.lane)).toEqual([
+    "source",
+    "unit",
+    "browser",
+    "browser",
+    "browser",
+    "browser",
+    "web-minimal",
+    "web-android",
+    "mobile-minimal",
+    "all-platforms",
+  ]);
+  expect(
+    regular
+      .filter((job: { lane: string }) => job.lane === "browser")
+      .map((job: { shard: string }) => job.shard),
+  ).toEqual(["1/4", "2/4", "3/4", "4/4"]);
   expect(commands).toContain('verify:starter "$STARTER_PROFILE"');
   expect(reusable.uses).toBe("./.github/actions/product-checks");
   expect(reusable.with.source_sha).toBe("${{ inputs.source_sha }}");

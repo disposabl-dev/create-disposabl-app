@@ -8,6 +8,10 @@ inputs:
   lane:
     required: true
     description: Source validation, unit tests, isolated browser, or a starter profile
+  browser_shard:
+    required: false
+    description: Isolated browser shard. Empty runs the full browser suite.
+    default: ""
   cli_recovery_version:
     required: false
     description: CLI recovery version
@@ -39,10 +43,6 @@ runs:
       if: inputs.lane == 'browser'
       run: python3 .github/scripts/product-browser-check-test.py
       shell: bash
-    - uses: actions/setup-node@v6
-      with:
-        node-version: "24"
-        package-manager-cache: false
     - uses: oven-sh/setup-bun@v2
       with:
         bun-version: 1.4.5
@@ -50,6 +50,10 @@ runs:
       if: inputs.lane == 'source'
       run: bun fmt --check
       shell: bash
+    - uses: actions/setup-node@v6
+      with:
+        node-version: "24"
+        package-manager-cache: false
     - name: Check product release guards
       if: inputs.lane == 'source'
       shell: bash
@@ -119,7 +123,8 @@ runs:
       run: bun run --cwd packages/create-disposabl-app verify:starter "$STARTER_PROFILE"
     - name: Restore browser test dependencies
       if: inputs.lane == 'browser'
-      uses: actions/cache@v4
+      id: browser-cache
+      uses: actions/cache/restore@v4
       with:
         path: |
           ${{ runner.temp }}/product-convex/backend.zip
@@ -151,6 +156,7 @@ runs:
       shell: bash
       env:
         PLAYWRIGHT_BROWSERS_PATH: "${{ runner.temp }}/product-browser-cache"
+        PRODUCT_BROWSER_SHARD: "${{ inputs.browser_shard }}"
       run: |
         set -euo pipefail
         # Create only a private network namespace; drop root before the test.
@@ -163,5 +169,13 @@ runs:
           fi
           exec runuser -u "$1" -- env -i HOME="$2" PATH="$3" \
             CONVEX_LOCAL_BINARY="$4" PLAYWRIGHT_BROWSERS_PATH="$5" \
-            PYTHONDONTWRITEBYTECODE=1 PRODUCT_BROWSER_REQUIRE_ISOLATION=1 PRODUCT_BROWSER_FROZEN_INSTALL=1 python3 "$6"
-        ' _ "$(id -un)" "$HOME" "$PATH" "$RUNNER_TEMP/product-convex/convex-local-backend" "$PLAYWRIGHT_BROWSERS_PATH" "$GITHUB_WORKSPACE/.github/scripts/product-browser-check.py"
+            PYTHONDONTWRITEBYTECODE=1 PRODUCT_BROWSER_REQUIRE_ISOLATION=1 PRODUCT_BROWSER_FROZEN_INSTALL=1 PRODUCT_BROWSER_SHARD="$7" python3 "$6"
+        ' _ "$(id -un)" "$HOME" "$PATH" "$RUNNER_TEMP/product-convex/convex-local-backend" "$PLAYWRIGHT_BROWSERS_PATH" "$GITHUB_WORKSPACE/.github/scripts/product-browser-check.py" "$PRODUCT_BROWSER_SHARD"
+    - name: Save browser test dependencies
+      if: inputs.lane == 'browser' && (inputs.browser_shard == '' || inputs.browser_shard == '1/4') && steps.browser-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: |
+          ${{ runner.temp }}/product-convex/backend.zip
+          ${{ runner.temp }}/product-browser-cache
+        key: ${{ steps.browser-cache.outputs.cache-primary-key }}

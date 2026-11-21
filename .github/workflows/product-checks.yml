@@ -18,11 +18,17 @@ permissions:
   contents: read
 jobs:
   check:
-    name: Product / ${{ matrix.lane }}
+    name: Product / ${{ matrix.lane }}${{ matrix.shard && format(' {0}', matrix.shard) || '' }}
     strategy:
       fail-fast: true
       matrix:
-        lane: ${{ fromJSON((inputs.cli_recovery_version != '' || inputs.recovery_version != '') && '["unit","browser"]' || '["source","unit","browser","web-minimal","web-android","mobile-minimal","all-platforms"]') }}
+        include: >-
+          ${{ fromJSON((inputs.cli_recovery_version != '' || inputs.recovery_version != '')
+          && '[{"lane":"unit"},{"lane":"browser"}]'
+          || '[{"lane":"source"},{"lane":"unit"},
+          {"lane":"browser","shard":"1/4"},{"lane":"browser","shard":"2/4"},
+          {"lane":"browser","shard":"3/4"},{"lane":"browser","shard":"4/4"},
+          {"lane":"web-minimal"},{"lane":"web-android"},{"lane":"mobile-minimal"},{"lane":"all-platforms"}]') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     outputs:
@@ -52,5 +58,6 @@ jobs:
         with:
           source_sha: ${{ inputs.source_sha }}
           lane: ${{ matrix.lane }}
+          browser_shard: ${{ matrix.shard || '' }}
           cli_recovery_version: ${{ inputs.cli_recovery_version }}
           recovery_version: ${{ inputs.recovery_version }}
