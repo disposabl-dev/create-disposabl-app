@@ -1,7 +1,7 @@
 import { afterEach, test } from "node:test";
 // @ts-expect-error bun:test is not included in this workspace's Node type set.
 import { expect } from "bun:test";
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import {
   existsSync,
   mkdtempSync,
@@ -782,116 +782,143 @@ test(
       expect(String(error)).toBe("Error: Invalid repository URL");
       expect(JSON.stringify(error)).not.toContain("synthetic-secret");
     }
-    const dir = temporaryDirectory("release-metadata-");
     const root = resolve(import.meta.dirname, "../..");
-    for (const name of ["cli", "sdk", "create-disposabl-app"]) {
-      const folder = join(dir, "packages", name);
-      mkdirSync(join(folder, "dist"), { recursive: true });
-      writeFileSync(join(folder, "dist/index.js"), "// fixture\n");
-      writeFileSync(
-        join(folder, "dist/verify-metadata.mjs"),
-        readFileSync(
-          join(
-            root,
-            "packages/disposabl-kit/server/release/verify-metadata.mjs",
+    const outcomes = await Promise.allSettled(
+      ["cli", "sdk", "create-disposabl-app"].map(async (name) => {
+        const dir = temporaryDirectory("release-metadata-");
+        const folder = join(dir, "packages", name);
+        mkdirSync(join(folder, "dist"), { recursive: true });
+        writeFileSync(join(folder, "dist/index.js"), "// fixture\n");
+        writeFileSync(
+          join(folder, "dist/verify-metadata.mjs"),
+          readFileSync(
+            join(
+              root,
+              "packages/disposabl-kit/server/release/verify-metadata.mjs",
+            ),
           ),
-        ),
-      );
-      const manifest = JSON.parse(
-        readFileSync(join(root, "packages", name, "package.json"), "utf8"),
-      );
-      writeFileSync(join(folder, "package.json"), JSON.stringify(manifest));
-      if (name !== "create-disposabl-app") {
-        verifyConditions(
-          {},
-          {
-            cwd: folder,
-            options: {
-              repositoryUrl:
-                "https://synthetic-user:synthetic-secret@github.com/example/app.git?token=synthetic-secret",
-              originalRepositoryURL: "git+https://github.com/example/app.git",
-            },
-          },
         );
-      }
-      const pack = (cwd = folder) =>
-        spawnSync("npm", ["pack", "--json", "--pack-destination", dir], {
-          cwd,
-          encoding: "utf8",
-          env: {
-            PATH: process.env.PATH,
-            NODE_ENV: "test",
-            HOME: dir,
-            npm_config_userconfig: join(dir, "empty-npmrc"),
-          },
-        });
-      let result = pack();
-      expect(result.status).toBe(0);
-      const archive = join(dir, JSON.parse(result.stdout)[0].filename);
-      const packed = JSON.parse(
-        execFileSync("tar", ["-xOf", archive, "package/package.json"], {
-          encoding: "utf8",
-        }),
-      );
-      expect(JSON.stringify(packed)).not.toContain("synthetic-secret");
-      expect(packed.repository.url).not.toContain("@");
-      const extracted = join(dir, `extracted-${name}`);
-      mkdirSync(extracted);
-      execFileSync("tar", ["-xf", archive, "-C", extracted]);
-      expect(pack(join(extracted, "package")).status).toBe(0);
-      writeFileSync(
-        join(extracted, "package/package.json"),
-        JSON.stringify({ ...packed, homepage: "https://synthetic-secret@" }),
-      );
-      const invalidRepack = pack(join(extracted, "package"));
-      expect(invalidRepack.status).not.toBe(0);
-      expect(invalidRepack.stderr).toContain("Invalid URL in package metadata");
-      expect(invalidRepack.stderr).not.toContain("synthetic-secret");
-      for (const [field, value] of [
-        [
-          "repository",
-          {
-            type: "git",
-            url: "https://user:synthetic-secret@example.test/repo",
-          },
-        ],
-        ["homepage", "https://example.test/?token=synthetic-secret"],
-        ["homepage", " https://user:synthetic-secret@example.test/ "],
-        ["homepage", "https:/example.test/?token=synthetic-secret"],
-        ["homepage", "//user:synthetic-secret@example.test/"],
-        [
-          "homepage",
-          "https:" +
-            String.fromCharCode(92) +
-            "user:synthetic-secret@example.test/repo",
-        ],
-        ["homepage", "\u0000ht\ttps://user:synthetic-secret@example.test/"],
-        [
-          "repository",
-          {
-            "synthetic-secret":
-              " Git+https://user:synthetic-secret@example.test/",
-          },
-        ],
-        ["bugs", { url: "https://example.test/#synthetic-secret" }],
-        ["funding", { url: "https://user:synthetic-secret@example.test/" }],
-      ]) {
-        const unsafe = { ...packed, [field as string]: value };
-        writeFileSync(join(folder, "package.json"), JSON.stringify(unsafe));
-        result = pack();
+        const manifest = JSON.parse(
+          readFileSync(join(root, "packages", name, "package.json"), "utf8"),
+        );
+        writeFileSync(join(folder, "package.json"), JSON.stringify(manifest));
+        if (name !== "create-disposabl-app") {
+          verifyConditions(
+            {},
+            {
+              cwd: folder,
+              options: {
+                repositoryUrl:
+                  "https://synthetic-user:synthetic-secret@github.com/example/app.git?token=synthetic-secret",
+                originalRepositoryURL: "git+https://github.com/example/app.git",
+              },
+            },
+          );
+        }
+        const pack = (cwd = folder) =>
+          new Promise<{
+            status: number | null;
+            stdout: string;
+            stderr: string;
+          }>((resolve, reject) => {
+            const child = spawn(
+              "npm",
+              ["pack", "--json", "--pack-destination", dir],
+              {
+                cwd,
+                env: {
+                  PATH: process.env.PATH,
+                  NODE_ENV: "test",
+                  HOME: dir,
+                  npm_config_userconfig: join(dir, "empty-npmrc"),
+                },
+              },
+            );
+            let stdout = "",
+              stderr = "";
+            child.stdout.setEncoding("utf8").on("data", (data) => {
+              stdout += data;
+            });
+            child.stderr.setEncoding("utf8").on("data", (data) => {
+              stderr += data;
+            });
+            child.once("error", reject);
+            child.once("close", (status) =>
+              resolve({ status, stdout, stderr }),
+            );
+          });
+        let result = await pack();
+        expect(result.status).toBe(0);
+        const archive = join(dir, JSON.parse(result.stdout)[0].filename);
+        const packed = JSON.parse(
+          execFileSync("tar", ["-xOf", archive, "package/package.json"], {
+            encoding: "utf8",
+          }),
+        );
+        expect(JSON.stringify(packed)).not.toContain("synthetic-secret");
+        expect(packed.repository.url).not.toContain("@");
+        const extracted = join(dir, `extracted-${name}`);
+        mkdirSync(extracted);
+        execFileSync("tar", ["-xf", archive, "-C", extracted]);
+        expect((await pack(join(extracted, "package"))).status).toBe(0);
+        writeFileSync(
+          join(extracted, "package/package.json"),
+          JSON.stringify({ ...packed, homepage: "https://synthetic-secret@" }),
+        );
+        const invalidRepack = await pack(join(extracted, "package"));
+        expect(invalidRepack.status).not.toBe(0);
+        expect(invalidRepack.stderr).toContain(
+          "Invalid URL in package metadata",
+        );
+        expect(invalidRepack.stderr).not.toContain("synthetic-secret");
+        for (const [field, value] of [
+          [
+            "repository",
+            {
+              type: "git",
+              url: "https://user:synthetic-secret@example.test/repo",
+            },
+          ],
+          ["homepage", "https://example.test/?token=synthetic-secret"],
+          ["homepage", " https://user:synthetic-secret@example.test/ "],
+          ["homepage", "https:/example.test/?token=synthetic-secret"],
+          ["homepage", "//user:synthetic-secret@example.test/"],
+          [
+            "homepage",
+            "https:" +
+              String.fromCharCode(92) +
+              "user:synthetic-secret@example.test/repo",
+          ],
+          ["homepage", "\u0000ht\ttps://user:synthetic-secret@example.test/"],
+          [
+            "repository",
+            {
+              "synthetic-secret":
+                " Git+https://user:synthetic-secret@example.test/",
+            },
+          ],
+          ["bugs", { url: "https://example.test/#synthetic-secret" }],
+          ["funding", { url: "https://user:synthetic-secret@example.test/" }],
+        ]) {
+          const unsafe = { ...packed, [field as string]: value };
+          writeFileSync(join(folder, "package.json"), JSON.stringify(unsafe));
+          result = await pack();
+          expect(result.status).not.toBe(0);
+          expect(result.stderr).toContain("Unsafe URL in package metadata");
+          expect(result.stderr).not.toContain("synthetic-secret");
+        }
+        writeFileSync(
+          join(folder, "package.json"),
+          JSON.stringify({ ...packed, homepage: "https://synthetic-secret@" }),
+        );
+        result = await pack();
         expect(result.status).not.toBe(0);
-        expect(result.stderr).toContain("Unsafe URL in package metadata");
+        expect(result.stderr).toContain("Invalid URL in package metadata");
         expect(result.stderr).not.toContain("synthetic-secret");
-      }
-      writeFileSync(
-        join(folder, "package.json"),
-        JSON.stringify({ ...packed, homepage: "https://synthetic-secret@" }),
-      );
-      result = pack();
-      expect(result.status).not.toBe(0);
-      expect(result.stderr).toContain("Invalid URL in package metadata");
-      expect(result.stderr).not.toContain("synthetic-secret");
-    }
+      }),
+    );
+    for (const outcome of outcomes)
+      if (outcome.status === "rejected") throw outcome.reason;
   },
 );
 
