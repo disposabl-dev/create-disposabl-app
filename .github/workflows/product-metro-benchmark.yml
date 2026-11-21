@@ -1,4 +1,4 @@
-name: Product Metro native bundle cache benchmark
+name: Product Metro OTA export cache benchmark
 on:
   push:
     branches: [benchmark/ci-product-metro-20261121]
@@ -8,13 +8,17 @@ jobs:
   bundle:
     runs-on: ubuntu-24.04
     timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [android, ios]
     env:
       CI: "1"
       EXPO_NO_TELEMETRY: "1"
       EXPO_NO_DOTENV: "1"
       E2E_TELEMETRY_DISABLED: "1"
-      UPDATE_POLICY: disabled
       DISPOSABL_MOBILE_CHANNEL: metro-benchmark
+      PLATFORM: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v6
         with: { ref: "${{ github.sha }}", persist-credentials: false }
@@ -23,38 +27,36 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with: { bun-version: "1.4.5" }
       - run: bun install --frozen-lockfile --filter @disposabl/mobile
-      - name: Measure cold and restored Android release bundles
+      - name: Compare actual Expo OTA export using fresh and restored transforms
         working-directory: apps/mobile
         run: |
-          entry=$(node -p 'require.resolve(require("./package.json").main)')
-          work="$RUNNER_TEMP/metro-proof"
-          mkdir -p "$work/build" "$work/fresh"
+          work="$RUNNER_TEMP/metro-ota"
+          mkdir -p "$work/fresh"
           bundle() {
             local stage="$1" restore="$2" origin="$3"
-            rm -rf -- "$work/build/assets"
-            mkdir -p "$work/build/assets" "$work/$stage-cache"
-            EXPO_METRO_CACHE_RESTORE_DIR="$work/$restore" EXPO_METRO_CACHE_OUTPUT_DIR="$work/$stage-cache" \
+            mkdir -p "$work/$stage-tmp" "$work/$stage-cache"
+            TMPDIR="$work/$stage-tmp" EXPO_METRO_CACHE_RESTORE_DIR="$work/$restore" \
+              EXPO_METRO_CACHE_OUTPUT_DIR="$work/$stage-cache" \
               EXPO_PUBLIC_CONVEX_URL="$origin" EXPO_PUBLIC_CONVEX_SITE_URL="$origin" \
-              /usr/bin/time -f "$stage Metro: %e s" bun x --no-install expo export:embed \
-                --platform android --dev false --reset-cache --entry-file "$entry" \
-                --bundle-output "$work/build/index.android.bundle" --assets-dest "$work/build/assets" \
-                --sourcemap-output "$work/build/index.android.bundle.map" --minify false
-            test -s "$work/build/index.android.bundle"
-            grep -Fq "$origin" "$work/build/index.android.bundle"
+              /usr/bin/time -f "$stage Metro OTA: %e s" bun x --no-install expo export \
+                --platform "$PLATFORM" --output-dir "$work/$stage"
+            test -n "$(find "$work/$stage-cache" -type f -print -quit)"
             (
-              cd "$work/build"
-              find assets index.android.bundle -type f -print0 | sort -z | xargs -0 sha256sum
+              cd "$work/$stage"
+              jq -e --arg platform "$PLATFORM" '.fileMetadata[$platform].bundle | type == "string" and length > 0' metadata.json
+              embedded=$(jq -r --arg platform "$PLATFORM" '.fileMetadata[$platform].bundle' metadata.json)
+              test -s "$embedded"
+              grep -aF -q "$origin" "$embedded"
+              if [[ "$origin" != https://metro-a.invalid ]] && grep -aF -q 'https://metro-a.invalid' "$embedded"; then
+                exit 1
+              fi
+              find . -type f -print0 | sort -z | xargs -0 sha256sum
             ) > "$work/$stage.sha256"
             du -sh "$work/$stage-cache"
-            test -n "$(find "$work/$stage-cache" -type f -print -quit)"
           }
           bundle cold fresh https://metro-a.invalid
           bundle warm cold-cache https://metro-a.invalid
           diff -u "$work/cold.sha256" "$work/warm.sha256"
           bundle updated cold-cache https://metro-b.invalid
-          if grep -Fq 'https://metro-a.invalid' "$work/build/index.android.bundle"; then
-            echo 'Restoring Metro transforms retained the previous app origin.' >&2
-            exit 1
-          fi
           bundle updated-cold fresh https://metro-b.invalid
           diff -u "$work/updated-cold.sha256" "$work/updated.sha256"
