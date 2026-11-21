@@ -12,7 +12,6 @@ jobs:
     env:
       VITE_CONVEX_URL: https://ci.invalid
       VITE_CONVEX_SITE_URL: https://ci.invalid
-      BUN_INSTALL_CACHE_DIR: ${{ runner.temp }}/web-bun-cache
       E2E_TELEMETRY_DISABLED: "1"
       DO_NOT_TRACK: "1"
       EXPO_NO_TELEMETRY: "1"
@@ -31,6 +30,8 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.4.5"
+      - name: Set isolated Bun cache
+        run: echo "BUN_INSTALL_CACHE_DIR=$RUNNER_TEMP/web-bun-cache" >> "$GITHUB_ENV"
       - name: Run cold then warm on the same runner
         shell: bash
         run: |
