@@ -42,6 +42,7 @@ node --input-type=module -e '
   const affected = (platform, dependency) => enabled.includes(platform) && changes(platform).some(p => shared(p) || dependency.test(p));
   const mobile = /^(apps\/mobile\/|packages\/disposabl-kit\/|\.github\/scripts\/(mobile|apple|android-runner)\.sh$)/;
   for (const platform of ["android", "ios"]) console.log(`${platform}=${(platform === "ios" ? process.env.IOS_BUILDS_ENABLED !== "false" : process.env.EXPO_CONNECTED === "true") && affected(platform, mobile)}`);
+  console.log(`ios_preview_update=${process.env.EXPO_CONNECTED === "true" && process.env.EXPO_PROJECT_CONFIGURED === "true"}`);
   const production = process.env.GITHUB_EVENT_NAME === "push" && process.env.GITHUB_REF === "refs/heads/main";
   const desktop = (production ? ["linux", "windows", "macos"] : []).filter(platform => affected(platform, platform === "macos" ? /^(apps\/desktop\/|\.github\/scripts\/macos-release\.sh$)/ : /^apps\/desktop\//))
     .map(platform => ({platform, runner: runners[platform]}));

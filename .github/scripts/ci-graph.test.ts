@@ -35,6 +35,7 @@ const keys = [
   "changed",
   "android",
   "ios",
+  "ios_preview_update",
   "desktop",
   "packages",
 ];
@@ -236,6 +237,7 @@ test("selector outputs and executable source select PR work and conservative mai
           RUNNER_TEMP: dir,
           GITHUB_OUTPUT: out,
           EXPO_CONNECTED: "true",
+          EXPO_PROJECT_CONFIGURED: pr ? "true" : "false",
           IOS_BUILDS_ENABLED: "true",
           RELEASE_PREFIX: "app",
           CHANNEL: "preview",
@@ -261,6 +263,10 @@ test("selector outputs and executable source select PR work and conservative mai
       expect(main[key]).toBeDefined();
     }
     expect([pr.android, pr.ios, pr.changed]).toEqual(["true", "true", "true"]);
+    expect([pr.ios_preview_update, main.ios_preview_update]).toEqual([
+      "true",
+      "false",
+    ]);
     expect([main.android, main.ios, main.changed]).toEqual([
       "true",
       "true",
@@ -270,6 +276,25 @@ test("selector outputs and executable source select PR work and conservative mai
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test("iOS simulator packaging and OTA can run independently with an existing Expo project", () => {
+  const simulator = pipeline.jobs["ios-preview"];
+  const update = pipeline.jobs["ios-preview-update"];
+  expect(simulator.needs).toEqual(["changes", "web"]);
+  expect(update.needs).toEqual(simulator.needs);
+  expect(update.env).toEqual(simulator.env);
+  const needs = {
+    changes: { result: "success", outputs: { ios_preview_update: "true" } },
+    web: { result: "success", outputs: { ios: "true" } },
+  };
+  expect(allowed(update, context("pull_request"), needs)).toBe(true);
+  expect(allowed(update, context("push"), needs)).toBe(false);
+  needs.changes.outputs.ios_preview_update = "false";
+  expect(allowed(update, context("pull_request"), needs)).toBe(false);
+  expect(step(simulator, "Publish compatible iOS preview update").if).toContain(
+    "needs.changes.outputs.ios_preview_update != 'true'",
+  );
 });
 
 test("generated reset retains root check and removes product-only gate", () => {
