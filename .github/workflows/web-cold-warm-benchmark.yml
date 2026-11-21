@@ -49,6 +49,8 @@ jobs:
             echo "--- $pass generation ---"
             /usr/bin/time -p bun run generate
             git diff --exit-code -- packages/backend/generated
+            echo "--- $pass build generator fixture required by product unit tests ---"
+            /usr/bin/time -p bun run --cwd packages/create-disposabl-app build
             echo "--- $pass complete source and unit gates ---"
             /usr/bin/time -p bun run --parallel check:source test:ci
             echo "--- $pass Vite build, fresh outputs and no Turbo cache ---"
