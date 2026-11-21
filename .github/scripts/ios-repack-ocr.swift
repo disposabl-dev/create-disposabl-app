@@ -4,7 +4,7 @@ import Vision
 
 let url = URL(fileURLWithPath: CommandLine.arguments[1])
 let request = VNRecognizeTextRequest()
-request.recognitionLevel = .accurate
+request.recognitionLevel = .fast
 request.usesLanguageCorrection = false
 let handler = VNImageRequestHandler(url: url)
 try handler.perform([request])

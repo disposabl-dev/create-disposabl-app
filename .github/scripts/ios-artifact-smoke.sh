@@ -54,9 +54,9 @@ sleep 20
 xcrun simctl io "$udid" screenshot "$evidence/screen.png"
 swiftc -O "$GITHUB_WORKSPACE/.github/scripts/ios-repack-ocr.swift" -o "$RUNNER_TEMP/starter-ocr"
 "$RUNNER_TEMP/starter-ocr" "$evidence/screen.png" > "$evidence/screen-text.txt"
-grep -F 'Your app starts here.' "$evidence/screen-text.txt"
-grep -Fx Android "$evidence/screen-text.txt"
-grep -Fx iOS "$evidence/screen-text.txt"
+tr '\n' ' ' < "$evidence/screen-text.txt" | grep -Fi 'Your app starts here.'
+grep -Fix Android "$evidence/screen-text.txt"
+grep -Fix iOS "$evidence/screen-text.txt"
 unset GH_TOKEN
 cd "$RUNNER_TEMP/generated"
 export E2E_IOS_DEVICE="$udid" E2E_IOS_APP_ID="$bundle" DISPOSABL_MOBILE_CHANNEL=native-benchmark
