@@ -1,0 +1,77 @@
+name: Product Bun lint A B benchmark
+on:
+  push:
+    branches: [benchmark/product-bun-lint-ab-20261121]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: ${{ matrix.workload }} / ${{ matrix.variant }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        workload: [source, all-platforms]
+        variant: [eslint, bun-lint]
+        include:
+          - variant: eslint
+            source: 48630a83685f3fcfbe9086ec2b9b8b3c6e3858a2
+          - variant: bun-lint
+            source: 922b0cd42b308368ca930194bc8aa85b45576566
+    env:
+      CI: "1"
+      GH_TOKEN: ""
+      E2E_TELEMETRY_DISABLED: "1"
+      DO_NOT_TRACK: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+      EXPO_NO_TELEMETRY: "1"
+      DISPOSABL_ANALYTICS_ENABLED: "false"
+      EXPO_PUBLIC_DISPOSABL_ANALYTICS_ENABLED: "false"
+      VITE_DISPOSABL_ANALYTICS_ENABLED: "false"
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ matrix.source }}
+          persist-credentials: false
+      - name: Verify benchmark source and runner
+        env:
+          EXPECTED: ${{ matrix.source }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED"
+          test -z "$(git status --porcelain)"
+          printf 'Source: %s\nTree: %s\n' "$(git rev-parse HEAD)" "$(git rev-parse HEAD^{tree})"
+          node -e 'const os=require("node:os");console.log(JSON.stringify({cpus:os.availableParallelism(),memory:os.totalmem(),arch:os.arch()}))'
+      - uses: actions/setup-node@v6
+        with: { node-version: "24", package-manager-cache: false }
+      - uses: oven-sh/setup-bun@v2
+        with: { bun-version: "1.4.5" }
+      - name: Report toolchain
+        run: |
+          node --version
+          npm --version
+          bun --revision
+      - name: Install frozen source dependencies
+        run: /usr/bin/time -p bun install --frozen-lockfile
+      - name: Install pinned Bun linter
+        if: matrix.variant == 'bun-lint'
+        uses: ./.github/actions/experimental-bun-lint
+      - name: Verify actual linter selection
+        if: matrix.variant == 'bun-lint'
+        run: |
+          set -euo pipefail
+          test -x "${DISPOSABL_BUN_LINT:?Pinned linter setup fell back to ESLint}"
+          test "$("$DISPOSABL_BUN_LINT" --revision)" = '1.4.6-canary.1+7bb427f3b'
+          "$DISPOSABL_BUN_LINT" --revision
+      - name: Full source checks
+        if: matrix.workload == 'source'
+        run: /usr/bin/time -p bun run check:ci
+      - name: Build current generator template
+        if: matrix.workload == 'all-platforms'
+        run: /usr/bin/time -p bun run --cwd packages/create-disposabl-app build
+      - name: Verify fresh all-platforms starter
+        if: matrix.workload == 'all-platforms'
+        run: /usr/bin/time -p bun run --cwd packages/create-disposabl-app verify:starter all-platforms
