@@ -25,14 +25,6 @@ SH
     chmod +x "$RUNNER_TEMP/fixture-bin/gh"
     printf 'REAL_GH=%s\n' "$real_gh" >> "$GITHUB_ENV"
     printf '%s\n' "$RUNNER_TEMP/fixture-bin" >> "$GITHUB_PATH"
-    ;;
-  seed)
-    mkdir -p "$(dirname "$output")"
-    cp "$RUNNER_TEMP/ios-repack/outer/ios-simulator.zip" "$output"
-    cd "$product/apps/mobile"
-    /usr/bin/time -p bash "$repack" manifest
-    ;;
-  replay)
     cd "$product/apps/mobile"
     python3 - <<'PY'
 from pathlib import Path
@@ -42,6 +34,21 @@ old = 'title: "What will you build?",'
 assert s.count(old) == 1
 p.write_text(s.replace(old, 'title: "Repack Cache Current",'))
 PY
+    git add src/features/studio/home.tsx
+    git -c user.name='CI Fixture' -c user.email=ci@example.invalid commit -m 'Change visible JavaScript only'
+    printf 'SOURCE=%s\n' "$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+    ;;
+  seed)
+    mkdir -p "$(dirname "$output")"
+    cp "$RUNNER_TEMP/ios-repack/outer/ios-simulator.zip" "$output"
+    cd "$product/apps/mobile"
+    /usr/bin/time -p bash "$repack" manifest
+    ;;
+  replay)
+    cd "$product/apps/mobile"
+    jq -e --arg current "$SOURCE" --arg run "$GITHUB_RUN_ID" --arg build "$DISPOSABL_IOS_BUILD_NUMBER" \
+      '.source_sha != $current and .source_run != $run and .build != $build' \
+      "$cache/ios-simulator-provenance.json"
     cp "$cache/ios-simulator.zip" "$RUNNER_TEMP/verified-base.zip"
     printf 'corrupt cache test\n' >> "$cache/ios-simulator.zip"
     if bash "$repack" repack; then

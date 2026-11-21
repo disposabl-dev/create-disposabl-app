@@ -23,9 +23,9 @@ env:
   CHANNEL: benchmark
   DISPOSABL_MOBILE_CHANNEL: benchmark
   DISPOSABL_ANDROID_CHANNEL: benchmark
-  DISPOSABL_IOS_BUILD_NUMBER: "1"
-  DISPOSABL_ANDROID_VERSION_CODE: "1"
-  REPLAY: "false"
+  DISPOSABL_IOS_BUILD_NUMBER: ${{ github.run_number }}
+  DISPOSABL_ANDROID_VERSION_CODE: ${{ github.run_number }}
+  REPLAY: "true"
   GH_REPO: ${{ github.repository }}
   SOURCE: 8bfee3cfd096ae3ac261dfda3c051e05c2c48688
   SOURCE_PATH: pulls/0
