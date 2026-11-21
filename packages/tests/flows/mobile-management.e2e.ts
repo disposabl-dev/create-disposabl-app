@@ -7,9 +7,13 @@ import config from "../../../disposabl.json";
 async function openGuestSettings(screen: TestFixtures["screen"]) {
   await screen.getByRole("button", "Settings", { exact: true }).tap();
   const signIn = screen.getByRole("button", "Sign in", { exact: true });
+  const signedIn = screen.getByRole("button", "Manage connections", {
+    exact: true,
+  });
   const logOut = screen.getByRole("button", "Log out", { exact: true });
-  await expect(signIn.or(logOut)).toBeVisible();
-  if (await logOut.isVisible()) {
+  await expect(signIn.or(signedIn)).toBeVisible();
+  if (await signedIn.isVisible()) {
+    await screen.scrollUntilVisible(logOut);
     await logOut.tap();
     await expect(screen.getByRole("button", "Close settings")).toHaveCount(0);
     await expect(
@@ -152,7 +156,14 @@ test(
     await expect(
       screen.getByText(username, { exact: true }).first(),
     ).toBeVisible();
-    await screen.getByRole("button", "Close settings").tap();
+    await screen
+      .getByRole("button", "Manage connections", { exact: true })
+      .tap();
+    await expect(
+      screen.getByText("Connect once. Every app you create stays yours."),
+    ).toBeVisible();
+    await expect(screen.getByRole("button", "Connect accounts")).toBeVisible();
+    await openMobile({ app, device, screen }, true);
     if (!config.features.includes("payments")) {
       await screen.getByRole("button", "Create app", { exact: true }).tap();
       const idea = screen.getByRole("textbox", "Your app idea", {
@@ -217,7 +228,9 @@ test(
     await expect(
       screen.getByRole("button", "Accent color: Blue"),
     ).toBeVisible();
-    await screen.getByRole("button", "Log out").tap();
+    const logOut = screen.getByRole("button", "Log out", { exact: true });
+    await screen.scrollUntilVisible(logOut);
+    await logOut.tap();
     await expect(
       screen.getByRole("button", "Create app", { exact: true }),
     ).toBeVisible();
