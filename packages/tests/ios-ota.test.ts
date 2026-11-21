@@ -342,7 +342,7 @@ test("every EAS backend alias must match the deployed backend before publication
   assert.equal(result.status, 0, result.stderr);
 });
 
-test("EAS environment cannot replace Android signing or submission policy", async () => {
+test("EAS environment cannot replace mobile signing, release policy, or cache paths", async () => {
   for (const key of [
     "ANDROID_KEYSTORE_BASE64",
     "ANDROID_KEYSTORE_PASSWORD",
@@ -352,6 +352,8 @@ test("EAS environment cannot replace Android signing or submission policy", asyn
     "ANDROID_SIGNING_ID",
     "ANDROID_PLAY_SUBMIT",
     "ANDROID_PLAY_UPLOAD_CERT_SHA256",
+    "EXPO_METRO_CACHE_RESTORE_DIR",
+    "EXPO_METRO_CACHE_OUTPUT_DIR",
     "UPDATE_POLICY",
     "PUBLIC_SITE_URL",
   ]) {

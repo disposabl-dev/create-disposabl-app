@@ -242,13 +242,36 @@ jobs:
           UPDATE_POLICY: ${{ github.event_name == 'push' && github.repository == 'disposabl-dev/create-disposabl-app' && 'expo' || '' }}
         working-directory: apps/mobile
         run: bash "$GITHUB_WORKSPACE/.github/scripts/mobile.sh" expo-fingerprint
+      - name: Restore Expo transform cache
+        id: metro-cache
+        if: steps.fingerprint.outputs.build == 'false' && !(github.event_name == 'push' && github.repository == 'disposabl-dev/create-disposabl-app')
+        uses: actions/cache@v4
+        with: &metro-cache
+          path: ${{ runner.temp }}/expo-metro-restore
+          key: expo-metro-v1-${{ github.job == 'android' && 'android' || 'ios' }}-${{ runner.os }}-${{ runner.arch }}-${{ env.NODE_VERSION }}-${{ env.BUN_VERSION }}-${{ hashFiles('bun.lock', 'package.json', 'apps/mobile/package.json', 'apps/mobile/*config.*', 'patches/**') }}
+      - &metro-paths
+        name: Set Expo transform cache paths
+        if: steps.metro-cache.outcome == 'success'
+        run: |
+          mkdir -p "$RUNNER_TEMP/expo-metro-restore" "$RUNNER_TEMP/expo-metro-output"
+          printf 'EXPO_METRO_CACHE_RESTORE_DIR=%s\nEXPO_METRO_CACHE_OUTPUT_DIR=%s\n' \
+            "$RUNNER_TEMP/expo-metro-restore" "$RUNNER_TEMP/expo-metro-output" >> "$GITHUB_ENV"
       - name: Update
+        id: ota
         if: steps.fingerprint.outputs.build == 'false' && !(github.event_name == 'push' && github.repository == 'disposabl-dev/create-disposabl-app')
         env:
           TAG: ${{ steps.fingerprint.outputs.tag }}
           SHA: ${{ steps.fingerprint.outputs.sha }}
           RUNTIME: ${{ steps.fingerprint.outputs.runtime }}
         run: bash "$GITHUB_WORKSPACE/.github/scripts/mobile.sh" expo-update
+      - &metro-stage
+        name: Save current Expo transforms on a cache miss
+        if: steps.ota.outcome == 'success' && steps.metro-cache.outcome == 'success' && steps.metro-cache.outputs.cache-hit != 'true'
+        run: |
+          if [[ -n "$(find "$EXPO_METRO_CACHE_OUTPUT_DIR" -type f -print -quit)" ]] &&
+            rmdir "$EXPO_METRO_CACHE_RESTORE_DIR"; then
+            mv "$EXPO_METRO_CACHE_OUTPUT_DIR" "$EXPO_METRO_CACHE_RESTORE_DIR"
+          fi
       - name: Prepare Android disk space
         if: steps.fingerprint.outputs.build == 'true' || (github.event_name == 'push' && github.repository == 'disposabl-dev/create-disposabl-app')
         id: native
@@ -495,9 +518,16 @@ jobs:
         timeout-minutes: 2
         working-directory: apps/mobile
         run: bash "$GITHUB_WORKSPACE/.github/scripts/mobile.sh" expo-channel
+      - name: Restore Expo transform cache
+        id: metro-cache
+        uses: actions/cache@v4
+        with: *metro-cache
+      - *metro-paths
       - name: Publish the preview update
+        id: ota
         working-directory: apps/mobile
         run: bash "$GITHUB_WORKSPACE/.github/scripts/apple.sh" ota
+      - *metro-stage
   ios-preview-report:
     name: Report iOS preview
     needs: [changes, web, ios-preview, ios-preview-update]
@@ -621,12 +651,20 @@ jobs:
         with:
           path: .ios-provenance/build.json
           key: ios-testflight-${{ env.ASC_APP_ID }}-${{ env.EXPO_PROJECT_ID }}-${{ steps.ios-plan.outputs.version }}-${{ steps.ios-plan.outputs.runtime }}
+      - name: Restore Expo transform cache
+        id: metro-cache
+        if: steps.ios-plan.outputs.action == 'update' || steps.ios-baseline.outputs.available == 'true'
+        uses: actions/cache@v4
+        with: *metro-cache
+      - *metro-paths
       - name: Publish compatible iOS production update
+        id: ota
         if: steps.ios-plan.outputs.action == 'update' || steps.ios-baseline.outputs.available == 'true'
         working-directory: apps/mobile
         env:
           RUNTIME: ${{ steps.ios-plan.outputs.runtime }}
         run: bash "$GITHUB_WORKSPACE/.github/scripts/apple.sh" ota
+      - *metro-stage
       - name: Build and submit to TestFlight
         if: github.repository != 'disposabl-dev/create-disposabl-app' && steps.ios-plan.outputs.action == 'build'
         working-directory: apps/mobile

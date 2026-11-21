@@ -84,7 +84,7 @@ bun -e '
       if (![process.env[backend[1]], expected].includes(value)) throw new Error(`EAS overrides the deployed backend: ${key}`);
       continue;
     }
-    if (/^(GITHUB_|RUNNER_|GH_|DISPOSABL_|ANDROID_|UPDATE_POLICY$|PUBLIC_SITE_URL$|BUN_|CI$|NODE_OPTIONS$|PATH$|HOME$|SOURCE(_PATH)?$|CHANNEL$|PLATFORM$|RELEASE_PREFIX$|MACOS_|EAS_(ENVIRONMENT|CLI)$|EXPO_(TOKEN|PROJECT_ID|OWNER|SLUG|NO_DOTENV)$)/.test(key)) throw new Error(`Reserved EAS variable: ${key}`);
+    if (/^(GITHUB_|RUNNER_|GH_|DISPOSABL_|ANDROID_|UPDATE_POLICY$|PUBLIC_SITE_URL$|BUN_|CI$|NODE_OPTIONS$|PATH$|HOME$|SOURCE(_PATH)?$|CHANNEL$|PLATFORM$|RELEASE_PREFIX$|MACOS_|EAS_(ENVIRONMENT|CLI)$|EXPO_METRO_CACHE_|EXPO_(TOKEN|PROJECT_ID|OWNER|SLUG|NO_DOTENV)$)/.test(key)) throw new Error(`Reserved EAS variable: ${key}`);
     if (key === "EXPO_PUBLIC_DISPOSABL_ANALYTICS_ENABLED") continue;
     effectiveEnv[key] = value;
     const delimiter = crypto.randomUUID();

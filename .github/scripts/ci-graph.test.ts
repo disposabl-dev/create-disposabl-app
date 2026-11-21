@@ -284,6 +284,48 @@ test("selector outputs and executable source select PR work and conservative mai
   }
 });
 
+test("mobile updates preserve cached transforms without changing the release inputs", () => {
+  const jobs = ["android", "ios-preview-update", "ios-production"].map(
+    (name) => pipeline.jobs[name],
+  );
+  const android = jobs[0];
+  for (const job of jobs) {
+    const restore = step(job, "Restore Expo transform cache");
+    expect(restore.uses).toBe("actions/cache@v4");
+    expect(restore.with.path).toBe("${{ runner.temp }}/expo-metro-restore");
+    expect(restore.with.key).toContain("hashFiles('bun.lock'");
+    expect(
+      job.steps.findIndex((item: any) => item.id === "ota"),
+    ).toBeGreaterThan(job.steps.indexOf(restore));
+  }
+  const dir = mkdtempSync(join(tmpdir(), "ci-expo-metro-"));
+  try {
+    const envFile = join(dir, "environment");
+    const prepare = step(android, "Set Expo transform cache paths");
+    const stage = step(android, "Save current Expo transforms on a cache miss");
+    const restored = join(dir, "expo-metro-restore");
+    const output = join(dir, "expo-metro-output");
+    const env = {
+      ...process.env,
+      RUNNER_TEMP: dir,
+      GITHUB_ENV: envFile,
+      EXPO_METRO_CACHE_RESTORE_DIR: restored,
+      EXPO_METRO_CACHE_OUTPUT_DIR: output,
+    };
+    execFileSync("bash", ["-e", "-c", prepare.run], { env });
+    expect(readFileSync(envFile, "utf8")).toBe(
+      `EXPO_METRO_CACHE_RESTORE_DIR=${restored}\nEXPO_METRO_CACHE_OUTPUT_DIR=${output}\n`,
+    );
+    writeFileSync(join(output, "transform"), "fresh");
+    expect(stage.if).toContain("steps.ota.outcome == 'success'");
+    expect(stage.if).toContain("cache-hit != 'true'");
+    execFileSync("bash", ["-e", "-c", stage.run], { env });
+    expect(readFileSync(join(restored, "transform"), "utf8")).toBe("fresh");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("enabled mobile jobs share first Expo setup and iOS reports both preview results", () => {
   const simulator = pipeline.jobs["ios-preview"];
   const update = pipeline.jobs["ios-preview-update"];
