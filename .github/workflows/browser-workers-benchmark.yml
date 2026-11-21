@@ -9,11 +9,15 @@ permissions:
 jobs:
   compare:
     if: github.repository == 'disposabl-dev/create-disposabl-app'
-    name: Browser / Blacksmith
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    name: Browser / ${{ matrix.shard }}
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1/4, 2/4, 3/4, 4/4]
+    runs-on: ubuntu-24.04
     timeout-minutes: 8
     env:
-      PRODUCT_BROWSER_SHARD: full
+      PRODUCT_BROWSER_SHARD: ${{ matrix.shard }}
       GH_TOKEN: ""
       PYTHONDONTWRITEBYTECODE: 1
       DO_NOT_TRACK: 1
