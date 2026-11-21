@@ -5,7 +5,7 @@
     "check": "bun fmt --check && bun run check:ci",
     "check:ci": "bun run generate && bun run check:source",
     "check:source": "turbo run typecheck lint && bun fmt --check",
-    "check:preview": "bun install --frozen-lockfile && bun run check && bun run build --filter=@disposabl/web",
+    "check:preview": "bun install --frozen-lockfile && bun fmt --check && bun run generate && bun run --parallel check:source test:ci && bun run build --filter=@disposabl/web",
     "hooks:install": ".githooks/install",
     "test": "bun run --cwd packages/tests test",
     "test:unit": "bun run --cwd packages/tests test:unit",
