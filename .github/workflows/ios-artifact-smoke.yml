@@ -1,7 +1,7 @@
-name: Benchmark iOS artifact smoke
+name: Verify hosted iOS simulator smoke
 on:
   push:
-    branches: [benchmark/ios-artifact-smoke-*]
+    branches: [benchmark/ios-artifact-smoke-pilot-20261121]
   workflow_dispatch:
 permissions:
   actions: read
@@ -16,16 +16,11 @@ jobs:
       matrix:
         include:
           - label: product
-            run: "44899216086"
-            sha: cd5ddf7e3a70743b5e12c652b7667d04e3fe067b
+            run: "44545235646"
+            sha: 45eb65d505fb51e9e1ac57915fee8d62fb0dce01
             test_sha: 4af6724ad8b797dcd4d6ee43d97820d950f72072
-            job: "136832362469"
+            job: "135638562659"
             name: ios-simulator
-          - label: generated
-            run: "44900751287"
-            sha: ff387a33827f9b19dd4fa241f6085296c8b94b2b
-            job: "136836017366"
-            name: first-ios-1
     steps:
       - uses: actions/checkout@v6
         with:
