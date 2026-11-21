@@ -22,6 +22,7 @@ executable=$(/usr/libexec/PlistBuddy -c 'Print CFBundleExecutable' "$plist")
 minimum=$(/usr/libexec/PlistBuddy -c 'Print MinimumOSVersion' "$plist")
 lipo -archs "$app/$executable" | tee "$evidence/architectures.txt"
 lipo -archs "$app/$executable" | grep -qw arm64
+codesign --verify --strict --deep "$app"
 xcodebuild -version | tee "$evidence/xcode.txt"
 xcrun simctl list -j runtimes > "$evidence/runtimes.json"
 xcrun simctl list -j devicetypes > "$evidence/devicetypes.json"
@@ -48,3 +49,11 @@ xcrun simctl launch "$udid" "$bundle" | tee "$evidence/launch.txt"
 sleep 20
 xcrun simctl io "$udid" screenshot "$evidence/screen.png"
 echo 'Inspect screen.png to establish what rendered; launch and screenshot capture alone do not prove behavior.' >> "$GITHUB_STEP_SUMMARY"
+if [[ -n "${PRODUCT_SOURCE:-}" ]]; then
+  unset GH_TOKEN
+  cd "$GITHUB_WORKSPACE/product"
+  [[ "$(git rev-parse HEAD)" == "$PRODUCT_SOURCE" ]]
+  export E2E_IOS_DEVICE="$udid" E2E_IOS_APP_ID="$bundle" DISPOSABL_MOBILE_CHANNEL=pr-92
+  export E2E_TELEMETRY_DISABLED=1 DO_NOT_TRACK=1 EXPO_NO_TELEMETRY=1
+  bun run --cwd packages/tests e2e run --target ios --retries 0 2>&1 | tee "$evidence/product-ios-checks.log"
+fi

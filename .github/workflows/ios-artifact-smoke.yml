@@ -26,7 +26,7 @@ jobs:
             job: "136836017366"
             name: first-ios-1
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
       - name: Verify origin and locate artifact
@@ -38,11 +38,32 @@ jobs:
           JOB: ${{ matrix.job }}
           ARTIFACT: ${{ matrix.name }}
         run: bash .github/scripts/ios-artifact-origin.sh
+      - name: Check out the exact product test suite
+        if: matrix.label == 'product' && steps.origin.outputs.ready == 'true'
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ matrix.sha }}
+          path: product
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        if: matrix.label == 'product' && steps.origin.outputs.ready == 'true'
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - uses: oven-sh/setup-bun@v2
+        if: matrix.label == 'product' && steps.origin.outputs.ready == 'true'
+        with:
+          bun-version: 1.4.5
+      - name: Install product test dependencies
+        if: matrix.label == 'product' && steps.origin.outputs.ready == 'true'
+        working-directory: product
+        run: bun install --frozen-lockfile --filter @disposabl/tests
       - name: Download and smoke simulator app
         if: steps.origin.outputs.ready == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           ARTIFACT_ID: ${{ steps.origin.outputs.id }}
+          PRODUCT_SOURCE: ${{ matrix.label == 'product' && matrix.sha || '' }}
         run: bash .github/scripts/ios-artifact-smoke.sh
       - uses: actions/upload-artifact@v4
         if: always() && steps.origin.outputs.ready == 'true'
