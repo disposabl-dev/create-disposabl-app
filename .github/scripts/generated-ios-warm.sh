@@ -17,13 +17,14 @@ case "${1:?}" in
       IFS=: read -r id sha name <<<"$spec"
       metadata=$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$id")
       jq -e --argjson id "$id" --arg digest "sha256:$sha" '.id == $id and .workflow_run.id == 44909246374 and .digest == $digest and .expired == false' <<<"$metadata" >/dev/null
+      if [[ "$name" == ios && "$DISPOSABL_IOS_BUILD_NUMBER" != 1 ]]; then continue; fi
       gh api --allow-escape-sequences "repos/$GITHUB_REPOSITORY/actions/artifacts/$id/zip" > "$RUNNER_TEMP/$name.zip"
       printf '%s  %s\n' "$sha" "$RUNNER_TEMP/$name.zip" | shasum -a 256 --check
     done
     unzip -q "$RUNNER_TEMP/source.zip" -d "$RUNNER_TEMP/generated-outer"
     (cd "$RUNNER_TEMP/generated-outer" && shasum -a 256 --check native-starter.sha256)
     tar -xzf "$RUNNER_TEMP/generated-outer/native-starter.tgz" -C "$fixture"
-    unzip -q "$RUNNER_TEMP/ios.zip" -d "$RUNNER_TEMP/generated-outer"
+    if [[ -f "$RUNNER_TEMP/ios.zip" ]]; then unzip -q "$RUNNER_TEMP/ios.zip" -d "$RUNNER_TEMP/generated-outer"; fi
     test ! -d "$fixture/apps/mobile/ios" && test ! -d "$fixture/apps/mobile/android"
     mkdir -p "$RUNNER_TEMP/fixture-bin"
     real_gh=$(command -v gh)

@@ -111,8 +111,15 @@ jobs:
         run: test "$HIT" = true
       - name: Repack current JS and counters
         run: bash .github/scripts/generated-ios-warm.sh warm
+      - uses: actions/upload-artifact@v7
+        with:
+          name: generated-ios-archive
+          path: dist/apple/ios-simulator.zip
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
       - name: Boot owned simulator
-        timeout-minutes: 5
+        timeout-minutes: 6
         run: bash .github/scripts/generated-ios-simulator.sh boot
       - name: Verify first launch and current counters
         timeout-minutes: 5
@@ -126,7 +133,6 @@ jobs:
         with:
           name: generated-ios-warm-${{ github.run_attempt }}
           path: |
-            dist/apple/ios-simulator.zip
             ${{ runner.temp }}/ios-repack-evidence/
           if-no-files-found: warn
           retention-days: 1
