@@ -31,6 +31,8 @@ jobs:
         working-directory: apps/mobile
         run: |
           work="$RUNNER_TEMP/metro-ota"
+          hermes="$(node -p 'require("node:path").dirname(require.resolve("hermes-compiler/package.json"))')/hermesc/linux64-bin/hermesc"
+          test -x "$hermes"
           mkdir -p "$work/fresh"
           bundle() {
             local stage="$1" restore="$2" origin="$3"
@@ -43,14 +45,18 @@ jobs:
             test -n "$(find "$work/$stage-cache" -type f -print -quit)"
             (
               cd "$work/$stage"
-              jq -e --arg platform "$PLATFORM" '.fileMetadata[$platform].bundle | type == "string" and length > 0' metadata.json
+              jq -e --arg platform "$PLATFORM" '.fileMetadata[$platform].bundle | type == "string" and length > 0' metadata.json >/dev/null
               embedded=$(jq -r --arg platform "$PLATFORM" '.fileMetadata[$platform].bundle' metadata.json)
               test -s "$embedded"
               grep -aF -q "$origin" "$embedded"
               if [[ "$origin" != https://metro-a.invalid ]] && grep -aF -q 'https://metro-a.invalid' "$embedded"; then
                 exit 1
               fi
-              find . -type f -print0 | sort -z | xargs -0 sha256sum
+              # Hermes embeds Expo's randomly generated compiler input path.
+              # Compare all bytecode instructions and only normalize that debug path.
+              "$hermes" -dump-bytecode "$embedded" | LC_ALL=C sed -E \
+                's#[/[:alnum:]._-]+/expo-bundler-[0-9.]+-[0-9]+/index\.js#<expo-bundler>/index.js#g' | sha256sum
+              find . -type f ! -name '*.hbc' -print0 | sort -z | xargs -0 sha256sum
             ) > "$work/$stage.sha256"
             du -sh "$work/$stage-cache"
           }
