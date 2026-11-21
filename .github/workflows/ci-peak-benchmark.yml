@@ -1,0 +1,112 @@
+name: CI peak benchmark
+on:
+  push:
+    branches: [benchmark/ci-peak-20261121]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-peak-benchmark
+  cancel-in-progress: false
+
+jobs:
+  measure:
+    if: github.repository == 'disposabl-dev/create-disposabl-app' && github.ref == 'refs/heads/benchmark/ci-peak-20261121'
+    name: ${{ matrix.platform }} / ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { platform: web, runner: ubuntu-24.04 }
+          - { platform: web, runner: blacksmith-4vcpu-ubuntu-2404 }
+          - { platform: android, runner: ubuntu-24.04 }
+          - { platform: android, runner: blacksmith-8vcpu-ubuntu-2404 }
+          - { platform: ios, runner: macos-26 }
+          - { platform: ios, runner: blacksmith-6vcpu-macos-26 }
+          - { platform: linux, runner: ubuntu-24.04 }
+          - { platform: macos, runner: macos-26 }
+          - { platform: windows, runner: windows-2025 }
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: ${{ (matrix.platform == 'android' || matrix.platform == 'ios') && 75 || 12 }}
+    defaults:
+      run:
+        shell: bash
+    env:
+      CI_PEAK_PLATFORM: ${{ matrix.platform }}
+      SEGMENT_DOWNLOAD_TIMEOUT_MINS: 1
+      E2E_TELEMETRY_DISABLED: 1
+      DO_NOT_TRACK: 1
+      EXPO_NO_DOTENV: 1
+      EXPO_NO_TELEMETRY: 1
+      EXPO_PUBLIC_E2E: "true"
+      EXPO_PUBLIC_DISPOSABL_ANALYTICS_ENABLED: "false"
+      VITE_DISPOSABL_ANALYTICS_ENABLED: "false"
+      EXPO_PROJECT_ID: 00000000-0000-4000-8000-000000000001
+      CONVEX_URL: https://ci.invalid
+      CONVEX_SITE_URL: https://ci.invalid
+      VITE_CONVEX_URL: https://ci.invalid
+      VITE_CONVEX_SITE_URL: https://ci.invalid
+      EXPO_PUBLIC_CONVEX_URL: https://ci.invalid
+      EXPO_PUBLIC_CONVEX_SITE_URL: https://ci.invalid
+      UPDATE_POLICY: disabled
+      DISPOSABL_MOBILE_CHANNEL: benchmark
+      DISPOSABL_RELEASE_VERSION: 1.0.1
+      DISPOSABL_DESKTOP_PLATFORM: ${{ matrix.platform }}
+      MACOS_NOTARIZE: "false"
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          package-manager-cache: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.5"
+      - name: Record source and runner
+        run: |
+          printf 'CI_PEAK_CACHE_DIR=%s\n' "$RUNNER_TEMP/ci-peak" >> "$GITHUB_ENV"
+          git rev-parse HEAD HEAD^{tree}
+          node -e 'const os=require("node:os"); console.log(JSON.stringify({platform:os.platform(),arch:os.arch(),cpu:os.cpus()[0]?.model,threads:os.availableParallelism(),memory:os.totalmem()}))'
+          bun --version
+          node --version
+      - name: Dependency cache
+        id: dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ci-peak-v1-bun-${{ matrix.platform }}-${{ matrix.runner }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}
+      - name: Install dependencies
+        run: bash .github/scripts/ci-peak-benchmark.sh install
+      - name: Configure Gradle
+        if: matrix.platform == 'android'
+        run: printf 'GRADLE_USER_HOME=%s\n' "$CI_PEAK_CACHE_DIR/gradle" >> "$GITHUB_ENV"
+      - uses: actions/setup-java@v5
+        if: matrix.platform == 'android'
+        with: { distribution: temurin, java-version: "17" }
+      - uses: android-actions/setup-android@v3
+        if: matrix.platform == 'android'
+        with: { packages: platform-tools }
+      - name: Prepare Android runner
+        if: matrix.platform == 'android'
+        run: bash .github/scripts/android-runner.sh prepare
+      - name: Native and task cache
+        id: build-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ runner.temp }}/ci-peak/ccache
+            ${{ runner.temp }}/ci-peak/gradle/caches
+            ${{ runner.temp }}/ci-peak/gradle/wrapper
+            ${{ runner.temp }}/ci-peak/electron
+            ${{ matrix.platform == 'ios' && '~/Library/Caches/CocoaPods' || '.ci-peak-unused' }}
+            ${{ matrix.platform == 'web' && '.turbo/cache' || '.ci-peak-unused' }}
+          key: ci-peak-v1-build-${{ matrix.platform }}-${{ matrix.runner }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}
+      - name: Record cache hits
+        run: |
+          printf 'Bun cache exact hit: %s\nBuild cache exact hit: %s\n' '${{ steps.dependencies.outputs.cache-hit }}' '${{ steps.build-cache.outputs.cache-hit }}' >> "$GITHUB_STEP_SUMMARY"
+      - name: Build and verify
+        run: bash .github/scripts/ci-peak-benchmark.sh build
