@@ -81,7 +81,7 @@ runs:
         EXPECTED_SOURCE: "${{ steps.source.outputs.sha }}"
       run: test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE"
       shell: bash
-    - uses: ./.github/actions/experimental-bun-lint
+    - uses: ./.github/actions/bun-lint
       if: inputs.lane == 'source'
     - name: Check source
       if: inputs.lane == 'source'
