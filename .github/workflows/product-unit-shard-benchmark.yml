@@ -37,7 +37,7 @@ jobs:
         run: |
           results="$RUNNER_TEMP/unit-proof"
           mkdir "$results"
-          printf '{}\n' > "$results/timings.json"
+          printf '{"version":1,"files":{}}\n' > "$results/timings.json"
           shard=()
           if [[ -n "$TEST_SHARD" ]]; then shard+=("--shard=$TEST_SHARD"); fi
           /usr/bin/time -p bun test --parallel=4 --bail=1 --reporter=junit \
