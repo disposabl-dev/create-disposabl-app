@@ -1,4 +1,4 @@
-name: Exact warm full product iOS
+name: Full product Android Metro cache replay
 on:
   push:
     branches: [benchmark/ci-peak-20261121]
@@ -8,18 +8,18 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-peak-benchmark
+  group: ci-peak-android-metro
   cancel-in-progress: false
 
 jobs:
   measure:
     if: github.repository == 'disposabl-dev/create-disposabl-app' && github.ref == 'refs/heads/benchmark/ci-peak-20261121'
-    name: Full product iOS exact warm replay
+    name: Product Android warm Metro profile
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { platform: ios, runner: macos-26 }
+          - { platform: android, runner: ubuntu-24.04, heap: default }
     runs-on: ${{ matrix.runner }}
     timeout-minutes: ${{ (matrix.platform == 'android' || matrix.platform == 'ios') && 75 || 12 }}
     defaults:
@@ -27,6 +27,7 @@ jobs:
         shell: bash
     env:
       CI_PEAK_PLATFORM: ${{ matrix.platform }}
+      CI_PEAK_HEAP: ${{ matrix.heap }}
       SEGMENT_DOWNLOAD_TIMEOUT_MINS: 1
       E2E_TELEMETRY_DISABLED: 1
       DO_NOT_TRACK: 1
@@ -102,20 +103,30 @@ jobs:
           printf 'Bun cache exact hit: %s\nBuild cache exact hit: %s\n' '${{ steps.dependencies.outputs.cache-hit }}' '${{ steps.build-cache.outputs.cache-hit }}' >> "$GITHUB_STEP_SUMMARY"
           test '${{ steps.dependencies.outputs.cache-hit }}' = true
           test '${{ steps.build-cache.outputs.cache-hit }}' = true
-      - name: Build and verify
-        run: bash .github/scripts/ci-peak-benchmark.sh build
-      - name: Verify and preserve the simulator archive
-        run: |
-          app=$(find "$RUNNER_TEMP/ios-build/Build/Products/Release-iphonesimulator" -maxdepth 1 -name '*.app' -type d -print -quit)
-          test -n "$app"
-          executable=$(/usr/libexec/PlistBuddy -c 'Print CFBundleExecutable' "$app/Info.plist")
-          lipo -archs "$app/$executable"
-          codesign --verify --strict --deep "$app"
-          unzip -tq "$RUNNER_TEMP/ios-simulator.zip"
-      - uses: actions/upload-artifact@v4
+      - name: Restore Metro transforms
+        id: metro
+        uses: actions/cache@v4
         with:
-          name: warm-product-ios-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/ios-simulator.zip
+          path: ${{ runner.temp }}/product-metro-restore
+          key: ci-peak-android-metro-v1-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+      - name: Build and verify
+        env:
+          EXPO_METRO_CACHE_RESTORE_DIR: ${{ runner.temp }}/product-metro-restore
+          EXPO_METRO_CACHE_OUTPUT_DIR: ${{ runner.temp }}/product-metro-output
+        run: |
+          mkdir -p "$EXPO_METRO_CACHE_RESTORE_DIR" "$EXPO_METRO_CACHE_OUTPUT_DIR"
+          bash .github/scripts/ci-peak-benchmark.sh build
+          test -n "$(find "$EXPO_METRO_CACHE_OUTPUT_DIR" -type f -print -quit)"
+      - name: Archive only transforms used in this build
+        if: steps.metro.outputs.cache-hit != 'true'
+        run: |
+          mv "$RUNNER_TEMP/product-metro-restore" "$RUNNER_TEMP/product-metro-unused"
+          mv "$RUNNER_TEMP/product-metro-output" "$RUNNER_TEMP/product-metro-restore"
+          du -sh "$RUNNER_TEMP/product-metro-restore"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: full-product-android-metro-${{ github.run_attempt }}
+          path: apps/mobile/android/build/reports/profile/
           retention-days: 1
-          compression-level: 0
-          if-no-files-found: error
+          if-no-files-found: warn
