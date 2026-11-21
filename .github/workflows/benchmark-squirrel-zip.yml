@@ -24,13 +24,13 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          fetch-depth: 2
+          fetch-depth: 3
           persist-credentials: false
       - name: Verify immutable product source
         shell: bash
         run: |
-          test "$(git rev-parse HEAD^)" = '48630a83685f3fcfbe9086ec2b9b8b3c6e3858a2'
-          git diff --exit-code HEAD^ HEAD -- . ':(exclude).github/workflows/benchmark-squirrel-zip.yml' ':(exclude).github/benchmarks/squirrel-*'
+          git merge-base --is-ancestor 48630a83685f3fcfbe9086ec2b9b8b3c6e3858a2 HEAD
+          git diff --exit-code 48630a83685f3fcfbe9086ec2b9b8b3c6e3858a2 HEAD -- . ':(exclude).github/workflows/benchmark-squirrel-zip.yml' ':(exclude).github/benchmarks/squirrel-*'
       - uses: actions/setup-node@v6
         with:
           node-version: "24"
@@ -53,7 +53,9 @@ jobs:
           Copy-Item $source $vendor -Recurse
           Move-Item (Join-Path $vendor '7z.exe') (Join-Path $vendor '7z-native.exe')
           $compiler = Join-Path $env:WINDIR 'Microsoft.NET/Framework64/v4.0.30319/csc.exe'
-          & $compiler /nologo "/out:$vendor/7z.exe" '.github/benchmarks/squirrel-7z-launcher.cs'
+          $launcherSource = Join-Path $env:GITHUB_WORKSPACE '.github\benchmarks\squirrel-7z-launcher.cs'
+          $launcherOutput = Join-Path $vendor '7z.exe'
+          & $compiler /nologo "/out:$launcherOutput" $launcherSource
           if ($LASTEXITCODE -ne 0) { throw 'Unable to compile test launcher' }
           "DISPOSABL_SQUIRREL_VENDOR=$vendor" >> $env:GITHUB_ENV
           "SQUIRREL_FAST_AUDIT=$env:RUNNER_TEMP/squirrel-fast-audit.txt" >> $env:GITHUB_ENV
@@ -64,7 +66,7 @@ jobs:
           export TMP="$(cygpath -aw ../sqtmp)"
           export TEMP="$TMP" TMPDIR="$TMP"
           export NODE_OPTIONS="--require \"$(cygpath -am .github/benchmarks/squirrel-preload.cjs)\""
-          time bun run --cwd apps/desktop preview
+          { time bun run --cwd apps/desktop preview; } 2>&1 | tee "$(cygpath -u "$RUNNER_TEMP")/squirrel-build.log"
       - name: Verify ZIP-level instrumentation
         if: matrix.mode == 'fast'
         shell: pwsh
@@ -113,7 +115,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: squirrel-${{ matrix.mode }}-${{ matrix.repeat }}
-          path: ${{ runner.temp }}/squirrel-manifest.json
+          path: |
+            ${{ runner.temp }}/squirrel-manifest.json
+            ${{ runner.temp }}/squirrel-build.log
           if-no-files-found: ignore
           retention-days: 1
   compare:

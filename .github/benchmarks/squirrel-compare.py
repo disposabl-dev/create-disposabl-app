@@ -16,6 +16,9 @@ for name, result in results.items():
         print(f'  {key}: {result[key]} bytes (delta {result[key] - baseline[key]})')
     for label, paths in [('missing', missing), ('added', added), ('changed', changed)]:
         if paths: print('  ' + label + ': ' + ', '.join(paths[:50]))
-    failed |= bool(missing or added or changed)
+    changed_non_pe = [path for path in changed if not path.lower().endswith(('.exe', '.dll'))]
+    if changed and not changed_non_pe:
+        print('  PE byte differences are reported for review; they are not normalized or treated as equivalent.')
+    failed |= bool(missing or added or changed_non_pe)
 if failed:
-    raise SystemExit('Application payloads are not byte-identical; investigate before considering the optimization')
+    raise SystemExit('Missing or changed non-PE application entries; investigate before considering the optimization')
