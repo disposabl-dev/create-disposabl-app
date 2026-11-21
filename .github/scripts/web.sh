@@ -49,7 +49,7 @@ case "${1:?operation required}" in
     TIMEFORMAT='Billing setup: %3R s'
     time bun x --no-install convex run "${target[@]}" billing:setup "$setup_args"
     TIMEFORMAT='Static upload: %3R s'
-    time bun x --no-install static-hosting upload "${target[@]}" --concurrency 12 --no-spa --dist ../../apps/web/dist/client
+    time bun --bun x --no-install static-hosting upload "${target[@]}" --concurrency 12 --no-spa --dist ../../apps/web/dist/client
     ;;
   *) echo "Unknown operation: $1" >&2; exit 1 ;;
 esac
