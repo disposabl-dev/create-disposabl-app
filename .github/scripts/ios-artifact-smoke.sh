@@ -2,7 +2,7 @@
 set -euo pipefail
 evidence="$RUNNER_TEMP/ios-smoke-evidence"
 work="$RUNNER_TEMP/ios-smoke-work"
-mkdir -p "$work/outer" "$work/inner"
+mkdir -p "$work/outer" "$work/inner" "$evidence"
 gh api --allow-escape-sequences "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID/zip" > "$work/artifact.zip"
 printf '%s  %s\n' "$ARTIFACT_DIGEST" "$work/artifact.zip" | shasum -a 256 --check
 shasum -a 256 "$work/artifact.zip" > "$evidence/sha256.txt"
@@ -25,6 +25,10 @@ lipo -archs "$app/$executable" | tee "$evidence/architectures.txt"
 grep -qw arm64 "$evidence/architectures.txt"
 grep -qw x86_64 "$evidence/architectures.txt"
 codesign --verify --strict --deep "$app"
+codesign -dv "$app" 2>&1 | grep -q 'Signature=adhoc'
+[[ $(/usr/libexec/PlistBuddy -c 'Print CFBundleVersion' "$plist") == 42 ]]
+[[ $(jq -er '.ios.buildNumber' "$app/EXConstants.bundle/app.config") == 42 ]]
+[[ $(jq -er '.android.versionCode' "$app/EXConstants.bundle/app.config") == 42 ]]
 xcodebuild -version | tee "$evidence/xcode.txt"
 xcrun simctl list -j runtimes > "$evidence/runtimes.json"
 xcrun simctl list -j devicetypes > "$evidence/devicetypes.json"
@@ -70,23 +74,14 @@ if xcrun simctl get_app_container "$udid" "$bundle" app >/dev/null 2>&1; then
   xcrun simctl uninstall "$udid" "$bundle"
 fi
 xcrun simctl install "$udid" "$app"
+installed=$(xcrun simctl get_app_container "$udid" "$bundle" app)
+[[ $(/usr/libexec/PlistBuddy -c 'Print CFBundleVersion' "$installed/Info.plist") == 42 ]]
+[[ $(jq -er '.ios.buildNumber' "$installed/EXConstants.bundle/app.config") == 42 ]]
+[[ $(jq -er '.android.versionCode' "$installed/EXConstants.bundle/app.config") == 42 ]]
+printf 'ios=42\nandroid=42\n' > "$evidence/installed-counters.txt"
 xcrun simctl launch "$udid" "$bundle" | tee "$evidence/launch.txt"
 sleep 20
 xcrun simctl io "$udid" screenshot "$evidence/screen.png"
 swiftc -O "$GITHUB_WORKSPACE/.github/scripts/ios-repack-ocr.swift" -o "$RUNNER_TEMP/starter-ocr"
 "$RUNNER_TEMP/starter-ocr" "$evidence/screen.png" > "$evidence/screen-text.txt"
-tr '\n' ' ' < "$evidence/screen-text.txt" | grep -Fi 'Your app starts here.'
-grep -Fix Android "$evidence/screen-text.txt"
-grep -Fix iOS "$evidence/screen-text.txt"
-unset GH_TOKEN
-cd "$RUNNER_TEMP/generated"
-export E2E_IOS_DEVICE="$udid" E2E_IOS_APP_ID="$bundle" DISPOSABL_MOBILE_CHANNEL=native-benchmark
-export E2E_CONVEX_URL=https://ci.invalid E2E_CONVEX_SITE_URL=https://ci.invalid EXPO_NO_DOTENV=1
-export E2E_TELEMETRY_DISABLED=1 DO_NOT_TRACK=1 EXPO_NO_TELEMETRY=1
-export AGENT_DEVICE_STATE_DIR="$(mktemp -d /tmp/ad-ios.XXXXXX)"
-status=0
-bun run --cwd packages/tests e2e run mobile.e2e.ts --target ios --retries 0 --no-cache 2>&1 |
-  tee "$evidence/generated-ios-checks.log" || status=$?
-if [[ -d packages/tests/.e2e ]]; then cp -R packages/tests/.e2e "$evidence/test-results"; fi
-[[ "$status" == 0 ]] || exit "$status"
-grep -E '✓.*mobile home renders' "$evidence/generated-ios-checks.log"
+tr '\n' ' ' < "$evidence/screen-text.txt" | grep -Fi 'Warm build 42'

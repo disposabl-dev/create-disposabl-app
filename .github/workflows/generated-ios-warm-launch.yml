@@ -1,0 +1,34 @@
+name: Generated warm iOS launch
+on:
+  push:
+    branches: [benchmark/generated-ios-warm-launch-20261121]
+permissions:
+  actions: read
+  contents: read
+jobs:
+  smoke:
+    if: github.repository == 'disposabl-dev/create-disposabl-app'
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Verify exact warm artifact provenance
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash .github/scripts/generated-warm-origin.sh
+      - name: Install and inspect repacked generated app
+        timeout-minutes: 14
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_ID: "14710542777"
+          ARTIFACT_DIGEST: c742c0616f01ac656102bd9c9efb82e2feb7624a901b8bc64f86446751558741
+        run: bash .github/scripts/ios-artifact-smoke.sh
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: generated-ios-warm-launch-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ios-smoke-evidence/
+          if-no-files-found: warn
+          retention-days: 1
