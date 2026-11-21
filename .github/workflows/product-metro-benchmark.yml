@@ -30,7 +30,7 @@ jobs:
         run: echo 'build=false' >> "$GITHUB_OUTPUT"
       - name: Restore Expo transform cache
         id: metro-cache
-        if: steps.fingerprint.outputs.build == 'false' && !(github.event_name == 'push' && github.repository == 'disposabl-dev/create-disposabl-app')
+        if: steps.fingerprint.outcome == 'success'
         uses: actions/cache@v4
         with:
           path: ${{ runner.temp }}/expo-metro-restore
