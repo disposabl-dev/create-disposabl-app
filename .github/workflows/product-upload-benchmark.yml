@@ -16,6 +16,7 @@ jobs:
     env:
       GH_TOKEN: ""
       DO_NOT_TRACK: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
       E2E_TELEMETRY_DISABLED: "1"
     steps:
       - uses: actions/checkout@v6
