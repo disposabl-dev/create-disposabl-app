@@ -1,7 +1,7 @@
-name: Full product cold-build benchmark
+name: Full product cold Android without preview R8
 on:
   push:
-    branches: [benchmark/ci-full-product-20261121]
+    branches: [benchmark/ci-full-product-no-r8-20261121]
   workflow_dispatch:
 
 permissions:
@@ -28,28 +28,16 @@ env:
   DISPOSABL_ANDROID_VERSION_CODE: "1"
   DISPOSABL_IOS_BUILD_NUMBER: "1"
   SOURCE: ${{ github.sha }}
-  SOURCE_PATH: git/ref/heads/benchmark/ci-full-product-20261121
+  SOURCE_PATH: git/ref/heads/benchmark/ci-full-product-no-r8-20261121
   GH_REPO: ${{ github.repository }}
   GH_TOKEN: ${{ github.token }}
 
 jobs:
-  product-checks:
-    if: github.repository == 'disposabl-dev/create-disposabl-app' && github.ref == 'refs/heads/benchmark/ci-full-product-20261121'
-    uses: ./.github/workflows/product-checks.yml
-    permissions:
-      contents: read
-    with:
-      source_sha: ${{ github.sha }}
-
   android:
-    if: github.repository == 'disposabl-dev/create-disposabl-app' && github.ref == 'refs/heads/benchmark/ci-full-product-20261121'
-    name: Cold product Android / ${{ matrix.heap }}
+    if: github.repository == 'disposabl-dev/create-disposabl-app' && github.ref == 'refs/heads/benchmark/ci-full-product-no-r8-20261121'
+    name: Cold product Android preview without R8
     runs-on: ubuntu-24.04
     timeout-minutes: 40
-    strategy:
-      fail-fast: false
-      matrix:
-        heap: [default, 4g]
     steps:
       - uses: actions/checkout@v6
         with:
@@ -86,9 +74,9 @@ jobs:
       - uses: android-actions/setup-android@v3
         with:
           packages: platform-tools
-      - name: Apply heap experiment
-        if: matrix.heap == '4g'
-        run: echo 'GRADLE_OPTS="-Dorg.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=512m"' >> "$GITHUB_ENV"
+      - name: Disable shrinking in this isolated preview
+        run: |
+          echo 'GRADLE_OPTS=-Dorg.gradle.project.android.enableMinifyInReleaseBuilds=false -Dorg.gradle.project.android.enableShrinkResourcesInReleaseBuilds=false' >> "$GITHUB_ENV"
       - name: Build and verify the real product preview APK
         working-directory: apps/mobile
         run: |
@@ -116,72 +104,8 @@ jobs:
           du -h "$apk"
       - uses: actions/upload-artifact@v4
         with:
-          name: full-product-android-${{ matrix.heap }}-${{ github.run_attempt }}
+          name: full-product-android-unminified-${{ github.run_attempt }}
           path: dist/release/
-          retention-days: 1
-          compression-level: 0
-          if-no-files-found: error
-
-  ios:
-    if: github.repository == 'disposabl-dev/create-disposabl-app' && github.ref == 'refs/heads/benchmark/ci-full-product-20261121'
-    name: Cold product iOS simulator
-    runs-on: macos-26
-    timeout-minutes: 65
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: ${{ github.sha }}
-          persist-credentials: false
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          package-manager-cache: false
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.4.5
-      - name: Verify product source and cold CocoaPods state
-        run: |
-          test "$(git rev-parse HEAD)" = "$SOURCE"
-          node -e 'const c=require("./disposabl.json");if(!c.features.includes("payments")||!c.platforms.includes("ios"))process.exit(1)'
-          test ! -e apps/mobile/ios
-          test ! -e "$RUNNER_TEMP/ios-build"
-          test ! -e "$RUNNER_TEMP/ios-ccache"
-          mkdir -p "$RUNNER_TEMP/cold-ios-home"
-          test -z "$(ls -A "$RUNNER_TEMP/cold-ios-home")"
-          printf 'Source %s\nTree %s\n' "$SOURCE" "$(git rev-parse HEAD^{tree})"
-          node -e 'const os=require("node:os");console.log(JSON.stringify({cpus:os.availableParallelism(),memory:os.totalmem(),arch:os.arch()}))'
-          xcodebuild -version
-          xcrun --sdk iphonesimulator --show-sdk-version
-          bun --version
-          node --version
-      - name: Install frozen mobile dependencies
-        run: /usr/bin/time -p bun install --frozen-lockfile --filter @disposabl/mobile
-      - name: Build and verify the real product simulator archive
-        working-directory: apps/mobile
-        run: |
-          set -euo pipefail
-          export CP_HOME_DIR="$RUNNER_TEMP/cold-ios-home"
-          export COCOAPODS_DISABLE_STATS=true
-          /usr/bin/time -p bash "$GITHUB_WORKSPACE/.github/scripts/apple.sh" simulator
-          archive="$GITHUB_WORKSPACE/dist/apple/ios-simulator.zip"
-          test -s "$archive"
-          unzip -tq "$archive"
-          app=$(find "$RUNNER_TEMP/ios-build/Build/Products/Release-iphonesimulator" -maxdepth 1 -name '*.app' -type d -print -quit)
-          test -n "$app"
-          codesign --verify --deep --strict "$app"
-          executable=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$app/Info.plist")
-          identifier=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Info.plist")
-          test "$identifier" = "dev.disposabl.mobile.preview"
-          architectures=$(lipo -archs "$app/$executable")
-          printf 'Simulator architectures: %s\n' "$architectures"
-          [[ " $architectures " == *" arm64 "* && " $architectures " == *" x86_64 "* ]]
-          printf '%s\n' "$SOURCE" > "$GITHUB_WORKSPACE/dist/apple/source.sha"
-          shasum -a 256 "$archive" > "$GITHUB_WORKSPACE/dist/apple/sha256.txt"
-          du -h "$archive"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: full-product-ios-${{ github.run_attempt }}
-          path: dist/apple/
           retention-days: 1
           compression-level: 0
           if-no-files-found: error
