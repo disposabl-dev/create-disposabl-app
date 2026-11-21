@@ -46,7 +46,8 @@ jobs:
       changed: ${{ steps.platforms.outputs.changed }}
       android: ${{ steps.platforms.outputs.android }}
       ios: ${{ steps.platforms.outputs.ios }}
-      ios_preview_update: ${{ steps.platforms.outputs.ios_preview_update }}
+      expo_connected: ${{ steps.platforms.outputs.expo_connected }}
+      expo_setup: ${{ steps.platforms.outputs.expo_setup }}
       desktop: ${{ steps.platforms.outputs.desktop }}
       packages: ${{ steps.platforms.outputs.packages }}
     steps:
@@ -170,22 +171,49 @@ jobs:
       - name: Report web result
         if: always()
         run: node .github/scripts/disposabl.mjs report web,api,mcp ${{ steps.deploy.outcome == 'success' && 'ready' || 'failed' }}
+  expo-project:
+    name: Initialize Expo project
+    needs: [changes, web]
+    if: needs.changes.outputs.expo_setup == 'true'
+    runs-on: ${{ needs.changes.outputs.linux_runner }}
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      id: ${{ steps.project.outputs.project_id }}
+      owner: ${{ steps.project.outputs.owner }}
+      slug: ${{ steps.project.outputs.slug }}
+    steps:
+      - *checkout
+      - *node
+      - *bun
+      - name: Create or link the Expo project once
+        id: project
+        working-directory: apps/mobile
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EXPO_OWNER: ${{ secrets.EXPO_OWNER || vars.EXPO_OWNER }}
+          EXPO_NO_TELEMETRY: "1"
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/mobile.sh" expo-project
   android:
     name: Android
-    needs: [changes, web]
-    if: needs.changes.outputs.android == 'true'
+    needs: [changes, web, expo-project]
+    if: always() && !cancelled() && needs.web.result == 'success' && (needs.expo-project.result == 'success' || needs.expo-project.result == 'skipped') && needs.changes.outputs.android == 'true'
     permissions: *release-permissions
     runs-on: ${{ needs.changes.outputs.android_runner }}
     timeout-minutes: 30
     outputs:
       release: ${{ steps.artifacts.outcome == 'success' }}
       built: ${{ steps.build.outcome == 'success' }}
+      expo_project_id: ${{ needs.expo-project.outputs.id }}
+      expo_owner: ${{ needs.expo-project.outputs.owner }}
+      expo_slug: ${{ needs.expo-project.outputs.slug }}
     env:
       PLATFORM: android
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-      EXPO_PROJECT_ID: ${{ secrets.EXPO_PROJECT_ID || vars.EXPO_PROJECT_ID }}
-      EXPO_OWNER: ${{ secrets.EXPO_OWNER || vars.EXPO_OWNER }}
-      EXPO_SLUG: ${{ secrets.EXPO_SLUG || vars.EXPO_SLUG }}
+      EXPO_PROJECT_ID: &expo_project_id ${{ secrets.EXPO_PROJECT_ID || vars.EXPO_PROJECT_ID || needs.expo-project.outputs.id }}
+      EXPO_OWNER: &expo_owner ${{ secrets.EXPO_OWNER || vars.EXPO_OWNER || needs.expo-project.outputs.owner }}
+      EXPO_SLUG: &expo_slug ${{ secrets.EXPO_SLUG || vars.EXPO_SLUG || needs.expo-project.outputs.slug }}
       EXPO_NO_DOTENV: "1"
       CONVEX_URL: ${{ needs.web.outputs.convex_url }}
       CONVEX_SITE_URL: ${{ needs.web.outputs.convex_site_url }}
@@ -332,9 +360,9 @@ jobs:
       contents: read
     env:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-      EXPO_PROJECT_ID: ${{ secrets.EXPO_PROJECT_ID || vars.EXPO_PROJECT_ID }}
-      EXPO_OWNER: ${{ secrets.EXPO_OWNER || vars.EXPO_OWNER }}
-      EXPO_SLUG: ${{ secrets.EXPO_SLUG || vars.EXPO_SLUG }}
+      EXPO_PROJECT_ID: ${{ secrets.EXPO_PROJECT_ID || vars.EXPO_PROJECT_ID || needs.android.outputs.expo_project_id }}
+      EXPO_OWNER: ${{ secrets.EXPO_OWNER || vars.EXPO_OWNER || needs.android.outputs.expo_owner }}
+      EXPO_SLUG: ${{ secrets.EXPO_SLUG || vars.EXPO_SLUG || needs.android.outputs.expo_slug }}
       EXPO_NO_DOTENV: "1"
     steps:
       - *checkout
@@ -364,8 +392,8 @@ jobs:
         run: bash "$GITHUB_WORKSPACE/.github/scripts/mobile.sh" android-submit
   android-failure:
     name: Report Android failure
-    needs: android
-    if: always() && (needs.android.result == 'failure' || needs.android.result == 'cancelled')
+    needs: [changes, expo-project, android]
+    if: always() && (needs.android.result == 'failure' || needs.android.result == 'cancelled' || (needs.changes.outputs.android == 'true' && needs.expo-project.result == 'failure'))
     permissions:
       contents: read
       id-token: write
@@ -374,11 +402,13 @@ jobs:
     steps:
       - *checkout
       - *node
-      - run: node .github/scripts/disposabl.mjs report android failed "Android build failed or was cancelled; check the workflow log."
+      - env:
+          DETAIL: ${{ needs.expo-project.result == 'failure' && 'Expo project setup failed. Check the workflow log.' || 'Android build failed or was cancelled. Check the workflow log.' }}
+        run: node .github/scripts/disposabl.mjs report android failed "$DETAIL"
   ios-preview:
     name: iOS simulator preview
-    needs: [changes, web]
-    if: github.event_name == 'pull_request' && needs.web.outputs.ios == 'true'
+    needs: [changes, web, expo-project]
+    if: always() && !cancelled() && needs.web.result == 'success' && (needs.expo-project.result == 'success' || needs.expo-project.result == 'skipped') && github.event_name == 'pull_request' && needs.web.outputs.ios == 'true'
     permissions: *release-permissions
     runs-on: ${{ needs.changes.outputs.macos_runner }}
     # Cold simulator builds compile native dependencies for both architectures.
@@ -390,9 +420,9 @@ jobs:
       EXPO_PUBLIC_CONVEX_URL: ${{ needs.web.outputs.convex_url }}
       PUBLIC_SITE_URL: ${{ needs.web.outputs.public_site_url }}
       EXPO_PUBLIC_CONVEX_SITE_URL: ${{ needs.web.outputs.public_site_url }}
-      EXPO_PROJECT_ID: ${{ secrets.EXPO_PROJECT_ID || vars.EXPO_PROJECT_ID }}
-      EXPO_OWNER: ${{ secrets.EXPO_OWNER || vars.EXPO_OWNER }}
-      EXPO_SLUG: ${{ secrets.EXPO_SLUG || vars.EXPO_SLUG }}
+      EXPO_PROJECT_ID: *expo_project_id
+      EXPO_OWNER: *expo_owner
+      EXPO_SLUG: *expo_slug
       EXPO_NO_DOTENV: "1"
     steps:
       - *checkout
@@ -407,15 +437,6 @@ jobs:
         if: env.EXPO_TOKEN != ''
         working-directory: apps/mobile
         run: bash "$GITHUB_WORKSPACE/.github/scripts/mobile.sh" expo-env
-      - name: Verify update channel
-        timeout-minutes: 2
-        if: env.EXPO_TOKEN != '' && needs.changes.outputs.ios_preview_update != 'true'
-        working-directory: apps/mobile
-        run: bash "$GITHUB_WORKSPACE/.github/scripts/mobile.sh" expo-channel
-      - name: Publish compatible iOS preview update
-        if: env.EXPO_TOKEN != '' && needs.changes.outputs.ios_preview_update != 'true'
-        working-directory: apps/mobile
-        run: bash "$GITHUB_WORKSPACE/.github/scripts/apple.sh" ota
       - name: Xcode toolchain
         run: |
           xcodebuild -version
@@ -453,16 +474,11 @@ jobs:
           compression-level: 0
           if-no-files-found: error
       - name: Report simulator archive
-        run: |
-          echo 'iOS simulator archive is available in this workflow run’s artifacts; it is not a device or TestFlight build.' >> "$GITHUB_STEP_SUMMARY"
-          node .github/scripts/disposabl.mjs report ios ready 'Simulator archive available in workflow artifacts.'
-      - name: Report failure
-        if: failure() || cancelled()
-        run: node .github/scripts/disposabl.mjs report ios failed 'iOS simulator build failed; check the workflow log.'
+        run: echo 'iOS simulator archive is available in this workflow run’s artifacts; it is not a device or TestFlight build.' >> "$GITHUB_STEP_SUMMARY"
   ios-preview-update:
     name: iOS preview update
-    needs: [changes, web]
-    if: github.event_name == 'pull_request' && needs.web.outputs.ios == 'true' && needs.changes.outputs.ios_preview_update == 'true'
+    needs: [changes, web, expo-project]
+    if: always() && !cancelled() && needs.web.result == 'success' && (needs.expo-project.result == 'success' || needs.expo-project.result == 'skipped') && github.event_name == 'pull_request' && needs.web.outputs.ios == 'true' && needs.changes.outputs.expo_connected == 'true'
     permissions:
       contents: read
       pull-requests: read
@@ -486,18 +502,39 @@ jobs:
       - name: Publish the preview update
         working-directory: apps/mobile
         run: bash "$GITHUB_WORKSPACE/.github/scripts/apple.sh" ota
+  ios-preview-report:
+    name: Report iOS preview
+    needs: [changes, web, ios-preview, ios-preview-update]
+    if: always() && !cancelled() && github.event_name == 'pull_request' && needs.web.result == 'success' && needs.web.outputs.ios == 'true'
+    permissions: *release-permissions
+    runs-on: ${{ needs.changes.outputs.linux_runner }}
+    timeout-minutes: 3
+    steps:
+      - *checkout
+      - *node
+      - name: Report combined iOS preview result
+        env:
+          ARCHIVE: ${{ needs.ios-preview.result }}
+          UPDATE: ${{ needs.ios-preview-update.result }}
+          EXPO_CONNECTED: ${{ needs.changes.outputs.expo_connected }}
+        run: |
+          if [[ "$ARCHIVE" == success && ( "$EXPO_CONNECTED" != true || "$UPDATE" == success ) ]]; then
+            node .github/scripts/disposabl.mjs report ios ready 'Simulator archive available in workflow artifacts.'
+          else
+            node .github/scripts/disposabl.mjs report ios failed 'The iOS simulator archive or Expo preview update failed. Check the workflow log.'
+          fi
   ios-production:
     name: iOS production and TestFlight
-    needs: [changes, web]
-    if: github.event_name == 'push' && needs.web.outputs.ios == 'true'
+    needs: [changes, web, expo-project]
+    if: always() && !cancelled() && needs.web.result == 'success' && (needs.expo-project.result == 'success' || needs.expo-project.result == 'skipped') && github.event_name == 'push' && needs.web.outputs.ios == 'true'
     permissions: *release-permissions
     runs-on: ${{ github.repository == 'disposabl-dev/create-disposabl-app' && 'xcode-27' || needs.changes.outputs.linux_runner }}
     timeout-minutes: 90
     env:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-      EXPO_PROJECT_ID: ${{ secrets.EXPO_PROJECT_ID || vars.EXPO_PROJECT_ID }}
-      EXPO_OWNER: ${{ secrets.EXPO_OWNER || vars.EXPO_OWNER }}
-      EXPO_SLUG: ${{ secrets.EXPO_SLUG || vars.EXPO_SLUG }}
+      EXPO_PROJECT_ID: *expo_project_id
+      EXPO_OWNER: *expo_owner
+      EXPO_SLUG: *expo_slug
       EXPO_NO_DOTENV: "1"
       ASC_APP_ID: ${{ secrets.ASC_APP_ID || vars.ASC_APP_ID }}
       CONVEX_URL: ${{ needs.web.outputs.convex_url }}

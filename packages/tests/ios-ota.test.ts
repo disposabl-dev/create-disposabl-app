@@ -40,6 +40,12 @@ async function run(
     );
     await mkdir(join(dir, "apps/web"), { recursive: true });
     await writeFile(
+      join(dir, "apps/mobile/app.json"),
+      JSON.stringify({
+        expo: { name: "Fixture Mobile", slug: "fixture-mobile" },
+      }),
+    );
+    await writeFile(
       join(dir, "apps/mobile/eas.json"),
       JSON.stringify({ build: { "ios-production": {}, "ios-preview": {} } }),
     );
@@ -61,6 +67,8 @@ const args = process.argv.slice(2);
 fs.appendFileSync(process.env.TRACE, JSON.stringify(args) + '\\n');
 if (args[0] === '-e') {
  require('node:child_process').execFileSync(process.env.REAL_BUN, args, {stdio:'inherit'});
+} else if (args.includes('init')) {
+ console.log(JSON.stringify({projectId:'00000000-0000-4000-8000-000000000001',owner:'fixture-owner',slug:'fixture-mobile'}));
 } else if (args.includes('env:pull')) {
  fs.writeFileSync(process.env.RUNNER_TEMP + '/expo.env', Object.entries(JSON.parse(process.env.EAS_VARS || '{}')).map(([k,v]) => k+'='+JSON.stringify(v)).join('\\n'));
 } else if (args.includes('submit:list')) {
@@ -94,7 +102,7 @@ else if (!args.includes('update')) process.exit(5);
       [
         resolve(
           import.meta.dirname,
-          operation === "expo-env"
+          operation === "expo-env" || operation === "expo-project"
             ? "../../.github/scripts/mobile.sh"
             : "../../.github/scripts/apple.sh",
         ),
@@ -141,6 +149,33 @@ else if (!args.includes('update')) process.exit(5);
     await rm(dir, { recursive: true, force: true });
   }
 }
+
+test("first Expo setup resolves one project for concurrent platform jobs", async () => {
+  const setup = await run("expo-project", { EXPO_PROJECT_ID: "" });
+  assert.equal(setup.status, 0, setup.stderr);
+  assert.equal(setup.trace.match(/"init"/g)?.length, 1);
+  const values = Object.fromEntries(
+    setup.output
+      .trim()
+      .split("\n")
+      .map((line) => line.split("=")),
+  );
+  assert.equal(values.project_id, "00000000-0000-4000-8000-000000000001");
+  const platforms = await Promise.all(
+    ["android", "ios"].map(() =>
+      run("expo-env", {
+        EXPO_PROJECT_ID: values.project_id,
+        EXPO_OWNER: values.owner,
+        EXPO_SLUG: values.slug,
+      }),
+    ),
+  );
+  for (const result of platforms) {
+    assert.equal(result.status, 0, result.stderr);
+    assert.doesNotMatch(result.trace, /"init"/);
+    assert.match(result.trace, /"env:pull"/);
+  }
+});
 
 test("product iOS delivery requires public store configuration", async () => {
   const config = {

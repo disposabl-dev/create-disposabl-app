@@ -35,7 +35,8 @@ const keys = [
   "changed",
   "android",
   "ios",
-  "ios_preview_update",
+  "expo_connected",
+  "expo_setup",
   "desktop",
   "packages",
 ];
@@ -115,8 +116,8 @@ function allowed(job: any, context: any, needs: any, cancelled = false) {
   )
     return false;
   const js = expression.replace(
-    /needs\.product-checks/g,
-    'needs["product-checks"]',
+    /needs\.(product-checks|expo-project)/g,
+    'needs["$1"]',
   );
   return !!new Function(
     "github",
@@ -266,10 +267,8 @@ test("selector outputs and executable source select PR work and conservative mai
       expect(main[key]).toBeDefined();
     }
     expect([pr.android, pr.ios, pr.changed]).toEqual(["true", "true", "true"]);
-    expect([pr.ios_preview_update, main.ios_preview_update]).toEqual([
-      "true",
-      "false",
-    ]);
+    expect([pr.expo_connected, main.expo_connected]).toEqual(["true", "true"]);
+    expect([pr.expo_setup, main.expo_setup]).toEqual(["false", "true"]);
     expect([main.android, main.ios, main.changed]).toEqual([
       "true",
       "true",
@@ -281,23 +280,64 @@ test("selector outputs and executable source select PR work and conservative mai
   }
 });
 
-test("iOS simulator packaging and OTA can run independently with an existing Expo project", () => {
+test("enabled mobile jobs share first Expo setup and iOS reports both preview results", () => {
   const simulator = pipeline.jobs["ios-preview"];
   const update = pipeline.jobs["ios-preview-update"];
-  expect(simulator.needs).toEqual(["changes", "web"]);
+  const project = pipeline.jobs["expo-project"];
+  const report = pipeline.jobs["ios-preview-report"];
+  expect(project.needs).toEqual(["changes", "web"]);
+  expect(simulator.needs).toEqual(["changes", "web", "expo-project"]);
   expect(update.needs).toEqual(simulator.needs);
   expect(update.env).toEqual(simulator.env);
+  expect(report.needs).toContain("ios-preview");
+  expect(report.needs).toContain("ios-preview-update");
   const needs = {
-    changes: { result: "success", outputs: { ios_preview_update: "true" } },
+    changes: {
+      result: "success",
+      outputs: { expo_connected: "true", expo_setup: "false" },
+    },
     web: { result: "success", outputs: { ios: "true" } },
+    "expo-project": { result: "skipped" },
   };
+  expect(allowed(project, context("pull_request"), needs)).toBe(false);
   expect(allowed(update, context("pull_request"), needs)).toBe(true);
   expect(allowed(update, context("push"), needs)).toBe(false);
-  needs.changes.outputs.ios_preview_update = "false";
+  needs.changes.outputs.expo_setup = "true";
+  expect(allowed(project, context("pull_request"), needs)).toBe(true);
+  needs["expo-project"].result = "failure";
   expect(allowed(update, context("pull_request"), needs)).toBe(false);
-  expect(step(simulator, "Publish compatible iOS preview update").if).toContain(
-    "needs.changes.outputs.ios_preview_update != 'true'",
-  );
+  expect(allowed(simulator, context("pull_request"), needs)).toBe(false);
+  needs["expo-project"].result = "success";
+  expect(allowed(update, context("pull_request"), needs)).toBe(true);
+  expect(allowed(simulator, context("pull_request"), needs)).toBe(true);
+  const dir = mkdtempSync(join(tmpdir(), "ci-ios-report-"));
+  try {
+    writeFileSync(join(dir, "node"), '#!/bin/sh\nprintf "%s\\n" "$4"', {
+      mode: 0o755,
+    });
+    const command = step(report, "Report combined iOS preview result").run;
+    for (const [archive, ota, expo, expected] of [
+      ["success", "success", "true", "ready"],
+      ["success", "failure", "true", "failed"],
+      ["failure", "success", "true", "failed"],
+      ["success", "skipped", "false", "ready"],
+    ]) {
+      expect(
+        execFileSync("bash", ["-c", command], {
+          env: {
+            ...process.env,
+            PATH: `${dir}:${process.env.PATH}`,
+            ARCHIVE: archive,
+            UPDATE: ota,
+            EXPO_CONNECTED: expo,
+          },
+          encoding: "utf8",
+        }).trim(),
+      ).toBe(expected);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test("generated reset retains root check and removes product-only gate", () => {
@@ -421,7 +461,7 @@ test("product and recovery gates remain independent of root and native release j
   expect(allowed(generatorCheckout, cli, {})).toBe(false);
   const submit = pipeline.jobs["android-submit"];
   expect(submit.needs).toBe("android");
-  expect(pipeline.jobs.android.if).toBe(
+  expect(pipeline.jobs.android.if).toContain(
     "needs.changes.outputs.android == 'true'",
   );
   expect(pipeline.jobs.android.outputs.release).toContain(
@@ -479,9 +519,14 @@ test("product and recovery gates remain independent of root and native release j
     expect(allowed(reporter, context("push"), { android: { result } })).toBe(
       true,
     );
-  expect(
-    allowed(reporter, context("push"), { android: { result: "success" } }),
-  ).toBe(false);
+  const reportNeeds = {
+    android: { result: "skipped" },
+    changes: { outputs: { android: "true" } },
+    "expo-project": { result: "failure" },
+  };
+  expect(allowed(reporter, context("push"), reportNeeds)).toBe(true);
+  reportNeeds["expo-project"].result = "skipped";
+  expect(allowed(reporter, context("push"), reportNeeds)).toBe(false);
 });
 
 test("meaningful workflow mutations are rejected", () => {

@@ -40,9 +40,8 @@ manifest() {
     {signing: $signing, signingId: $signingId, channel: ($channel | required("channel")), projectId: (.extra.eas.projectId | required("projectId")), applicationId: (.android.package | required("applicationId")), runtimeVersion: ($runtime | required("runtimeVersion") | if test("^[a-f0-9]{40,64}$") then . else error("Invalid runtimeVersion") end), androidArchitectures: (.extra.disposablAndroidArchitectures | if type == "array" and length > 0 then . else error("Missing Android architectures") end)}
   '
 }
-case "${1:?operation required}" in
-  expo-env)
-if [[ -z "$EXPO_PROJECT_ID" ]]; then
+configure_expo_project() {
+  [[ -z "${EXPO_PROJECT_ID:-}" ]] || return 0
   # Initialize with static config; app.config.js reads the resulting environment.
   mkdir -p "$RUNNER_TEMP/expo-project"
   jq --slurpfile app ../../disposabl.json --arg owner "${EXPO_OWNER:-}" '
@@ -61,7 +60,14 @@ if [[ -z "$EXPO_PROJECT_ID" ]]; then
   EXPO_SLUG=$(jq -er .slug "$RUNNER_TEMP/expo-project.json")
   export EXPO_PROJECT_ID EXPO_OWNER EXPO_SLUG
   printf 'EXPO_PROJECT_ID=%s\nEXPO_OWNER=%s\nEXPO_SLUG=%s\n' "$EXPO_PROJECT_ID" "$EXPO_OWNER" "$EXPO_SLUG" >> "$GITHUB_ENV"
-fi
+}
+case "${1:?operation required}" in
+  expo-project)
+    configure_expo_project
+    printf 'project_id=%s\nowner=%s\nslug=%s\n' "$EXPO_PROJECT_ID" "${EXPO_OWNER:-}" "${EXPO_SLUG:-}" >> "$GITHUB_OUTPUT"
+    ;;
+  expo-env)
+configure_expo_project
 jq --arg channel "$CHANNEL" '.build["ios-" + env.EAS_ENVIRONMENT].channel = $channel' eas.json > "$RUNNER_TEMP/eas.json"
 mv "$RUNNER_TEMP/eas.json" eas.json
 bun x "$EAS_CLI" env:pull --environment "$EAS_ENVIRONMENT" --path "$RUNNER_TEMP/expo.env" --non-interactive

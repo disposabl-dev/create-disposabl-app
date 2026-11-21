@@ -499,9 +499,9 @@ async function verifyPackagedProfiles() {
           }
         >;
       };
-      assert.equal(
-        parsed.jobs.android.if,
-        "needs.changes.outputs.android == 'true'",
+      assert.match(
+        parsed.jobs.android.if ?? "",
+        /needs\.changes\.outputs\.android == 'true'/,
       );
       assert.equal(parsed.jobs["android-submit"].needs, "android");
       assert.match(

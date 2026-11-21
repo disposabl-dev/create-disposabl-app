@@ -63,7 +63,8 @@ with tempfile.TemporaryDirectory() as temp:
     workflow = (root / '.github/workflows/pipeline.yml').read_text()
     assert "vars.ANDROID_PLAY_SUBMIT == 'true'" in workflow
     assert 'DISPOSABL_ANDROID_PLAY_ENABLED' not in workflow
-    assert 'python3 .github/scripts/android-release.test.py' in workflow
+    action = (root / '.github/actions/product-checks/action.yml').read_text()
+    assert 'python3 .github/scripts/android-release.test.py' in action
     assert 'wanted.signing === "fallback"' in script and 'signingId: $signingId' in script
     assert 'ANDROID_PLAY_SERVICE_ACCOUNT:?' in script and 'ANDROID_PLAY_TRACK:?' in script
     assert 'EXPO_PUBLIC_CONVEX_URL' in workflow and 'DISPOSABL_ANDROID_CHANNEL: *channel' in workflow

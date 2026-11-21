@@ -25,7 +25,7 @@ print('source succession PASS')
 workflow=(root/'.github/workflows/pipeline.yml').read_text()
 assert not (root/'.github/workflows/play-bundle.yml').exists()
 assert '  android-play:\n' not in workflow and 'DISPOSABL_ANDROID_PLAY_ENABLED' not in workflow
-assert "if: needs.changes.outputs.android == 'true'" in workflow
+assert "needs.changes.outputs.android == 'true'" in workflow
 assert "UPDATE_POLICY: ${{ github.event_name == 'push' && github.repository == 'disposabl-dev/create-disposabl-app' && 'expo' || '' }}" in workflow
 build=workflow.split('  android:',1)[1].split('  android-submit:',1)[0]
 job=workflow.split('  android-submit:',1)[1].split('  android-failure:',1)[0]
