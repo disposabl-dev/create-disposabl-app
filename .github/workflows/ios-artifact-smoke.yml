@@ -8,11 +8,18 @@ permissions:
 jobs:
   smoke:
     runs-on: macos-26
-    timeout-minutes: 12
+    timeout-minutes: 17
     steps:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.5
       - name: Verify first generated build provenance
         id: origin
         env:
@@ -22,6 +29,19 @@ jobs:
           JOB: "136861433310"
           ARTIFACT: first-ios-1
         run: bash .github/scripts/ios-artifact-origin.sh
+      - name: Install tests from the exact generated source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          archive="$RUNNER_TEMP/generated-source.zip"
+          gh api --allow-escape-sequences "repos/$GITHUB_REPOSITORY/actions/artifacts/14708343861/zip" > "$archive"
+          printf '%s  %s\n' '8ac1ad71e911d957ed61a73f90e6a4d07181b6bca24717c7f083b5d094ce2991' "$archive" | shasum -a 256 --check
+          mkdir "$RUNNER_TEMP/exact-source" "$RUNNER_TEMP/generated"
+          unzip -q "$archive" -d "$RUNNER_TEMP/exact-source"
+          (cd "$RUNNER_TEMP/exact-source" && shasum -a 256 --check native-starter.sha256)
+          tar -xzf "$RUNNER_TEMP/exact-source/native-starter.tgz" -C "$RUNNER_TEMP/generated"
+          cd "$RUNNER_TEMP/generated"
+          bun install --frozen-lockfile --filter @disposabl/mobile --filter @disposabl/tests
       - name: Install and inspect the first generated app
         env:
           GH_TOKEN: ${{ github.token }}
