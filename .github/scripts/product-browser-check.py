@@ -262,7 +262,7 @@ def main():
         command([cli, 'dev', '--once', '--typecheck', 'disable', '--codegen', 'disable'], cwd=backend, environment=admin, log='sync.log')
         platforms = json.loads((source / 'disposabl.json').read_text()).get('platforms', [])
         targets = 'web,backend,api' if 'api' in platforms else 'web,backend'
-        command(['bun', 'run', 'e2e', 'run', '--target', targets, '--retries', '0', '--no-cache'], cwd=source, environment=testenv, log='e2e.log')
+        command(['bun', 'run', 'e2e', 'run', '--target', targets, '--retries', '0', '--no-cache', '--workers', os.environ['PRODUCT_BROWSER_WORKERS']], cwd=source, environment=testenv, log='e2e.log')
         print(f'Product {targets} E2E passed', flush=True)
     if any(listeners(port) for port in PORTS):
         raise RuntimeError('Listener still present after backend teardown')
