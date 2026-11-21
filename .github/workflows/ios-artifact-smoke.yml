@@ -10,7 +10,7 @@ jobs:
     runs-on: macos-26
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.4.1.app/Contents/Developer
-    timeout-minutes: 23
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v6
         with:
@@ -38,11 +38,11 @@ jobs:
           archive="$RUNNER_TEMP/generated-source.zip"
           gh api --allow-escape-sequences "repos/$GITHUB_REPOSITORY/actions/artifacts/14708343861/zip" > "$archive"
           printf '%s  %s\n' '8ac1ad71e911d957ed61a73f90e6a4d07181b6bca24717c7f083b5d094ce2991' "$archive" | shasum -a 256 --check
-          mkdir "$RUNNER_TEMP/exact-source" "$RUNNER_TEMP/generated"
+          mkdir "$RUNNER_TEMP/exact-source" "$GITHUB_WORKSPACE/generated"
           unzip -q "$archive" -d "$RUNNER_TEMP/exact-source"
           (cd "$RUNNER_TEMP/exact-source" && shasum -a 256 --check native-starter.sha256)
-          tar -xzf "$RUNNER_TEMP/exact-source/native-starter.tgz" -C "$RUNNER_TEMP/generated"
-          cd "$RUNNER_TEMP/generated"
+          tar -xzf "$RUNNER_TEMP/exact-source/native-starter.tgz" -C "$GITHUB_WORKSPACE/generated"
+          cd "$GITHUB_WORKSPACE/generated"
           bun install --frozen-lockfile --filter @disposabl/mobile --filter @disposabl/tests
       - name: Install and inspect the first generated app
         env:
@@ -51,7 +51,14 @@ jobs:
           ARTIFACT_DIGEST: ${{ steps.origin.outputs.digest }}
         run: |
           test -n "$ARTIFACT_ID"
-          bash .github/scripts/ios-artifact-smoke.sh
+          bash .github/scripts/ios-artifact-smoke.sh launch
+      - name: Run first-launch guest test
+        timeout-minutes: 10
+        run: bash .github/scripts/ios-artifact-smoke.sh test
+      - name: Remove owned simulator
+        if: always()
+        timeout-minutes: 2
+        run: bash .github/scripts/ios-artifact-smoke.sh cleanup
       - uses: actions/upload-artifact@v7
         if: always()
         with:

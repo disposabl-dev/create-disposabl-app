@@ -2,6 +2,8 @@
 set -euo pipefail
 evidence="$RUNNER_TEMP/ios-smoke-evidence"
 work="$RUNNER_TEMP/ios-smoke-work"
+case "${1:?phase required}" in
+  launch)
 mkdir -p "$work/outer" "$work/inner"
 gh api --allow-escape-sequences "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID/zip" > "$work/artifact.zip"
 printf '%s  %s\n' "$ARTIFACT_DIGEST" "$work/artifact.zip" | shasum -a 256 --check
@@ -60,7 +62,8 @@ if [[ -z "$udid" ]]; then
 fi
 [[ -n "$udid" ]] || { echo 'No compatible iPhone device type' >&2; exit 1; }
 [[ "$udid" =~ ^[[:xdigit:]]{8}-[[:xdigit:]]{4}-[[:xdigit:]]{4}-[[:xdigit:]]{4}-[[:xdigit:]]{12}$ && "$udid" != "$template" ]]
-trap 'xcrun simctl shutdown "$udid" || true; xcrun simctl delete "$udid" || true' EXIT
+printf '%s\n' "$udid" > "$work/owned-udid"
+printf '%s\n' "$bundle" > "$work/bundle"
 printf 'bundle=%s\nminimum=%s\nruntime=%s\ndevice=%s\nudid=%s\nmethod=%s\ntemplate=%s\n' "$bundle" "$minimum" "$runtime" "$device" "$udid" "$method" "$template" > "$evidence/target.txt"
 python3 - "$udid" <<'PY'
 import subprocess, sys
@@ -78,8 +81,12 @@ swiftc -O "$GITHUB_WORKSPACE/.github/scripts/ios-repack-ocr.swift" -o "$RUNNER_T
 tr '\n' ' ' < "$evidence/screen-text.txt" | grep -Fi 'Your app starts here.'
 grep -Fix Android "$evidence/screen-text.txt"
 grep -Fix iOS "$evidence/screen-text.txt"
+;;
+  test)
 unset GH_TOKEN
-cd "$RUNNER_TEMP/generated"
+udid=$(cat "$work/owned-udid")
+bundle=$(cat "$work/bundle")
+cd "$GITHUB_WORKSPACE/generated"
 export E2E_IOS_DEVICE="$udid" E2E_IOS_APP_ID="$bundle" DISPOSABL_MOBILE_CHANNEL=native-benchmark
 export E2E_CONVEX_URL=https://ci.invalid E2E_CONVEX_SITE_URL=https://ci.invalid EXPO_NO_DOTENV=1
 export E2E_TELEMETRY_DISABLED=1 DO_NOT_TRACK=1 EXPO_NO_TELEMETRY=1
@@ -92,3 +99,14 @@ bun run --cwd packages/tests e2e run mobile.e2e.ts --target ios --retries 0 --ac
 if [[ -d packages/tests/.e2e ]]; then cp -R packages/tests/.e2e "$evidence/test-results"; fi
 [[ "$status" == 0 ]] || exit "$status"
 grep -E '✓.*mobile home renders' "$evidence/generated-ios-checks.log"
+;;
+  cleanup)
+if [[ -f "$work/owned-udid" ]]; then
+  udid=$(cat "$work/owned-udid")
+  [[ "$udid" =~ ^[[:xdigit:]]{8}-[[:xdigit:]]{4}-[[:xdigit:]]{4}-[[:xdigit:]]{4}-[[:xdigit:]]{12}$ ]]
+  xcrun simctl shutdown "$udid" || true
+  xcrun simctl delete "$udid"
+fi
+;;
+  *) echo "Unknown phase" >&2; exit 2 ;;
+esac
