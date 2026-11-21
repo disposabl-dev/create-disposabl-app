@@ -37,7 +37,7 @@ jobs:
       contents: read
       pull-requests: read
       actions: read
-    runs-on: *linux-runner
+    runs-on: ubuntu-slim
     timeout-minutes: 3
     outputs:
       linux_runner: ${{ steps.platforms.outputs.linux_runner }}
