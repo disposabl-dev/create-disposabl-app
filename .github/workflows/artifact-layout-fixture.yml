@@ -1,12 +1,9 @@
 name: Artifact layout compatibility fixture
 on:
-  workflow_dispatch:
-    inputs:
-      count:
-        description: Number of release artifacts
-        required: true
-        type: choice
-        options: [one, many]
+  push:
+    branches:
+      - benchmark/artifact-layout-one-20261121
+      - benchmark/artifact-layout-many-20261121
 permissions:
   contents: read
   actions: read
@@ -18,15 +15,17 @@ jobs:
           mkdir -p /tmp/android /tmp/linux
           printf 'android stub\n' > /tmp/android/android.apk
           printf 'linux stub\n' > /tmp/linux/linux.deb
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: release-android
           path: /tmp/android/*
-      - uses: actions/upload-artifact@v4
-        if: inputs.count == 'many'
+          retention-days: 1
+      - uses: actions/upload-artifact@v7
+        if: github.ref_name == 'benchmark/artifact-layout-many-20261121'
         with:
           name: release-linux
           path: /tmp/linux/*
+          retention-days: 1
   layout:
     needs: upload
     runs-on: ubuntu-24.04
@@ -36,6 +35,8 @@ jobs:
         version: [v4, v8, corrected]
     steps:
       - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
       - name: Select release artifact destination
         id: release-artifacts
         if: matrix.version == 'corrected'
@@ -67,7 +68,7 @@ jobs:
           path: artifacts
       - name: Verify actual publisher directory inputs
         env:
-          COUNT: ${{ inputs.count }}
+          COUNT: ${{ github.ref_name == 'benchmark/artifact-layout-many-20261121' && 'many' || 'one' }}
           VERSION: ${{ matrix.version }}
           EXPECTED_RELEASE_ARTIFACTS: ${{ steps.release-artifacts.outputs.names }}
         run: |
