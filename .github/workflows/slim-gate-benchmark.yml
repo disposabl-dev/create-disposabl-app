@@ -1,0 +1,54 @@
+name: Default runner planning and fast failure comparison
+on:
+  push:
+    branches: [benchmark/ci-slim-gate-20261121]
+permissions:
+  contents: read
+  pull-requests: read
+jobs:
+  gate:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-slim]
+        replicate: [1, 2, 3]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: 4b26685cf6c81e9ffc54ad40aecb06cbcb7e0763
+          persist-credentials: false
+      - name: Run current platform selection against PR metadata
+        id: platforms
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          SOURCE: 4b26685cf6c81e9ffc54ad40aecb06cbcb7e0763
+          RELEASE_PREFIX: benchmark-slim-gate
+          CHANNEL: pr-92
+          PR: "92"
+          EXPO_CONNECTED: "true"
+          EXPO_PROJECT_CONFIGURED: "true"
+          IOS_BUILDS_ENABLED: "true"
+        run: time bash .github/scripts/platforms.sh
+      - name: Verify expected unchanged plan
+        env:
+          CHANGED: ${{ steps.platforms.outputs.changed }}
+          ANDROID: ${{ steps.platforms.outputs.android }}
+          IOS: ${{ steps.platforms.outputs.ios }}
+          EXPO_SETUP: ${{ steps.platforms.outputs.expo_setup }}
+          LINUX: ${{ steps.platforms.outputs.linux_runner }}
+        run: '[[ "$CHANGED $ANDROID $IOS $EXPO_SETUP $LINUX" == "true true true false ubuntu-24.04" ]]'
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.5
+      - name: Verify valid and malformed source before install
+        run: |
+          time bun fmt --check
+          printf 'export const = 1;\n' > apps/web/src/ci-broken-benchmark.ts
+          if time bun fmt --check > "$RUNNER_TEMP/invalid-formatter.log" 2>&1; then
+            echo 'Malformed fixture passed formatting.' >&2
+            exit 1
+          fi
+          grep -F 'ci-broken-benchmark.ts' "$RUNNER_TEMP/invalid-formatter.log"
