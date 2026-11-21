@@ -289,6 +289,9 @@ test("mobile updates preserve cached transforms without changing the release inp
     (name) => pipeline.jobs[name],
   );
   const android = jobs[0];
+  expect(step(android, "Restore Expo transform cache").with.key).toContain(
+    "'native' || 'ota'",
+  );
   for (const job of jobs) {
     const restore = step(job, "Restore Expo transform cache");
     expect(restore.uses).toBe("actions/cache@v6");
@@ -321,6 +324,83 @@ test("mobile updates preserve cached transforms without changing the release inp
     expect(stage.if).toContain("cache-hit != 'true'");
     execFileSync("bash", ["-e", "-c", stage.run], { env });
     expect(readFileSync(join(restored, "transform"), "utf8")).toBe("fresh");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("release artifacts stage in platform directories for single and multiple downloads", () => {
+  const publisher = pipeline.jobs.publish;
+  const select = step(publisher, "Select release artifact destination");
+  const download = publisher.steps.find(
+    (item: any) => item.uses === "actions/download-artifact@v8",
+  );
+  expect(download.with.pattern).toBe("release-{android,linux,windows,macos}");
+  expect(download.with.path).toBe(
+    "${{ steps.release-artifacts.outputs.path }}",
+  );
+  const dir = mkdtempSync(join(tmpdir(), "release-artifact-layout-"));
+  try {
+    mkdirSync(join(dir, "bin"));
+    writeFileSync(
+      join(dir, "bin/gh"),
+      '#!/bin/bash\njq -r "$5" "$ARTIFACT_LIST"\n',
+      {
+        mode: 0o755,
+      },
+    );
+    const output = join(dir, "output");
+    const listing = join(dir, "listing.json");
+    const env = {
+      ...process.env,
+      PATH: `${join(dir, "bin")}:${process.env.PATH}`,
+      GITHUB_OUTPUT: output,
+      ARTIFACT_LIST: listing,
+    };
+    const run = (names: string[]) => {
+      writeFileSync(
+        listing,
+        JSON.stringify({
+          artifacts: [
+            ...names.map((name) => ({ name, expired: false })),
+            { name: "release-macos", expired: true },
+            { name: "ios-simulator", expired: false },
+          ],
+        }),
+      );
+      writeFileSync(output, "");
+      execFileSync("bash", ["-e", "-o", "pipefail", "-c", select.run], { env });
+      return readFileSync(output, "utf8");
+    };
+    expect(run(["release-android", "release-android"])).toBe(
+      "path=artifacts/release-android\nnames=release-android\n",
+    );
+    expect(run(["release-windows", "release-linux"])).toBe(
+      "path=artifacts\nnames=release-linux release-windows\n",
+    );
+    expect(() => run([])).toThrow();
+
+    const publish = step(publisher, "Publish verified build artifacts");
+    const publishEnv = {
+      ...env,
+      EXPECTED_RELEASE_ARTIFACTS: "release-android",
+    };
+    mkdirSync(join(dir, "artifacts"));
+    writeFileSync(join(dir, "artifacts/android.json"), "{}");
+    const runPublisher = () =>
+      execFileSync("bash", ["-e", "-c", publish.run], {
+        cwd: dir,
+        env: publishEnv,
+      });
+    expect(runPublisher).toThrow();
+    mkdirSync(join(dir, "artifacts/release-android"));
+    writeFileSync(join(dir, "artifacts/release-android/android.json"), "{}");
+    mkdirSync(join(dir, ".github/scripts"), { recursive: true });
+    writeFileSync(
+      join(dir, ".github/scripts/release.sh"),
+      'printf "%s" "$1"\n',
+    );
+    expect(runPublisher().toString()).toBe("release-publish");
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

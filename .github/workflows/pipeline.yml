@@ -248,9 +248,10 @@ jobs:
         id: metro-cache
         if: steps.fingerprint.outcome == 'success'
         uses: actions/cache@v6
-        with: &metro-cache
+        with:
           path: ${{ runner.temp }}/expo-metro-restore
-          key: expo-metro-v1-${{ github.job == 'android' && 'android' || 'ios' }}-${{ runner.os }}-${{ runner.arch }}-${{ env.NODE_VERSION }}-${{ env.BUN_VERSION }}-${{ hashFiles('bun.lock', 'package.json', 'apps/mobile/package.json', 'apps/mobile/*config.*', 'patches/**') }}
+          # Gradle's embedded bundle and a standalone OTA export use different transform inputs.
+          key: expo-metro-v1-android-${{ (steps.fingerprint.outputs.build == 'true' || (github.event_name == 'push' && github.repository == 'disposabl-dev/create-disposabl-app')) && 'native' || 'ota' }}-${{ runner.os }}-${{ runner.arch }}-${{ env.NODE_VERSION }}-${{ env.BUN_VERSION }}-${{ hashFiles('bun.lock', 'package.json', 'apps/mobile/package.json', 'apps/mobile/*config.*', 'patches/**') }}
       - &metro-paths
         name: Set Expo transform cache paths
         if: steps.metro-cache.outcome == 'success'
@@ -584,7 +585,9 @@ jobs:
       - name: Restore Expo transform cache
         id: metro-cache
         uses: actions/cache@v6
-        with: *metro-cache
+        with: &ios-metro-cache
+          path: ${{ runner.temp }}/expo-metro-restore
+          key: expo-metro-v1-ios-${{ runner.os }}-${{ runner.arch }}-${{ env.NODE_VERSION }}-${{ env.BUN_VERSION }}-${{ hashFiles('bun.lock', 'package.json', 'apps/mobile/package.json', 'apps/mobile/*config.*', 'patches/**') }}
       - *metro-paths
       - name: Publish the preview update
         id: ota
@@ -718,7 +721,7 @@ jobs:
         id: metro-cache
         if: steps.ios-plan.outputs.action == 'update' || steps.ios-baseline.outputs.available == 'true'
         uses: actions/cache@v6
-        with: *metro-cache
+        with: *ios-metro-cache
       - *metro-paths
       - name: Publish compatible iOS production update
         id: ota
@@ -911,11 +914,33 @@ jobs:
       - name: Select release source
         id: source
         run: bash .github/scripts/release.sh release-source
+      - name: Select release artifact destination
+        id: release-artifacts
+        if: steps.source.outputs.current == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          names=$(gh api --paginate "repos/$GH_REPO/actions/runs/$GITHUB_RUN_ID/artifacts?per_page=100" \
+            --jq '.artifacts[] | select(.expired == false) | .name | select(test("^release-(android|linux|windows|macos)$"))' | LC_ALL=C sort -u)
+          [[ -n "$names" ]] || { echo '::error::No release artifacts were uploaded.'; exit 1; }
+          # Download v8 extracts a single match directly to the destination.
+          path=artifacts
+          if [[ "$names" != *$'\n'* ]]; then path="artifacts/$names"; fi
+          printf 'path=%s\nnames=%s\n' "$path" "${names//$'\n'/ }" >> "$GITHUB_OUTPUT"
       - uses: actions/download-artifact@v8
         if: steps.source.outputs.current == 'true'
         with:
-          pattern: release-*
-          path: artifacts
+          pattern: release-{android,linux,windows,macos}
+          path: ${{ steps.release-artifacts.outputs.path }}
       - name: Publish verified build artifacts
         if: steps.source.outputs.current == 'true'
-        run: bash .github/scripts/release.sh release-publish
+        env:
+          EXPECTED_RELEASE_ARTIFACTS: ${{ steps.release-artifacts.outputs.names }}
+        run: |
+          read -r -a names <<< "$EXPECTED_RELEASE_ARTIFACTS"
+          for name in "${names[@]}"; do
+            directory="artifacts/$name"
+            [[ -d "$directory" && -n "$(find "$directory" -maxdepth 1 -type f -size +0c -print -quit)" ]] ||
+              { echo "::error::Missing staged release artifact $name."; exit 1; }
+          done
+          bash .github/scripts/release.sh release-publish
