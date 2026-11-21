@@ -55,7 +55,7 @@ repack)
   cp "$app/$exe" "$work/native-original"
   codesign --remove-signature "$work/native-original"
   (cd "$app" && find Frameworks -type f -perm -111 -exec shasum -a 256 {} + | sort) > "$work/framework.hashes"
-  for marker in 'Discover Pilot A' 'Discover Pilot B'; do
+  for marker in 'Repack Pilot A' 'Repack Pilot B'; do
     case "$marker" in
       *A) variant=A; DISPOSABL_IOS_BUILD_NUMBER=1;;
       *B) variant=B; DISPOSABL_IOS_BUILD_NUMBER=42;;
@@ -65,9 +65,9 @@ repack)
     python3 - "$root/apps/mobile/src/features/studio/home.tsx" "$marker" <<'PY'
 from pathlib import Path
 import sys
-p=Path(sys.argv[1]); s=p.read_text(); old='<Screen title="Discover">'
+p=Path(sys.argv[1]); s=p.read_text(); old='title: "What will you build?",'
 assert s.count(old)==1
-p.write_text(s.replace(old, '<Screen title="'+sys.argv[2]+'">'))
+p.write_text(s.replace(old, 'title: "'+sys.argv[2]+'",'))
 PY
     git -C "$root" diff -- apps/mobile/src/features/studio/home.tsx > "$evidence/variant-$variant.patch"
     actual=$(bun x --no-install expo-updates runtimeversion:resolve --platform ios --workflow managed | jq -er .runtimeVersion)

@@ -35,14 +35,15 @@ PY
     ;;
   launch)
     udid=$(cat "$work/owned-udid")
+    swiftc -O "$GITHUB_WORKSPACE/.github/scripts/ios-repack-ocr.swift" -o "$work/ocr"
     bundle=dev.disposabl.mobile.preview
     for variant in base A B; do
       if [[ "$variant" == base ]]; then
         app=$(cat "$work/app-path")
-        marker=Discover
+        marker="What will you build?"
       else
         app="$work/repacked-$variant.app"
-        marker="Discover Pilot $variant"
+        marker="Repack Pilot $variant"
       fi
       xcrun simctl install "$udid" "$app"
       installed=$(xcrun simctl get_app_container "$udid" "$bundle" app)
@@ -56,10 +57,15 @@ PY
       for attempt in 1 2 3; do
         sleep 10
         xcrun simctl io "$udid" screenshot "$evidence/screen-$variant.png"
-        swift "$GITHUB_WORKSPACE/.github/scripts/ios-repack-ocr.swift" "$evidence/screen-$variant.png" > "$evidence/ocr-$variant.txt"
+        "$work/ocr" "$evidence/screen-$variant.png" > "$evidence/ocr-$variant.txt"
         if grep -Fx "$marker" "$evidence/ocr-$variant.txt"; then matched=true; break; fi
       done
-      [[ "$matched" == true ]] || { echo "Visible marker $variant was not recognized; inspect screenshot" >&2; exit 1; }
+      if [[ "$matched" != true ]]; then
+        xcrun simctl spawn "$udid" log show --last 2m --predicate 'process == "Disposabl"' > "$evidence/app-log-$variant.txt" 2>&1 || true
+        cat "$evidence/ocr-$variant.txt"
+        echo "Visible marker $variant was not recognized; inspect screenshot" >&2
+        exit 1
+      fi
       xcrun simctl terminate "$udid" "$bundle" || true
       xcrun simctl uninstall "$udid" "$bundle"
     done

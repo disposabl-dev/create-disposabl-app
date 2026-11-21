@@ -61,7 +61,7 @@ jobs:
         timeout-minutes: 5
         run: bash .github/scripts/ios-repack-launch.sh boot
       - name: Install and inspect both repacked apps
-        timeout-minutes: 6
+        timeout-minutes: 8
         run: bash .github/scripts/ios-repack-launch.sh launch
       - name: Capture diagnostics and remove owned simulator
         if: always()
