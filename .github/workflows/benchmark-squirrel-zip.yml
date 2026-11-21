@@ -1,0 +1,133 @@
+name: Benchmark Squirrel ZIP compression (manual)
+on:
+  push:
+    branches: [benchmark/windows-squirrel-zip-20261121]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    if: github.ref == 'refs/heads/benchmark/windows-squirrel-zip-20261121'
+    name: Squirrel ${{ matrix.mode }} / ${{ matrix.repeat }}
+    runs-on: windows-2025
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [default, fast]
+        repeat: [1, 2]
+    env:
+      DISPOSABL_DESKTOP_PLATFORM: windows
+      DISPOSABL_RELEASE_VERSION: 1.42.1
+      DISPOSABL_DESKTOP_UPDATE_URL: https://ci.invalid/desktop/updates/00000000000000000000000000000001
+      CONVEX_SITE_URL: https://ci.invalid
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Verify immutable product source
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD^)" = '48630a83685f3fcfbe9086ec2b9b8b3c6e3858a2'
+          git diff --exit-code HEAD^ HEAD -- . ':(exclude).github/workflows/benchmark-squirrel-zip.yml' ':(exclude).github/benchmarks/squirrel-*'
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          package-manager-cache: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.5
+      - name: Install locked desktop dependencies
+        shell: bash
+        run: time bun install --frozen-lockfile --filter ./apps/desktop
+      - name: Prepare isolated ZIP-level launcher
+        if: matrix.mode == 'fast'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $package = node -e "const {createRequire}=require('node:module');const path=require('node:path');console.log(createRequire(path.join(process.cwd(),'apps/desktop/package.json')).resolve('electron-winstaller/package.json'))"
+          if ($LASTEXITCODE -ne 0) { throw 'Unable to resolve electron-winstaller' }
+          $source = Join-Path (Split-Path $package) 'vendor'
+          $vendor = Join-Path (Split-Path $env:GITHUB_WORKSPACE) 'squirrel-zip-benchmark-vendor'
+          Copy-Item $source $vendor -Recurse
+          Move-Item (Join-Path $vendor '7z.exe') (Join-Path $vendor '7z-native.exe')
+          $compiler = Join-Path $env:WINDIR 'Microsoft.NET/Framework64/v4.0.30319/csc.exe'
+          & $compiler /nologo "/out:$vendor/7z.exe" '.github/benchmarks/squirrel-7z-launcher.cs'
+          if ($LASTEXITCODE -ne 0) { throw 'Unable to compile test launcher' }
+          "DISPOSABL_SQUIRREL_VENDOR=$vendor" >> $env:GITHUB_ENV
+          "SQUIRREL_FAST_AUDIT=$env:RUNNER_TEMP/squirrel-fast-audit.txt" >> $env:GITHUB_ENV
+      - name: Time the normal Forge and Squirrel release entry point
+        shell: bash
+        run: |
+          mkdir -p ../sqtmp
+          export TMP="$(cygpath -aw ../sqtmp)"
+          export TEMP="$TMP" TMPDIR="$TMP"
+          export NODE_OPTIONS="--require \"$(cygpath -am .github/benchmarks/squirrel-preload.cjs)\""
+          time bun run --cwd apps/desktop preview
+      - name: Verify ZIP-level instrumentation
+        if: matrix.mode == 'fast'
+        shell: pwsh
+        run: |
+          if (!(Test-Path $env:SQUIRREL_FAST_AUDIT)) { throw 'Launcher did not intercept ZIP creation' }
+          Get-Content $env:SQUIRREL_FAST_AUDIT
+      - name: Verify package, update record and installer sizes
+        shell: bash
+        run: python .github/benchmarks/squirrel-manifest.py
+      - name: Install and launch on isolated runner
+        timeout-minutes: 4
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $install = Join-Path $env:LOCALAPPDATA 'desktop'
+          if (Test-Path $install) { throw 'Refusing to overwrite an existing installation' }
+          $setup = (Get-ChildItem dist/release/*Setup.exe).FullName
+          $appProcess = $null
+          function Stop-TestDesktop {
+            Get-CimInstance Win32_Process -Filter "Name = 'desktop.exe'" | Where-Object { $_.ExecutablePath -and $_.ExecutablePath.StartsWith($install + [IO.Path]::DirectorySeparatorChar, [System.StringComparison]::OrdinalIgnoreCase) } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+          }
+          try {
+            $proc = Start-Process $setup -ArgumentList '--silent' -PassThru
+            if (!$proc.WaitForExit(120000)) { Stop-Process -Id $proc.Id -Force; throw 'Setup timed out' }
+            if ($proc.ExitCode -ne 0) { throw "Setup failed with exit code $($proc.ExitCode)" }
+            $app = Join-Path $install 'app-1.42.1/desktop.exe'
+            if (!(Test-Path $app)) { throw "Installed executable missing: $app" }
+            Stop-TestDesktop
+            $appProcess = Start-Process $app -PassThru
+            Start-Sleep -Seconds 8
+            $appProcess.Refresh()
+            if ($appProcess.HasExited) { throw "Installed application exited: $($appProcess.ExitCode)" }
+            Write-Host 'Installed application process launched and remained running.'
+          } finally {
+            if ($appProcess -and !$appProcess.HasExited) { Stop-Process -Id $appProcess.Id -Force -ErrorAction SilentlyContinue }
+            Stop-TestDesktop
+            $updater = Join-Path $install 'Update.exe'
+            if (Test-Path $updater) {
+              $uninstall = Start-Process $updater -ArgumentList '--uninstall','--silent' -PassThru
+              if (!$uninstall.WaitForExit(60000)) { Stop-Process -Id $uninstall.Id -Force -ErrorAction SilentlyContinue }
+            }
+            if (Test-Path $install) { Remove-Item $install -Recurse -Force -ErrorAction SilentlyContinue }
+          }
+      - name: Upload package evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: squirrel-${{ matrix.mode }}-${{ matrix.repeat }}
+          path: ${{ runner.temp }}/squirrel-manifest.json
+          if-no-files-found: ignore
+          retention-days: 1
+  compare:
+    if: always() && needs.build.result != 'skipped'
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: squirrel-*
+          path: squirrel-manifests
+      - name: Compare uncompressed application files and package sizes
+        run: python3 .github/benchmarks/squirrel-compare.py
