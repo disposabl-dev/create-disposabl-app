@@ -56,7 +56,11 @@ repack)
   codesign --remove-signature "$work/native-original"
   (cd "$app" && find Frameworks -type f -perm -111 -exec shasum -a 256 {} + | sort) > "$work/framework.hashes"
   for marker in 'Discover Pilot A' 'Discover Pilot B'; do
-    case "$marker" in *A) variant=A;; *B) variant=B;; esac
+    case "$marker" in
+      *A) variant=A; DISPOSABL_IOS_BUILD_NUMBER=1;;
+      *B) variant=B; DISPOSABL_IOS_BUILD_NUMBER=42;;
+    esac
+    export DISPOSABL_IOS_BUILD_NUMBER
     git -C "$root" restore apps/mobile/src/features/studio/home.tsx
     python3 - "$root/apps/mobile/src/features/studio/home.tsx" "$marker" <<'PY'
 from pathlib import Path
@@ -88,6 +92,8 @@ PY
     diff -u "$work/framework.hashes" "$work/framework-$variant.hashes"
     newprivacy=$(find "$dest" -path '*SDWebImage*' -name PrivacyInfo.xcprivacy -print -quit)
     [[ $(shasum -a 256 "$newprivacy" | awk '{print $1}') == "$(cat "$work/privacy.hash")" ]]
+    python3 "$GITHUB_WORKSPACE/.github/scripts/ios-preview-build-number.py" "$app" "$dest" "$DISPOSABL_IOS_BUILD_NUMBER"
+    /usr/libexec/PlistBuddy -c 'Print CFBundleVersion' "$dest/Info.plist" > "$evidence/build-number-$variant.txt"
     codesign --force --sign - --entitlements "$work/entitlements.plist" "$dest"
     codesign --verify --deep --strict "$dest"
     codesign -d --entitlements :- "$dest" > "$work/entitlements-$variant.plist" 2>/dev/null

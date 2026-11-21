@@ -45,6 +45,12 @@ PY
         marker="Discover Pilot $variant"
       fi
       xcrun simctl install "$udid" "$app"
+      installed=$(xcrun simctl get_app_container "$udid" "$bundle" app)
+      actual=$(/usr/libexec/PlistBuddy -c 'Print CFBundleVersion' "$installed/Info.plist")
+      expected=1
+      if [[ "$variant" == B ]]; then expected=42; fi
+      [[ "$actual" == "$expected" ]]
+      echo "$actual" > "$evidence/installed-build-$variant.txt"
       xcrun simctl launch "$udid" "$bundle" | tee "$evidence/launch-$variant.txt"
       matched=false
       for attempt in 1 2 3; do
