@@ -107,7 +107,11 @@ case "${1:?operation required}" in
     test -n "$workspace"
     # Simulator signing embeds the entitlements SecureStore needs for Keychain.
     # The local ad-hoc identity requires no Apple account or provisioning profile.
-    xcodebuild -workspace "$workspace" -scheme "$(basename "$workspace" .xcworkspace)" -configuration Release -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath "$RUNNER_TEMP/ios-build" CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- build
+    /usr/bin/time -p xcodebuild -quiet -showBuildTimingSummary \
+      -workspace "$workspace" -scheme "$(basename "$workspace" .xcworkspace)" \
+      -configuration Release -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+      -derivedDataPath "$RUNNER_TEMP/ios-build" COMPILER_INDEX_STORE_ENABLE=NO \
+      CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- build
     if [[ "${USE_CCACHE:-}" == 1 ]]; then ccache --show-stats; fi
     app=$(find "$RUNNER_TEMP/ios-build/Build/Products/Release-iphonesimulator" -maxdepth 1 -name '*.app' -type d -print -quit)
     test -n "$app"
