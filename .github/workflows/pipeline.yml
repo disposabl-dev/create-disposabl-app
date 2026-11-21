@@ -483,7 +483,7 @@ jobs:
         id: simulator-native-cache
         if: steps.simulator-identity.outputs.key != ''
         continue-on-error: true
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: ${{ runner.temp }}/ios-preview-native-cache
           key: ${{ steps.simulator-identity.outputs.key }}
