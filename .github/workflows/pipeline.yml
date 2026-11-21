@@ -671,9 +671,17 @@ jobs:
         run: command -v fakeroot && command -v rpmbuild && command -v dpkg-deb || { sudo apt-get update && sudo apt-get install -y fakeroot dpkg rpm; }
       - name: Build
         if: matrix.platform != 'macos'
+        shell: bash
         env:
           DPKG_DEB_COMPRESSOR_LEVEL: ${{ matrix.platform == 'linux' && '1' || '' }}
-        run: bun run --cwd apps/desktop preview
+        run: |
+          # Squirrel reads and rewrites the whole packaged app in this directory.
+          if [[ "$RUNNER_OS" == Windows ]] && maker_temp=$(mktemp -d ../squirrel.XXXXXX); then
+            trap 'rm -rf -- "$maker_temp"' EXIT
+            export TEMP="$(cygpath -aw "$maker_temp")"
+            export TMP="$TEMP" TMPDIR="$TEMP"
+          fi
+          bun run --cwd apps/desktop preview
       - name: Build macOS
         if: matrix.platform == 'macos'
         shell: bash
