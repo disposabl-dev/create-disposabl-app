@@ -57,6 +57,16 @@ jobs:
         run: /usr/bin/time -p bun install --frozen-lockfile --filter @disposabl/mobile
       - name: Repack two visible fixture variants and check identities
         run: bash .github/scripts/ios-repack-benchmark.sh repack
+      - name: Create and boot an owned simulator
+        timeout-minutes: 5
+        run: bash .github/scripts/ios-repack-launch.sh boot
+      - name: Install and inspect both repacked apps
+        timeout-minutes: 6
+        run: bash .github/scripts/ios-repack-launch.sh launch
+      - name: Capture diagnostics and remove owned simulator
+        if: always()
+        timeout-minutes: 2
+        run: bash .github/scripts/ios-repack-launch.sh cleanup
       - uses: actions/upload-artifact@v4
         if: always()
         with:
