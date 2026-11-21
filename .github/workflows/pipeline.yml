@@ -435,11 +435,13 @@ jobs:
         run: |
           xcodebuild -version
           xcrun swift --version
-      - name: Restore CocoaPods downloads
+      - name: Restore CocoaPods downloads and specifications
         uses: actions/cache@v4
         with:
-          path: ~/Library/Caches/CocoaPods
-          key: cocoapods-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}
+          path: |
+            ~/Library/Caches/CocoaPods
+            ~/.cocoapods/repos/trunk
+          key: cocoapods-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}
       - name: Enable simulator compiler cache
         id: simulator-cache
         timeout-minutes: 2
