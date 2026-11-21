@@ -1,0 +1,149 @@
+name: Fresh generated native builds
+on:
+  push:
+    branches: [benchmark/ci-first-native-20261121]
+permissions:
+  contents: read
+env:
+  EXPO_NO_DOTENV: "1"
+  EXPO_NO_TELEMETRY: "1"
+  E2E_TELEMETRY_DISABLED: "1"
+  CI: "1"
+  EXPO_PROJECT_ID: 00000000-0000-4000-8000-000000000001
+  EXPO_PUBLIC_CONVEX_URL: https://ci.invalid
+  EXPO_PUBLIC_CONVEX_SITE_URL: https://ci.invalid
+  DISPOSABL_MOBILE_CHANNEL: native-benchmark
+  CHANNEL: native-benchmark
+jobs:
+  fixture:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.5
+      - run: bun install --frozen-lockfile
+      - run: bun run --cwd packages/create-disposabl-app build
+      - name: Generate an app with Android and iOS enabled
+        run: |
+          export FIRST_NATIVE_APP="$RUNNER_TEMP/native-starter"
+          bun -e '
+            import {createApp} from "./packages/create-disposabl-app/scaffold";
+            await createApp("packages/create-disposabl-app/dist/templates/default", process.env.FIRST_NATIVE_APP, "native-first-build", {
+              version: "test",
+              desktopId: "00000000000000000000000000000001",
+              platforms: ["web", "android", "ios"],
+              features: ["authentication"],
+              androidArchitectures: ["arm64-v8a", "x86_64"],
+            });
+          '
+          (cd "$FIRST_NATIVE_APP" && bun install --lockfile-only)
+          tar --exclude=.git -czf "$RUNNER_TEMP/native-starter.tgz" -C "$FIRST_NATIVE_APP" .
+          (cd "$RUNNER_TEMP" && shasum -a 256 native-starter.tgz > native-starter.sha256)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-starter-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/native-starter.tgz
+            ${{ runner.temp }}/native-starter.sha256
+          compression-level: 0
+          retention-days: 1
+          if-no-files-found: error
+    outputs:
+      attempt: ${{ github.run_attempt }}
+  native:
+    needs: fixture
+    name: First ${{ matrix.platform }} package
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { platform: android, runner: ubuntu-24.04 }
+          - { platform: ios, runner: macos-26 }
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 55
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: native-starter-${{ needs.fixture.outputs.attempt }}
+          path: .fixture
+      - name: Verify and extract the exact generated source
+        run: |
+          (cd .fixture && shasum -a 256 --check native-starter.sha256)
+          mkdir generated
+          tar -xzf .fixture/native-starter.tgz -C generated
+          jq -e '.platforms == ["web", "android", "ios"]' generated/disposabl.json
+          test ! -d generated/apps/mobile/android && test ! -d generated/apps/mobile/ios
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.5
+      - uses: actions/cache@v4
+        id: deps
+        with:
+          path: ~/.bun/install/cache
+          key: first-native-bun-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('generated/bun.lock') }}
+      - name: Install frozen mobile dependencies
+        working-directory: generated
+        run: time bun install --frozen-lockfile --filter @disposabl/mobile
+      - uses: actions/setup-java@v5
+        if: matrix.platform == 'android'
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v3
+        if: matrix.platform == 'android'
+        with:
+          packages: platform-tools
+      - uses: gradle/actions/setup-gradle@v4
+        if: matrix.platform == 'android'
+        with:
+          cache-read-only: false
+      - uses: actions/cache@v4
+        id: native
+        with:
+          path: ${{ matrix.platform == 'android' && format('{0}/first-ccache', runner.temp) || '~/Library/Caches/CocoaPods' }}
+          key: first-native-toolchain-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('generated/bun.lock') }}
+      - name: Build first Android APK and check its runtime and signature
+        if: matrix.platform == 'android'
+        working-directory: generated/apps/mobile
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE: ${{ github.sha }}
+          SOURCE_PATH: git/ref/heads/benchmark/ci-first-native-20261121
+          CCACHE_COMPILERCHECK: content
+          CCACHE_MAXSIZE: 512M
+          CMAKE_C_COMPILER_LAUNCHER: ccache
+          CMAKE_CXX_COMPILER_LAUNCHER: ccache
+        run: |
+          command -v ccache || { sudo apt-get update -qq && sudo apt-get install -y ccache; }
+          export GH_REPO="$GITHUB_REPOSITORY" GITHUB_WORKSPACE="$GITHUB_WORKSPACE/generated"
+          export CCACHE_DIR="$RUNNER_TEMP/first-ccache" CCACHE_BASEDIR="$GITHUB_WORKSPACE"
+          RUNTIME=$(bun x --no-install expo-updates runtimeversion:resolve --platform android --workflow managed | jq -er .runtimeVersion)
+          export RUNTIME
+          /usr/bin/time -p bash ../../.github/scripts/mobile.sh android-build
+          jq -e --arg runtime "$RUNTIME" '.runtimeVersion == $runtime and .signing == "fallback"' ../../dist/release/android.json
+      - name: Build first iOS simulator app with normal release configuration
+        if: matrix.platform == 'ios'
+        working-directory: generated/apps/mobile
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE: ${{ github.sha }}
+          SOURCE_PATH: git/ref/heads/benchmark/ci-first-native-20261121
+        run: |
+          export GH_REPO="$GITHUB_REPOSITORY" GITHUB_WORKSPACE="$GITHUB_WORKSPACE/generated"
+          /usr/bin/time -p bash ../../.github/scripts/apple.sh simulator
+          unzip -tq ../../dist/apple/ios-simulator.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: first-${{ matrix.platform }}-${{ github.run_attempt }}
+          path: ${{ matrix.platform == 'android' && 'generated/dist/release' || 'generated/dist/apple/ios-simulator.zip' }}
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 1
