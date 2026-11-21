@@ -36,13 +36,28 @@ try {
   if (!(Test-Path $app)) { throw "Updated executable missing: $app" }
   Assert-FixtureSignature $app
   Stop-TestDesktop
-  $run = Start-Process $app -PassThru
+  $debugPort = 0
+  if ($env:SQUIRREL_CAPTURE_WINDOWS -eq 'true') {
+    $debugListener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, 0)
+    $debugListener.Start()
+    $debugPort = $debugListener.LocalEndpoint.Port
+    $debugListener.Stop()
+    $run = Start-Process $app -ArgumentList "--remote-debugging-port=$debugPort",'--remote-debugging-address=127.0.0.1' -PassThru
+  } else {
+    $run = Start-Process $app -PassThru
+  }
   Start-Sleep -Seconds 8
   $run.Refresh()
   if ($run.HasExited) { throw "Updated application exited: $($run.ExitCode)" }
   $observed = (Get-CimInstance Win32_Process -Filter "ProcessId = $($run.Id)").ExecutablePath
   $version = (Get-Item $observed).VersionInfo.FileVersion
   if ($observed -ne $app -or $version -notlike '1.42.2*') { throw "Wrong updated application version/path: $version $observed" }
+  if ($env:SQUIRREL_CAPTURE_WINDOWS -eq 'true') {
+    $window = Get-Process -Id $run.Id
+    Write-Host "Fixture 1.42.2 OS MainWindowTitle: '$($window.MainWindowTitle)' handle=$($window.MainWindowHandle)"
+    node .github/benchmarks/squirrel-window-capture.mjs $debugPort '1.42.2'
+    if ($LASTEXITCODE -ne 0) { throw 'Packaged Electron window capture failed' }
+  }
   Stop-Process -Id $run.Id -Force -ErrorAction SilentlyContinue
   Stop-TestDesktop
   $timer.Stop()

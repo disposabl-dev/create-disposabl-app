@@ -1,13 +1,12 @@
-name: Qualify Squirrel ZIP update (manual)
+name: Qualify packaged Windows install and update UI
 on:
   push:
-    branches: [benchmark/windows-squirrel-update-20261121]
-  workflow_dispatch:
+    branches: [benchmark/windows-squirrel-visible-20261121]
 permissions:
   contents: read
 jobs:
   update:
-    if: github.ref == 'refs/heads/benchmark/windows-squirrel-update-20261121'
+    if: github.repository == 'disposabl-dev/create-disposabl-app'
     name: Local update / ${{ matrix.signing }}
     runs-on: windows-2025
     timeout-minutes: 18
@@ -18,7 +17,7 @@ jobs:
     env:
       DISPOSABL_DESKTOP_PLATFORM: windows
       DISPOSABL_DESKTOP_UPDATE_URL: https://ci.invalid/desktop/updates/00000000000000000000000000000001
-      CONVEX_SITE_URL: https://ci.invalid
+      SQUIRREL_CAPTURE_WINDOWS: "true"
     steps:
       - uses: actions/checkout@v6
         with:
@@ -39,23 +38,6 @@ jobs:
       - name: Install frozen desktop dependencies
         shell: bash
         run: time bun install --frozen-lockfile --filter ./apps/desktop
-      - name: Prepare isolated ZIP-level launcher
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $package = node -e "const {createRequire}=require('node:module');const path=require('node:path');console.log(createRequire(path.join(process.cwd(),'apps/desktop/package.json')).resolve('electron-winstaller/package.json'))"
-          if ($LASTEXITCODE -ne 0) { throw 'Unable to resolve electron-winstaller' }
-          $source = Join-Path (Split-Path $package) 'vendor'
-          $vendor = Join-Path (Split-Path $env:GITHUB_WORKSPACE) 'squirrel-update-fixture-vendor'
-          Copy-Item $source $vendor -Recurse
-          Move-Item (Join-Path $vendor '7z.exe') (Join-Path $vendor '7z-native.exe')
-          $compiler = Join-Path $env:WINDIR 'Microsoft.NET/Framework64/v4.0.30319/csc.exe'
-          $launcherSource = Join-Path $env:GITHUB_WORKSPACE '.github\benchmarks\squirrel-7z-launcher.cs'
-          $launcherOutput = Join-Path $vendor '7z.exe'
-          & $compiler /nologo "/out:$launcherOutput" $launcherSource
-          if ($LASTEXITCODE -ne 0) { throw 'Unable to compile test launcher' }
-          "SQUIRREL_TEST_VENDOR=$vendor" >> $env:GITHUB_ENV
-          "SQUIRREL_FAST_AUDIT=$env:RUNNER_TEMP/squirrel-update-fast-audit.txt" >> $env:GITHUB_ENV
       - name: Create temporary fixture-only signing identity
         if: matrix.signing == 'fixture-signed'
         shell: pwsh
@@ -81,17 +63,16 @@ jobs:
         shell: pwsh
         timeout-minutes: 4
         run: .github/benchmarks/squirrel-update-install.ps1
-      - name: Build version 2 with fast ZIP compression
+      - name: Build version 2 with default ZIP compression
         shell: bash
         run: |
           export TMP="$(cygpath -aw ../sqtmp)" TEMP="$(cygpath -aw ../sqtmp)" TMPDIR="$(cygpath -aw ../sqtmp)"
-          export DISPOSABL_RELEASE_VERSION=1.42.2 DISPOSABL_SQUIRREL_VENDOR="$SQUIRREL_TEST_VENDOR"
+          export DISPOSABL_RELEASE_VERSION=1.42.2
           export NODE_OPTIONS="--require \"$(cygpath -am .github/benchmarks/squirrel-preload.cjs)\""
           { time bun run --cwd apps/desktop preview; } 2>&1 | tee "$(cygpath -u "$RUNNER_TEMP")/squirrel-v2-build.log"
-          test -s "$(cygpath -u "$SQUIRREL_FAST_AUDIT")"
           python .github/benchmarks/squirrel-manifest.py
           cp "$(cygpath -u "$RUNNER_TEMP")/squirrel-manifest.json" "$(cygpath -u "$RUNNER_TEMP")/squirrel-v2-manifest.json"
-      - name: Apply fast package through localhost Squirrel feed
+      - name: Apply package through localhost Squirrel feed and verify the window
         shell: pwsh
         timeout-minutes: 5
         run: .github/benchmarks/squirrel-update-apply.ps1
@@ -101,7 +82,7 @@ jobs:
         run: .github/benchmarks/squirrel-update-cleanup.ps1
       - name: Upload fixture evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: squirrel-update-${{ matrix.signing }}
           path: |
@@ -111,5 +92,7 @@ jobs:
             ${{ runner.temp }}/squirrel-v2-manifest.json
             ${{ runner.temp }}/squirrel-update-feed.log
             ${{ runner.temp }}/squirrel-update-result.txt
+            ${{ runner.temp }}/squirrel-window-*.png
+            ${{ runner.temp }}/squirrel-window-*.json
           if-no-files-found: ignore
           retention-days: 1
