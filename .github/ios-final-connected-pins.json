@@ -1,25 +1,25 @@
 {
-  "test_sha": "REPLACE_WITH_40_HEX_COMMIT",
+  "test_sha": "dbc181455ca2d523e783d8a1a1e2ff73d2ba31b9",
   "include": [
     {
       "label": "cold",
-      "run": "REPLACE",
-      "attempt": "REPLACE",
-      "job": "REPLACE",
-      "artifact": "REPLACE",
-      "digest": "REPLACE",
-      "sha": "REPLACE",
-      "build": "REPLACE"
+      "run": "44911811710",
+      "attempt": "1",
+      "job": "136869580673",
+      "artifact": "14710572821",
+      "digest": "05ca8023e4e3b1dfffb37766f45d0adafc84c6d8a90d7ed9537e25d382c8d709",
+      "sha": "7cc12407379800696b8f20543a6062ef56bb0cd3",
+      "build": "287"
     },
     {
       "label": "warm",
-      "run": "REPLACE",
-      "attempt": "REPLACE",
-      "job": "REPLACE",
-      "artifact": "REPLACE",
-      "digest": "REPLACE",
-      "sha": "REPLACE",
-      "build": "REPLACE"
+      "run": "44913233504",
+      "attempt": "1",
+      "job": "136873952936",
+      "artifact": "14711046329",
+      "digest": "acfde78978afe0dc041f0a0b421fdf187ccc5ddc854b1dd504a42a0de6750181",
+      "sha": "dbc181455ca2d523e783d8a1a1e2ff73d2ba31b9",
+      "build": "288"
     }
   ]
 }

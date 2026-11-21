@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 api="repos/$GITHUB_REPOSITORY/actions"
-run=$(gh api "$api/runs/$RUN")
+run=$(gh api "$api/runs/$RUN/attempts/$ATTEMPT")
 job=$(gh api "$api/jobs/$JOB")
 jq -e --arg sha "$EXPECTED_SHA" --argjson attempt "$ATTEMPT" '.head_sha == $sha and .run_attempt == $attempt and .event == "pull_request" and .path == ".github/workflows/pipeline.yml" and .head_repository.full_name == "disposabl-dev/create-disposabl-app" and any(.pull_requests[]?; .number == 92)' <<<"$run" >/dev/null
 jq -e --argjson run "$RUN" --argjson attempt "$ATTEMPT" --arg sha "$EXPECTED_SHA" '.run_id == $run and .run_attempt == $attempt and .head_sha == $sha and .name == "iOS simulator preview" and .conclusion == "success"' <<<"$job" >/dev/null
