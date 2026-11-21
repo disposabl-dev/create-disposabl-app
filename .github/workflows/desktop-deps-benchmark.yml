@@ -1,0 +1,70 @@
+name: Filtered desktop dependency benchmark
+on:
+  push:
+    branches: [benchmark/ci-desktop-deps-20261121]
+permissions:
+  contents: read
+jobs:
+  build:
+    if: github.repository == 'disposabl-dev/create-disposabl-app'
+    name: ${{ matrix.platform }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { platform: macos, runner: macos-26 }
+          - { platform: windows, runner: windows-2025 }
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: bash
+    env:
+      DISPOSABL_DESKTOP_PLATFORM: ${{ matrix.platform }}
+      DISPOSABL_RELEASE_VERSION: 1.42.1
+      DISPOSABL_DESKTOP_UPDATE_URL: https://ci.invalid/desktop/updates/00000000000000000000000000000001
+      CONVEX_SITE_URL: https://ci.invalid
+      MACOS_NOTARIZE: "false"
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.5
+      - uses: actions/cache@v4
+        id: cache
+        with:
+          path: ~/.bun/install/cache
+          key: desktop-slim-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}
+      - name: Install filtered frozen dependencies
+        run: time bun install --frozen-lockfile --filter ./apps/desktop
+      - name: Resolve the locked publisher CLI without installing it
+        working-directory: packages/backend
+        run: bun x --no-install convex --version
+      - name: Build the desktop installer
+        run: time bun run --cwd apps/desktop preview
+      - name: Verify the staged Squirrel feed
+        if: matrix.platform == 'windows'
+        run: |
+          ls -lh dist/release
+          archive=$(find dist/update -type f -name '*-full.nupkg' -print -quit)
+          test -s "$archive"
+          unzip -tq "$archive"
+          digest=$(sha1sum "$archive" | cut -d' ' -f1 | tr '[:lower:]' '[:upper:]')
+          expected="$digest $(basename "$archive") $(wc -c < "$archive" | tr -d ' ')"
+          actual=$(tr -d '\r\n' < dist/update/production/win32/x64/RELEASES)
+          test "$actual" = "$expected"
+      - name: Verify the ad-hoc Mac installer
+        if: matrix.platform == 'macos'
+        run: |
+          ls -lh dist/release
+          hdiutil verify dist/release/*.dmg
+          unzip -tq dist/release/*.zip
+          app=$(find apps/desktop/out -maxdepth 2 -name '*.app' -type d -print -quit)
+          test -n "$app"
+          codesign --verify --strict --deep "$app"
