@@ -612,7 +612,7 @@ jobs:
           echo "DISPOSABL_DESKTOP_UPDATE_URL=${CONVEX_SITE_URL}/desktop/updates/$id" >> "$GITHUB_ENV"
       - *bun
       - *cache
-      - run: bun install --frozen-lockfile --filter ./apps/desktop ${{ matrix.platform != 'linux' && '--filter @disposabl/backend' || '' }}
+      - run: bun install --frozen-lockfile --filter ./apps/desktop
       - name: Report desktop build
         run: node .github/scripts/disposabl.mjs report "$PLATFORM" building
       - name: Electron
