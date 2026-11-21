@@ -1,0 +1,38 @@
+name: Isolated browser worker benchmark
+on:
+  push:
+    branches: [benchmark/ci-browser-workers-20261121]
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    if: github.repository == 'disposabl-dev/create-disposabl-app'
+    name: ${{ matrix.workers }} workers / ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { workers: 1, runner: ubuntu-24.04 }
+          - { workers: 4, runner: ubuntu-24.04 }
+          - { workers: 4, runner: blacksmith-4vcpu-ubuntu-2404 }
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 8
+    env:
+      PRODUCT_BROWSER_WORKERS: ${{ matrix.workers }}
+      GH_TOKEN: ""
+      PYTHONDONTWRITEBYTECODE: 1
+      DO_NOT_TRACK: 1
+      E2E_TELEMETRY_DISABLED: 1
+      EXPO_NO_TELEMETRY: 1
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Validate exact source in isolation
+        uses: ./.github/actions/product-checks
+        with:
+          source_sha: ${{ github.sha }}
+          lane: browser
