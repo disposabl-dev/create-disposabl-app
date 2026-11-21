@@ -8,7 +8,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-peak-benchmark
+  group: ci-peak-android-replay
   cancel-in-progress: false
 
 jobs:
@@ -19,15 +19,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { platform: web, runner: ubuntu-24.04 }
-          - { platform: web, runner: blacksmith-4vcpu-ubuntu-2404 }
           - { platform: android, runner: ubuntu-24.04 }
-          - { platform: android, runner: blacksmith-8vcpu-ubuntu-2404 }
-          - { platform: ios, runner: macos-26 }
-          - { platform: ios, runner: blacksmith-6vcpu-macos-26 }
-          - { platform: linux, runner: ubuntu-24.04 }
-          - { platform: macos, runner: macos-26 }
-          - { platform: windows, runner: windows-2025 }
     runs-on: ${{ matrix.runner }}
     timeout-minutes: ${{ (matrix.platform == 'android' || matrix.platform == 'ios') && 75 || 12 }}
     defaults:
