@@ -1,0 +1,69 @@
+name: Desktop cold and warm benchmark
+on:
+  push:
+    branches: [benchmark/ci-desktop-warm-20261121]
+permissions:
+  contents: read
+jobs:
+  desktop:
+    if: github.repository == 'disposabl-dev/create-disposabl-app'
+    name: ${{ matrix.platform }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { platform: linux, runner: ubuntu-24.04 }
+          - { platform: macos, runner: macos-26 }
+    defaults:
+      run:
+        shell: bash
+    env:
+      DISPOSABL_DESKTOP_PLATFORM: ${{ matrix.platform }}
+      DISPOSABL_RELEASE_VERSION: 1.42.1
+      DISPOSABL_DESKTOP_UPDATE_URL: https://ci.invalid/desktop/updates/00000000000000000000000000000001
+      CONVEX_SITE_URL: https://ci.invalid
+      MACOS_NOTARIZE: "false"
+      BUN_INSTALL_CACHE_DIR: ${{ runner.temp }}/desktop-bun-cache
+      electron_config_cache: ${{ runner.temp }}/desktop-electron-cache
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.5
+      - name: Prepare isolated cold caches and packaging tools
+        run: |
+          test ! -e "$BUN_INSTALL_CACHE_DIR"
+          test ! -e "$electron_config_cache"
+          if [[ "$RUNNER_OS" == Linux ]]; then
+            command -v fakeroot && command -v rpmbuild && command -v dpkg-deb && command -v cpio || { sudo apt-get update && sudo apt-get install -y fakeroot dpkg rpm cpio; }
+          fi
+          node --version
+          bun --version
+          uname -a
+      - name: Cold install
+        run: time bun install --frozen-lockfile --filter ./apps/desktop
+      - name: Cold package
+        run: time bun run --cwd apps/desktop preview
+      - name: Verify cold package
+        run: time bash .github/scripts/desktop-warm-verify.sh
+      - name: Clear installed dependencies and generated output
+        run: |
+          test -d "$BUN_INSTALL_CACHE_DIR"
+          test -d "$electron_config_cache"
+          du -sh "$BUN_INSTALL_CACHE_DIR" "$electron_config_cache"
+          find . -name node_modules -type d -prune -exec rm -rf {} +
+          rm -rf apps/desktop/out apps/desktop/.vite dist
+      - name: Warm install
+        run: time bun install --frozen-lockfile --filter ./apps/desktop
+      - name: Warm package
+        run: time bun run --cwd apps/desktop preview
+      - name: Verify warm package
+        run: time bash .github/scripts/desktop-warm-verify.sh
