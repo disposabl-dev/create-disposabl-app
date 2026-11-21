@@ -2,7 +2,7 @@
 set -euo pipefail
 work="$RUNNER_TEMP/ios-repack"
 evidence="$RUNNER_TEMP/ios-repack-evidence"
-mkdir -p "$evidence"
+mkdir -p "$work" "$evidence"
 case "${1:?phase required}" in
   boot)
     app="${IOS_REPACK_CACHE_APP:-$work/repacked-A.app}"

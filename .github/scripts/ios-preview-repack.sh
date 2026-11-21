@@ -1,5 +1,4 @@
 #!/bin/bash
-# Experimental same-PR native cache reuse. Any error falls back to the native build.
 set -euo pipefail
 work="$RUNNER_TEMP/ios-preview-repack"
 cache="$RUNNER_TEMP/ios-preview-native-cache"
@@ -12,14 +11,16 @@ check_source() {
 }
 identity() {
   : "${EXPO_PROJECT_ID:?}" "${CHANNEL:?}" "${PR_NUMBER:?}" "${CONVEX_URL:?}" "${PUBLIC_SITE_URL:?}" "${NATIVE_INPUT_HASH:?}"
-  local config runtime bundle toolchain config_hash version build
+  local config runtime bundle toolchain config_hash version build android_version
   config=$(bun x --no-install expo config --json)
   jq -e --arg project "$EXPO_PROJECT_ID" '.extra.eas.projectId == $project' <<<"$config" >/dev/null
   bundle=$(jq -er '.ios.bundleIdentifier | select(type == "string" and length > 0)' <<<"$config")
   version=$(jq -er '.ios.version // .version | select(type == "string" and length > 0)' <<<"$config")
   build=$(jq -er '.ios.buildNumber | select(type == "string" and length > 0)' <<<"$config")
+  android_version=$(jq -er '.android.versionCode | select(type == "number" and . == floor and . >= 1 and . <= 2100000000)' <<<"$config")
   printf '%s\n' "$build" > "$work/current-build"
-  config_hash=$(jq -S -c 'del(.ios.buildNumber)' <<<"$config" | shasum -a 256 | cut -d' ' -f1)
+  printf '%s\n' "$android_version" > "$work/current-android-version"
+  config_hash=$(jq -S -c 'del(.ios.buildNumber, .android.versionCode)' <<<"$config" | shasum -a 256 | cut -d' ' -f1)
   runtime=$(bun x --no-install expo-updates runtimeversion:resolve --platform ios --workflow managed | jq -er 'select(.fingerprintSources != null) | .runtimeVersion | select(test("^[a-f0-9]{40,64}$"))')
   toolchain=$({ xcodebuild -version; xcrun --sdk iphonesimulator --show-sdk-build-version; uname -m; } | shasum -a 256 | cut -d' ' -f1)
   jq -n --arg repo "$GH_REPO" --arg pr "$PR_NUMBER" --arg project "$EXPO_PROJECT_ID" --arg channel "$CHANNEL" --arg bundle "$bundle" --arg version "$version" --arg config "$config_hash" --arg native_inputs "$NATIVE_INPUT_HASH" --arg runtime "$runtime" --arg sdk "$toolchain" --arg backend "$CONVEX_URL" --arg site "$PUBLIC_SITE_URL" --arg convexsite "${CONVEX_SITE_URL:-}" --arg publicbackend "${EXPO_PUBLIC_CONVEX_URL:-}" --arg publicsite "${EXPO_PUBLIC_CONVEX_SITE_URL:-}" '{repo:$repo,pr:$pr,project:$project,channel:$channel,bundle:$bundle,version:$version,config_sha256:$config,native_inputs:$native_inputs,runtime:$runtime,toolchain:$sdk,backend:$backend,site:$site,convex_site:$convexsite,public_backend:$publicbackend,public_site:$publicsite}' | jq -S . > "$work/identity.json"
@@ -47,11 +48,11 @@ case "${1:?}" in
     check_source
     identity
     key=$(shasum -a 256 "$work/identity.json" | cut -d' ' -f1)
-    echo "key=ios-preview-native-v1-$key" >> "$GITHUB_OUTPUT"
+    echo "key=ios-preview-native-v2-$key" >> "$GITHUB_OUTPUT"
     ;;
   manifest)
     check_source
-    test -s "$work/identity.json" && test -s "$work/current-build"
+    test -s "$work/identity.json" && test -s "$work/current-build" && test -s "$work/current-android-version"
     archive="$out/ios-simulator.zip"
     test -s "$archive"
     mkdir "$work/native"
@@ -61,6 +62,8 @@ case "${1:?}" in
     while IFS= read -r item; do native+=("$item"); done < <(find "$work/native" -maxdepth 1 -type d -name '*.app')
     [[ ${#native[@]} == 1 ]]
     app=${native[0]}
+    [[ -d "$app/Frameworks" ]]
+    [[ -z $(find "$app" -mindepth 1 -type d \( -name '*.app' -o -name '*.appex' \) -print -quit) ]]
     codesign --verify --deep --strict "$app"
     codesign -dv "$app" 2>&1 | grep -q 'Signature=adhoc'
     check_app_identity "$app" "$(cat "$work/current-build")"
@@ -68,6 +71,7 @@ case "${1:?}" in
     arches=$(lipo -archs "$app/$exe")
     [[ " $arches " == *' arm64 '* && " $arches " == *' x86_64 '* ]]
     [[ $(jq -er .ios.buildNumber "$app/EXConstants.bundle/app.config") == "$(cat "$work/current-build")" ]]
+    [[ $(jq -er .android.versionCode "$app/EXConstants.bundle/app.config") == "$(cat "$work/current-android-version")" ]]
     embedded=$(/usr/libexec/PlistBuddy -c 'Print EXUpdatesRuntimeVersion' "$app/Expo.plist")
     [[ "$embedded" != file:fingerprint ]] || embedded=$(cat "$app/EXUpdates.bundle/fingerprint")
     [[ "$embedded" == "$(jq -r .runtime "$work/identity.json")" ]]
@@ -82,7 +86,7 @@ case "${1:?}" in
     ;;
   repack)
     check_source
-    test -s "$work/identity.json" && test -s "$work/current-build"
+    test -s "$work/identity.json" && test -s "$work/current-build" && test -s "$work/current-android-version"
     m="$cache/ios-simulator-provenance.json"
     archive="$cache/ios-simulator.zip"
     python3 "$GITHUB_WORKSPACE/.github/scripts/ios-preview-cache-validate.py" "$work/identity.json" "$m" "$archive"
@@ -110,7 +114,8 @@ case "${1:?}" in
     mkdir "$work/result"
     result="$work/result/$(basename "$app")"
     env -u GH_TOKEN -u EXPO_TOKEN EXPO_NO_TELEMETRY=1 DO_NOT_TRACK=1 bun x @expo/repack-app@0.10.4 --platform ios --source-app "$app" --output "$result" --js-bundle-only --embed-bundle-assets
-    python3 "$GITHUB_WORKSPACE/.github/scripts/ios-preview-build-number.py" "$app" "$result" "$(cat "$work/current-build")"
+    python3 "$GITHUB_WORKSPACE/.github/scripts/ios-preview-build-number.py" "$app" "$result" \
+      "$(cat "$work/current-build")" "$(cat "$work/current-android-version")"
     check_app_identity "$result" "$(cat "$work/current-build")"
     cmp "$app/Expo.plist" "$result/Expo.plist"
     if [[ -f "$app/EXUpdates.bundle/fingerprint" ]]; then
@@ -137,6 +142,7 @@ case "${1:?}" in
     unzip -tq "$work/final.zip"
     mv "$work/final.zip" "$out/ios-simulator.zip"
     check_source
+    echo "Reused a compatible simulator archive and embedded the current JavaScript." >> "$GITHUB_STEP_SUMMARY"
     echo 'reused=true' >> "$GITHUB_OUTPUT"
     ;;
   *) exit 2 ;;

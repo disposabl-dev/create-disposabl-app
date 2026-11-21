@@ -1,7 +1,7 @@
 name: Product simulator cache and boot overlap pilot
 on:
   push:
-    branches: [benchmark/ios-cache-overlap-20261121]
+    branches: [benchmark/ios-distinct-source-20261121]
 permissions:
   actions: read
   contents: read
@@ -23,8 +23,9 @@ env:
   CHANNEL: benchmark
   DISPOSABL_MOBILE_CHANNEL: benchmark
   DISPOSABL_ANDROID_CHANNEL: benchmark
-  DISPOSABL_IOS_BUILD_NUMBER: ${{ github.run_attempt > 1 && '42' || '1' }}
+  DISPOSABL_IOS_BUILD_NUMBER: "1"
   DISPOSABL_ANDROID_VERSION_CODE: "1"
+  REPLAY: "false"
   GH_REPO: ${{ github.repository }}
   SOURCE: 8bfee3cfd096ae3ac261dfda3c051e05c2c48688
   SOURCE_PATH: pulls/0
@@ -65,41 +66,41 @@ jobs:
       - uses: actions/cache/restore@v6
         id: native
         with:
-          key: bench-${{ github.run_id }}-${{ steps.key.outputs.key }}
+          key: bench-ios-distinct-${{ steps.key.outputs.key }}
           path: ${{ runner.temp }}/ios-preview-native-cache
       - name: Verify initial miss or exact warm hit
         env:
           HIT: ${{ steps.native.outputs.cache-hit }}
         run: |
-          if (( GITHUB_RUN_ATTEMPT > 1 )); then test "$HIT" = true
+          if [[ "$REPLAY" == true ]]; then test "$HIT" = true
           else test "$HIT" != true; fi
       - name: Read exact verified cold artifact on cache miss
-        if: github.run_attempt == 1
+        if: env.REPLAY == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
         run: bash .github/scripts/ios-repack-benchmark.sh origin
       - name: Seed validated native archive with production helper
-        if: github.run_attempt == 1
+        if: env.REPLAY == 'false'
         run: bash .github/scripts/ios-native-cache-pilot.sh seed
       - uses: actions/cache/save@v6
-        if: github.run_attempt == 1
+        if: env.REPLAY == 'false'
         with:
-          key: bench-${{ github.run_id }}-${{ steps.key.outputs.key }}
+          key: bench-ios-distinct-${{ steps.key.outputs.key }}
           path: ${{ runner.temp }}/ios-preview-native-cache
       - name: Verify cached base and overlap simulator boot with repack
-        if: github.run_attempt > 1
+        if: env.REPLAY == 'true'
         timeout-minutes: 7
         run: bash .github/scripts/ios-native-cache-overlap.sh
       - name: Verify current marker and build number on first launch
-        if: github.run_attempt > 1
+        if: env.REPLAY == 'true'
         timeout-minutes: 6
         run: bash .github/scripts/ios-native-cache-pilot.sh launch
       - name: Remove owned simulator
-        if: always() && github.run_attempt > 1
+        if: always() && env.REPLAY == 'true'
         timeout-minutes: 2
         run: bash .github/scripts/ios-repack-launch.sh cleanup
       - uses: actions/upload-artifact@v7
-        if: always() && github.run_attempt > 1
+        if: always() && env.REPLAY == 'true'
         with:
           name: native-cache-replay-${{ github.run_attempt }}
           path: ${{ runner.temp }}/ios-repack-evidence/

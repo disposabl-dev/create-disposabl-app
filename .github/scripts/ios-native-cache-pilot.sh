@@ -64,8 +64,9 @@ PY
     bundle=dev.disposabl.mobile.preview
     xcrun simctl install "$udid" "$IOS_REPACK_CACHE_APP"
     installed=$(xcrun simctl get_app_container "$udid" "$bundle" app)
-    test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleVersion' "$installed/Info.plist")" = 42
-    test "$(jq -er '.ios.buildNumber' "$installed/EXConstants.bundle/app.config")" = 42
+    test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleVersion' "$installed/Info.plist")" = "$DISPOSABL_IOS_BUILD_NUMBER"
+    test "$(jq -er '.ios.buildNumber' "$installed/EXConstants.bundle/app.config")" = "$DISPOSABL_IOS_BUILD_NUMBER"
+    test "$(jq -er '.android.versionCode' "$installed/EXConstants.bundle/app.config")" = "$DISPOSABL_ANDROID_VERSION_CODE"
     xcrun simctl launch "$udid" "$bundle" | tee "$evidence/cache-launch.txt"
     swiftc -O "$GITHUB_WORKSPACE/.github/scripts/ios-repack-ocr.swift" -o "$RUNNER_TEMP/cache-ocr"
     for iteration in 1 2 3; do
