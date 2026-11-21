@@ -34,7 +34,7 @@ for (const name of ["cp", "rm"]) {
   };
 }
 syncBuiltinESMExports();
-if (process.env.DISPOSABL_SQUIRREL_VENDOR) {
+if (process.env.DISPOSABL_SQUIRREL_VENDOR || process.env.SQUIRREL_TEST_PFX) {
   const desktopRequire = createRequire(
     join(process.env.GITHUB_WORKSPACE, "apps/desktop/package.json"),
   );
@@ -43,6 +43,13 @@ if (process.env.DISPOSABL_SQUIRREL_VENDOR) {
   winstaller.createWindowsInstaller = (options) =>
     original({
       ...options,
-      vendorDirectory: process.env.DISPOSABL_SQUIRREL_VENDOR,
+      ...(process.env.DISPOSABL_SQUIRREL_VENDOR
+        ? { vendorDirectory: process.env.DISPOSABL_SQUIRREL_VENDOR }
+        : {}),
+      ...(process.env.SQUIRREL_TEST_PFX
+        ? {
+            signWithParams: `/fd sha256 /f "${process.env.SQUIRREL_TEST_PFX}" /p fixture-only-password`,
+          }
+        : {}),
     });
 }
