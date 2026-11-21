@@ -37,6 +37,7 @@ const productReleaseFiles = [
   ".github/scripts/product-check-source.sh",
   ".github/scripts/product-check-source-test.py",
   ".github/scripts/ci-graph.test.ts",
+  ".github/scripts/test-ios-preview-cache.py",
 ];
 
 // Product-only proof harnesses must not enter generated apps. Keep the same
