@@ -69,7 +69,7 @@ jobs:
           EXPECTED_BUILD: ${{ matrix.build }}
         run: bash .github/scripts/ios-artifact-smoke.sh prepare
       - name: Create and boot dedicated simulator
-        timeout-minutes: 5
+        timeout-minutes: 6
         run: bash .github/scripts/ios-artifact-smoke.sh boot
       - name: Install and capture Discover
         timeout-minutes: 4

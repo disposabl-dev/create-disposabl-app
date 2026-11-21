@@ -60,9 +60,9 @@ printf 'bundle=%s\nminimum=%s\nruntime=%s\ndevice=%s\nudid=%s\n' "$bundle" "$min
 python3 - "$udid" <<'BOOT'
 import subprocess, sys
 try:
-    subprocess.run(["xcrun", "simctl", "bootstatus", sys.argv[1], "-b"], check=True, timeout=180)
+    subprocess.run(["xcrun", "simctl", "bootstatus", sys.argv[1], "-b"], check=True, timeout=300)
 except subprocess.TimeoutExpired:
-    raise SystemExit("Simulator boot timed out after 180 seconds")
+    raise SystemExit("Simulator boot timed out after 300 seconds")
 BOOT
 ;;
   launch)
@@ -73,6 +73,7 @@ xcrun simctl install "$udid" "$app"
 installed=$(xcrun simctl get_app_container "$udid" "$bundle" app)
 [[ $(/usr/libexec/PlistBuddy -c 'Print CFBundleVersion' "$installed/Info.plist") == "$EXPECTED_BUILD" ]]
 [[ $(jq -er '.ios.buildNumber' "$installed/EXConstants.bundle/app.config") == "$EXPECTED_BUILD" ]]
+[[ $(jq -er '.android.versionCode' "$installed/EXConstants.bundle/app.config") == "$EXPECTED_BUILD" ]]
 printf '%s\n' "$EXPECTED_BUILD" > "$evidence/installed-build.txt"
 xcrun simctl launch "$udid" "$bundle" | tee "$evidence/launch.txt"
 sleep 20
@@ -89,7 +90,7 @@ udid=$(cat "$work/owned-udid")
   [[ "$(git rev-parse HEAD)" == "$PRODUCT_SOURCE" ]]
   export E2E_IOS_DEVICE="$udid" E2E_IOS_APP_ID="$bundle" DISPOSABL_MOBILE_CHANNEL=pr-92
   export E2E_TELEMETRY_DISABLED=1 DO_NOT_TRACK=1 EXPO_NO_TELEMETRY=1
-  bun run --cwd packages/tests e2e run --target ios --retries 0 2>&1 | tee "$evidence/product-ios-checks.log"
+bun run --cwd packages/tests e2e run --target ios --retries 0 --no-cache 2>&1 | tee "$evidence/product-ios-checks.log"
   python3 - "$evidence/product-ios-checks.log" <<'PY'
 import re, sys
 from pathlib import Path
