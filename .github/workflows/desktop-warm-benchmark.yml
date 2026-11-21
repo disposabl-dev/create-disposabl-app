@@ -25,8 +25,6 @@ jobs:
       DISPOSABL_DESKTOP_UPDATE_URL: https://ci.invalid/desktop/updates/00000000000000000000000000000001
       CONVEX_SITE_URL: https://ci.invalid
       MACOS_NOTARIZE: "false"
-      BUN_INSTALL_CACHE_DIR: ${{ runner.temp }}/desktop-bun-cache
-      electron_config_cache: ${{ runner.temp }}/desktop-electron-cache
     steps:
       - uses: actions/checkout@v6
         with:
@@ -40,8 +38,11 @@ jobs:
           bun-version: 1.4.5
       - name: Prepare isolated cold caches and packaging tools
         run: |
+          export BUN_INSTALL_CACHE_DIR="$RUNNER_TEMP/desktop-bun-cache"
+          export electron_config_cache="$RUNNER_TEMP/desktop-electron-cache"
           test ! -e "$BUN_INSTALL_CACHE_DIR"
           test ! -e "$electron_config_cache"
+          printf 'BUN_INSTALL_CACHE_DIR=%s\nelectron_config_cache=%s\n' "$BUN_INSTALL_CACHE_DIR" "$electron_config_cache" >> "$GITHUB_ENV"
           if [[ "$RUNNER_OS" == Linux ]]; then
             command -v fakeroot && command -v rpmbuild && command -v dpkg-deb && command -v cpio || { sudo apt-get update && sudo apt-get install -y fakeroot dpkg rpm cpio; }
           fi
