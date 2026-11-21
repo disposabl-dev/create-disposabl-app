@@ -1,20 +1,20 @@
-name: Full product Android Metro cache replay
+name: Android segmented Gradle cache benchmark
 on:
   push:
-    branches: [benchmark/ci-peak-20261121]
+    branches: [benchmark/android-segmented-cache-local-20261121]
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-peak-android-metro
+  group: android-segmented-cache
   cancel-in-progress: false
 
 jobs:
   measure:
-    if: github.repository == 'disposabl-dev/create-disposabl-app' && github.ref == 'refs/heads/benchmark/ci-peak-20261121'
-    name: Product Android warm Metro profile
+    if: github.repository == 'disposabl-dev/create-disposabl-app' && github.ref == 'refs/heads/benchmark/android-segmented-cache-local-20261121'
+    name: Android segmented cache profile
     strategy:
       fail-fast: false
       matrix:
@@ -74,9 +74,6 @@ jobs:
           key: ci-peak-v1-bun-${{ matrix.platform }}-${{ matrix.runner }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}
       - name: Install dependencies
         run: bash .github/scripts/ci-peak-benchmark.sh install
-      - name: Configure Gradle
-        if: matrix.platform == 'android'
-        run: printf 'GRADLE_USER_HOME=%s\n' "$CI_PEAK_CACHE_DIR/gradle" >> "$GITHUB_ENV"
       - uses: actions/setup-java@v5
         if: matrix.platform == 'android'
         with: { distribution: temurin, java-version: "17" }
@@ -86,29 +83,28 @@ jobs:
       - name: Prepare Android runner
         if: matrix.platform == 'android'
         run: bash .github/scripts/android-runner.sh prepare
-      - name: Native and task cache
-        id: build-cache
+      - name: Shipping Gradle segmented cache
+        uses: gradle/actions/setup-gradle@v4
+        with: { cache-read-only: false }
+      - name: Compiler cache
+        id: compiler-cache
         uses: actions/cache@v4
         with:
-          path: |
-            ${{ runner.temp }}/ci-peak/ccache
-            ${{ runner.temp }}/ci-peak/gradle/caches
-            ${{ runner.temp }}/ci-peak/gradle/wrapper
-            ${{ runner.temp }}/ci-peak/electron
-            ${{ matrix.platform == 'ios' && '~/Library/Caches/CocoaPods' || '.ci-peak-unused' }}
-            ${{ matrix.platform == 'web' && '.turbo/cache' || '.ci-peak-unused' }}
-          key: ci-peak-v1-build-${{ matrix.platform }}-${{ matrix.runner }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}
-      - name: Record cache hits
+          path: ${{ runner.temp }}/ci-peak/ccache
+          key: android-segmented-ccache-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+      - name: Report cache pass
         run: |
-          printf 'Bun cache exact hit: %s\nBuild cache exact hit: %s\n' '${{ steps.dependencies.outputs.cache-hit }}' '${{ steps.build-cache.outputs.cache-hit }}' >> "$GITHUB_STEP_SUMMARY"
-          test '${{ steps.dependencies.outputs.cache-hit }}' = true
-          test '${{ steps.build-cache.outputs.cache-hit }}' = true
+          printf 'Attempt: %s; compiler cache hit: %s; Bun cache hit: %s\n' "$GITHUB_RUN_ATTEMPT" '${{ steps.compiler-cache.outputs.cache-hit }}' '${{ steps.dependencies.outputs.cache-hit }}' | tee -a "$GITHUB_STEP_SUMMARY"
+          if (( GITHUB_RUN_ATTEMPT > 1 )); then test '${{ steps.compiler-cache.outputs.cache-hit }}' = true; fi
       - name: Restore Metro transforms
         id: metro
         uses: actions/cache@v4
         with:
           path: ${{ runner.temp }}/product-metro-restore
-          key: ci-peak-android-metro-v1-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+          key: android-segmented-metro-v1-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+      - name: Verify repeat Metro cache
+        if: github.run_attempt > 1
+        run: test '${{ steps.metro.outputs.cache-hit }}' = true
       - name: Build and verify
         env:
           EXPO_METRO_CACHE_RESTORE_DIR: ${{ runner.temp }}/product-metro-restore
@@ -126,7 +122,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: full-product-android-metro-${{ github.run_attempt }}
+          name: android-segmented-profile-${{ github.run_attempt }}
           path: apps/mobile/android/build/reports/profile/
           retention-days: 1
           if-no-files-found: warn

@@ -52,6 +52,7 @@ case "$platform" in
     else
       timed 'Expo prebuild' bun x --no-install expo prebuild --platform android --no-install
     fi
+    runtime=$(bun x --no-install expo-updates runtimeversion:resolve --platform android --workflow managed | jq -er '.runtimeVersion | select(test("^[a-f0-9]{40,64}$"))')
     cd android
     flags=(--profile)
     if [[ "${CI_PEAK_HEAP:-}" == 4g ]]; then
@@ -69,6 +70,10 @@ case "$platform" in
     unzip -tq "$aab"
     cert=$(node "$root/.github/scripts/android-signatures.mjs" "$apk" fallback)
     node "$root/.github/scripts/android-signatures.mjs" "$aab" "$cert"
+    test "$(unzip -p "$apk" assets/fingerprint)" = "$runtime"
+    test "$cert" = fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c
+    printf 'Runtime: %s; certificate: %s\n' "$runtime" "$cert" | tee -a "$GITHUB_STEP_SUMMARY"
+    sha256sum "$apk" "$aab" | tee -a "$GITHUB_STEP_SUMMARY"
     wc -c "$apk" "$aab"
     ;;
   ios)
