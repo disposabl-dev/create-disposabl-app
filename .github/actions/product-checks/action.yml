@@ -57,7 +57,9 @@ runs:
         package-manager-cache: false
     - name: Verify CI graph
       if: inputs.lane == 'unit' && inputs.cli_recovery_version == '' && inputs.recovery_version == ''
-      run: bun test ./.github/scripts/ci-graph.test.ts
+      run: |
+        bun test ./.github/scripts/ci-graph.test.ts
+        python3 .github/scripts/test-ios-preview-cache.py
       shell: bash
     - name: Restore dependencies
       id: deps

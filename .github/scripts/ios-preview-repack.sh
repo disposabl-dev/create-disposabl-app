@@ -1,5 +1,4 @@
 #!/bin/bash
-# Experimental same-PR native cache reuse. Any error falls back to the native build.
 set -euo pipefail
 work="$RUNNER_TEMP/ios-preview-repack"
 cache="$RUNNER_TEMP/ios-preview-native-cache"
@@ -137,6 +136,7 @@ case "${1:?}" in
     unzip -tq "$work/final.zip"
     mv "$work/final.zip" "$out/ios-simulator.zip"
     check_source
+    echo "Reused a compatible simulator archive and embedded the current JavaScript." >> "$GITHUB_STEP_SUMMARY"
     echo 'reused=true' >> "$GITHUB_OUTPUT"
     ;;
   *) exit 2 ;;
