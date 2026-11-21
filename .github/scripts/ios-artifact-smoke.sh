@@ -40,21 +40,32 @@ PY
 udid=''
 while IFS= read -r device; do
   if udid=$(xcrun simctl create Smoke "$device" "$runtime" 2>/dev/null); then break; fi
-done < <(jq -r '[.devicetypes[] | select(.name | startswith("iPhone"))] | reverse | .[].identifier' "$evidence/devicetypes.json")
+done < <(jq -r '[.devicetypes[] | select(.name | startswith("iPhone"))] | sort_by(if .name == "iPhone 17" then 0 else 1 end, .name) | .[].identifier' "$evidence/devicetypes.json")
 [[ -n "$udid" ]] || { echo 'No compatible iPhone device type' >&2; exit 1; }
 trap 'xcrun simctl shutdown "$udid" || true; xcrun simctl delete "$udid" || true' EXIT
 printf 'bundle=%s\nminimum=%s\nruntime=%s\ndevice=%s\nudid=%s\n' "$bundle" "$minimum" "$runtime" "$device" "$udid" > "$evidence/target.txt"
-xcrun simctl boot "$udid"
-xcrun simctl bootstatus "$udid" -b
+python3 - "$udid" <<'PY'
+import subprocess, sys
+subprocess.run(['xcrun', 'simctl', 'bootstatus', sys.argv[1], '-b'], check=True, timeout=300)
+PY
 xcrun simctl install "$udid" "$app"
 xcrun simctl launch "$udid" "$bundle" | tee "$evidence/launch.txt"
 sleep 20
 xcrun simctl io "$udid" screenshot "$evidence/screen.png"
-echo 'Inspect screen.png to establish what rendered; launch and screenshot capture alone do not prove behavior.' >> "$GITHUB_STEP_SUMMARY"
+swiftc -O "$GITHUB_WORKSPACE/.github/scripts/ios-repack-ocr.swift" -o "$RUNNER_TEMP/starter-ocr"
+"$RUNNER_TEMP/starter-ocr" "$evidence/screen.png" > "$evidence/screen-text.txt"
+grep -F 'Your app starts here.' "$evidence/screen-text.txt"
+grep -Fx Android "$evidence/screen-text.txt"
+grep -Fx iOS "$evidence/screen-text.txt"
 unset GH_TOKEN
 cd "$RUNNER_TEMP/generated"
 export E2E_IOS_DEVICE="$udid" E2E_IOS_APP_ID="$bundle" DISPOSABL_MOBILE_CHANNEL=native-benchmark
 export E2E_CONVEX_URL=https://ci.invalid E2E_CONVEX_SITE_URL=https://ci.invalid EXPO_NO_DOTENV=1
 export E2E_TELEMETRY_DISABLED=1 DO_NOT_TRACK=1 EXPO_NO_TELEMETRY=1
-bun run --cwd packages/tests e2e run --target ios --retries 0 --no-cache 2>&1 | tee "$evidence/generated-ios-checks.log"
+export AGENT_DEVICE_STATE_DIR="$(mktemp -d /tmp/ad-ios.XXXXXX)"
+status=0
+bun run --cwd packages/tests e2e run mobile.e2e.ts --target ios --retries 0 --no-cache 2>&1 |
+  tee "$evidence/generated-ios-checks.log" || status=$?
+if [[ -d packages/tests/.e2e ]]; then cp -R packages/tests/.e2e "$evidence/test-results"; fi
+[[ "$status" == 0 ]] || exit "$status"
 grep -E '✓.*mobile home renders' "$evidence/generated-ios-checks.log"

@@ -50,11 +50,6 @@ jobs:
         run: |
           test -n "$ARTIFACT_ID"
           bash .github/scripts/ios-artifact-smoke.sh
-          swiftc -O .github/scripts/ios-repack-ocr.swift -o "$RUNNER_TEMP/starter-ocr"
-          "$RUNNER_TEMP/starter-ocr" "$RUNNER_TEMP/ios-smoke-evidence/screen.png" > "$RUNNER_TEMP/ios-smoke-evidence/screen-text.txt"
-          grep -F 'Your app starts here.' "$RUNNER_TEMP/ios-smoke-evidence/screen-text.txt"
-          grep -Fx Android "$RUNNER_TEMP/ios-smoke-evidence/screen-text.txt"
-          grep -Fx iOS "$RUNNER_TEMP/ios-smoke-evidence/screen-text.txt"
       - uses: actions/upload-artifact@v7
         if: always()
         with:
