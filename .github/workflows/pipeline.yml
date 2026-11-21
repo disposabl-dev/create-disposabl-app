@@ -108,14 +108,14 @@ jobs:
         if: github.repository != 'disposabl-dev/create-disposabl-app'
         run: bun fmt --check
       - &cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.bun/install/cache
           key: bun-${{ github.job == 'desktop' && 'desktop-' || (github.job == 'android' || startsWith(github.job, 'ios-')) && 'mobile-' || '' }}${{ runner.os }}-${{ runner.arch }}-${{ env.BUN_VERSION }}-${{ hashFiles('bun.lock') }}
           restore-keys: bun-${{ github.job == 'desktop' && 'desktop-' || (github.job == 'android' || startsWith(github.job, 'ios-')) && 'mobile-' || '' }}${{ runner.os }}-${{ runner.arch }}-${{ env.BUN_VERSION }}-
       - name: Restore task cache
         if: github.repository != 'disposabl-dev/create-disposabl-app'
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: .turbo/cache
           key: turbo-v1-${{ runner.os }}-${{ runner.arch }}-${{ env.BUN_VERSION }}-${{ hashFiles('bun.lock') }}-${{ env.SOURCE }}
@@ -247,7 +247,7 @@ jobs:
       - name: Restore Expo transform cache
         id: metro-cache
         if: steps.fingerprint.outcome == 'success'
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with: &metro-cache
           path: ${{ runner.temp }}/expo-metro-restore
           key: expo-metro-v1-${{ github.job == 'android' && 'android' || 'ios' }}-${{ runner.os }}-${{ runner.arch }}-${{ env.NODE_VERSION }}-${{ env.BUN_VERSION }}-${{ hashFiles('bun.lock', 'package.json', 'apps/mobile/package.json', 'apps/mobile/*config.*', 'patches/**') }}
@@ -293,7 +293,7 @@ jobs:
       - name: Restore native compiler cache
         if: steps.native.outcome == 'success'
         id: native-cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: ${{ runner.temp }}/ccache
           key: android-ccache-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock', 'apps/mobile/app.json', 'apps/mobile/scripts/**') }}-${{ env.SOURCE }}
@@ -353,7 +353,7 @@ jobs:
       - name: Upload release artifacts
         id: artifacts
         if: hashFiles('dist/release/*') != ''
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-${{ env.PLATFORM }}
           path: dist/release/
@@ -368,7 +368,7 @@ jobs:
           ((github.event_name == 'push' && steps.native-cache.outputs.cache-hit != 'true') ||
            (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository &&
             steps.native-cache.outputs.cache-matched-key == ''))
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: ${{ runner.temp }}/ccache
           key: ${{ steps.native-cache.outputs.cache-primary-key }}
@@ -392,7 +392,7 @@ jobs:
       - *bun
       - uses: actions/setup-java@v5
         with: { distribution: temurin, java-version: "17" }
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: release-android
           path: dist/release
@@ -470,7 +470,7 @@ jobs:
             printf 'cas_key=%s\n' "$id" >> "$GITHUB_OUTPUT"
           fi
       - name: Restore CocoaPods downloads and specifications
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/Library/Caches/CocoaPods
@@ -478,7 +478,7 @@ jobs:
           key: cocoapods-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}
       - name: Restore Xcode compilation cache
         if: steps.xcode.outputs.cas_key != ''
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ runner.temp }}/ios-cas
           key: ios-simulator-cas-v1-${{ runner.arch }}-${{ steps.xcode.outputs.cas_key }}-${{ hashFiles('bun.lock', 'apps/mobile/app.*', 'apps/mobile/package.json', 'apps/mobile/plugins/**', 'patches/**') }}
@@ -490,7 +490,7 @@ jobs:
         run: bash .github/scripts/apple.sh prepare-cache
       - name: Restore simulator compiler cache
         if: steps.simulator-cache.outputs.enabled == 'true'
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ runner.temp }}/ios-ccache
           key: ios-simulator-ccache-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}-${{ env.SOURCE }}
@@ -504,7 +504,7 @@ jobs:
           CCACHE_MAXSIZE: 512M
         working-directory: apps/mobile
         run: bash "$GITHUB_WORKSPACE/.github/scripts/apple.sh" simulator
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ios-simulator
           path: dist/apple/ios-simulator.zip
@@ -539,7 +539,7 @@ jobs:
         run: bash "$GITHUB_WORKSPACE/.github/scripts/mobile.sh" expo-channel
       - name: Restore Expo transform cache
         id: metro-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with: *metro-cache
       - *metro-paths
       - name: Publish the preview update
@@ -616,7 +616,7 @@ jobs:
       - name: Restore TestFlight upload provenance
         id: ios-provenance
         if: github.repository == 'disposabl-dev/create-disposabl-app' && steps.apple-prerequisites.outputs.ready == 'true'
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: .ios-provenance/build.json
           key: ios-testflight-${{ env.ASC_APP_ID }}-${{ env.EXPO_PROJECT_ID }}-${{ steps.ios-plan.outputs.version }}-${{ steps.ios-plan.outputs.runtime }}
@@ -645,7 +645,7 @@ jobs:
         run: bash .github/scripts/apple.sh prepare-cache
       - name: Restore production compiler cache
         if: steps.production-cache.outputs.enabled == 'true'
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ runner.temp }}/ios-ccache
           key: ios-production-ccache-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}-${{ env.SOURCE }}
@@ -666,14 +666,14 @@ jobs:
         run: bash "$GITHUB_WORKSPACE/.github/scripts/apple.sh" production
       - name: Save TestFlight upload provenance
         if: github.repository == 'disposabl-dev/create-disposabl-app' && steps.apple-prerequisites.outputs.ready == 'true' && steps.ios-provenance.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: .ios-provenance/build.json
           key: ios-testflight-${{ env.ASC_APP_ID }}-${{ env.EXPO_PROJECT_ID }}-${{ steps.ios-plan.outputs.version }}-${{ steps.ios-plan.outputs.runtime }}
       - name: Restore Expo transform cache
         id: metro-cache
         if: steps.ios-plan.outputs.action == 'update' || steps.ios-baseline.outputs.available == 'true'
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with: *metro-cache
       - *metro-paths
       - name: Publish compatible iOS production update
@@ -734,7 +734,7 @@ jobs:
       - name: Report desktop build
         run: node .github/scripts/disposabl.mjs report "$PLATFORM" building
       - name: Electron
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: .cache/electron
           key: electron-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('apps/desktop/package.json') }}
@@ -772,7 +772,7 @@ jobs:
           node apps/desktop/publish-update.mjs
       - name: Upload desktop release artifacts
         if: matrix.platform != 'macos' || env.MACOS_NOTARIZE == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-${{ env.PLATFORM }}
           path: dist/release/
@@ -781,7 +781,7 @@ jobs:
           if-no-files-found: error
       - name: Upload staged update feed
         if: matrix.platform != 'linux' && env.DISPOSABL_DESKTOP_UPDATE_URL != '' && (matrix.platform != 'macos' || env.MACOS_NOTARIZE == 'true')
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: desktop-update-${{ env.PLATFORM }}
           path: dist/update/
@@ -790,7 +790,7 @@ jobs:
           if-no-files-found: error
       - name: Upload unsigned macOS artifact
         if: matrix.platform == 'macos' && env.MACOS_NOTARIZE != 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: macos-unsigned
           path: |
@@ -867,7 +867,7 @@ jobs:
       - name: Select release source
         id: source
         run: bash .github/scripts/release.sh release-source
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         if: steps.source.outputs.current == 'true'
         with:
           pattern: release-*

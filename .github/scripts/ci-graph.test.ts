@@ -291,7 +291,7 @@ test("mobile updates preserve cached transforms without changing the release inp
   const android = jobs[0];
   for (const job of jobs) {
     const restore = step(job, "Restore Expo transform cache");
-    expect(restore.uses).toBe("actions/cache@v4");
+    expect(restore.uses).toBe("actions/cache@v6");
     expect(restore.with.path).toBe("${{ runner.temp }}/expo-metro-restore");
     expect(restore.with.key).toContain("hashFiles('bun.lock'");
     expect(

@@ -55,7 +55,7 @@ test("product and generated apps share one artifact build and gate submission", 
   );
   assert.ok(
     submit.steps.some(
-      (step: { uses?: string }) => step.uses === "actions/download-artifact@v4",
+      (step: { uses?: string }) => step.uses === "actions/download-artifact@v8",
     ),
   );
   const fingerprint = job.steps.find(

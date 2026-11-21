@@ -103,7 +103,7 @@ jobs:
         if: inputs.recovery_version == ''
         with:
           bun-version: "1.4.5"
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         if: inputs.recovery_version == ''
         with:
           path: ${{ runner.temp }}/bun-cli-cache
@@ -291,7 +291,7 @@ jobs:
         if: inputs.cli_recovery_version == ''
         with:
           bun-version: "1.4.5"
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         if: inputs.cli_recovery_version == ''
         with:
           path: ${{ runner.temp }}/bun-generator-cache

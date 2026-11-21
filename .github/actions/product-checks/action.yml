@@ -61,14 +61,14 @@ runs:
       shell: bash
     - name: Restore dependencies
       id: deps
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v6
       with:
         path: ~/.bun/install/cache
         key: bun-${{ runner.os }}-${{ runner.arch }}-1.4.5-${{ hashFiles('bun.lock') }}
         restore-keys: bun-${{ runner.os }}-${{ runner.arch }}-1.4.5-
     - name: Restore source task cache
       if: inputs.lane == 'source'
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: .turbo/cache
         key: turbo-v1-${{ runner.os }}-${{ runner.arch }}-1.4.5-${{ hashFiles('bun.lock') }}-${{ steps.source.outputs.sha }}
@@ -89,7 +89,7 @@ runs:
       shell: bash
     - name: Save dependencies
       if: inputs.lane == 'source' && steps.deps.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v4
+      uses: actions/cache/save@v6
       with:
         path: ~/.bun/install/cache
         key: ${{ steps.deps.outputs.cache-primary-key }}
@@ -127,7 +127,7 @@ runs:
     - name: Restore browser test dependencies
       if: inputs.lane == 'browser'
       id: browser-cache
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v6
       with:
         path: |
           ${{ runner.temp }}/product-convex/backend.zip
@@ -182,7 +182,7 @@ runs:
         ' _ "$(id -un)" "$HOME" "$PATH" "$RUNNER_TEMP/product-convex/convex-local-backend" "$PLAYWRIGHT_BROWSERS_PATH" "$GITHUB_WORKSPACE/.github/scripts/product-browser-check.py" "$PRODUCT_BROWSER_SHARD"
     - name: Save browser test dependencies
       if: inputs.lane == 'browser' && (inputs.browser_shard == '' || inputs.browser_shard == '1/4') && steps.browser-cache.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v4
+      uses: actions/cache/save@v6
       with:
         path: |
           ${{ runner.temp }}/product-convex/backend.zip
