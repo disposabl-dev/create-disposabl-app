@@ -1,0 +1,110 @@
+name: Product simulator native archive cache pilot
+on:
+  push:
+    branches: [benchmark/ios-preview-native-cache-20261121]
+permissions:
+  actions: read
+  contents: read
+env:
+  CI: "1"
+  DO_NOT_TRACK: "1"
+  E2E_TELEMETRY_DISABLED: "1"
+  EXPO_NO_TELEMETRY: "1"
+  EXPO_NO_DOTENV: "1"
+  DISPOSABL_ANALYTICS_ENABLED: "false"
+  EXPO_PUBLIC_DISPOSABL_ANALYTICS_ENABLED: "false"
+  VITE_DISPOSABL_ANALYTICS_ENABLED: "false"
+  EXPO_PROJECT_ID: 00000000-0000-4000-8000-000000000001
+  CONVEX_URL: https://ci.invalid
+  CONVEX_SITE_URL: https://ci.invalid
+  PUBLIC_SITE_URL: https://ci.invalid
+  EXPO_PUBLIC_CONVEX_URL: https://ci.invalid
+  EXPO_PUBLIC_CONVEX_SITE_URL: https://ci.invalid
+  CHANNEL: benchmark
+  DISPOSABL_MOBILE_CHANNEL: benchmark
+  DISPOSABL_ANDROID_CHANNEL: benchmark
+  DISPOSABL_IOS_BUILD_NUMBER: ${{ github.run_attempt > 1 && '42' || '1' }}
+  DISPOSABL_ANDROID_VERSION_CODE: "1"
+  GH_REPO: ${{ github.repository }}
+  SOURCE: 8bfee3cfd096ae3ac261dfda3c051e05c2c48688
+  SOURCE_PATH: pulls/0
+  PR_NUMBER: "0"
+jobs:
+  cache:
+    if: github.repository == 'disposabl-dev/create-disposabl-app'
+    runs-on: macos-26
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@v6
+        with:
+          ref: 8bfee3cfd096ae3ac261dfda3c051e05c2c48688
+          path: product
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.5
+      - name: Install exact product dependencies
+        working-directory: product
+        run: bun install --frozen-lockfile --filter @disposabl/mobile
+      - name: Prepare immutable fixture source guard
+        run: bash .github/scripts/ios-native-cache-pilot.sh setup
+      - name: Compute the authentic native compatibility identity
+        id: key
+        working-directory: product/apps/mobile
+        env:
+          NATIVE_INPUT_HASH: ${{ hashFiles('product/bun.lock', 'product/apps/mobile/app.*', 'product/apps/mobile/package.json', 'product/apps/mobile/plugins/**', 'product/patches/**', 'product/.github/scripts/apple.sh') }}
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/ios-preview-repack.sh" identity
+      - uses: actions/cache/restore@v6
+        id: native
+        with:
+          key: bench-${{ github.run_id }}-${{ steps.key.outputs.key }}
+          path: ${{ runner.temp }}/ios-preview-native-cache
+      - name: Verify initial miss or exact warm hit
+        env:
+          HIT: ${{ steps.native.outputs.cache-hit }}
+        run: |
+          if (( GITHUB_RUN_ATTEMPT > 1 )); then test "$HIT" = true
+          else test "$HIT" != true; fi
+      - name: Read exact verified cold artifact on cache miss
+        if: github.run_attempt == 1
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash .github/scripts/ios-repack-benchmark.sh origin
+      - name: Seed validated native archive with production helper
+        if: github.run_attempt == 1
+        run: bash .github/scripts/ios-native-cache-pilot.sh seed
+      - uses: actions/cache/save@v6
+        if: github.run_attempt == 1
+        with:
+          key: bench-${{ github.run_id }}-${{ steps.key.outputs.key }}
+          path: ${{ runner.temp }}/ios-preview-native-cache
+      - name: Reject corrupt cache and repack current source
+        if: github.run_attempt > 1
+        run: bash .github/scripts/ios-native-cache-pilot.sh replay
+      - name: Boot an owned simulator
+        if: github.run_attempt > 1
+        timeout-minutes: 5
+        run: bash .github/scripts/ios-repack-launch.sh boot
+      - name: Verify current marker and build number on first launch
+        if: github.run_attempt > 1
+        timeout-minutes: 6
+        run: bash .github/scripts/ios-native-cache-pilot.sh launch
+      - name: Remove owned simulator
+        if: always() && github.run_attempt > 1
+        timeout-minutes: 2
+        run: bash .github/scripts/ios-repack-launch.sh cleanup
+      - uses: actions/upload-artifact@v7
+        if: always() && github.run_attempt > 1
+        with:
+          name: native-cache-replay-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ios-repack-evidence/
+          compression-level: 0
+          retention-days: 1

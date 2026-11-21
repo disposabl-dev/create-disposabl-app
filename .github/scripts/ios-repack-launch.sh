@@ -5,7 +5,7 @@ evidence="$RUNNER_TEMP/ios-repack-evidence"
 mkdir -p "$evidence"
 case "${1:?phase required}" in
   boot)
-    app="$work/repacked-A.app"
+    app="${IOS_REPACK_CACHE_APP:-$work/repacked-A.app}"
     minimum=$(/usr/libexec/PlistBuddy -c 'Print MinimumOSVersion' "$app/Info.plist")
     xcodebuild -version > "$evidence/simulator-xcode.txt"
     xcrun simctl list -j runtimes > "$evidence/simulator-runtimes.json"
