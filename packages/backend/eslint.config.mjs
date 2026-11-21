@@ -4,19 +4,13 @@ import globals from "globals";
 import tsParser from "@typescript-eslint/parser";
 import js from "@eslint/js";
 import convexPlugin from "@convex-dev/eslint-plugin";
+import tsPlugin from "@typescript-eslint/eslint-plugin";
 
-import { FlatCompat } from "@eslint/eslintrc";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const compat = new FlatCompat({
-  baseDirectory: __dirname,
-  recommendedConfig: js.configs.recommended,
-  allConfig: js.configs.all,
-});
-
 export default defineConfig([
   {
     files: ["convex/**/*.ts"],
@@ -33,10 +27,10 @@ export default defineConfig([
       },
     },
 
-    extends: compat.extends(
-      "eslint:recommended",
-      "plugin:@typescript-eslint/recommended-type-checked",
-    ),
+    extends: [
+      js.configs.recommended,
+      ...tsPlugin.configs["flat/recommended-type-checked"],
+    ],
 
     rules: {
       "@typescript-eslint/no-unused-vars": [

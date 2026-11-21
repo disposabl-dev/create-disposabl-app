@@ -64,7 +64,7 @@
     "start": "expo start --dev-client",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "lint": "cd ../.. && eslint --config apps/mobile/eslint.config.js apps/mobile/src packages/disposabl-kit/mobile",
+    "lint": "node ../../.github/scripts/experimental-lint.mjs mobile",
     "dev": "expo start --dev-client",
     "typecheck": "bun check",
     "build:ios": "bunx eas-cli@27.2.0 build --platform ios --profile ios-preview --local"

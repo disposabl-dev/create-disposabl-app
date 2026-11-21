@@ -8,7 +8,7 @@
     "dev": "convex dev --run billing:setup",
     "logs": "convex logs",
     "typecheck": "bun check -p convex",
-    "lint": "eslint . --report-unused-disable-directives --max-warnings 0",
+    "lint": "node ../../.github/scripts/experimental-lint.mjs backend",
     "format": "prettier --write 'convex/**/*.ts'"
   },
   "dependencies": {
