@@ -1,0 +1,28 @@
+name: Simulator artifact naming on rerun
+on:
+  push:
+    branches: [benchmark/ci-artifact-rerun-20261121]
+permissions:
+  contents: read
+jobs:
+  upload:
+    runs-on: macos-26
+    timeout-minutes: 3
+    steps:
+      - run: printf '%s\n' "$GITHUB_RUN_ATTEMPT" > simulator-fixture
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ios-simulator
+          path: simulator-fixture
+          retention-days: 1
+          compression-level: 0
+          if-no-files-found: error
+  verify:
+    needs: upload
+    runs-on: ubuntu-slim
+    timeout-minutes: 3
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: ios-simulator
+      - run: test "$(cat simulator-fixture)" = "$GITHUB_RUN_ATTEMPT"
