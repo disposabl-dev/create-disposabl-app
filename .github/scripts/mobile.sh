@@ -169,7 +169,10 @@ binary=android/app/build/outputs/apk/release/app-release.apk
 fingerprint=assets/fingerprint
 
 tasks=(:app:assembleRelease)
-if [[ "$CHANNEL" == production && "$ANDROID_SIGNING_MODE" == release ]]; then
+if [[ "$CHANNEL" != production ]]; then
+  # Preview APKs keep release JS, signing and ABIs without store shrinking.
+  tasks+=(-Pandroid.enableMinifyInReleaseBuilds=false -Pandroid.enableShrinkResourcesInReleaseBuilds=false)
+elif [[ "$ANDROID_SIGNING_MODE" == release ]]; then
   tasks+=(:app:bundleRelease)
 fi
 (cd android && bash ../../../.github/scripts/android-runner.sh build "${tasks[@]}")
