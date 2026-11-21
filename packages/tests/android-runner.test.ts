@@ -246,7 +246,7 @@ test("native warmup requires completed Gradle work, a real result, and enough re
   }
 });
 
-test("native warmup and production share cache keys and only pushes save objects", () => {
+test("native warmup shares release cache keys and PRs only seed a missing cache", () => {
   const root = resolve(import.meta.dirname, "../..");
   const primeText = readFileSync(
     join(root, ".github/workflows/android-cache-prime.yml"),
@@ -303,7 +303,19 @@ test("native warmup and production share cache keys and only pushes save objects
   const save = android.steps.find(
     (step) => step.name === "Save native compiler cache",
   );
-  assert.match(save?.if ?? "", /^github.event_name == 'push'/);
+  assert.match(save?.if ?? "", /steps\.build\.outcome == 'success'/);
+  assert.match(
+    save?.if ?? "",
+    /steps\.native-compiler\.outputs\.enabled == 'true'/,
+  );
+  assert.match(
+    save?.if ?? "",
+    /github\.event_name == 'push' && .*cache-hit != 'true'/,
+  );
+  assert.match(
+    save?.if ?? "",
+    /github\.event_name == 'pull_request' && github\.event\.pull_request\.head\.repo\.full_name == github\.repository\s+&&\s+steps\.native-cache\.outputs\.cache-matched-key == ''/,
+  );
   assert.match(primeText, /actions\/cache\/save@v4/);
   assert.match(pipelineText, /actions\/cache\/restore@v4/);
   assert.doesNotMatch(primeText + pipelineText, /CCACHE_SLOPPINESS/);

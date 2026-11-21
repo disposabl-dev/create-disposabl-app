@@ -274,13 +274,17 @@ jobs:
           key: android-ccache-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock', 'apps/mobile/app.json', 'apps/mobile/scripts/**') }}-${{ env.SOURCE }}
           restore-keys: android-ccache-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock', 'apps/mobile/app.json', 'apps/mobile/scripts/**') }}-
       - name: Install native compiler cache
-        if: steps.native.outcome == 'success' && (github.event_name == 'push' || steps.native-cache.outputs.cache-matched-key != '')
+        if: steps.native.outcome == 'success'
+        id: native-compiler
         run: |
           if ! command -v ccache >/dev/null; then
-            sudo apt-get update -qq
-            sudo apt-get install -y ccache
+            if ! sudo apt-get update -qq || ! sudo apt-get install -y ccache; then
+              echo '::warning::Native compiler cache is unavailable.'
+              exit 0
+            fi
           fi
           printf 'CCACHE_DIR=%s\nCCACHE_BASEDIR=%s\nCCACHE_MAXSIZE=512M\nCCACHE_COMPILERCHECK=content\nCMAKE_C_COMPILER_LAUNCHER=ccache\nCMAKE_CXX_COMPILER_LAUNCHER=ccache\n' "$RUNNER_TEMP/ccache" "$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
+          echo 'enabled=true' >> "$GITHUB_OUTPUT"
       - name: Select Android bundle validation
         if: steps.native.outcome == 'success'
         id: bundletool-needed
@@ -329,7 +333,13 @@ jobs:
           compression-level: 0
           if-no-files-found: error
       - name: Save native compiler cache
-        if: github.event_name == 'push' && steps.build.outcome == 'success' && steps.native-cache.outputs.cache-hit != 'true'
+        # GitHub scopes PR caches to their own merge ref. Save only the first
+        # compatible entry in that scope and reuse it for subsequent PR commits.
+        if: >-
+          steps.build.outcome == 'success' && steps.native-compiler.outputs.enabled == 'true' &&
+          ((github.event_name == 'push' && steps.native-cache.outputs.cache-hit != 'true') ||
+           (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository &&
+            steps.native-cache.outputs.cache-matched-key == ''))
         uses: actions/cache/save@v4
         with:
           path: ${{ runner.temp }}/ccache
