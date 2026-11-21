@@ -1,0 +1,76 @@
+name: Full product fail-fast probes
+on:
+  push:
+    branches: [benchmark/product-fail-fast-20261121]
+permissions:
+  contents: read
+jobs:
+  reject:
+    name: Reject ${{ matrix.problem }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        problem: [syntax, type, lint]
+    env:
+      CI: "1"
+      DO_NOT_TRACK: "1"
+      EXPO_NO_TELEMETRY: "1"
+      PROBLEM: ${{ matrix.problem }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          {
+            ref: "${{ github.sha }}",
+            fetch-depth: 2,
+            persist-credentials: false,
+          }
+      - uses: oven-sh/setup-bun@v2
+        with: { bun-version: "1.4.5" }
+      - name: Reject malformed syntax before dependencies
+        if: matrix.problem == 'syntax'
+        run: |
+          printf 'export const ciSyntaxProbe = ;\n' > apps/web/src/ciSyntaxProbe.ts
+          if /usr/bin/time -p bun fmt --check > "$RUNNER_TEMP/check.log" 2>&1; then
+            echo 'Unexpected acceptance of malformed syntax' >&2
+            exit 1
+          fi
+          cat "$RUNNER_TEMP/check.log"
+          grep -F 'ciSyntaxProbe.ts' "$RUNNER_TEMP/check.log"
+          test ! -e node_modules
+      - uses: actions/setup-node@v6
+        if: matrix.problem != 'syntax'
+        with: { node-version: "24", package-manager-cache: false }
+      - uses: ./.github/actions/bun-lint
+        if: matrix.problem != 'syntax'
+      - if: matrix.problem != 'syntax'
+        run: bun install --frozen-lockfile
+      - name: Reject source regression through the real check command
+        if: matrix.problem != 'syntax'
+        run: |
+          test "$("$DISPOSABL_BUN_LINT" --revision)" = '1.4.6-canary.1+7bb427f3b'
+          if [[ "$PROBLEM" == type ]]; then
+            probe=apps/web/src/ciTypeProbe.ts
+            printf 'export const ciTypeProbe: string = 42;\n' > "$probe"
+            expected=ciTypeProbe.ts
+          else
+            probe=packages/backend/convex/ciLintProbe.ts
+            cat > "$probe" <<'TS'
+          import { v } from "convex/values";
+          import { query } from "./_generated/server";
+
+          export const ciLintProbe = query({
+            returns: v.null(),
+            handler: () => null,
+          });
+          TS
+            expected=require-args-validator
+          fi
+          bun fmt "$probe"
+          if /usr/bin/time -p bun run check:ci > "$RUNNER_TEMP/check.log" 2>&1; then
+            echo "Unexpected acceptance of $PROBLEM regression" >&2
+            exit 1
+          fi
+          grep -F "$expected" "$RUNNER_TEMP/check.log"
+          rg '^real |command.*failed|task.*failed' "$RUNNER_TEMP/check.log" || true
