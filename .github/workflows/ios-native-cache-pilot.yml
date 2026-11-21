@@ -87,10 +87,14 @@ jobs:
         with:
           key: bench-ios-distinct-${{ steps.key.outputs.key }}
           path: ${{ runner.temp }}/ios-preview-native-cache
-      - name: Verify cached base and overlap simulator boot with repack
+      - name: Verify cached base and repack current JavaScript
         if: env.REPLAY == 'true'
-        timeout-minutes: 7
-        run: bash .github/scripts/ios-native-cache-overlap.sh
+        timeout-minutes: 6
+        run: bash .github/scripts/ios-native-cache-pilot.sh replay
+      - name: Boot simulator after repack is complete
+        if: env.REPLAY == 'true'
+        timeout-minutes: 6
+        run: bash .github/scripts/ios-repack-launch.sh boot
       - name: Verify current marker and build number on first launch
         if: env.REPLAY == 'true'
         timeout-minutes: 6
