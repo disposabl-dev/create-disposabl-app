@@ -1,0 +1,18 @@
+name: Install experimental Bun linter
+description: Use a pinned Bun linter when available, otherwise retain ESLint
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        prefix="$RUNNER_TEMP/disposabl-bun-lint"
+        if npm install --prefix "$prefix" --no-save 'bun@1.4.5-canary.20261120.1+7bb427f'; then
+          linter="$prefix/node_modules/.bin/bun"
+          if [[ "$("$linter" --revision)" == '1.4.6-canary.1+7bb427f3b' ]]; then
+            printf 'DISPOSABL_BUN_LINT=%s\n' "$linter" >> "$GITHUB_ENV"
+          else
+            echo 'Bun linter revision mismatch; using ESLint.'
+          fi
+        else
+          echo 'Bun linter unavailable; using ESLint.'
+        fi

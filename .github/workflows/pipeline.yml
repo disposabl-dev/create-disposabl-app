@@ -127,6 +127,8 @@ jobs:
           node .github/scripts/disposabl.mjs report web,api,mcp building
           if [[ -z "$EXPO_TOKEN" ]]; then node .github/scripts/disposabl.mjs report android blocked 'Connect Expo before building Android.'; fi
           if [[ '${{ github.event_name }}' == pull_request ]]; then node .github/scripts/disposabl.mjs report cli,typescript-sdk blocked 'Packages publish after merge to main.'; fi
+      - uses: ./.github/actions/experimental-bun-lint
+        if: github.repository != 'disposabl-dev/create-disposabl-app'
       - name: Check
         if: github.repository != 'disposabl-dev/create-disposabl-app'
         run: |
