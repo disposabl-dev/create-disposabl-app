@@ -31,7 +31,8 @@ origin)
   codesign --verify --deep --strict "$app"
   codesign -d --entitlements :- "$app" > "$work/entitlements.plist" 2> "$evidence/entitlements-log.txt"
   plutil -lint "$work/entitlements.plist"
-  /usr/libexec/PlistBuddy -c 'Print keychain-access-groups' "$work/entitlements.plist" > "$evidence/keychain-groups.txt"
+  # Ad-hoc simulator builds may have an empty entitlements dictionary.
+  plutil -convert json -o "$evidence/base-entitlements.json" "$work/entitlements.plist"
   ;;
 repack)
   [[ $(git -C "$root" rev-parse HEAD) == "$source_sha" ]]
@@ -74,6 +75,11 @@ PY
     find "$dest" -path '*/assets/*' -type f | sed "s|^$dest/||" | sort > "$evidence/assets-$variant.txt"
     [[ $(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$dest/Info.plist") == "$bundle" ]]
     cmp "$app/Expo.plist" "$dest/Expo.plist"
+    if [[ -f "$app/EXUpdates.bundle/fingerprint" ]]; then
+      cmp "$app/EXUpdates.bundle/fingerprint" "$dest/EXUpdates.bundle/fingerprint"
+    fi
+    hermes="$(node -p 'require("node:path").dirname(require.resolve("hermes-compiler/package.json"))')/hermesc/osx-bin/hermesc"
+    "$hermes" -dump-bytecode "$dest/main.jsbundle" | grep -F "$marker" > "$evidence/$variant-marker.txt"
     [[ $(lipo -archs "$dest/$exe") == "$(cat "$evidence/architectures.txt")" ]]
     cp "$dest/$exe" "$work/native-$variant"
     codesign --remove-signature "$work/native-$variant"
