@@ -1,0 +1,47 @@
+name: Hosted candidate release checks
+on:
+  push:
+    branches: [benchmark/ci-product-gates-20261121]
+permissions:
+  contents: read
+jobs:
+  checks:
+    uses: ./.github/workflows/product-checks.yml
+    with:
+      source_sha: ${{ github.sha }}
+  timeout:
+    name: Verify Linux Web timeout terminates Turbo and its child
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.5
+      - name: Prepare locked Turbo and a hung build fixture
+        run: |
+          bun install --frozen-lockfile --filter .
+          echo "$GITHUB_WORKSPACE/node_modules/.bin" >> "$GITHUB_PATH"
+          mkdir -p "$RUNNER_TEMP/hung-web/apps/web"
+          cd "$RUNNER_TEMP/hung-web"
+          printf '%s\n' '{"private":true,"packageManager":"bun@1.4.5","workspaces":["apps/*"]}' > package.json
+          printf '%s\n' '{"tasks":{"build":{"cache":false}}}' > turbo.json
+          printf '%s\n' '{"name":"@disposabl/web","scripts":{"build":"bash hung.sh"}}' > apps/web/package.json
+          printf '%s\n' 'echo "$BASHPID" > "$RUNNER_TEMP/hung-web.pid"' 'trap "" TERM' 'while :; do sleep 1; done' > apps/web/hung.sh
+          bun install --lockfile-only
+      - name: Reject the timeout and verify the publisher never ran
+        run: |
+          cd "$RUNNER_TEMP/hung-web"
+          result=0
+          bash -ec '/usr/bin/timeout --kill-after=2s 2s bun x --no-install turbo run build --filter=@disposabl/web; touch "$RUNNER_TEMP/published"' || result=$?
+          test -s "$RUNNER_TEMP/hung-web.pid"
+          [[ "$result" == 124 || "$result" == 137 ]]
+          test ! -e "$RUNNER_TEMP/published"
+          pid=$(cat "$RUNNER_TEMP/hung-web.pid")
+          if kill -0 "$pid" 2>/dev/null && [[ "$(ps -o state= -p "$pid" | tr -d ' ')" != Z ]]; then
+            echo 'The timed-out build process is still running.'
+            exit 1
+          fi
+          echo "Turbo timeout returned $result, stopped the build, and skipped publication."
