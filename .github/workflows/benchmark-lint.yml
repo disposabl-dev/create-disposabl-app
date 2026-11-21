@@ -1,0 +1,48 @@
+name: Compare Bun lint with locked ESLint
+on:
+  push:
+    branches: [benchmark/ci-bun-lint-20261121]
+permissions:
+  contents: read
+jobs:
+  compare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Install locked product dependencies
+        run: bun install --frozen-lockfile
+      - name: Install exact Bun canary
+        run: |
+          npm install --prefix "$RUNNER_TEMP/bun-canary" --no-save 'bun@1.4.5-canary.20261120.1+7bb427f'
+          test "$("$RUNNER_TEMP/bun-canary/node_modules/.bin/bun" --revision)" = '1.4.6-canary.1+7bb427f3b'
+      - name: Build generator and create all-platform starter
+        run: |
+          bun run --cwd packages/create-disposabl-app build
+          bun .github/benchmarks/create-starter.ts "$RUNNER_TEMP/lint-starter"
+          cd "$RUNNER_TEMP/lint-starter"
+          bun install
+          bun install --frozen-lockfile
+      - name: Compare linters and validate negative probes
+        env:
+          BENCHMARK_CANARY: ${{ runner.temp }}/bun-canary/node_modules/.bin/bun
+          BENCHMARK_STARTER: ${{ runner.temp }}/lint-starter
+          BENCHMARK_OUTPUT: ${{ runner.temp }}/lint-results
+        run: bun .github/benchmarks/lint.ts
+      - name: Upload benchmark evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-benchmark-evidence
+          path: ${{ runner.temp }}/lint-results
+          if-no-files-found: ignore
+          retention-days: 1
