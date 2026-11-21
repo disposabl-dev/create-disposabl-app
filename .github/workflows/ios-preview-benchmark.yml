@@ -1,0 +1,89 @@
+name: Product iOS preview build experiments
+on:
+  push:
+    branches: [benchmark/ios-preview-experiment-*]
+  workflow_dispatch:
+permissions:
+  contents: read
+env:
+  CI: "1"
+  DO_NOT_TRACK: "1"
+  E2E_TELEMETRY_DISABLED: "1"
+  EXPO_NO_TELEMETRY: "1"
+  EXPO_NO_DOTENV: "1"
+  DISPOSABL_ANALYTICS_ENABLED: "false"
+  EXPO_PUBLIC_DISPOSABL_ANALYTICS_ENABLED: "false"
+  VITE_DISPOSABL_ANALYTICS_ENABLED: "false"
+  EXPO_PROJECT_ID: 00000000-0000-4000-8000-000000000001
+  CONVEX_URL: https://ci.invalid
+  CONVEX_SITE_URL: https://ci.invalid
+  PUBLIC_SITE_URL: https://ci.invalid
+  EXPO_PUBLIC_CONVEX_URL: https://ci.invalid
+  EXPO_PUBLIC_CONVEX_SITE_URL: https://ci.invalid
+  CHANNEL: benchmark
+  DISPOSABL_MOBILE_CHANNEL: benchmark
+  DISPOSABL_IOS_BUILD_NUMBER: "1"
+jobs:
+  preview:
+    if: github.repository == 'disposabl-dev/create-disposabl-app'
+    name: Cold product simulator / ${{ matrix.arm }}
+    runs-on: macos-26
+    timeout-minutes: 65
+    strategy:
+      fail-fast: false
+      matrix:
+        arm: [arm64, unoptimized-universal]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.5
+      - name: Verify source and cold state
+        env:
+          SOURCE: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE"
+          git diff --exit-code 48630a83 "$SOURCE" -- apps packages bun.lock disposabl.json .github/scripts/apple.sh
+          node -e 'const c=require("./disposabl.json");if(!c.features.includes("payments")||!c.platforms.includes("ios"))process.exit(1)'
+          node -e 'const c=require("./apps/mobile/package.json");if(!c.expo.autolinking.ios.buildFromSource.includes("expo-image"))process.exit(1)'
+          test ! -e apps/mobile/ios && test ! -e "$RUNNER_TEMP/ios-build" && test ! -e "$RUNNER_TEMP/cold-ios-home"
+          mkdir "$RUNNER_TEMP/cold-ios-home"
+          printf 'Source %s\nTree %s\n' "$SOURCE" "$(git rev-parse HEAD^{tree})"
+          node -e 'const o=require("node:os");console.log(JSON.stringify({cpus:o.availableParallelism(),memory:o.totalmem(),arch:o.arch()}))'
+          test "$(uname -m)" = arm64
+          xcodebuild -version
+          xcrun --sdk iphonesimulator --show-sdk-version
+          bun --version
+          node --version
+      - name: Install frozen mobile dependencies
+        run: /usr/bin/time -p bun install --frozen-lockfile --filter @disposabl/mobile
+      - name: Generate native app and install pods
+        working-directory: apps/mobile
+        env:
+          CP_HOME_DIR: ${{ runner.temp }}/cold-ios-home
+          COCOAPODS_DISABLE_STATS: "true"
+        run: |
+          /usr/bin/time -p bun x --no-install expo prebuild --platform ios --no-install
+          /usr/bin/time -p bash -c 'cd ios && pod install'
+      - name: Build and verify simulator archive
+        working-directory: apps/mobile
+        env:
+          EXPERIMENT: ${{ matrix.arm }}
+          SOURCE: ${{ github.sha }}
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/ios-preview-benchmark.sh"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: product-ios-preview-${{ matrix.arm }}-${{ github.run_attempt }}
+          path: dist/apple/
+          retention-days: 1
+          compression-level: 0
+          if-no-files-found: error
