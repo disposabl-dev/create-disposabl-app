@@ -1,0 +1,87 @@
+name: Benchmark stock Linux runners (manual)
+on:
+  push:
+    branches: [benchmark/stock-linux-runners-20261121]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    if: github.ref == 'refs/heads/benchmark/stock-linux-runners-20261121'
+    name: ${{ matrix.label }}
+    runs-on: ${{ matrix.label }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        label: [ubuntu-24.04, ubuntu-24.04-arm, ubuntu-26.04, ubuntu-26.04-arm]
+    env:
+      DO_NOT_TRACK: "1"
+      E2E_TELEMETRY_DISABLED: "1"
+      EXPO_NO_TELEMETRY: "1"
+      DISPOSABL_ANALYTICS_ENABLED: "false"
+      EXPO_PUBLIC_DISPOSABL_ANALYTICS_ENABLED: "false"
+      VITE_DISPOSABL_ANALYTICS_ENABLED: "false"
+      VITE_CONVEX_URL: https://benchmark.invalid
+      VITE_CONVEX_SITE_URL: https://benchmark.invalid
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Verify immutable product source
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD^)" = '48630a83685f3fcfbe9086ec2b9b8b3c6e3858a2'
+          git diff --exit-code HEAD^ HEAD -- . ':(exclude).github/workflows/benchmark-stock-runners.yml' ':(exclude).github/benchmarks/stock-runner-manifest.py' ':(exclude).github/benchmarks/stock-runner-compare.py'
+          git rev-parse HEAD
+          uname -m
+          sha256sum bun.lock
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24.22.3"
+          package-manager-cache: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.5
+          no-cache: true
+      - name: Verify runtimes
+        run: |
+          node -e 'if (process.versions.node !== "24.22.3") process.exit(1); console.log("Node", process.version, process.arch)'
+          test "$(bun --revision)" = '1.4.5+a7733435c'
+      - name: Install full frozen dependency graph with empty cache
+        run: |
+          test ! -e "$RUNNER_TEMP/stock-runner-bun-cache"
+          bun install --frozen-lockfile --cache-dir "$RUNNER_TEMP/stock-runner-bun-cache"
+      - name: Check product and generate inputs
+        run: bun run check:ci
+      - name: Build CLI and SDK
+        run: bun x --no-install turbo run build --filter ./packages/cli --filter ./packages/sdk
+      - name: Build Web and docs
+        run: bun x --no-install turbo run build --filter=@disposabl/web
+      - name: Record emitted paths and hashes
+        run: python3 .github/benchmarks/stock-runner-manifest.py
+      - name: Upload paths and hashes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-${{ matrix.label }}
+          path: ${{ runner.temp }}/stock-runner-manifest.json
+          if-no-files-found: ignore
+          retention-days: 1
+  compare:
+    name: Compare emitted assets
+    if: always() && needs.build.result != 'skipped'
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: web-ubuntu-*
+          path: runner-manifests
+      - name: Compare application paths and SHA-256
+        run: python3 .github/benchmarks/stock-runner-compare.py
