@@ -1,0 +1,56 @@
+name: Product Web build dependency benchmark
+on:
+  push:
+    branches: [benchmark/ci-product-web-install-20261121]
+permissions:
+  contents: read
+jobs:
+  web:
+    name: Product Web / ${{ matrix.install }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        install: [full, filtered]
+    env:
+      VITE_CONVEX_URL: https://ci.invalid
+      VITE_CONVEX_SITE_URL: https://ci.invalid
+      E2E_TELEMETRY_DISABLED: "1"
+      DO_NOT_TRACK: "1"
+      CHANNEL: pr-4242
+      INSTALL_MODE: ${{ matrix.install }}
+    steps:
+      - uses: actions/checkout@v6
+        with: { ref: "${{ github.sha }}", persist-credentials: false }
+      - uses: actions/setup-node@v6
+        with: { node-version: "24", package-manager-cache: false }
+      - uses: oven-sh/setup-bun@v2
+        with: { bun-version: "1.4.5" }
+      - name: Install cold frozen dependency graph
+        run: |
+          export BUN_INSTALL_CACHE_DIR="$RUNNER_TEMP/web-dependencies"
+          args=(--frozen-lockfile)
+          if [[ "$INSTALL_MODE" == filtered ]]; then
+            args+=(--filter disposabl-dev --filter @disposabl/web --filter @disposabl/backend --filter @disposabl/docs --filter @disposabl/cli --filter @disposabl/sdk)
+          fi
+          /usr/bin/time -p bun install "${args[@]}"
+      - name: Generate real product release inputs and package Web
+        run: |
+          /usr/bin/time -p bun run generate
+          /usr/bin/time -p bun x --no-install turbo run build --filter ./packages/cli --filter ./packages/sdk
+          /usr/bin/time -p bun x --no-install turbo run build --filter @disposabl/web
+          test -s apps/web/dist/client/index.html
+          test -s apps/web/dist/client/sitemap.xml
+          test -s apps/web/dist/client/docs/index.html
+          (
+            cd apps/web/dist/client
+            find . -type f -print0 | sort -z | xargs -0 sha256sum
+          ) > "$RUNNER_TEMP/web.sha256"
+          wc -l "$RUNNER_TEMP/web.sha256"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-digests-${{ matrix.install }}
+          path: ${{ runner.temp }}/web.sha256
+          retention-days: 1
+          if-no-files-found: error
