@@ -6,6 +6,7 @@ never downloads a binary or configures a cloud deployment. Retained evidence is
 private; apply an OS network sandbox externally if outbound denial is required.
 """
 import importlib.util
+import hashlib
 import errno
 import json
 import os
@@ -146,7 +147,7 @@ def main():
     if len(sys.argv) != 1:
         raise RuntimeError('No arguments accepted; supply CONVEX_LOCAL_BINARY and PLAYWRIGHT_BROWSERS_PATH')
     shard = os.environ.get('PRODUCT_BROWSER_SHARD', '')
-    if shard and not re.fullmatch(r'[1-4]/4', shard):
+    if shard and not re.fullmatch(r'(?:[1-4]/4|[1-6]/6)', shard):
         raise RuntimeError('Invalid product browser shard')
     binary = Path(os.environ.get('CONVEX_LOCAL_BINARY', '')).resolve()
     browsers = Path(os.environ.get('PLAYWRIGHT_BROWSERS_PATH', '')).resolve()
@@ -266,7 +267,22 @@ def main():
         platforms = json.loads((source / 'disposabl.json').read_text()).get('platforms', [])
         targets = 'web,backend,api' if 'api' in platforms else 'web,backend'
         options = ['--shard', shard] if shard else []
+        workers = os.environ.get('PRODUCT_BROWSER_PROOF_WORKERS', '')
+        if workers not in {'1', '2'}:
+            raise RuntimeError('Invalid benchmark worker count')
+        options += ['--workers', workers]
         command(['bun', 'run', 'e2e', 'run', '--target', targets, '--retries', '0', '--no-cache', *options], cwd=source, environment=testenv, log='e2e.log')
+        report = json.loads((source / 'packages/tests/.e2e/report.json').read_text())
+        cases = []
+        for result in report['run']['results']:
+            if not result['selected']:
+                continue
+            identity = json.dumps([result['testId'], result['targetId']])
+            duration = sum(a['durationMs'] for a in result['attempts'])
+            cases.append([hashlib.sha256(identity.encode()).hexdigest(), result['status'], duration])
+        if not cases:
+            raise RuntimeError('Benchmark recorded no selected cases')
+        Path(os.environ['PRODUCT_BROWSER_PROOF']).write_text(json.dumps(sorted(cases)))
         print(f'Product {targets} E2E passed', flush=True)
     if any(listeners(port) for port in PORTS):
         raise RuntimeError('Listener still present after backend teardown')
