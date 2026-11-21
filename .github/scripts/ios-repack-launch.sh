@@ -36,8 +36,14 @@ PY
   launch)
     udid=$(cat "$work/owned-udid")
     bundle=dev.disposabl.mobile.preview
-    for variant in A B; do
-      app="$work/repacked-$variant.app"
+    for variant in base A B; do
+      if [[ "$variant" == base ]]; then
+        app=$(cat "$work/app-path")
+        marker=Discover
+      else
+        app="$work/repacked-$variant.app"
+        marker="Discover Pilot $variant"
+      fi
       xcrun simctl install "$udid" "$app"
       xcrun simctl launch "$udid" "$bundle" | tee "$evidence/launch-$variant.txt"
       matched=false
@@ -45,13 +51,13 @@ PY
         sleep 10
         xcrun simctl io "$udid" screenshot "$evidence/screen-$variant.png"
         swift "$GITHUB_WORKSPACE/.github/scripts/ios-repack-ocr.swift" "$evidence/screen-$variant.png" > "$evidence/ocr-$variant.txt"
-        if grep -F "Discover Pilot $variant" "$evidence/ocr-$variant.txt"; then matched=true; break; fi
+        if grep -Fx "$marker" "$evidence/ocr-$variant.txt"; then matched=true; break; fi
       done
       [[ "$matched" == true ]] || { echo "Visible marker $variant was not recognized; inspect screenshot" >&2; exit 1; }
       xcrun simctl terminate "$udid" "$bundle" || true
       xcrun simctl uninstall "$udid" "$bundle"
     done
-    echo 'Both variant markers were recognized in screenshots. Review the images; this does not prove offline operation.' >> "$GITHUB_STEP_SUMMARY"
+    echo 'Recognized the original launch and both repacked markers. Screenshots are available in the run artifact.' >> "$GITHUB_STEP_SUMMARY"
     ;;
   cleanup)
     if [[ -f "$work/owned-udid" ]]; then
