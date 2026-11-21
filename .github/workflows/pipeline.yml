@@ -118,7 +118,7 @@ jobs:
           key: turbo-v1-${{ runner.os }}-${{ runner.arch }}-${{ env.BUN_VERSION }}-${{ hashFiles('bun.lock') }}-${{ env.SOURCE }}
           restore-keys: turbo-v1-${{ runner.os }}-${{ runner.arch }}-${{ env.BUN_VERSION }}-${{ hashFiles('bun.lock') }}-
       - &install
-        run: bun install --frozen-lockfile ${{ github.job == 'desktop' && '--filter "*desktop*" --filter @disposabl/backend' || (github.job == 'android' || startsWith(github.job, 'ios-')) && '--filter @disposabl/mobile' || '' }}
+        run: bun install --frozen-lockfile ${{ (github.job == 'android' || startsWith(github.job, 'ios-')) && '--filter @disposabl/mobile' || '' }}
       - name: Report build start
         run: |
           node .github/scripts/disposabl.mjs report web,api,mcp building
@@ -612,7 +612,7 @@ jobs:
           echo "DISPOSABL_DESKTOP_UPDATE_URL=${CONVEX_SITE_URL}/desktop/updates/$id" >> "$GITHUB_ENV"
       - *bun
       - *cache
-      - *install
+      - run: bun install --frozen-lockfile --filter ./apps/desktop ${{ matrix.platform != 'linux' && '--filter @disposabl/backend' || '' }}
       - name: Report desktop build
         run: node .github/scripts/disposabl.mjs report "$PLATFORM" building
       - name: Electron
@@ -626,6 +626,8 @@ jobs:
         run: command -v fakeroot && command -v rpmbuild && command -v dpkg-deb || { sudo apt-get update && sudo apt-get install -y fakeroot dpkg rpm; }
       - name: Build
         if: matrix.platform != 'macos'
+        env:
+          DPKG_DEB_COMPRESSOR_LEVEL: ${{ matrix.platform == 'linux' && '1' || '' }}
         run: bun run --cwd apps/desktop preview
       - name: Build macOS
         if: matrix.platform == 'macos'
