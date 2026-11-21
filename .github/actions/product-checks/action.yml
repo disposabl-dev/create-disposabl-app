@@ -156,8 +156,11 @@ runs:
         # Create only a private network namespace; drop root before the test.
         sudo unshare --net --fork /bin/bash -euc '
           ip link set lo up
-          test "$(ip -o link show | wc -l)" -eq 1
-          ip -o link show | grep -Eq "^[0-9]+: lo:"
+          # Some kernels create inactive tunnel interfaces in a fresh namespace.
+          if [[ "$(ip -o link show up | wc -l)" -ne 1 ]] || ! ip -o link show up | grep -Eq "^[0-9]+: lo:"; then
+            echo "The network namespace must have only loopback active." >&2
+            exit 1
+          fi
           exec runuser -u "$1" -- env -i HOME="$2" PATH="$3" \
             CONVEX_LOCAL_BINARY="$4" PLAYWRIGHT_BROWSERS_PATH="$5" \
             PYTHONDONTWRITEBYTECODE=1 PRODUCT_BROWSER_REQUIRE_ISOLATION=1 PRODUCT_BROWSER_FROZEN_INSTALL=1 python3 "$6"
