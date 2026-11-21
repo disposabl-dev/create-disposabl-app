@@ -41,6 +41,7 @@ bundle=$(cat "$work/bundle")
 xcodebuild -version | tee "$evidence/xcode.txt"
 xcrun simctl list -j runtimes > "$evidence/runtimes.json"
 xcrun simctl list -j devicetypes > "$evidence/devicetypes.json"
+xcrun simctl list -j devices available > "$evidence/available-devices.json"
 runtime=$(python3 - "$evidence/runtimes.json" "$minimum" <<'PY'
 import json, sys
 def version(s): return tuple(map(int, s.split('.')))
@@ -51,24 +52,44 @@ print(max(runtimes, key=lambda r: version(r['version']))['identifier'])
 PY
 )
 udid=''
-while IFS= read -r device; do
-  if udid=$(xcrun simctl create Smoke "$device" "$runtime" 2>/dev/null); then break; fi
-done < <(jq -r '[.devicetypes[] | select(.name | startswith("iPhone"))] | sort_by(if .name == "iPhone 17" then 0 else 1 end, .name) | .[].identifier' "$evidence/devicetypes.json")
+method=create
+template=''
+while IFS=$'\t' read -r candidate candidate_runtime candidate_name; do
+  [[ -n "$candidate" ]] || continue
+  if udid=$(xcrun simctl clone "$candidate" SmokeClone 2>/dev/null); then
+    runtime="$candidate_runtime"
+    device="$candidate_name"
+    template="$candidate"
+    method=clone
+    break
+  else
+    udid=''
+  fi
+done < <(python3 "$GITHUB_WORKSPACE/.github/scripts/ios-smoke-templates.py" "$evidence/runtimes.json" "$evidence/available-devices.json" "$minimum")
+if [[ -z "$udid" ]]; then
+  while IFS= read -r device; do
+    if udid=$(xcrun simctl create Smoke "$device" "$runtime" 2>/dev/null); then break; else udid=''; fi
+  done < <(jq -r '[.devicetypes[] | select(.name | startswith("iPhone"))] | sort_by(if .name == "iPhone 17" then 0 else 1 end, .name) | .[].identifier' "$evidence/devicetypes.json")
+fi
 [[ -n "$udid" ]] || { echo 'No compatible iPhone device type' >&2; exit 1; }
+[[ "$udid" =~ ^[[:xdigit:]]{8}-[[:xdigit:]]{4}-[[:xdigit:]]{4}-[[:xdigit:]]{4}-[[:xdigit:]]{12}$ && "$udid" != "$template" ]]
 printf '%s\n' "$udid" > "$work/owned-udid"
-printf 'bundle=%s\nminimum=%s\nruntime=%s\ndevice=%s\nudid=%s\n' "$bundle" "$minimum" "$runtime" "$device" "$udid" > "$evidence/target.txt"
+printf 'bundle=%s\nminimum=%s\nruntime=%s\ndevice=%s\nudid=%s\nmethod=%s\ntemplate=%s\n' "$bundle" "$minimum" "$runtime" "$device" "$udid" "$method" "$template" > "$evidence/target.txt"
 python3 - "$udid" <<'BOOT'
 import subprocess, sys
 try:
-    subprocess.run(["xcrun", "simctl", "bootstatus", sys.argv[1], "-b"], check=True, timeout=300)
+    subprocess.run(["xcrun", "simctl", "bootstatus", sys.argv[1], "-b"], check=True, timeout=420)
 except subprocess.TimeoutExpired:
-    raise SystemExit("Simulator boot timed out after 300 seconds")
+    raise SystemExit("Simulator boot timed out after 420 seconds")
 BOOT
 ;;
   launch)
 app=$(cat "$work/app")
 bundle=$(cat "$work/bundle")
 udid=$(cat "$work/owned-udid")
+if xcrun simctl get_app_container "$udid" "$bundle" app >/dev/null 2>&1; then
+  xcrun simctl uninstall "$udid" "$bundle"
+fi
 xcrun simctl install "$udid" "$app"
 installed=$(xcrun simctl get_app_container "$udid" "$bundle" app)
 [[ $(/usr/libexec/PlistBuddy -c 'Print CFBundleVersion' "$installed/Info.plist") == "$EXPECTED_BUILD" ]]

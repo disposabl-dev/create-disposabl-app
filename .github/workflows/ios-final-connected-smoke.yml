@@ -1,7 +1,7 @@
 name: Final connected iOS preview smoke
 on:
   push:
-    branches: [benchmark/ios-final-connected-20261121]
+    branches: [benchmark/ios-final-connected-clone-20261121]
 permissions:
   actions: read
   contents: read
@@ -26,7 +26,7 @@ jobs:
     if: github.repository == 'disposabl-dev/create-disposabl-app'
     name: Connected iOS ${{ matrix.label }}
     runs-on: macos-26
-    timeout-minutes: 25
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.pins.outputs.matrix) }}
@@ -68,8 +68,8 @@ jobs:
           ARTIFACT_DIGEST: ${{ matrix.digest }}
           EXPECTED_BUILD: ${{ matrix.build }}
         run: bash .github/scripts/ios-artifact-smoke.sh prepare
-      - name: Create and boot dedicated simulator
-        timeout-minutes: 6
+      - name: Clone or create and boot dedicated simulator
+        timeout-minutes: 9
         run: bash .github/scripts/ios-artifact-smoke.sh boot
       - name: Install and capture Discover
         timeout-minutes: 4
