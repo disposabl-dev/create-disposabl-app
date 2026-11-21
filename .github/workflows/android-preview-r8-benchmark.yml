@@ -69,8 +69,8 @@ jobs:
           unzip -tq "$apk"
           signer=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)
           "$signer" verify --print-certs "$apk"
-          jq '{androidArchitectures}' ../../disposabl.json > "$RUNNER_TEMP/abi.json"
-          node ../../.github/scripts/verify-android-abis.mjs "$apk" "$RUNNER_TEMP/abi.json"
+          manifest=$(jq -c '{androidArchitectures}' ../../disposabl.json)
+          node ../../.github/scripts/verify-android-abis.mjs "$apk" "$manifest"
           wc -c "$apk"
       - uses: actions/upload-artifact@v4
         if: matrix.optimization == 'unminified'
