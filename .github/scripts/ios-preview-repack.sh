@@ -60,6 +60,8 @@ case "${1:?}" in
     while IFS= read -r item; do native+=("$item"); done < <(find "$work/native" -maxdepth 1 -type d -name '*.app')
     [[ ${#native[@]} == 1 ]]
     app=${native[0]}
+    [[ -d "$app/Frameworks" ]]
+    [[ -z $(find "$app" -mindepth 1 -type d \( -name '*.app' -o -name '*.appex' \) -print -quit) ]]
     codesign --verify --deep --strict "$app"
     codesign -dv "$app" 2>&1 | grep -q 'Signature=adhoc'
     check_app_identity "$app" "$(cat "$work/current-build")"

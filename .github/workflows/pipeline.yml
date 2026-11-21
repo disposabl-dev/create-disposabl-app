@@ -472,6 +472,7 @@ jobs:
           fi
       - name: Compute exact simulator cache identity
         id: simulator-identity
+        if: env.EXPO_PROJECT_ID != ''
         continue-on-error: true
         timeout-minutes: 3
         env:
