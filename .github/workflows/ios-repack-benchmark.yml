@@ -1,0 +1,67 @@
+name: Synthetic product iOS repack pilot
+on:
+  push:
+    branches: [benchmark/ios-repack-pilot-*]
+  workflow_dispatch:
+permissions:
+  actions: read
+  contents: read
+env:
+  CI: "1"
+  DO_NOT_TRACK: "1"
+  E2E_TELEMETRY_DISABLED: "1"
+  EXPO_NO_TELEMETRY: "1"
+  EXPO_NO_DOTENV: "1"
+  DISPOSABL_ANALYTICS_ENABLED: "false"
+  EXPO_PUBLIC_DISPOSABL_ANALYTICS_ENABLED: "false"
+  VITE_DISPOSABL_ANALYTICS_ENABLED: "false"
+  EXPO_PROJECT_ID: 00000000-0000-4000-8000-000000000001
+  CONVEX_URL: https://ci.invalid
+  CONVEX_SITE_URL: https://ci.invalid
+  PUBLIC_SITE_URL: https://ci.invalid
+  EXPO_PUBLIC_CONVEX_URL: https://ci.invalid
+  EXPO_PUBLIC_CONVEX_SITE_URL: https://ci.invalid
+  CHANNEL: benchmark
+  DISPOSABL_MOBILE_CHANNEL: benchmark
+  DISPOSABL_ANDROID_CHANNEL: benchmark
+  DISPOSABL_IOS_BUILD_NUMBER: "1"
+  DISPOSABL_ANDROID_VERSION_CODE: "1"
+jobs:
+  repack:
+    if: github.repository == 'disposabl-dev/create-disposabl-app'
+    runs-on: macos-26
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@v6
+        with:
+          ref: 8bfee3cfd096ae3ac261dfda3c051e05c2c48688
+          path: product
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.5
+      - name: Verify exact original and download
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash .github/scripts/ios-repack-benchmark.sh origin
+      - name: Install exact product dependencies
+        working-directory: product
+        run: /usr/bin/time -p bun install --frozen-lockfile --filter @disposabl/mobile
+      - name: Repack two visible fixture variants and check identities
+        run: bash .github/scripts/ios-repack-benchmark.sh repack
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: product-ios-repack-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ios-repack-evidence/
+          retention-days: 1
+          compression-level: 0
+          if-no-files-found: warn
