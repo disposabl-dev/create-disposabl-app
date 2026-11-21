@@ -1,0 +1,12 @@
+name: Candidate product checks on GitHub runners
+on:
+  push:
+    branches: [benchmark/ci-final-product-checks-20261121]
+permissions:
+  contents: read
+jobs:
+  source:
+    if: github.repository == 'disposabl-dev/create-disposabl-app'
+    uses: ./.github/workflows/product-checks.yml
+    with:
+      source_sha: ${{ github.sha }}
