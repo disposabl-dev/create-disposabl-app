@@ -420,7 +420,7 @@ export const tick = internalAction({
           const result = await request(sandbox.sandboxId, "/prompt", {
             provider: "codex",
             model: "gpt-6.2-sol",
-            fast: true,
+            speed: "ultrafast",
             prompt:
               `Disposabl delivery ${queued.messageId}\n` +
               credentialInstructions(current.appId) +

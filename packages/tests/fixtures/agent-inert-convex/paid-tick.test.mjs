@@ -68,7 +68,7 @@ mock.module(paths("boat.ts"), () => ({
       expect(body).toEqual({
         provider: "codex",
         model: "gpt-6.2-sol",
-        fast: true,
+        speed: "ultrafast",
         prompt: "Disposabl delivery message\nsynthetic",
         ...(state.app.agent.conversationId
           ? { conversationId: state.app.agent.conversationId }
