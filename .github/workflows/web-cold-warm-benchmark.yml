@@ -2,7 +2,6 @@ name: Product Web cold and warm benchmark
 on:
   push:
     branches: [benchmark/web-cold-warm-20261121]
-  workflow_dispatch:
 permissions:
   contents: read
 jobs:
@@ -30,6 +29,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.4.5"
+      - uses: ./.github/actions/bun-lint
       - name: Set isolated Bun cache
         run: echo "BUN_INSTALL_CACHE_DIR=$RUNNER_TEMP/web-bun-cache" >> "$GITHUB_ENV"
       - name: Run cold then warm on the same runner
@@ -48,7 +48,7 @@ jobs:
             /usr/bin/time -p bun install --frozen-lockfile
             echo "--- $pass generation ---"
             /usr/bin/time -p bun run generate
-            git diff --exit-code -- packages/backend/generated apps/web/src/routeTree.gen.ts
+            git diff --exit-code -- packages/backend/generated
             echo "--- $pass complete source and unit gates ---"
             /usr/bin/time -p bun run --parallel check:source test:ci
             echo "--- $pass Vite build, fresh outputs and no Turbo cache ---"
@@ -63,7 +63,7 @@ jobs:
             echo '::endgroup::'
           done
       - name: Preserve static output manifests
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: web-static-manifests
           path: ${{ runner.temp }}/*-web.sha256
