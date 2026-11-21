@@ -332,12 +332,9 @@ pipeline.jobs.web.steps = pipeline.jobs.web.steps?.filter(
 );
 for (const step of pipeline.jobs.web.steps ?? []) {
   if (
-    [
-      "Check source formatting",
-      "Restore task cache",
-      "Check",
-      "Test generated app",
-    ].includes(step.name ?? "")
+    ["Check source formatting", "Restore task cache", "Check"].includes(
+      step.name ?? "",
+    )
   )
     delete step.if;
 }

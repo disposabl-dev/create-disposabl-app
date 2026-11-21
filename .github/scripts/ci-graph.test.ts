@@ -42,7 +42,8 @@ const keys = [
 const step = (job: any, name: string) =>
   job.steps.find((item: any) => item.name === name);
 const hasRootCheck = (job: any) =>
-  job.steps.some((item: any) => item.run === "bun run check:ci");
+  step(job, "Check")?.run ===
+  "bun run generate\nbun run --parallel check:source test:ci\n";
 
 test("deployment exports public client origins for subsequent Expo steps", () => {
   const command = step(pipeline.jobs.web, "Deploy").run.match(
@@ -190,7 +191,9 @@ function assertGraph(p: any) {
   expect(step(j.web, "Check product release guards")).toBeUndefined();
   expect(
     step({ steps: action.runs.steps }, "Check product release guards").if,
-  ).toBe("inputs.lane == 'source'");
+  ).toBe(
+    "inputs.lane == 'unit' && inputs.cli_recovery_version == '' && inputs.recovery_version == ''",
+  );
   expect(allowed(j.web, context("push"), needs("success", "failure"))).toBe(
     false,
   );
@@ -487,7 +490,7 @@ test("meaningful workflow mutations are rejected", () => {
   expect(() => assertGraph(missing)).toThrow();
   const noCheck = structuredClone(pipeline);
   noCheck.jobs.web.steps = noCheck.jobs.web.steps.filter(
-    (x: any) => x.run !== "bun run check:ci",
+    (x: any) => x.name !== "Check",
   );
   expect(() => assertGraph(noCheck)).toThrow();
   const fork = structuredClone(pipeline);

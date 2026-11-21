@@ -28,6 +28,7 @@ runs:
   using: composite
   steps:
     - name: Test source resolution
+      if: inputs.lane == 'source' || (inputs.lane == 'unit' && (inputs.cli_recovery_version != '' || inputs.recovery_version != ''))
       run: python3 .github/scripts/product-check-source-test.py
       shell: bash
     - name: Resolve and verify source
@@ -40,7 +41,7 @@ runs:
       run: bash .github/scripts/product-check-source.sh
       shell: bash
     - name: Check browser isolation harness
-      if: inputs.lane == 'browser'
+      if: inputs.lane == 'browser' && (inputs.browser_shard == '' || inputs.browser_shard == '1/4')
       run: python3 .github/scripts/product-browser-check-test.py
       shell: bash
     - uses: oven-sh/setup-bun@v2
@@ -54,13 +55,6 @@ runs:
       with:
         node-version: "24"
         package-manager-cache: false
-    - name: Check product release guards
-      if: inputs.lane == 'source'
-      shell: bash
-      run: |
-        python3 .github/scripts/play-bundle.test.py
-        python3 .github/scripts/android-release.test.py
-        node --test .github/scripts/android-bundle-verify.test.mjs .github/scripts/{store-review,apple-review,play-review}.test.mjs
     - name: Verify CI graph
       if: inputs.lane == 'unit' && inputs.cli_recovery_version == '' && inputs.recovery_version == ''
       run: bun test ./.github/scripts/ci-graph.test.ts
@@ -115,6 +109,13 @@ runs:
           bun run test:unit --parallel=4 --bail=1
         fi
       shell: bash
+    - name: Check product release guards
+      if: inputs.lane == 'unit' && inputs.cli_recovery_version == '' && inputs.recovery_version == ''
+      shell: bash
+      run: |
+        python3 .github/scripts/play-bundle.test.py
+        python3 .github/scripts/android-release.test.py
+        node --test .github/scripts/android-bundle-verify.test.mjs .github/scripts/{store-review,apple-review,play-review}.test.mjs
     - name: Verify fresh generated project
       if: inputs.lane != 'unit' && inputs.lane != 'browser' && inputs.lane != 'source'
       shell: bash
