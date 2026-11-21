@@ -11,7 +11,7 @@ check_source() {
 }
 identity() {
   : "${EXPO_PROJECT_ID:?}" "${CHANNEL:?}" "${PR_NUMBER:?}" "${CONVEX_URL:?}" "${PUBLIC_SITE_URL:?}" "${NATIVE_INPUT_HASH:?}"
-  local config runtime bundle toolchain config_hash version build android_version
+  local config runtime bundle toolchain config_hash version build android_version expo_env
   config=$(bun x --no-install expo config --json)
   jq -e --arg project "$EXPO_PROJECT_ID" '.extra.eas.projectId == $project' <<<"$config" >/dev/null
   bundle=$(jq -er '.ios.bundleIdentifier | select(type == "string" and length > 0)' <<<"$config")
@@ -21,9 +21,23 @@ identity() {
   printf '%s\n' "$build" > "$work/current-build"
   printf '%s\n' "$android_version" > "$work/current-android-version"
   config_hash=$(jq -S -c 'del(.ios.buildNumber, .android.versionCode)' <<<"$config" | shasum -a 256 | cut -d' ' -f1)
+  expo_env=none
+  if [[ -f "$RUNNER_TEMP/expo.env" ]]; then
+    # EAS variables can affect native plugins even when Expo config is identical.
+    expo_env=$(node --input-type=module -e '
+      import { createHmac } from "node:crypto";
+      import { readFileSync } from "node:fs";
+      import { parseEnv } from "node:util";
+      const token = process.env.EXPO_TOKEN;
+      if (!token) throw new Error("Missing key for simulator environment identity");
+      const env = parseEnv(readFileSync(process.argv[1], "utf8"));
+      const values = Object.keys(env).sort().map(key => [key, env[key]]);
+      console.log(createHmac("sha256", token).update("disposabl-ios-preview\0").update(JSON.stringify(values)).digest("hex"));
+    ' "$RUNNER_TEMP/expo.env")
+  fi
   runtime=$(bun x --no-install expo-updates runtimeversion:resolve --platform ios --workflow managed | jq -er 'select(.fingerprintSources != null) | .runtimeVersion | select(test("^[a-f0-9]{40,64}$"))')
   toolchain=$({ xcodebuild -version; xcrun --sdk iphonesimulator --show-sdk-build-version; uname -m; } | shasum -a 256 | cut -d' ' -f1)
-  jq -n --arg repo "$GH_REPO" --arg pr "$PR_NUMBER" --arg project "$EXPO_PROJECT_ID" --arg channel "$CHANNEL" --arg bundle "$bundle" --arg version "$version" --arg config "$config_hash" --arg native_inputs "$NATIVE_INPUT_HASH" --arg runtime "$runtime" --arg sdk "$toolchain" --arg backend "$CONVEX_URL" --arg site "$PUBLIC_SITE_URL" --arg convexsite "${CONVEX_SITE_URL:-}" --arg publicbackend "${EXPO_PUBLIC_CONVEX_URL:-}" --arg publicsite "${EXPO_PUBLIC_CONVEX_SITE_URL:-}" '{repo:$repo,pr:$pr,project:$project,channel:$channel,bundle:$bundle,version:$version,config_sha256:$config,native_inputs:$native_inputs,runtime:$runtime,toolchain:$sdk,backend:$backend,site:$site,convex_site:$convexsite,public_backend:$publicbackend,public_site:$publicsite}' | jq -S . > "$work/identity.json"
+  jq -n --arg repo "$GH_REPO" --arg pr "$PR_NUMBER" --arg project "$EXPO_PROJECT_ID" --arg channel "$CHANNEL" --arg bundle "$bundle" --arg version "$version" --arg config "$config_hash" --arg native_inputs "$NATIVE_INPUT_HASH" --arg eas "$expo_env" --arg runtime "$runtime" --arg sdk "$toolchain" --arg backend "$CONVEX_URL" --arg site "$PUBLIC_SITE_URL" --arg convexsite "${CONVEX_SITE_URL:-}" --arg publicbackend "${EXPO_PUBLIC_CONVEX_URL:-}" --arg publicsite "${EXPO_PUBLIC_CONVEX_SITE_URL:-}" '{repo:$repo,pr:$pr,project:$project,channel:$channel,bundle:$bundle,version:$version,config_sha256:$config,native_inputs:$native_inputs,eas_env:$eas,runtime:$runtime,toolchain:$sdk,backend:$backend,site:$site,convex_site:$convexsite,public_backend:$publicbackend,public_site:$publicsite}' | jq -S . > "$work/identity.json"
 }
 check_app_identity() {
   local app=$1 build=$2
