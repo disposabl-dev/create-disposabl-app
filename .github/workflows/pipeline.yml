@@ -146,28 +146,8 @@ jobs:
         id: deploy
         timeout-minutes: 10
         env:
-          TRUSTED: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
           CONVEX_DEPLOY_KEY: ${{ secrets[github.event_name == 'push' && 'CONVEX_DEPLOY_KEY' || 'CONVEX_DEPLOY_KEY_PREVIEW'] }}
-        run: |
-          if [[ "$TRUSTED" != true ]]; then VITE_CONVEX_URL=https://ci.invalid VITE_CONVEX_SITE_URL=https://ci.invalid bun run build --filter=@disposabl/web; exit; fi
-          : "${CONVEX_DEPLOY_KEY:?Configure the Convex deployment secret for this repository}"
-          cd packages/backend
-          export AUTH_TARGET=--prod
-          target=()
-          if [[ "$CHANNEL" != production ]]; then export AUTH_TARGET="--preview-name $CHANNEL"; target=(--preview-name "$CHANNEL"); fi
-          if [[ "$CHANNEL" == production ]]; then bun x --no-install convex env set --prod BILLING_ENVIRONMENT live; fi
-          bun x --no-install convex deploy --yes "${target[@]}" --cmd-url-env-var-name CONVEX_URL --cmd 'set -e; for name in CONVEX_URL CONVEX_SITE_URL; do value=$(printenv "$name"); test -n "$value"; printf "%s=%s\n" "$name" "$value" | tee -a "$GITHUB_ENV" >> "$GITHUB_OUTPUT"; done; export VITE_CONVEX_URL="$CONVEX_URL"; if node -e "process.exit(require(\"../../disposabl.json\").appId ? 0 : 1)"; then node ../../.github/scripts/disposabl.mjs site; PUBLIC_SITE_URL=$(sed -n "s/^PUBLIC_SITE_URL=//p" "$GITHUB_OUTPUT" | tail -1); export PUBLIC_SITE_URL; bun x --no-install convex env set $AUTH_TARGET PUBLIC_SITE_URL "$PUBLIC_SITE_URL"; else PUBLIC_SITE_URL="$CONVEX_SITE_URL"; printf "PUBLIC_SITE_URL=%s\n" "$PUBLIC_SITE_URL" | tee -a "$GITHUB_ENV" >> "$GITHUB_OUTPUT"; fi; for prefix in VITE_ EXPO_PUBLIC_; do export "${prefix}CONVEX_URL=$CONVEX_URL" "${prefix}CONVEX_SITE_URL=$PUBLIC_SITE_URL"; printf "%sCONVEX_URL=%s\n%sCONVEX_SITE_URL=%s\n" "$prefix" "$CONVEX_URL" "$prefix" "$PUBLIC_SITE_URL" >> "$GITHUB_ENV"; done; /usr/bin/time -p timeout --kill-after=10s 120s bun x --no-install turbo run build --cwd ../.. --filter=@disposabl/web'
-          setup_target=(--prod)
-          if [[ "$CHANNEL" != production ]]; then setup_target=("${target[@]}"); fi
-          setup_args='{"expectedEnvironment":"live"}'
-          if [[ "$CHANNEL" != production ]]; then
-            setup_args='{"expectedEnvironment":"test"}'
-            if [[ "$GH_REPO" == disposabl-dev/create-disposabl-app ]]; then
-              setup_args='{"expectedEnvironment":"test","allowUnconfiguredPreview":true}'
-            fi
-          fi
-          bun x --no-install convex run "${setup_target[@]}" billing:setup "$setup_args"
-          bun x --no-install static-hosting upload $AUTH_TARGET --concurrency 12 --no-spa --dist ../../apps/web/dist/client
+        run: bash .github/scripts/web.sh deploy
       - name: Report web result
         if: always()
         run: node .github/scripts/disposabl.mjs report web,api,mcp ${{ steps.deploy.outcome == 'success' && 'ready' || 'failed' }}

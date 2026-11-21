@@ -47,15 +47,18 @@ const hasRootCheck = (job: any) =>
   "bun run generate\nbun run --parallel check:source test:ci\n";
 
 test("deployment exports public client origins for subsequent Expo steps", () => {
-  const command = step(pipeline.jobs.web, "Deploy").run.match(
-    /--cmd '([^']*)'/,
-  )[1];
+  expect(step(pipeline.jobs.web, "Deploy").run).toBe(
+    "bash .github/scripts/web.sh deploy",
+  );
+  const deploy = source(".github/scripts/web.sh");
+  const command = deploy.match(/--cmd '([^']*)'/)![1];
   for (const appId of [undefined, "fixture-app"]) {
     const dir = mkdtempSync(join(tmpdir(), "deployment-origins-"));
     try {
       for (const path of ["bin", "packages/backend", ".github/scripts"])
         mkdirSync(join(dir, path), { recursive: true });
       writeFileSync(join(dir, "disposabl.json"), JSON.stringify({ appId }));
+      writeFileSync(join(dir, ".github/scripts/web.sh"), deploy);
       writeFileSync(
         join(dir, "bin/bun"),
         '#!/usr/bin/env bash\nif [[ "$5" == build ]]; then printf "%s\\n%s\\n" "$VITE_CONVEX_URL" "$VITE_CONVEX_SITE_URL" > "$BUILD_VARS"; fi\n',
@@ -75,10 +78,11 @@ test("deployment exports public client origins for subsequent Expo steps", () =>
           CONVEX_URL: "https://fixture.convex.cloud",
           CONVEX_SITE_URL: "https://fixture.convex.site",
           PUBLIC_SITE_URL: "",
+          GITHUB_WORKSPACE: dir,
           GITHUB_ENV: envFile,
           GITHUB_OUTPUT: output,
           BUILD_VARS: join(dir, "build-vars"),
-          AUTH_TARGET: "--prod",
+          CHANNEL: "production",
         },
       });
       const expectedSite = appId
