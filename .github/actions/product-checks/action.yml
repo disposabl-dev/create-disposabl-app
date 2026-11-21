@@ -129,7 +129,7 @@ runs:
         path: |
           ${{ runner.temp }}/product-convex/backend.zip
           ${{ runner.temp }}/product-browser-cache
-        key: product-browser-v2-1447815-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}
+        key: product-browser-v3-1447815-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}
     - name: Prepare isolated browser test dependencies
       if: inputs.lane == 'browser'
       shell: bash
@@ -146,10 +146,16 @@ runs:
         verify
         unzip -q "$RUNNER_TEMP/product-convex/backend.zip" -d "$RUNNER_TEMP/product-convex"
         chmod +x "$RUNNER_TEMP/product-convex/convex-local-backend"
-        bun x --no-install e2e-web install chromium
+        playwright=$(node --input-type=module -e '
+          import { createRequire } from "node:module";
+          import { dirname, join } from "node:path";
+          const require = createRequire(import.meta.resolve("@e2e-dev/web"));
+          console.log(join(dirname(require.resolve("playwright-core/package.json")), "cli.js"));
+        ')
+        node "$playwright" install --only-shell chromium
         browser=$(find "$PLAYWRIGHT_BROWSERS_PATH" -type f -name chrome-headless-shell -print -quit)
         if [[ ! -x "$browser" ]] || ! ldd "$browser" > "$RUNNER_TEMP/chromium-libraries" || grep -q 'not found' "$RUNNER_TEMP/chromium-libraries"; then
-          bun run --cwd packages/tests setup:browser
+          node "$playwright" install --with-deps --only-shell chromium
         fi
     - name: Run isolated product web and backend E2E
       if: inputs.lane == 'browser'
