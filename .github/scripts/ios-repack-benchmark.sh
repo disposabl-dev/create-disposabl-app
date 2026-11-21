@@ -79,7 +79,7 @@ PY
       cmp "$app/EXUpdates.bundle/fingerprint" "$dest/EXUpdates.bundle/fingerprint"
     fi
     hermes="$(node -p 'require("node:path").dirname(require.resolve("hermes-compiler/package.json"))')/hermesc/osx-bin/hermesc"
-    "$hermes" -dump-bytecode "$dest/main.jsbundle" | grep -F "$marker" > "$evidence/$variant-marker.txt"
+    "$hermes" -b -dump-bytecode "$dest/main.jsbundle" | grep -aF "]: $marker" > "$evidence/$variant-marker.txt"
     [[ $(lipo -archs "$dest/$exe") == "$(cat "$evidence/architectures.txt")" ]]
     cp "$dest/$exe" "$work/native-$variant"
     codesign --remove-signature "$work/native-$variant"
