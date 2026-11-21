@@ -263,11 +263,45 @@ def main():
             raise RuntimeError('Unexpected backend environment')
         print('Owned listeners verified; backend telemetry disabled, Boat blank, other provider values absent', flush=True)
         command([cli, 'dev', '--once', '--typecheck', 'disable', '--codegen', 'disable'], cwd=backend, environment=admin, log='sync.log')
-        platforms = json.loads((source / 'disposabl.json').read_text()).get('platforms', [])
-        targets = 'web,backend,api' if 'api' in platforms else 'web,backend'
-        options = ['--shard', shard] if shard else []
-        command(['bun', 'run', 'e2e', 'run', '--target', targets, '--retries', '0', '--no-cache', *options], cwd=source, environment=testenv, log='e2e.log')
-        print(f'Product {targets} E2E passed', flush=True)
+        origins = {'VITE_CONVEX_URL': 'http://127.0.0.1:3520', 'VITE_CONVEX_SITE_URL': 'http://127.0.0.1:3521'}
+        started = time.monotonic()
+        command(['bun', 'x', '--no-install', 'turbo', 'run', 'build', '--filter=@disposabl/web'],
+                cwd=source, environment=env | origins, log='web-build.log')
+        print(f'Web build {time.monotonic() - started:.3f}s', flush=True)
+        from concurrent.futures import ThreadPoolExecutor
+        from urllib.parse import quote
+        from urllib.error import HTTPError
+
+        dist = source / 'apps/web/dist/client'
+        files = sorted(path for path in dist.rglob('*') if path.is_file())
+        assert len(files) > 100 and (dist / 'index.html') in files
+        site = origins['VITE_CONVEX_SITE_URL']
+
+        def verify(path):
+            route = quote(path.relative_to(dist).as_posix())
+            with urllib.request.urlopen(f'{site}/{route}', timeout=15) as response:
+                if response.status != 200 or response.read() != path.read_bytes():
+                    raise RuntimeError(f'Uploaded bytes differ for {route}')
+
+        arms = [('node', '12'), ('node', '24'), ('bun', '12')]
+        if shard == '2/4': arms.reverse()
+        for engine, workers in arms:
+            started = time.monotonic()
+            bun = ['bun'] + (['--bun'] if engine == 'bun' else [])
+            output = command([*bun, 'x', '--no-install', 'static-hosting', 'upload', '--dev', '--no-spa',
+                              '--dist', str(dist), '--concurrency', workers], cwd=backend, environment=admin,
+                             log=f'upload-{engine}-{workers}.log')
+            elapsed = time.monotonic() - started
+            if f'[{len(files)}/{len(files)}]' not in output or 'Publishing deployment' not in output:
+                raise RuntimeError('Missing full upload and atomic publish markers')
+            with ThreadPoolExecutor(max_workers=6) as pool:
+                list(pool.map(verify, files))
+            try:
+                urllib.request.urlopen(f'{site}/ci-upload-unknown-route', timeout=10).close()
+                raise RuntimeError('Unknown route unexpectedly served content')
+            except HTTPError as exc:
+                if exc.code != 404: raise
+            print(f'UPLOAD engine={engine} workers={workers} files={len(files)} duration={elapsed:.3f}s byte_verified=yes', flush=True)
     if any(listeners(port) for port in PORTS):
         raise RuntimeError('Listener still present after backend teardown')
     print('Owned backend stopped; ports 3520/3521 released', flush=True)

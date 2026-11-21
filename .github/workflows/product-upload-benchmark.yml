@@ -1,0 +1,29 @@
+name: Product Web upload benchmark
+on:
+  push:
+    branches: [benchmark/ci-web-upload-workers-20261121]
+permissions:
+  contents: read
+jobs:
+  upload:
+    if: github.repository == 'disposabl-dev/create-disposabl-app'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        order: ["1/4", "2/4"]
+    env:
+      GH_TOKEN: ""
+      DO_NOT_TRACK: "1"
+      E2E_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: ./.github/actions/product-checks
+        with:
+          source_sha: ${{ github.sha }}
+          lane: browser
+          browser_shard: ${{ matrix.order }}
