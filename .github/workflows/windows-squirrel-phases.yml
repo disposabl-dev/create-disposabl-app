@@ -1,0 +1,87 @@
+name: Windows Squirrel phase timings
+on:
+  push:
+    branches: [ci-benchmark/windows-squirrel-phases]
+permissions:
+  contents: read
+jobs:
+  installer:
+    if: github.repository == 'disposabl-dev/create-disposabl-app'
+    runs-on: windows-2025
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        temp: [default, workspace-drive]
+    defaults:
+      run:
+        shell: bash
+    env:
+      DISPOSABL_DESKTOP_PLATFORM: windows
+      DISPOSABL_RELEASE_VERSION: 1.42.1
+      DISPOSABL_DESKTOP_UPDATE_URL: https://ci.invalid/desktop/updates/00000000000000000000000000000001
+      CONVEX_SITE_URL: https://ci.invalid
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.5
+      - name: Install locked desktop dependencies
+        run: time bun install --frozen-lockfile --filter ./apps/desktop
+      - name: Time Forge and Squirrel with the normal release entry point
+        env:
+          TEMP_LAYOUT: ${{ matrix.temp }}
+        run: |
+          if [[ "$TEMP_LAYOUT" == workspace-drive ]]; then
+            mkdir -p ../sqtmp
+            export TMP="$(cygpath -aw ../sqtmp)"
+            export TEMP="$TMP" TMPDIR="$TMP"
+          fi
+          node -e 'console.log({workspace: process.cwd(), temp: require("os").tmpdir()})'
+          probe="$(cygpath -u "$RUNNER_TEMP")/squirrel-phases.cjs"
+          cat > "$probe" <<'JS'
+          const childProcess = require('node:child_process');
+          const fs = require('node:fs/promises');
+          const { basename } = require('node:path');
+          const { syncBuiltinESMExports } = require('node:module');
+          const logTime = (name, start) =>
+            console.log(`PHASE ${name} ${((performance.now() - start) / 1000).toFixed(3)} s`);
+          const spawn = childProcess.spawn;
+          childProcess.spawn = function (command, ...args) {
+            const start = performance.now();
+            const child = spawn.call(this, command, ...args);
+            if (/^(rcedit|nuget|squirrel|signtool)\.(exe|com)$/i.test(basename(command))) {
+              child.once('close', () => logTime(basename(command), start));
+            }
+            return child;
+          };
+          for (const name of ['cp', 'rm']) {
+            const original = fs[name];
+            fs[name] = async function (...args) {
+              const target = name === 'cp' ? args[1] : args[0];
+              if (!basename(String(target)).startsWith('squirrel-maker-')) return original.apply(this, args);
+              const start = performance.now();
+              try { return await original.apply(this, args); }
+              finally { logTime(`Forge temp ${name}`, start); }
+            };
+          }
+          syncBuiltinESMExports();
+          JS
+          export NODE_OPTIONS="--require \"$(cygpath -am "$probe")\""
+          time bun run --cwd apps/desktop preview
+      - name: Verify installer and exact update feed
+        run: |
+          test -s "$(find dist/release -name '*Setup.exe' -type f -print -quit)"
+          archive=$(find dist/update -name '*-full.nupkg' -type f -print -quit)
+          test -s "$archive"
+          unzip -tq "$archive"
+          digest=$(sha1sum "$archive" | cut -d' ' -f1 | tr '[:lower:]' '[:upper:]')
+          expected="$digest $(basename "$archive") $(wc -c < "$archive" | tr -d ' ')"
+          actual=$(tr -d '\r\n' < dist/update/production/win32/x64/RELEASES)
+          test "$actual" = "$expected"
