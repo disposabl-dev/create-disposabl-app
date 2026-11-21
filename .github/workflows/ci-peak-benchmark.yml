@@ -8,19 +8,18 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-peak-android-replay
+  group: ci-peak-android-ninja
   cancel-in-progress: false
 
 jobs:
   measure:
     if: github.repository == 'disposabl-dev/create-disposabl-app' && github.ref == 'refs/heads/benchmark/ci-peak-20261121'
-    name: Android warm profile / ${{ matrix.heap }}
+    name: Android warm build with native intermediates
     strategy:
       fail-fast: false
       matrix:
         include:
           - { platform: android, runner: ubuntu-24.04, heap: default }
-          - { platform: android, runner: ubuntu-24.04, heap: 4g }
     runs-on: ${{ matrix.runner }}
     timeout-minutes: ${{ (matrix.platform == 'android' || matrix.platform == 'ios') && 75 || 12 }}
     defaults:
@@ -104,7 +103,25 @@ jobs:
           printf 'Bun cache exact hit: %s\nBuild cache exact hit: %s\n' '${{ steps.dependencies.outputs.cache-hit }}' '${{ steps.build-cache.outputs.cache-hit }}' >> "$GITHUB_STEP_SUMMARY"
           test '${{ steps.dependencies.outputs.cache-hit }}' = true
           test '${{ steps.build-cache.outputs.cache-hit }}' = true
+      - name: Prebuild before restoring native intermediates
+        working-directory: apps/mobile
+        run: /usr/bin/time -p bun x --no-install expo prebuild --platform android --no-install
+      - name: Restore or save exact-source native intermediates
+        id: ninja
+        uses: actions/cache@v4
+        with:
+          path: |
+            apps/mobile/android/app/.cxx
+            apps/mobile/android/app/build/intermediates/cxx
+            node_modules/react-native-reanimated/android/.cxx
+            node_modules/react-native-reanimated/android/build/intermediates/cxx
+            node_modules/react-native-worklets/android/.cxx
+            node_modules/react-native-worklets/android/build/intermediates/cxx
+          key: android-native-intermediates-v1-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
       - name: Build and verify
+        env:
+          CI_PEAK_ANDROID_PREBUILT: "true"
+          CI_PEAK_NATIVE_HIT: ${{ steps.ninja.outputs.cache-hit }}
         run: bash .github/scripts/ci-peak-benchmark.sh build
       - uses: actions/upload-artifact@v4
         if: always()

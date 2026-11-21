@@ -47,7 +47,11 @@ case "$platform" in
     compiler_cache
     export CMAKE_C_COMPILER_LAUNCHER=ccache CMAKE_CXX_COMPILER_LAUNCHER=ccache
     cd apps/mobile
-    timed 'Expo prebuild' bun x --no-install expo prebuild --platform android --no-install
+    if [[ "${CI_PEAK_ANDROID_PREBUILT:-}" == true ]]; then
+      printf 'Native intermediate cache exact match: %s\n' "${CI_PEAK_NATIVE_HIT:-}" | tee -a "$GITHUB_STEP_SUMMARY"
+    else
+      timed 'Expo prebuild' bun x --no-install expo prebuild --platform android --no-install
+    fi
     cd android
     flags=(--profile)
     if [[ "${CI_PEAK_HEAP:-}" == 4g ]]; then
