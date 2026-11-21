@@ -1,0 +1,33 @@
+name: Desktop compression benchmark
+on:
+  push:
+    branches: [benchmark/ci-desktop-compression-20261121]
+permissions:
+  contents: read
+jobs:
+  linux:
+    if: github.repository == 'disposabl-dev/create-disposabl-app'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 9
+    env:
+      VITE_CONVEX_SITE_URL: https://ci.invalid
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.5
+      - name: Install only the desktop workspace and Linux packagers
+        run: |
+          time bun install --frozen-lockfile --filter ./apps/desktop
+          command -v fakeroot && command -v rpmbuild && command -v dpkg-deb && command -v cpio || { sudo apt-get update && sudo apt-get install -y fakeroot rpm cpio; }
+          rpm --version
+          dpkg-deb --version | head -1
+          nproc
+      - name: Measure package creation and compare extracted files
+        run: bash .github/scripts/desktop-compression-benchmark.sh
