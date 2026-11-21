@@ -18,6 +18,7 @@ jobs:
           - label: product
             run: "44899216086"
             sha: cd5ddf7e3a70743b5e12c652b7667d04e3fe067b
+            test_sha: 4af6724ad8b797dcd4d6ee43d97820d950f72072
             job: "136832362469"
             name: ios-simulator
           - label: generated
@@ -38,11 +39,11 @@ jobs:
           JOB: ${{ matrix.job }}
           ARTIFACT: ${{ matrix.name }}
         run: bash .github/scripts/ios-artifact-origin.sh
-      - name: Check out the exact product test suite
+      - name: Check out the product test suite with the updated Guides assertion
         if: matrix.label == 'product' && steps.origin.outputs.ready == 'true'
         uses: actions/checkout@v6
         with:
-          ref: ${{ matrix.sha }}
+          ref: ${{ matrix.test_sha }}
           path: product
           persist-credentials: false
       - uses: actions/setup-node@v6
@@ -63,7 +64,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           ARTIFACT_ID: ${{ steps.origin.outputs.id }}
-          PRODUCT_SOURCE: ${{ matrix.label == 'product' && matrix.sha || '' }}
+          ARTIFACT_DIGEST: ${{ steps.origin.outputs.digest }}
+          PRODUCT_SOURCE: ${{ matrix.test_sha || '' }}
         run: bash .github/scripts/ios-artifact-smoke.sh
       - uses: actions/upload-artifact@v4
         if: always() && steps.origin.outputs.ready == 'true'

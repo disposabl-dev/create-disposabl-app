@@ -16,7 +16,9 @@ artifacts=$(gh api --paginate --slurp "$api/runs/$RUN/artifacts?per_page=100" | 
 matches=$(jq --arg name "$ARTIFACT" '[.[] | select(.name == $name and .expired == false)]' <<<"$artifacts")
 [[ $(jq length <<<"$matches") == 1 ]] || { echo "Expected exactly one unexpired $ARTIFACT artifact" >&2; exit 1; }
 id=$(jq -r '.[0].id' <<<"$matches")
+digest=$(jq -er '.[0].digest | select(test("^sha256:[a-f0-9]{64}$")) | sub("^sha256:"; "")' <<<"$matches")
 mkdir -p "$RUNNER_TEMP/ios-smoke-evidence"
-jq -n --arg run "$RUN" --arg sha "$EXPECTED_SHA" --arg job "$JOB" --arg name "$ARTIFACT" --arg id "$id" '{run:$run, head_sha:$sha, job:$job, artifact_name:$name, artifact_id:$id}' > "$RUNNER_TEMP/ios-smoke-evidence/origin.json"
+jq -n --arg run "$RUN" --arg sha "$EXPECTED_SHA" --arg job "$JOB" --arg name "$ARTIFACT" --arg id "$id" --arg digest "$digest" '{run:$run, head_sha:$sha, job:$job, artifact_name:$name, artifact_id:$id, artifact_sha256:$digest}' > "$RUNNER_TEMP/ios-smoke-evidence/origin.json"
 echo "id=$id" >> "$GITHUB_OUTPUT"
+echo "digest=$digest" >> "$GITHUB_OUTPUT"
 echo 'ready=true' >> "$GITHUB_OUTPUT"

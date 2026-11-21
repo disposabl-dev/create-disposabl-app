@@ -3,7 +3,8 @@ set -euo pipefail
 evidence="$RUNNER_TEMP/ios-smoke-evidence"
 work="$RUNNER_TEMP/ios-smoke-work"
 mkdir -p "$work/outer" "$work/inner"
-gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID/zip" > "$work/artifact.zip"
+gh api --allow-escape-sequences "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID/zip" > "$work/artifact.zip"
+printf '%s  %s\n' "$ARTIFACT_DIGEST" "$work/artifact.zip" | shasum -a 256 --check
 shasum -a 256 "$work/artifact.zip" > "$evidence/sha256.txt"
 unzip -q "$work/artifact.zip" -d "$work/outer"
 mapfile_compat=()
