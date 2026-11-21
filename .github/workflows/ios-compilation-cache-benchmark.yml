@@ -1,0 +1,74 @@
+name: Xcode compilation cache benchmark
+on:
+  push:
+    branches: [benchmark/ci-xcode-cas-20261121]
+permissions:
+  contents: read
+jobs:
+  simulator:
+    if: github.repository == 'disposabl-dev/create-disposabl-app'
+    name: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-26, blacksmith-6vcpu-macos-26]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    env:
+      EXPO_NO_DOTENV: "1"
+      EXPO_NO_TELEMETRY: "1"
+      E2E_TELEMETRY_DISABLED: "1"
+      DISPOSABL_MOBILE_CHANNEL: benchmark
+      EXPO_PROJECT_ID: 00000000-0000-4000-8000-000000000001
+      EXPO_PUBLIC_CONVEX_URL: https://ci.invalid
+      EXPO_PUBLIC_CONVEX_SITE_URL: https://ci.invalid
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.5
+      - name: Identify SDK and compiler
+        id: toolchain
+        run: |
+          xcodebuild -version
+          xcrun --sdk iphonesimulator --show-sdk-version
+          fingerprint=$({ xcodebuild -version; xcrun --sdk iphonesimulator --show-sdk-build-version; printf '%s\n' "$GITHUB_WORKSPACE"; } | shasum -a 256 | cut -d' ' -f1)
+          printf 'id=%s\n' "$fingerprint" >> "$GITHUB_OUTPUT"
+      - name: Restore compiler cache and CocoaPods downloads
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ runner.temp }}/ios-cas
+            ~/Library/Caches/CocoaPods
+          key: benchmark-ios-cas-v1-${{ matrix.runner }}-${{ runner.arch }}-${{ steps.toolchain.outputs.id }}-${{ hashFiles('bun.lock') }}
+      - run: bun install --frozen-lockfile --filter @disposabl/mobile
+      - name: Compile and verify app with Xcode compilation caching
+        working-directory: apps/mobile
+        env:
+          FOUND_CACHE: ${{ steps.cache.outputs.cache-hit }}
+        run: |
+          set -euo pipefail
+          printf 'Exact cache hit: %s\n' "${FOUND_CACHE:-false}"
+          bun x --no-install expo prebuild --platform ios --no-install
+          (cd ios && time USE_CCACHE=0 pod install)
+          workspace=$(find ios -maxdepth 1 -name '*.xcworkspace' -print -quit)
+          test -n "$workspace"
+          /usr/bin/time -p xcodebuild -quiet -showBuildTimingSummary -workspace "$workspace" \
+            -scheme "$(basename "$workspace" .xcworkspace)" -configuration Release \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/ios-build" CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- \
+            COMPILATION_CACHE_ENABLE_CACHING=YES COMPILATION_CACHE_CAS_PATH="$RUNNER_TEMP/ios-cas" build
+          du -sh "$RUNNER_TEMP/ios-cas"
+          app=$(find "$RUNNER_TEMP/ios-build/Build/Products/Release-iphonesimulator" -maxdepth 1 -name '*.app' -type d -print -quit)
+          test -n "$app"
+          codesign --verify --deep --strict "$app"
+          lipo -archs "$app/$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$app/Info.plist")"
+          ditto -c -k --sequesterRsrc --keepParent "$app" "$RUNNER_TEMP/ios-simulator.zip"
+          unzip -tq "$RUNNER_TEMP/ios-simulator.zip"
