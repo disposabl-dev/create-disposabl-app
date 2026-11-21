@@ -1,18 +1,14 @@
-name: Android preview R8 comparison
+name: Android Gradle heap comparison
 on:
   push:
-    branches: [benchmark/ci-android-preview-r8-20261121]
+    branches: [benchmark/ci-android-gradle-heap-20261121]
 permissions:
   contents: read
   actions: read
 jobs:
   apk:
     if: github.repository == 'disposabl-dev/create-disposabl-app'
-    name: Android preview / ${{ matrix.optimization }}
-    strategy:
-      fail-fast: false
-      matrix:
-        optimization: [r8, unminified]
+    name: Android preview with 4 GiB Gradle heap
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     env:
@@ -23,7 +19,6 @@ jobs:
       EXPO_PUBLIC_CONVEX_URL: https://ci.invalid
       EXPO_PUBLIC_CONVEX_SITE_URL: https://ci.invalid
       DISPOSABL_MOBILE_CHANNEL: native-benchmark
-      ANDROID_OPTIMIZATION: ${{ matrix.optimization }}
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -59,11 +54,8 @@ jobs:
           bash ../../.github/scripts/android-runner.sh prepare
           bash ../../.github/scripts/android-runner.sh check
           bun x --no-install expo prebuild --platform android --no-install
-          flags=()
-          if [[ "$ANDROID_OPTIMIZATION" == unminified ]]; then
-            flags+=(-Pandroid.enableMinifyInReleaseBuilds=false -Pandroid.enableShrinkResourcesInReleaseBuilds=false)
-          fi
-          (cd android && bash ../../../.github/scripts/android-runner.sh build :app:assembleRelease "${flags[@]}")
+          free -m
+          (cd android && bash ../../../.github/scripts/android-runner.sh build :app:assembleRelease --profile "-Dorg.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m")
           apk=android/app/build/outputs/apk/release/app-release.apk
           test -s "$apk"
           unzip -tq "$apk"
@@ -72,11 +64,6 @@ jobs:
           jq '{androidArchitectures}' ../../disposabl.json > "$RUNNER_TEMP/abi.json"
           node ../../.github/scripts/verify-android-abis.mjs "$apk" "$RUNNER_TEMP/abi.json"
           wc -c "$apk"
-      - uses: actions/upload-artifact@v4
-        if: matrix.optimization == 'unminified'
-        with:
-          name: first-unminified-apk-${{ github.run_attempt }}
-          path: generated/apps/mobile/android/app/build/outputs/apk/release/app-release.apk
-          if-no-files-found: error
-          compression-level: 0
-          retention-days: 1
+          report=$(find android -type f -path '*/reports/profile/profile-*.html' -print -quit)
+          test -s "$report"
+          sed -n '/minifyReleaseWithR8/{N;p}' "$report"
