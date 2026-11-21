@@ -1,32 +1,19 @@
-name: Benchmark iOS artifact smoke
+name: Benchmark iOS XCTest driver cache
 on:
   push:
-    branches: [benchmark/ios-artifact-smoke-*]
+    branches: [benchmark/ios-driver-cache-*]
   workflow_dispatch:
 permissions:
   actions: read
   contents: read
 jobs:
   smoke:
-    name: Smoke ${{ matrix.label }}
+    if: github.repository == 'disposabl-dev/create-disposabl-app'
     runs-on: macos-26
     timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - label: product
-            run: "44899216086"
-            sha: cd5ddf7e3a70743b5e12c652b7667d04e3fe067b
-            test_sha: 4af6724ad8b797dcd4d6ee43d97820d950f72072
-            job: "136832362469"
-            name: ios-simulator
-          - label: generated
-            run: "44900751287"
-            sha: ff387a33827f9b19dd4fa241f6085296c8b94b2b
-            job: "136836017366"
-            name: first-ios-1
     steps:
+      - name: Start elapsed timer
+        run: echo "SMOKE_START=$(date +%s)" >> "$GITHUB_ENV"
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
@@ -34,33 +21,69 @@ jobs:
         id: origin
         env:
           GH_TOKEN: ${{ github.token }}
-          RUN: ${{ matrix.run }}
-          EXPECTED_SHA: ${{ matrix.sha }}
-          JOB: ${{ matrix.job }}
-          ARTIFACT: ${{ matrix.name }}
-        run: bash .github/scripts/ios-artifact-origin.sh
-      - name: Check out the product test suite with the updated Guides assertion
-        if: matrix.label == 'product' && steps.origin.outputs.ready == 'true'
+          RUN: "44899216086"
+          EXPECTED_SHA: cd5ddf7e3a70743b5e12c652b7667d04e3fe067b
+          JOB: "136832362469"
+          ARTIFACT: ios-simulator
+        run: |
+          bash .github/scripts/ios-artifact-origin.sh
+          grep -Fx 'ready=true' "$GITHUB_OUTPUT"
+      - name: Check out exact product smoke tests
         uses: actions/checkout@v6
         with:
-          ref: ${{ matrix.test_sha }}
+          ref: 4af6724ad8b797dcd4d6ee43d97820d950f72072
           path: product
           persist-credentials: false
       - uses: actions/setup-node@v6
-        if: matrix.label == 'product' && steps.origin.outputs.ready == 'true'
         with:
           node-version: 24
           package-manager-cache: false
       - uses: oven-sh/setup-bun@v2
-        if: matrix.label == 'product' && steps.origin.outputs.ready == 'true'
         with:
           bun-version: 1.4.5
       - name: Install product test dependencies
-        if: matrix.label == 'product' && steps.origin.outputs.ready == 'true'
         working-directory: product
-        run: bun install --frozen-lockfile --filter @disposabl/tests
+        run: /usr/bin/time -p bun install --frozen-lockfile --filter @disposabl/tests
+      - name: Identify driver and runner image
+        id: driver
+        working-directory: product
+        env:
+          ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          [[ "$ATTEMPT" == 1 || "$ATTEMPT" == 2 ]]
+          test "$(jq -r .version node_modules/agent-device/package.json)" = 0.21.36
+          test "$(jq -r .version node_modules/@e2e-dev/mobile/package.json)" = 0.12.6
+          test "$(uname -m)" = arm64
+          test -n "${ImageVersion:-}"
+          xcode=$(xcodebuild -version | tr '\n' '-')
+          sdk=$(xcrun --sdk iphonesimulator --show-sdk-version)
+          driverhash=$(find node_modules/agent-device/dist/apple/runner -type f -exec shasum -a 256 {} + | LC_ALL=C sort | shasum -a 256 | cut -d ' ' -f 1)
+          lockhash=$(shasum -a 256 bun.lock | cut -d ' ' -f 1)
+          key=$(printf '%s\n' "$ImageVersion" "$xcode" "$sdk" "$driverhash" "$lockhash" | shasum -a 256 | cut -d ' ' -f 1)
+          printf 'key=ios-driver-%s-%s\n' "$GITHUB_RUN_ID" "$key" >> "$GITHUB_OUTPUT"
+          mkdir -p "$RUNNER_TEMP/ios-smoke-evidence"
+          printf 'image=%s\nxcode=%s\nsdk=%s\ndriver=%s\nlock=%s\n' "$ImageVersion" "$xcode" "$sdk" "$driverhash" "$lockhash" > "$RUNNER_TEMP/ios-smoke-evidence/cache-identity.txt"
+      - name: Restore exact driver cache on second attempt
+        id: restore
+        if: github.run_attempt == 2
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.agent-device/apple-runner/derived/ios-simulator
+          key: ${{ steps.driver.outputs.key }}
+          fail-on-cache-miss: true
+      - name: Confirm comparison state
+        env:
+          ATTEMPT: ${{ github.run_attempt }}
+          HIT: ${{ steps.restore.outputs.cache-hit }}
+        run: |
+          if [[ "$ATTEMPT" == 1 ]]; then
+            test ! -e "$HOME/.agent-device/apple-runner/derived/ios-simulator"
+          else
+            [[ "$HIT" == true ]]
+            test -d "$HOME/.agent-device/apple-runner/derived/ios-simulator"
+          fi
       - name: Download and verify simulator artifact
-        if: steps.origin.outputs.ready == 'true'
         timeout-minutes: 5
         env:
           GH_TOKEN: ${{ github.token }}
@@ -68,27 +91,40 @@ jobs:
           ARTIFACT_DIGEST: ${{ steps.origin.outputs.digest }}
         run: bash .github/scripts/ios-artifact-smoke.sh prepare
       - name: Create and boot simulator
-        if: steps.origin.outputs.ready == 'true'
         timeout-minutes: 5
         run: bash .github/scripts/ios-artifact-smoke.sh boot
       - name: Install, launch and capture screenshot
-        if: steps.origin.outputs.ready == 'true'
         timeout-minutes: 4
         run: bash .github/scripts/ios-artifact-smoke.sh launch
-      - name: Run product TesterArmy checks
-        if: matrix.label == 'product' && steps.origin.outputs.ready == 'true'
+      - name: Run identical product TesterArmy checks
         timeout-minutes: 8
         env:
-          PRODUCT_SOURCE: ${{ matrix.test_sha || '' }}
+          PRODUCT_SOURCE: 4af6724ad8b797dcd4d6ee43d97820d950f72072
         run: bash .github/scripts/ios-artifact-smoke.sh test
-      - name: Remove owned simulator
-        if: always() && steps.origin.outputs.ready == 'true'
-        timeout-minutes: 2
-        run: bash .github/scripts/ios-artifact-smoke.sh cleanup
-      - uses: actions/upload-artifact@v4
-        if: always() && steps.origin.outputs.ready == 'true'
+      - name: Check guest case identities
+        run: python3 .github/scripts/ios-driver-cases.py "$RUNNER_TEMP/ios-smoke-evidence/product-ios-checks.log"
+      - name: Confirm driver cache metadata exists
+        if: github.run_attempt == 1
+        run: |
+          dir="$HOME/.agent-device/apple-runner/derived/ios-simulator"
+          find "$dir" -name .agent-device-runner-cache.json -type f -print | tee "$RUNNER_TEMP/ios-smoke-evidence/cache-manifests.txt"
+          test -s "$RUNNER_TEMP/ios-smoke-evidence/cache-manifests.txt"
+      - name: Save native driver cache after cold test
+        if: github.run_attempt == 1
+        uses: actions/cache/save@v4
         with:
-          name: ios-smoke-${{ matrix.label }}-${{ github.run_attempt }}
+          path: ~/.agent-device/apple-runner/derived/ios-simulator
+          key: ${{ steps.driver.outputs.key }}
+      - name: Remove owned simulator and record elapsed
+        if: always()
+        timeout-minutes: 2
+        run: |
+          bash .github/scripts/ios-artifact-smoke.sh cleanup
+          echo "Elapsed through simulator cleanup: $(($(date +%s) - SMOKE_START)) seconds" | tee -a "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-driver-cache-evidence-${{ github.run_attempt }}
           path: ${{ runner.temp }}/ios-smoke-evidence/
           if-no-files-found: warn
           retention-days: 3
