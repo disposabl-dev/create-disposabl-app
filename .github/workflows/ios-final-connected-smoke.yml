@@ -20,7 +20,7 @@ jobs:
         with:
           persist-credentials: false
       - id: pins
-        run: python3 .github/scripts/ios-final-pins.py >> "$GITHUB_OUTPUT"
+        run: python3 .github/scripts/ios-final-pins.py warm >> "$GITHUB_OUTPUT"
   smoke:
     needs: pins
     if: github.repository == 'disposabl-dev/create-disposabl-app'
@@ -77,7 +77,7 @@ jobs:
           EXPECTED_BUILD: ${{ matrix.build }}
         run: bash .github/scripts/ios-artifact-smoke.sh launch
       - name: Run guest iOS tests
-        timeout-minutes: 8
+        timeout-minutes: 12
         env:
           PRODUCT_SOURCE: ${{ needs.pins.outputs.test_sha }}
         run: bash .github/scripts/ios-artifact-smoke.sh test

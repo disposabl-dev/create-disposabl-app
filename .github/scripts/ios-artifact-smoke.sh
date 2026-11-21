@@ -112,8 +112,10 @@ udid=$(cat "$work/owned-udid")
   export E2E_IOS_DEVICE="$udid" E2E_IOS_APP_ID="$bundle" DISPOSABL_MOBILE_CHANNEL=pr-92
   export E2E_TELEMETRY_DISABLED=1 DO_NOT_TRACK=1 EXPO_NO_TELEMETRY=1
 export AGENT_DEVICE_STATE_DIR="$(mktemp -d /tmp/ad-ios.XXXXXX)"
+bun x --no-install agent-device prepare ios-runner --platform ios --udid "$udid" \
+  --session e2e-ios-0 --timeout 240000 --json | tee "$evidence/driver-prepare.json"
 status=0
-bun run --cwd packages/tests e2e run --target ios --retries 0 --no-cache 2>&1 |
+bun run --cwd packages/tests e2e run --target ios --retries 0 --action-timeout 60000 --no-cache 2>&1 |
   tee "$evidence/product-ios-checks.log" || status=$?
 if [[ -d packages/tests/.e2e ]]; then cp -R packages/tests/.e2e "$evidence/test-results"; fi
 [[ "$status" == 0 ]] || exit "$status"

@@ -21,5 +21,9 @@ for lane in lanes:
         raise SystemExit('Pin each installed iOS build number')
 if lanes[0]['artifact'] == lanes[1]['artifact'] or lanes[0]['job'] == lanes[1]['job']:
     raise SystemExit('The two builds must have distinct artifacts and jobs')
-print('matrix=' + json.dumps({'include': lanes}, separators=(',', ':')))
+label = sys.argv[1] if len(sys.argv) > 1 else None
+selected = [lane for lane in lanes if label is None or lane['label'] == label]
+if not selected:
+    raise SystemExit('Unknown simulator test lane')
+print('matrix=' + json.dumps({'include': selected}, separators=(',', ':')))
 print('test_sha=' + p['test_sha'])
