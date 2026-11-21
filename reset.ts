@@ -314,44 +314,40 @@ const pipeline = Bun.YAML.parse(
   >;
 };
 if (
-  !pipeline.jobs.changes?.steps?.some(
-    (step) => step.name === "Product checks",
-  ) ||
-  !pipeline.jobs.android ||
-  !pipeline.jobs["android-submit"] ||
-  !pipeline.jobs.web?.outputs ||
-  !pipeline.jobs.web.steps?.some(
+  !pipeline.jobs["product-checks"] ||
+  !pipeline.jobs.web ||
+  !pipeline.jobs.android?.steps?.some(
     (step) => step.name === "Allocate product Android version",
   ) ||
-  !pipeline.jobs["android-submit"].steps?.some(
+  !pipeline.jobs["android-submit"]?.steps?.some(
     (step) => step.name === "Verify product Play identity",
   )
 )
   throw new Error("Starter product release boundary changed.");
-pipeline.jobs.changes.steps = pipeline.jobs.changes.steps?.filter(
-  (step) => step.name !== "Product checks",
-);
+delete pipeline.jobs["product-checks"];
 pipeline.jobs.web.needs = "changes";
 pipeline.jobs.web.if = "needs.changes.outputs.changed == 'true'";
-pipeline.jobs.web.outputs.android_build =
-  "${{ steps.fingerprint.outputs.build }}";
-delete pipeline.jobs.web.outputs.android_version_code;
 pipeline.jobs.web.steps = pipeline.jobs.web.steps?.filter(
-  (step) =>
-    ![
-      "Check product release guards",
-      "Allocate product Android version",
-    ].includes(step.name ?? ""),
+  (step) => step.name !== "Generate checked release inputs",
 );
 for (const step of pipeline.jobs.web.steps ?? []) {
-  if (["Expo", "Channel", "Fingerprint"].includes(step.name ?? ""))
-    step.if = "needs.changes.outputs.android == 'true'";
+  if (
+    ["Check source formatting", "Restore task cache", "Check"].includes(
+      step.name ?? "",
+    )
+  )
+    delete step.if;
+}
+pipeline.jobs.android.steps = pipeline.jobs.android.steps?.filter(
+  (step) => step.name !== "Allocate product Android version",
+);
+for (const step of pipeline.jobs.android.steps ?? []) {
+  if (step.name === "Channel") delete step.if;
   if (step.name === "Fingerprint" && step.env) delete step.env.UPDATE_POLICY;
   if (step.name === "Update")
     step.if = "steps.fingerprint.outputs.build == 'false'";
-}
-pipeline.jobs.android.if = "needs.web.outputs.android_build == 'true'";
-for (const step of pipeline.jobs.android.steps ?? []) {
+  if (step.name === "Prepare Android disk space")
+    step.if = "steps.fingerprint.outputs.build == 'true'";
   if (step.name === "Build" && step.env) {
     delete step.env.UPDATE_POLICY;
     delete step.env.DISPOSABL_ANDROID_VERSION_CODE;
@@ -360,9 +356,6 @@ for (const step of pipeline.jobs.android.steps ?? []) {
 pipeline.jobs["android-submit"].steps = pipeline.jobs[
   "android-submit"
 ].steps?.filter((step) => step.name !== "Verify product Play identity");
-pipeline.jobs["android-failure"].needs = "android";
-pipeline.jobs["android-failure"].if =
-  "always() && (needs.android.result == 'failure' || needs.android.result == 'cancelled')";
 if (eas.submit?.production) delete eas.submit.production;
 if (eas.submit && !Object.keys(eas.submit).length) delete eas.submit;
 if (
@@ -526,6 +519,7 @@ for (const path of [
   "packages/sdk/src/generated",
   "packages/create-disposabl-app",
   ".github/workflows/publish.yml",
+  "apps/web/src/router/_authenticated/dashboard.billing.tsx",
   "apps/web/src/router/_authenticated/dashboard.connections.tsx",
   "apps/web/src/router/mobile-login.tsx",
   "apps/mobile/src/app/(authenticated)/apps",

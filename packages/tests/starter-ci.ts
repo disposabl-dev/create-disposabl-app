@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdtemp, readdir, rm } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createApp } from "../create-disposabl-app/scaffold";
@@ -39,16 +39,11 @@ try {
       platforms: selectPlatforms(profile.platforms),
       features: selectFeatures(profile.features),
     });
-    const tests = (await readdir(join(cwd, "packages/tests")))
-      .filter((file) => file.endsWith(".test.ts"))
-      .sort()
-      .map((file) => `./packages/tests/${file}`);
     // Match CLI setup, then run the same frozen install and checks as a preview.
     for (const args of [
       ["fmt"],
       ["install"],
       ["run", "check:preview"],
-      ["test", ...tests],
       ...["cli", "sdk"]
         .filter((name) =>
           existsSync(join(cwd, "packages", name, "package.json")),

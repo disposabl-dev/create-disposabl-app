@@ -53,7 +53,10 @@ if (platform === 'macos') {
     ) + '\n',
   );
 } else {
-  const releases = await readFile(join(release, 'RELEASES'), 'utf8');
+  const releases = (await readFile(join(release, 'RELEASES'), 'utf8')).replace(
+    /^\uFEFF/,
+    '',
+  );
   const names = [
     ...releases.matchAll(/^[A-Fa-f0-9]{40}\s+(\S+)\s+\d+\s*$/gm),
   ].map((match) => match[1]);

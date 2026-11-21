@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 report() { node "$GITHUB_WORKSPACE/.github/scripts/disposabl.mjs" report ios "$@"; }
-check_source() { test "$(gh api "repos/$GH_REPO/$SOURCE_PATH" --jq 'if has("head") then (if .state == "open" then .head.sha else "closed" end) else .object.sha end')" = "$SOURCE"; }
+check_source() {
+  local current
+  current=$(gh api "repos/$GH_REPO/$SOURCE_PATH" --jq 'if has("head") then (if .state == "open" then .head.sha else "closed" end) else .object.sha end')
+  [[ "$current" == "$SOURCE" ]] || { echo "iOS source changed while this run was queued: $SOURCE_PATH" >&2; return 1; }
+}
 runtime() { bun x --no-install expo-updates runtimeversion:resolve --platform ios --workflow managed | jq -er 'select(.fingerprintSources != null) | .runtimeVersion | select(test("^[a-f0-9]{40,64}$"))'; }
 product_payments() {
   [[ "${GH_REPO:-}" == disposabl-dev/create-disposabl-app ]] || return 0
@@ -9,7 +13,21 @@ product_payments() {
     [[ "${!name:-}" =~ [^[:space:]] ]] || { echo "Missing $name" >&2; return 1; }
   done
 }
+use_compiler_cache() {
+  if [[ -n "${CCACHE_DIR:-}" ]] && command -v ccache >/dev/null; then
+    export USE_CCACHE=1
+    ccache --zero-stats
+  fi
+}
 case "${1:?operation required}" in
+  prepare-cache)
+    if ! command -v ccache >/dev/null && command -v brew >/dev/null; then
+      HOMEBREW_NO_AUTO_UPDATE=1 brew install ccache || echo '::warning::iOS compiler cache is unavailable.'
+    fi
+    if command -v ccache >/dev/null; then
+      echo 'enabled=true' >> "$GITHUB_OUTPUT"
+    fi
+    ;;
   ota-plan)
     product_payments
     check_source
@@ -42,8 +60,9 @@ case "${1:?operation required}" in
     ;;
   ota)
     check_source
-    expected=${RUNTIME:-$(runtime)}
-    test "$(runtime)" = "$expected"
+    actual=$(runtime)
+    expected=${RUNTIME:-$actual}
+    test "$actual" = "$expected"
     bun x --no-install expo export --platform ios --output-dir dist/update-ios
     test "$(runtime)" = "$expected"
     check_source
@@ -82,12 +101,23 @@ case "${1:?operation required}" in
   simulator)
     check_source
     bun x --no-install expo prebuild --platform ios --no-install
+    xcode_settings=(COMPILER_INDEX_STORE_ENABLE=NO CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=-)
+    if [[ -n "${XCODE_COMPILATION_CACHE_DIR:-}" ]]; then
+      export USE_CCACHE=0
+      xcode_settings+=(COMPILATION_CACHE_ENABLE_CACHING=YES "COMPILATION_CACHE_CAS_PATH=$XCODE_COMPILATION_CACHE_DIR")
+    else
+      use_compiler_cache
+    fi
     (cd ios && pod install)
     workspace=$(find ios -maxdepth 1 -name '*.xcworkspace' -print -quit)
     test -n "$workspace"
     # Simulator signing embeds the entitlements SecureStore needs for Keychain.
     # The local ad-hoc identity requires no Apple account or provisioning profile.
-    xcodebuild -workspace "$workspace" -scheme "$(basename "$workspace" .xcworkspace)" -configuration Release -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath "$RUNNER_TEMP/ios-build" CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- build
+    /usr/bin/time -p xcodebuild -quiet -showBuildTimingSummary \
+      -workspace "$workspace" -scheme "$(basename "$workspace" .xcworkspace)" \
+      -configuration Release -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+      -derivedDataPath "$RUNNER_TEMP/ios-build" "${xcode_settings[@]}" build
+    if [[ "${USE_CCACHE:-}" == 1 ]]; then ccache --show-stats; fi
     app=$(find "$RUNNER_TEMP/ios-build/Build/Products/Release-iphonesimulator" -maxdepth 1 -name '*.app' -type d -print -quit)
     test -n "$app"
     check_source
@@ -114,7 +144,9 @@ case "${1:?operation required}" in
       : "${ASC_APP_ID:?ASC app ID required}" "${APP_VERSION:?App version required}" "${RUNTIME:?Runtime required}"
       ipa="$RUNNER_TEMP/disposabl.ipa"
       check_source
+      use_compiler_cache
       EAS_NO_VCS=1 bun x "$EAS_CLI" build --platform ios --profile ios-production --local --output "$ipa" --non-interactive --freeze-credentials
+      if [[ "${USE_CCACHE:-}" == 1 ]]; then ccache --show-stats; fi
       test -s "$ipa"
       mkdir -p "$RUNNER_TEMP/ios-ipa"
       unzip -q "$ipa" -d "$RUNNER_TEMP/ios-ipa"

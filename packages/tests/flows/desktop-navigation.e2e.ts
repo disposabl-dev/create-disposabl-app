@@ -5,6 +5,7 @@ import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn, execFileSync } from "node:child_process";
+import { createRequire } from "node:module";
 import { root } from "../project";
 
 test(
@@ -75,11 +76,10 @@ test(
         ],
         { cwd: root },
       );
-      const electron = execFileSync(
-        process.execPath,
-        ["-e", 'console.log(require("electron"))'],
-        { cwd: root, encoding: "utf8" },
-      ).trim();
+      const fromDesktop = createRequire(
+        join(root, "apps/desktop/package.json"),
+      );
+      const electron = fromDesktop("electron") as string;
       const env = { ...process.env };
       delete env.ELECTRON_RUN_AS_NODE;
       for (const extra of [

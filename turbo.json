@@ -10,7 +10,9 @@
       "env": ["VITE_CONVEX_SITE_URL", "VITE_CONVEX_URL"]
     },
     "lint": {
-      "dependsOn": ["^lint"]
+      "dependsOn": ["^lint"],
+      "env": ["DISPOSABL_BUN_LINT"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/.github/scripts/bun-lint.mjs"]
     },
     "format": {
       "dependsOn": ["^format"],
@@ -41,7 +43,12 @@
     },
     "@disposabl/disposabl-kit#lint": {
       "dependsOn": ["^lint"],
-      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/packages/backend/convex/**"]
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/packages/backend/convex/**",
+        "$TURBO_ROOT$/.github/scripts/bun-lint.mjs"
+      ],
+      "env": ["DISPOSABL_BUN_LINT"]
     },
     "@disposabl/disposabl-kit#typecheck": {
       "dependsOn": ["^typecheck", "@disposabl/web#generate:routes"],

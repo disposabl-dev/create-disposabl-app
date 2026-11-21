@@ -62,6 +62,11 @@ test("CI uses the deployed target, runs setup before upload and stops on setup f
   try {
     await mkdir(join(temp, "packages/backend"), { recursive: true });
     await mkdir(join(temp, "bin"));
+    await mkdir(join(temp, ".github/scripts"), { recursive: true });
+    await writeFile(
+      join(temp, ".github/scripts/web.sh"),
+      await readFile(join(root, ".github/scripts/web.sh"), "utf8"),
+    );
     // Record the actual shell command boundaries without running any tools/providers.
     await writeFile(
       join(temp, "bin/bun"),
@@ -92,7 +97,6 @@ case "$*" in *'convex run '*) exit "$SETUP_EXIT";; esac
           env: {
             NODE_ENV: "test",
             PATH: `${join(temp, "bin")}:${process.env.PATH}`,
-            TRUSTED: "true",
             CONVEX_DEPLOY_KEY: "fixture",
             CHANNEL: channel,
             GH_REPO: repository,

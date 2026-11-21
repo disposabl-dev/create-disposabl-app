@@ -145,6 +145,9 @@ def listeners(port):
 def main():
     if len(sys.argv) != 1:
         raise RuntimeError('No arguments accepted; supply CONVEX_LOCAL_BINARY and PLAYWRIGHT_BROWSERS_PATH')
+    shard = os.environ.get('PRODUCT_BROWSER_SHARD', '')
+    if shard and not re.fullmatch(r'[1-4]/4', shard):
+        raise RuntimeError('Invalid product browser shard')
     binary = Path(os.environ.get('CONVEX_LOCAL_BINARY', '')).resolve()
     browsers = Path(os.environ.get('PLAYWRIGHT_BROWSERS_PATH', '')).resolve()
     if not os.environ.get('CONVEX_LOCAL_BINARY') or not os.environ.get('PLAYWRIGHT_BROWSERS_PATH') or not binary.is_file() or not os.access(binary, os.X_OK) or not browsers.is_dir():
@@ -262,7 +265,8 @@ def main():
         command([cli, 'dev', '--once', '--typecheck', 'disable', '--codegen', 'disable'], cwd=backend, environment=admin, log='sync.log')
         platforms = json.loads((source / 'disposabl.json').read_text()).get('platforms', [])
         targets = 'web,backend,api' if 'api' in platforms else 'web,backend'
-        command(['bun', 'run', 'e2e', 'run', '--target', targets, '--retries', '0', '--no-cache'], cwd=source, environment=testenv, log='e2e.log')
+        options = ['--shard', shard] if shard else []
+        command(['bun', 'run', 'e2e', 'run', '--target', targets, '--retries', '0', '--no-cache', *options], cwd=source, environment=testenv, log='e2e.log')
         print(f'Product {targets} E2E passed', flush=True)
     if any(listeners(port) for port in PORTS):
         raise RuntimeError('Listener still present after backend teardown')

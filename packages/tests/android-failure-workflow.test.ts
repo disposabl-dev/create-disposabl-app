@@ -38,7 +38,8 @@ test("Android uses its selected runner while allowing native build and cache fin
 
 test("product and generated apps share one artifact build and gate submission", () => {
   const job = workflow.jobs.android;
-  assert.equal(job.if, "needs.web.outputs.android_build == 'true'");
+  assert.match(job.if, /needs\.changes\.outputs\.android == 'true'/);
+  assert.ok(job.needs.includes("expo-project"));
   assert.equal(workflow.jobs["android-play"], undefined);
   assert.equal(
     job.steps.filter((step: { run?: string }) =>
@@ -50,32 +51,25 @@ test("product and generated apps share one artifact build and gate submission", 
   assert.equal(submit.needs, "android");
   assert.equal(
     submit.if,
-    "github.event_name == 'push' && vars.ANDROID_PLAY_SUBMIT == 'true' && needs.android.result == 'success'",
+    "github.event_name == 'push' && vars.ANDROID_PLAY_SUBMIT == 'true' && needs.android.outputs.built == 'true' && needs.android.result == 'success'",
   );
   assert.ok(
     submit.steps.some(
       (step: { uses?: string }) => step.uses === "actions/download-artifact@v4",
     ),
   );
-  const fingerprint = workflow.jobs.web.steps.find(
+  const fingerprint = job.steps.find(
     (step: { name?: string }) => step.name === "Fingerprint",
   );
-  assert.equal(fingerprint.if, "needs.changes.outputs.android == 'true'");
+  assert.equal(fingerprint.id, "fingerprint");
 });
 
 test("Android failure reporting handles failed and cancelled builds independently", () => {
   const job = workflow.jobs["android-failure"];
-  const hasPlayJob = !!workflow.jobs["android-play"];
-  assert.deepEqual(
-    job.needs,
-    hasPlayJob ? ["android", "android-play"] : "android",
-  );
-  assert.equal(
-    job.if,
-    hasPlayJob
-      ? "always() && (needs.android.result == 'failure' || needs.android.result == 'cancelled' || needs.android-play.result == 'failure' || needs.android-play.result == 'cancelled')"
-      : "always() && (needs.android.result == 'failure' || needs.android.result == 'cancelled')",
-  );
+  assert.deepEqual(job.needs, ["changes", "expo-project", "android"]);
+  assert.match(job.if, /needs\.android\.result == 'failure'/);
+  assert.match(job.if, /needs\.android\.result == 'cancelled'/);
+  assert.match(job.if, /needs\.expo-project\.result == 'failure'/);
   assert.deepEqual(job.permissions, { contents: "read", "id-token": "write" });
   assert.equal(job["runs-on"], "ubuntu-24.04");
   assert.equal(job["timeout-minutes"], 5);
@@ -83,7 +77,7 @@ test("Android failure reporting handles failed and cancelled builds independentl
   assert.equal(job.steps[1].uses, "actions/setup-node@v6");
   assert.equal(
     job.steps[2].run,
-    'node .github/scripts/disposabl.mjs report android failed "Android build failed or was cancelled; check the workflow log."',
+    'node .github/scripts/disposabl.mjs report android failed "$DETAIL"',
   );
   assert.equal(
     workflow.jobs.android.steps.some((step: { run?: string }) =>

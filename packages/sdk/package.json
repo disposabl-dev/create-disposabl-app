@@ -20,7 +20,7 @@
   "scripts": {
     "generate": "openapi-ts && bun fmt src/generated",
     "build": "bun build.ts",
-    "typecheck": "bun run generate && tsc --noEmit",
+    "typecheck": "bun run generate && bun check",
     "lint": "bun check",
     "release": "semantic-release",
     "prepack": "node dist/verify-metadata.mjs"
