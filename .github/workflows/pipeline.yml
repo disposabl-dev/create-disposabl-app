@@ -244,7 +244,7 @@ jobs:
         run: bash "$GITHUB_WORKSPACE/.github/scripts/mobile.sh" expo-fingerprint
       - name: Restore Expo transform cache
         id: metro-cache
-        if: steps.fingerprint.outputs.build == 'false' && !(github.event_name == 'push' && github.repository == 'disposabl-dev/create-disposabl-app')
+        if: steps.fingerprint.outcome == 'success'
         uses: actions/cache@v4
         with: &metro-cache
           path: ${{ runner.temp }}/expo-metro-restore
@@ -267,7 +267,7 @@ jobs:
       - &metro-stage
         name: Save current Expo transforms on a cache miss
         if: steps.ota.outcome == 'success' && steps.metro-cache.outcome == 'success' && steps.metro-cache.outputs.cache-hit != 'true'
-        run: |
+        run: &metro-stage-command |
           if [[ -n "$(find "$EXPO_METRO_CACHE_OUTPUT_DIR" -type f -print -quit)" ]] &&
             rmdir "$EXPO_METRO_CACHE_RESTORE_DIR"; then
             mv "$EXPO_METRO_CACHE_OUTPUT_DIR" "$EXPO_METRO_CACHE_RESTORE_DIR"
@@ -340,6 +340,9 @@ jobs:
           DISPOSABL_ANDROID_VERSION_CODE: ${{ steps.android-version.outputs.version || github.run_number }}
           DISPOSABL_ANDROID_CHANNEL: *channel
         run: bash "$GITHUB_WORKSPACE/.github/scripts/mobile.sh" android-build
+      - name: Save current Expo transforms from the native build
+        if: steps.build.outcome == 'success' && steps.metro-cache.outcome == 'success' && steps.metro-cache.outputs.cache-hit != 'true'
+        run: *metro-stage-command
       - &publish
         name: Publish
         if: github.job == 'desktop' || hashFiles('dist/release/android.json') != ''
