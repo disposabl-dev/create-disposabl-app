@@ -25,6 +25,7 @@ case "${1:?operation required}" in
     fi
     ;;
   build)
+    shift
     # Keep aggregate CPU/memory samples in the job log, including interrupted builds.
     # Do not print process arguments or environment values, which can contain secrets.
     sampler=""
@@ -36,7 +37,7 @@ case "${1:?operation required}" in
     fi
     TIMEFORMAT='Gradle elapsed: %3R seconds; shell and child CPU: %3U user, %3S system'
     status=0
-    time ./gradlew :app:assembleRelease --no-daemon --build-cache || status=$?
+    time ./gradlew "$@" --no-daemon --build-cache || status=$?
     if [[ -n "${CCACHE_DIR:-}" ]]; then ccache --show-stats; fi
     exit "$status"
     ;;

@@ -7,7 +7,7 @@
     "generate:watch": "bun generate.ts --watch",
     "dev": "convex dev --run billing:setup",
     "logs": "convex logs",
-    "typecheck": "tsc -p convex",
+    "typecheck": "bun check -p convex",
     "lint": "eslint . --report-unused-disable-directives --max-warnings 0",
     "format": "prettier --write 'convex/**/*.ts'"
   },

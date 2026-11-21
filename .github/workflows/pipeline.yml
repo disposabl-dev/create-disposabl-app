@@ -16,13 +16,11 @@ env:
   DISPOSABL_MOBILE_CHANNEL: *channel
   EAS_ENVIRONMENT: ${{ github.event_name == 'push' && 'production' || 'preview' }}
   EAS_CLI: eas-cli@27.2.0
-  BUN_VERSION: &bun-version "1.4.4"
+  BUN_VERSION: &bun-version "1.4.5"
   NODE_VERSION: &node-version "24"
   LINUX_RUNNER: &linux-runner ubuntu-24.04
-  WEB_RUNNER: ubuntu-24.04
-  WINDOWS_RUNNER: windows-2025
-  MACOS_RUNNER: macos-26
   RELEASE_PREFIX: app
+  SEGMENT_DOWNLOAD_TIMEOUT_MINS: "1"
   DISPOSABL_ANDROID_VERSION_CODE: ${{ github.run_number }}
   DISPOSABL_IOS_BUILD_NUMBER: ${{ github.run_number }}
   # Build jobs only read this repository. Keep installation tokens in publishing jobs.
@@ -40,7 +38,7 @@ jobs:
       pull-requests: read
       actions: read
     runs-on: *linux-runner
-    timeout-minutes: 30
+    timeout-minutes: 3
     outputs:
       linux_runner: ${{ steps.platforms.outputs.linux_runner }}
       android_runner: ${{ steps.platforms.outputs.android_runner }}
@@ -62,57 +60,41 @@ jobs:
           EXPO_CONNECTED: ${{ secrets.EXPO_TOKEN != '' }}
           IOS_BUILDS_ENABLED: ${{ vars.IOS_BUILDS_ENABLED != 'false' }}
         run: bash "$GITHUB_WORKSPACE/.github/scripts/platforms.sh"
-      - name: Product checks
-        if: github.repository == 'disposabl-dev/create-disposabl-app'
-        uses: ./.github/actions/product-checks
-        with:
-          source_sha: ${{ github.event.pull_request.head.sha || github.sha }}
-        env:
-          GH_TOKEN: ""
-          PYTHONDONTWRITEBYTECODE: "1"
-          DO_NOT_TRACK: "1"
-          E2E_TELEMETRY_DISABLED: "1"
-          EXPO_NO_TELEMETRY: "1"
-          DISPOSABL_ANALYTICS_ENABLED: "false"
-          EXPO_PUBLIC_DISPOSABL_ANALYTICS_ENABLED: "false"
-          VITE_DISPOSABL_ANALYTICS_ENABLED: "false"
+  product-checks:
+    if: github.repository == 'disposabl-dev/create-disposabl-app' && (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository)
+    uses: ./.github/workflows/product-checks.yml
+    with:
+      source_sha: ${{ github.event.pull_request.head.sha || github.sha }}
   web:
     name: Web
-    needs: [changes]
+    needs: [changes, product-checks]
     # Fork code must not run in a job with deployment credentials.
-    if: always() && !cancelled() && needs.changes.result == 'success' && (needs.changes.outputs.changed == 'true' || (github.event_name == 'push' && github.repository == 'disposabl-dev/create-disposabl-app'))
+    if: always() && !cancelled() && needs.changes.result == 'success' && needs.product-checks.result == 'success' && (needs.changes.outputs.changed == 'true' || (github.event_name == 'push' && github.repository == 'disposabl-dev/create-disposabl-app'))
     permissions: &release-permissions
       contents: read
       pull-requests: read
       id-token: write
-    timeout-minutes: 20
+    timeout-minutes: 10
     runs-on: ${{ needs.changes.outputs.linux_runner }}
     outputs:
       desktop: ${{ needs.changes.outputs.desktop }}
       ios: ${{ needs.changes.outputs.ios }}
       packages: ${{ needs.changes.outputs.packages }}
-      release: ${{ steps.artifacts.outcome == 'success' }}
-      android_build: ${{ needs.changes.outputs.android == 'true' && github.event_name == 'push' && github.repository == 'disposabl-dev/create-disposabl-app' && 'true' || steps.fingerprint.outputs.build }}
-      android_runtime: ${{ steps.fingerprint.outputs.runtime }}
-      android_version_code: ${{ steps.android-version.outputs.version }}
       convex_url: ${{ steps.deploy.outputs.CONVEX_URL }}
       convex_site_url: ${{ steps.deploy.outputs.CONVEX_SITE_URL }}
       public_site_url: ${{ steps.deploy.outputs.PUBLIC_SITE_URL }}
     env:
-      PLATFORM: android
-      DISPOSABL_ANDROID_SIGNING: ${{ github.event_name == 'push' && secrets.DISPOSABL_ANDROID_SIGNING || '' }}
-      ANDROID_KEYSTORE_BASE64: ${{ github.event_name == 'push' && secrets.ANDROID_KEYSTORE_BASE64 || '' }}
-      ANDROID_KEYSTORE_PASSWORD: ${{ github.event_name == 'push' && secrets.ANDROID_KEYSTORE_PASSWORD || '' }}
-      ANDROID_KEY_ALIAS: ${{ github.event_name == 'push' && secrets.ANDROID_KEY_ALIAS || '' }}
-      ANDROID_KEY_PASSWORD: ${{ github.event_name == 'push' && secrets.ANDROID_KEY_PASSWORD || '' }}
-      ANDROID_PLAY_SUBMIT: ${{ vars.ANDROID_PLAY_SUBMIT }}
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-      EXPO_PROJECT_ID: ${{ secrets.EXPO_PROJECT_ID || vars.EXPO_PROJECT_ID }}
-      EXPO_OWNER: ${{ secrets.EXPO_OWNER || vars.EXPO_OWNER }}
-      EXPO_SLUG: ${{ secrets.EXPO_SLUG || vars.EXPO_SLUG }}
-      EXPO_NO_DOTENV: "1"
     steps:
       - *checkout
+      - name: Check deployment configuration
+        env:
+          DEPLOY_KEY_PRESENT: ${{ secrets[github.event_name == 'push' && 'CONVEX_DEPLOY_KEY' || 'CONVEX_DEPLOY_KEY_PREVIEW'] != '' }}
+        run: |
+          if [[ "$DEPLOY_KEY_PRESENT" != true ]]; then
+            echo '::error::Configure the Convex deployment key for this release channel.'
+            exit 1
+          fi
       - &node
         uses: actions/setup-node@v6
         with: { node-version: *node-version, package-manager-cache: false }
@@ -125,12 +107,22 @@ jobs:
       - &bun
         uses: oven-sh/setup-bun@v2
         with: { bun-version: *bun-version }
+      - name: Check source formatting
+        if: github.repository != 'disposabl-dev/create-disposabl-app'
+        run: bun fmt --check
       - &cache
         uses: actions/cache@v4
         with:
           path: ~/.bun/install/cache
-          key: bun-${{ github.job == 'desktop' && 'desktop-' || '' }}${{ runner.os }}-${{ runner.arch }}-${{ env.BUN_VERSION }}-${{ hashFiles('bun.lock') }}
-          restore-keys: bun-${{ github.job == 'desktop' && 'desktop-' || '' }}${{ runner.os }}-${{ runner.arch }}-${{ env.BUN_VERSION }}-
+          key: bun-${{ github.job == 'desktop' && 'desktop-' || (github.job == 'android' || startsWith(github.job, 'ios-')) && 'mobile-' || '' }}${{ runner.os }}-${{ runner.arch }}-${{ env.BUN_VERSION }}-${{ hashFiles('bun.lock') }}
+          restore-keys: bun-${{ github.job == 'desktop' && 'desktop-' || (github.job == 'android' || startsWith(github.job, 'ios-')) && 'mobile-' || '' }}${{ runner.os }}-${{ runner.arch }}-${{ env.BUN_VERSION }}-
+      - name: Restore task cache
+        if: github.repository != 'disposabl-dev/create-disposabl-app'
+        uses: actions/cache@v4
+        with:
+          path: .turbo/cache
+          key: turbo-v1-${{ runner.os }}-${{ runner.arch }}-${{ env.BUN_VERSION }}-${{ hashFiles('bun.lock') }}-${{ env.SOURCE }}
+          restore-keys: turbo-v1-${{ runner.os }}-${{ runner.arch }}-${{ env.BUN_VERSION }}-${{ hashFiles('bun.lock') }}-
       - &install
         run: bun install --frozen-lockfile ${{ github.job == 'desktop' && '--filter "*desktop*" --filter @disposabl/backend' || (github.job == 'android' || startsWith(github.job, 'ios-')) && '--filter @disposabl/mobile' || '' }}
       - name: Report build start
@@ -139,12 +131,21 @@ jobs:
           if [[ -z "$EXPO_TOKEN" ]]; then node .github/scripts/disposabl.mjs report android blocked 'Connect Expo before building Android.'; fi
           if [[ '${{ github.event_name }}' == pull_request ]]; then node .github/scripts/disposabl.mjs report cli,typescript-sdk blocked 'Packages publish after merge to main.'; fi
       - name: Check
-        run: bun run check
+        if: github.repository != 'disposabl-dev/create-disposabl-app'
+        run: bun run check:ci
+      - name: Generate checked release inputs
+        if: github.repository == 'disposabl-dev/create-disposabl-app'
+        run: bun run generate
+      - name: Test generated app
+        if: github.repository != 'disposabl-dev/create-disposabl-app'
+        run: bun run test:unit --parallel=4 --bail=1
       - name: Build selected clients
         run: |
+          packages=()
           for package in cli sdk; do
-            if test -f "packages/$package/package.json"; then bun run --cwd "packages/$package" build; fi
+            if [[ -f "packages/$package/package.json" ]]; then packages+=(--filter "./packages/$package"); fi
           done
+          if (( ${#packages[@]} )); then bun x --no-install turbo run build "${packages[@]}"; fi
       - name: Deploy
         id: deploy
         timeout-minutes: 10
@@ -159,7 +160,7 @@ jobs:
           target=()
           if [[ "$CHANNEL" != production ]]; then export AUTH_TARGET="--preview-name $CHANNEL"; target=(--preview-name "$CHANNEL"); fi
           if [[ "$CHANNEL" == production ]]; then bun x --no-install convex env set --prod BILLING_ENVIRONMENT live; fi
-          bun x --no-install convex deploy --yes "${target[@]}" --cmd-url-env-var-name CONVEX_URL --cmd 'set -e; for name in CONVEX_URL CONVEX_SITE_URL; do value=$(printenv "$name"); test -n "$value"; printf "%s=%s\n" "$name" "$value" | tee -a "$GITHUB_ENV" >> "$GITHUB_OUTPUT"; done; export VITE_CONVEX_URL="$CONVEX_URL"; if node -e "process.exit(require(\"../../disposabl.json\").appId ? 0 : 1)"; then node ../../.github/scripts/disposabl.mjs site; PUBLIC_SITE_URL=$(sed -n "s/^PUBLIC_SITE_URL=//p" "$GITHUB_OUTPUT" | tail -1); export PUBLIC_SITE_URL; bun x --no-install convex env set $AUTH_TARGET PUBLIC_SITE_URL "$PUBLIC_SITE_URL"; else PUBLIC_SITE_URL="$CONVEX_SITE_URL"; printf "PUBLIC_SITE_URL=%s\n" "$PUBLIC_SITE_URL" | tee -a "$GITHUB_ENV" >> "$GITHUB_OUTPUT"; fi; for prefix in VITE_ EXPO_PUBLIC_; do export "${prefix}CONVEX_URL=$CONVEX_URL" "${prefix}CONVEX_SITE_URL=$PUBLIC_SITE_URL"; printf "%sCONVEX_URL=%s\n%sCONVEX_SITE_URL=%s\n" "$prefix" "$CONVEX_URL" "$prefix" "$PUBLIC_SITE_URL" >> "$GITHUB_ENV"; done; bun run --cwd ../.. build --filter=@disposabl/web'
+          bun x --no-install convex deploy --yes "${target[@]}" --cmd-url-env-var-name CONVEX_URL --cmd 'set -e; for name in CONVEX_URL CONVEX_SITE_URL; do value=$(printenv "$name"); test -n "$value"; printf "%s=%s\n" "$name" "$value" | tee -a "$GITHUB_ENV" >> "$GITHUB_OUTPUT"; done; export VITE_CONVEX_URL="$CONVEX_URL"; if node -e "process.exit(require(\"../../disposabl.json\").appId ? 0 : 1)"; then node ../../.github/scripts/disposabl.mjs site; PUBLIC_SITE_URL=$(sed -n "s/^PUBLIC_SITE_URL=//p" "$GITHUB_OUTPUT" | tail -1); export PUBLIC_SITE_URL; bun x --no-install convex env set $AUTH_TARGET PUBLIC_SITE_URL "$PUBLIC_SITE_URL"; else PUBLIC_SITE_URL="$CONVEX_SITE_URL"; printf "PUBLIC_SITE_URL=%s\n" "$PUBLIC_SITE_URL" | tee -a "$GITHUB_ENV" >> "$GITHUB_OUTPUT"; fi; for prefix in VITE_ EXPO_PUBLIC_; do export "${prefix}CONVEX_URL=$CONVEX_URL" "${prefix}CONVEX_SITE_URL=$PUBLIC_SITE_URL"; printf "%sCONVEX_URL=%s\n%sCONVEX_SITE_URL=%s\n" "$prefix" "$CONVEX_URL" "$prefix" "$PUBLIC_SITE_URL" >> "$GITHUB_ENV"; done; /usr/bin/time -p timeout --kill-after=10s 120s bun x --no-install turbo run build --cwd ../.. --filter=@disposabl/web'
           setup_target=(--prod)
           if [[ "$CHANNEL" != production ]]; then setup_target=("${target[@]}"); fi
           setup_args='{"expectedEnvironment":"live"}'
@@ -174,60 +175,16 @@ jobs:
       - name: Report web result
         if: always()
         run: node .github/scripts/disposabl.mjs report web,api,mcp ${{ steps.deploy.outcome == 'success' && 'ready' || 'failed' }}
-      - name: Allocate product Android version
-        id: android-version
-        if: needs.changes.outputs.android == 'true' && github.event_name == 'push' && github.repository == 'disposabl-dev/create-disposabl-app'
-        run: |
-          [[ "$GITHUB_RUN_NUMBER" =~ ^[1-9][0-9]*$ && "$GITHUB_RUN_NUMBER" -le 20999989 ]] || { echo 'Invalid pipeline run number' >&2; exit 1; }
-          [[ "$GITHUB_RUN_ATTEMPT" =~ ^[1-9][0-9]?$ ]] || { echo 'Invalid pipeline attempt' >&2; exit 1; }
-          version=$((1000 + 100 * GITHUB_RUN_NUMBER + GITHUB_RUN_ATTEMPT))
-          echo "DISPOSABL_ANDROID_VERSION_CODE=$version" >> "$GITHUB_ENV"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-      - name: Expo
-        if: needs.changes.outputs.android == 'true'
-        working-directory: apps/mobile
-        run: bash "$GITHUB_WORKSPACE/.github/scripts/mobile.sh" expo-env
-      - name: Channel
-        if: needs.changes.outputs.android == 'true' && !(github.event_name == 'push' && github.repository == 'disposabl-dev/create-disposabl-app')
-        working-directory: apps/mobile
-        run: bash "$GITHUB_WORKSPACE/.github/scripts/mobile.sh" expo-channel
-      - name: Fingerprint
-        id: fingerprint
-        if: needs.changes.outputs.android == 'true'
-        env:
-          UPDATE_POLICY: ${{ github.event_name == 'push' && github.repository == 'disposabl-dev/create-disposabl-app' && 'expo' || '' }}
-        working-directory: apps/mobile
-        run: bash "$GITHUB_WORKSPACE/.github/scripts/mobile.sh" expo-fingerprint
-      - name: Update
-        if: steps.fingerprint.outputs.build == 'false' && !(github.event_name == 'push' && github.repository == 'disposabl-dev/create-disposabl-app')
-        env:
-          TAG: ${{ steps.fingerprint.outputs.tag }}
-          SHA: ${{ steps.fingerprint.outputs.sha }}
-          RUNTIME: ${{ steps.fingerprint.outputs.runtime }}
-        run: bash "$GITHUB_WORKSPACE/.github/scripts/mobile.sh" expo-update
-      - &publish
-        name: Publish
-        if: github.job == 'android' || (github.job == 'web' && hashFiles('dist/release/android.json') != '') || github.job == 'desktop'
-        shell: bash
-        run: bash "$GITHUB_WORKSPACE/.github/scripts/release.sh" verify-artifacts
-      - &artifacts
-        name: Upload release artifacts
-        id: artifacts
-        if: hashFiles('dist/release/*') != ''
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-${{ env.PLATFORM }}
-          path: dist/release/
-          retention-days: 3
-          compression-level: 0
-          if-no-files-found: error
   android:
     name: Android
     needs: [changes, web]
-    if: needs.web.outputs.android_build == 'true'
+    if: needs.changes.outputs.android == 'true'
     permissions: *release-permissions
     runs-on: ${{ needs.changes.outputs.android_runner }}
     timeout-minutes: 30
+    outputs:
+      release: ${{ steps.artifacts.outcome == 'success' }}
+      built: ${{ steps.build.outcome == 'success' }}
     env:
       PLATFORM: android
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
@@ -243,40 +200,82 @@ jobs:
       ANDROID_PLAY_SUBMIT: ${{ vars.ANDROID_PLAY_SUBMIT }}
     steps:
       - *checkout
-      - name: Prepare Android disk space
-        run: bash .github/scripts/android-runner.sh prepare
       - *node
       - *bun
       - *cache
       - *install
       - name: Report mobile build
         run: node .github/scripts/disposabl.mjs report "$PLATFORM" building
+      - name: Allocate product Android version
+        id: android-version
+        if: github.event_name == 'push' && github.repository == 'disposabl-dev/create-disposabl-app'
+        run: |
+          [[ "$GITHUB_RUN_NUMBER" =~ ^[1-9][0-9]*$ && "$GITHUB_RUN_NUMBER" -le 20999989 ]] || { echo 'Invalid pipeline run number' >&2; exit 1; }
+          [[ "$GITHUB_RUN_ATTEMPT" =~ ^[1-9][0-9]?$ ]] || { echo 'Invalid pipeline attempt' >&2; exit 1; }
+          version=$((1000 + 100 * GITHUB_RUN_NUMBER + GITHUB_RUN_ATTEMPT))
+          echo "DISPOSABL_ANDROID_VERSION_CODE=$version" >> "$GITHUB_ENV"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
       - name: Expo
+        timeout-minutes: 2
         working-directory: apps/mobile
         run: bash "$GITHUB_WORKSPACE/.github/scripts/mobile.sh" expo-env
+      - name: Channel
+        timeout-minutes: 2
+        if: github.event_name != 'push' || github.repository != 'disposabl-dev/create-disposabl-app'
+        working-directory: apps/mobile
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/mobile.sh" expo-channel
       - name: Java
         uses: actions/setup-java@v5
         with: { distribution: temurin, java-version: "17" }
+      - name: Fingerprint
+        timeout-minutes: 2
+        id: fingerprint
+        env:
+          DISPOSABL_ANDROID_SIGNING: ${{ github.event_name == 'push' && secrets.DISPOSABL_ANDROID_SIGNING || '' }}
+          ANDROID_KEYSTORE_BASE64: ${{ github.event_name == 'push' && secrets.ANDROID_KEYSTORE_BASE64 || '' }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ github.event_name == 'push' && secrets.ANDROID_KEYSTORE_PASSWORD || '' }}
+          ANDROID_KEY_ALIAS: ${{ github.event_name == 'push' && secrets.ANDROID_KEY_ALIAS || '' }}
+          ANDROID_KEY_PASSWORD: ${{ github.event_name == 'push' && secrets.ANDROID_KEY_PASSWORD || '' }}
+          UPDATE_POLICY: ${{ github.event_name == 'push' && github.repository == 'disposabl-dev/create-disposabl-app' && 'expo' || '' }}
+        working-directory: apps/mobile
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/mobile.sh" expo-fingerprint
+      - name: Update
+        if: steps.fingerprint.outputs.build == 'false' && !(github.event_name == 'push' && github.repository == 'disposabl-dev/create-disposabl-app')
+        env:
+          TAG: ${{ steps.fingerprint.outputs.tag }}
+          SHA: ${{ steps.fingerprint.outputs.sha }}
+          RUNTIME: ${{ steps.fingerprint.outputs.runtime }}
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/mobile.sh" expo-update
+      - name: Prepare Android disk space
+        if: steps.fingerprint.outputs.build == 'true' || (github.event_name == 'push' && github.repository == 'disposabl-dev/create-disposabl-app')
+        id: native
+        run: bash .github/scripts/android-runner.sh prepare
       - name: SDK
+        if: steps.native.outcome == 'success'
         uses: android-actions/setup-android@v3
         with: { packages: platform-tools }
       - name: Gradle
+        if: steps.native.outcome == 'success'
         uses: gradle/actions/setup-gradle@v4
-        with: { cache-read-only: false }
+        with: { cache-read-only: "${{ github.event_name != 'push' }}" }
       - name: Restore native compiler cache
-        if: github.event_name == 'push'
+        if: steps.native.outcome == 'success'
         id: native-cache
         uses: actions/cache/restore@v4
         with:
           path: ${{ runner.temp }}/ccache
-          key: android-ccache-v1-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+          key: android-ccache-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock', 'apps/mobile/app.json', 'apps/mobile/scripts/**') }}-${{ env.SOURCE }}
+          restore-keys: android-ccache-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock', 'apps/mobile/app.json', 'apps/mobile/scripts/**') }}-
       - name: Install native compiler cache
-        if: github.event_name == 'push' && steps.native-cache.outputs.cache-hit == 'true'
+        if: steps.native.outcome == 'success' && (github.event_name == 'push' || steps.native-cache.outputs.cache-matched-key != '')
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y ccache
-          printf 'CCACHE_DIR=%s\nCCACHE_COMPILERCHECK=content\nCMAKE_C_COMPILER_LAUNCHER=ccache\nCMAKE_CXX_COMPILER_LAUNCHER=ccache\n' "$RUNNER_TEMP/ccache" >> "$GITHUB_ENV"
+          if ! command -v ccache >/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y ccache
+          fi
+          printf 'CCACHE_DIR=%s\nCCACHE_BASEDIR=%s\nCCACHE_MAXSIZE=512M\nCCACHE_COMPILERCHECK=content\nCMAKE_C_COMPILER_LAUNCHER=ccache\nCMAKE_CXX_COMPILER_LAUNCHER=ccache\n' "$RUNNER_TEMP/ccache" "$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
       - name: Select Android bundle validation
+        if: steps.native.outcome == 'success'
         id: bundletool-needed
         env:
           SIGNING_BUNDLE: ${{ github.event_name == 'push' && secrets.DISPOSABL_ANDROID_SIGNING || '' }}
@@ -292,25 +291,46 @@ jobs:
           curl --fail --location --silent --show-error --retry 3 https://github.com/google/bundletool/releases/download/1.18.3/bundletool-all-1.18.3.jar --output "$RUNNER_TEMP/bundletool.jar"
           echo 'a099cfa1543f55593bc2ed16a70a7c67fe54b1747bb7301f37fdfd6d91028e29  '"$RUNNER_TEMP/bundletool.jar" | sha256sum --check --status
       - name: Build
+        id: build
+        if: steps.native.outcome == 'success'
         working-directory: apps/mobile
         env:
-          RUNTIME: ${{ needs.web.outputs.android_runtime }}
-          BUNDLETOOL_JAR: ${{ runner.temp }}/bundletool.jar
-          UPDATE_POLICY: ${{ github.event_name == 'push' && github.repository == 'disposabl-dev/create-disposabl-app' && 'expo' || '' }}
-          DISPOSABL_ANDROID_VERSION_CODE: ${{ needs.web.outputs.android_version_code || github.run_number }}
-          DISPOSABL_ANDROID_CHANNEL: *channel
           DISPOSABL_ANDROID_SIGNING: ${{ github.event_name == 'push' && secrets.DISPOSABL_ANDROID_SIGNING || '' }}
           ANDROID_KEYSTORE_BASE64: ${{ github.event_name == 'push' && secrets.ANDROID_KEYSTORE_BASE64 || '' }}
           ANDROID_KEYSTORE_PASSWORD: ${{ github.event_name == 'push' && secrets.ANDROID_KEYSTORE_PASSWORD || '' }}
           ANDROID_KEY_ALIAS: ${{ github.event_name == 'push' && secrets.ANDROID_KEY_ALIAS || '' }}
           ANDROID_KEY_PASSWORD: ${{ github.event_name == 'push' && secrets.ANDROID_KEY_PASSWORD || '' }}
+          RUNTIME: ${{ steps.fingerprint.outputs.runtime }}
+          BUNDLETOOL_JAR: ${{ runner.temp }}/bundletool.jar
+          UPDATE_POLICY: ${{ github.event_name == 'push' && github.repository == 'disposabl-dev/create-disposabl-app' && 'expo' || '' }}
+          DISPOSABL_ANDROID_VERSION_CODE: ${{ steps.android-version.outputs.version || github.run_number }}
+          DISPOSABL_ANDROID_CHANNEL: *channel
         run: bash "$GITHUB_WORKSPACE/.github/scripts/mobile.sh" android-build
-      - *publish
-      - *artifacts
+      - &publish
+        name: Publish
+        if: github.job == 'desktop' || hashFiles('dist/release/android.json') != ''
+        shell: bash
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/release.sh" verify-artifacts
+      - name: Upload release artifacts
+        id: artifacts
+        if: hashFiles('dist/release/*') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ env.PLATFORM }}
+          path: dist/release/
+          retention-days: 3
+          compression-level: 0
+          if-no-files-found: error
+      - name: Save native compiler cache
+        if: github.event_name == 'push' && steps.build.outcome == 'success' && steps.native-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ runner.temp }}/ccache
+          key: ${{ steps.native-cache.outputs.cache-primary-key }}
   android-submit:
     name: Android Play submission
     needs: android
-    if: github.event_name == 'push' && vars.ANDROID_PLAY_SUBMIT == 'true' && needs.android.result == 'success'
+    if: github.event_name == 'push' && vars.ANDROID_PLAY_SUBMIT == 'true' && needs.android.outputs.built == 'true' && needs.android.result == 'success'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
@@ -388,10 +408,12 @@ jobs:
       - name: Report build
         run: node .github/scripts/disposabl.mjs report ios building
       - name: Load Expo environment
+        timeout-minutes: 2
         if: env.EXPO_TOKEN != ''
         working-directory: apps/mobile
         run: bash "$GITHUB_WORKSPACE/.github/scripts/mobile.sh" expo-env
       - name: Verify update channel
+        timeout-minutes: 2
         if: env.EXPO_TOKEN != ''
         working-directory: apps/mobile
         run: bash "$GITHUB_WORKSPACE/.github/scripts/mobile.sh" expo-channel
@@ -403,7 +425,29 @@ jobs:
         run: |
           xcodebuild -version
           xcrun swift --version
+      - name: Restore CocoaPods downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/CocoaPods
+          key: cocoapods-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}
+      - name: Enable simulator compiler cache
+        id: simulator-cache
+        timeout-minutes: 2
+        continue-on-error: true
+        run: bash .github/scripts/apple.sh prepare-cache
+      - name: Restore simulator compiler cache
+        if: steps.simulator-cache.outputs.enabled == 'true'
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/ios-ccache
+          key: ios-simulator-ccache-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}-${{ env.SOURCE }}
+          restore-keys: ios-simulator-ccache-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}-
       - name: Build simulator archive
+        env:
+          CCACHE_DIR: ${{ runner.temp }}/ios-ccache
+          CCACHE_BASEDIR: ${{ github.workspace }}
+          CCACHE_COMPILERCHECK: content
+          CCACHE_MAXSIZE: 512M
         working-directory: apps/mobile
         run: bash "$GITHUB_WORKSPACE/.github/scripts/apple.sh" simulator
       - uses: actions/upload-artifact@v4
@@ -450,14 +494,17 @@ jobs:
         working-directory: apps/mobile
         run: bash "$GITHUB_WORKSPACE/.github/scripts/apple.sh" prerequisites
       - name: Load Expo environment
+        timeout-minutes: 2
         if: steps.apple-prerequisites.outputs.ready == 'true'
         working-directory: apps/mobile
         run: bash "$GITHUB_WORKSPACE/.github/scripts/mobile.sh" expo-env
       - name: Verify update channel
+        timeout-minutes: 2
         if: steps.apple-prerequisites.outputs.ready == 'true'
         working-directory: apps/mobile
         run: bash "$GITHUB_WORKSPACE/.github/scripts/mobile.sh" expo-channel
       - name: Select iOS update or native build
+        timeout-minutes: 2
         id: ios-plan
         if: steps.apple-prerequisites.outputs.ready == 'true'
         working-directory: apps/mobile
@@ -486,11 +533,29 @@ jobs:
             echo '### Submit for Store Review' >> "$GITHUB_STEP_SUMMARY"
             printf 'After Apple processes the upload, run `bun run store:review ios %s %s` with the local App Store Connect key.\n' "$APP_VERSION" "$build" >> "$GITHUB_STEP_SUMMARY"
           fi
+      - name: Enable production compiler cache
+        id: production-cache
+        if: github.repository == 'disposabl-dev/create-disposabl-app' && steps.apple-prerequisites.outputs.ready == 'true' && steps.ios-provenance.outputs.cache-hit != 'true'
+        timeout-minutes: 2
+        continue-on-error: true
+        run: bash .github/scripts/apple.sh prepare-cache
+      - name: Restore production compiler cache
+        if: steps.production-cache.outputs.enabled == 'true'
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/ios-ccache
+          key: ios-production-ccache-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}-${{ env.SOURCE }}
+          restore-keys: ios-production-ccache-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}-
       - name: Build product iOS and upload to TestFlight
         if: github.repository == 'disposabl-dev/create-disposabl-app' && steps.apple-prerequisites.outputs.ready == 'true' && steps.ios-provenance.outputs.cache-hit != 'true'
         working-directory: apps/mobile
         env:
           DEVELOPER_DIR: /Applications/Xcode_27.2.app/Contents/Developer
+          EAS_LOCAL_BUILD_WORKINGDIR: ${{ runner.temp }}/eas-ios
+          CCACHE_DIR: ${{ runner.temp }}/ios-ccache
+          CCACHE_BASEDIR: ${{ runner.temp }}/eas-ios
+          CCACHE_COMPILERCHECK: content
+          CCACHE_MAXSIZE: 512M
           APP_VERSION: ${{ steps.ios-plan.outputs.version }}
           RUNTIME: ${{ steps.ios-plan.outputs.runtime }}
           IOS_IDENTIFIER: ${{ steps.ios-plan.outputs.identifier }}
@@ -544,6 +609,13 @@ jobs:
     steps:
       - *checkout
       - *node
+      - name: Configure desktop update identity
+        shell: bash
+        run: |
+          id=$(node -p "require('./disposabl.json').desktopId || ''")
+          if [[ ! "$id" =~ ^[a-f0-9]{32}$ ]]; then echo 'Desktop identity missing; regenerate this app before its first installation.' >&2; exit 1; fi
+          echo "DISPOSABL_DESKTOP_ID=$id" >> "$GITHUB_ENV"
+          echo "DISPOSABL_DESKTOP_UPDATE_URL=${CONVEX_SITE_URL}/desktop/updates/$id" >> "$GITHUB_ENV"
       - *bun
       - *cache
       - *install
@@ -553,17 +625,11 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .cache/electron
-          key: electron-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}
+          key: electron-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('apps/desktop/package.json') }}
+          restore-keys: electron-${{ runner.os }}-${{ runner.arch }}-
       - name: Packages
         if: matrix.platform == 'linux'
         run: command -v fakeroot && command -v rpmbuild && command -v dpkg-deb || { sudo apt-get update && sudo apt-get install -y fakeroot dpkg rpm; }
-      - name: Configure desktop update identity
-        shell: bash
-        run: |
-          id=$(node -p "require('./disposabl.json').desktopId || ''")
-          if [[ ! "$id" =~ ^[a-f0-9]{32}$ ]]; then echo 'Desktop identity missing; regenerate this app before its first installation.' >&2; exit 1; fi
-          echo "DISPOSABL_DESKTOP_ID=$id" >> "$GITHUB_ENV"
-          echo "DISPOSABL_DESKTOP_UPDATE_URL=${CONVEX_SITE_URL}/desktop/updates/$id" >> "$GITHUB_ENV"
       - name: Build
         if: matrix.platform != 'macos'
         run: bun run --cwd apps/desktop preview
@@ -598,6 +664,7 @@ jobs:
           name: desktop-update-${{ env.PLATFORM }}
           path: dist/update/
           retention-days: 3
+          compression-level: 0
           if-no-files-found: error
       - name: Upload unsigned macOS artifact
         if: matrix.platform == 'macos' && env.MACOS_NOTARIZE != 'true'
@@ -656,7 +723,7 @@ jobs:
   # The publisher executes scripts from main only; the authorizer verifies workflow_sha.
   publish:
     needs: [changes, web, android, desktop]
-    if: always() && !cancelled() && needs.web.result == 'success' && (needs.web.outputs.release == 'true' || needs.android.result == 'success' || needs.desktop.result == 'success')
+    if: always() && !cancelled() && needs.web.result == 'success' && ((needs.android.result == 'success' && needs.android.outputs.release == 'true') || needs.desktop.result == 'success')
     environment: publishing
     runs-on: ${{ needs.changes.outputs.linux_runner }}
     timeout-minutes: 15

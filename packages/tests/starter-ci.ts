@@ -48,7 +48,7 @@ try {
       ["fmt"],
       ["install"],
       ["run", "check:preview"],
-      ["test", ...tests],
+      ["test", "--parallel=4", "--bail=1", ...tests],
       ...["cli", "sdk"]
         .filter((name) =>
           existsSync(join(cwd, "packages", name, "package.json")),

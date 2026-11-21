@@ -30,6 +30,8 @@ test("Android build diagnostics preserve Gradle arguments and failure status", (
             "../../.github/scripts/android-runner.sh",
           ),
           "build",
+          ":app:assembleRelease",
+          ":app:bundleRelease",
         ],
         {
           cwd: dir,
@@ -47,7 +49,7 @@ test("Android build diagnostics preserve Gradle arguments and failure status", (
       assert.equal(result.status, status, result.stderr);
       assert.match(
         result.stdout,
-        /:app:assembleRelease --no-daemon --build-cache/,
+        /:app:assembleRelease :app:bundleRelease --no-daemon --build-cache/,
       );
       assert.match(result.stdout, /Android runner processors: \d+/);
       assert.match(result.stderr, /Gradle elapsed:/);
@@ -191,7 +193,7 @@ test("native warmup requires completed Gradle work, a real result, and enough re
   }
 });
 
-test("native warmup and production use the same exact-commit cache", () => {
+test("native warmup and production share cache keys and only pushes save objects", () => {
   const root = resolve(import.meta.dirname, "../..");
   const primeText = readFileSync(
     join(root, ".github/workflows/android-cache-prime.yml"),
@@ -201,25 +203,34 @@ test("native warmup and production use the same exact-commit cache", () => {
     join(root, ".github/workflows/pipeline.yml"),
     "utf8",
   );
-  const prime = JSON.parse(
-    execFileSync(
-      process.execPath,
-      [
-        "-e",
-        "console.log(JSON.stringify(Bun.YAML.parse(await Bun.file(process.argv[1]).text())))",
-        join(root, ".github/workflows/android-cache-prime.yml"),
-      ],
-      { encoding: "utf8" },
-    ),
-  ) as {
-    jobs: {
-      prime: {
-        if: string;
-        "timeout-minutes": number;
-        env: Record<string, string>;
-      };
+  const parseWorkflow = (source: string) =>
+    JSON.parse(
+      execFileSync(
+        process.execPath,
+        [
+          "-e",
+          "console.log(JSON.stringify(Bun.YAML.parse(await Bun.stdin.text())))",
+        ],
+        { encoding: "utf8", input: source },
+      ),
+    ) as {
+      jobs: Record<
+        string,
+        {
+          if: string;
+          "timeout-minutes": number;
+          env: Record<string, string>;
+          steps: {
+            name?: string;
+            if?: string;
+            uses?: string;
+            with?: Record<string, string>;
+          }[];
+        }
+      >;
     };
-  };
+  const prime = parseWorkflow(primeText);
+  const android = parseWorkflow(pipelineText).jobs.android;
   assert.equal(prime.jobs.prime.if, "github.ref == 'refs/heads/main'");
   assert.equal(prime.jobs.prime["timeout-minutes"], 20);
   assert.doesNotMatch(
@@ -228,10 +239,18 @@ test("native warmup and production use the same exact-commit cache", () => {
   );
   assert.match(primeText, /CCACHE_DIR=%s\\n.*\$RUNNER_TEMP\/ccache/);
   assert.doesNotMatch(primeText, /secrets\.|id-token|publish|report/i);
-  const key =
-    "android-ccache-v1-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}";
-  assert.equal(primeText.split(key).length - 1, 2);
-  assert.equal(pipelineText.split(key).length - 1, 1);
+  const prefix =
+    "android-ccache-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock', 'apps/mobile/app.json', 'apps/mobile/scripts/**') }}-";
+  assert.equal(primeText.split(prefix + "${{ github.sha }}").length - 1, 2);
+  const restore = android.steps.find(
+    (step) => step.name === "Restore native compiler cache",
+  );
+  assert.equal(restore?.with?.key, prefix + "${{ env.SOURCE }}");
+  assert.equal(restore?.with?.["restore-keys"], prefix);
+  const save = android.steps.find(
+    (step) => step.name === "Save native compiler cache",
+  );
+  assert.match(save?.if ?? "", /^github.event_name == 'push'/);
   assert.match(primeText, /actions\/cache\/save@v4/);
   assert.match(pipelineText, /actions\/cache\/restore@v4/);
   assert.doesNotMatch(primeText + pipelineText, /CCACHE_SLOPPINESS/);

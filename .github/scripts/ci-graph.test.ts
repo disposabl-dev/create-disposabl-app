@@ -41,7 +41,7 @@ const keys = [
 const step = (job: any, name: string) =>
   job.steps.find((item: any) => item.name === name);
 const hasRootCheck = (job: any) =>
-  job.steps.some((item: any) => item.run === "bun run check");
+  job.steps.some((item: any) => item.run === "bun run check:ci");
 
 test("deployment exports public client origins for subsequent Expo steps", () => {
   const command = step(pipeline.jobs.web, "Deploy").run.match(
@@ -55,7 +55,7 @@ test("deployment exports public client origins for subsequent Expo steps", () =>
       writeFileSync(join(dir, "disposabl.json"), JSON.stringify({ appId }));
       writeFileSync(
         join(dir, "bin/bun"),
-        '#!/usr/bin/env bash\nif [[ "$1" == run ]]; then printf "%s\\n%s\\n" "$VITE_CONVEX_URL" "$VITE_CONVEX_SITE_URL" > "$BUILD_VARS"; fi\n',
+        '#!/usr/bin/env bash\nif [[ "$5" == build ]]; then printf "%s\\n%s\\n" "$VITE_CONVEX_URL" "$VITE_CONVEX_SITE_URL" > "$BUILD_VARS"; fi\n',
         { mode: 0o755 },
       );
       writeFileSync(
@@ -170,15 +170,25 @@ function assertGraph(p: any) {
   expect(allowed(j.changes, context("pull_request"), {})).toBe(true);
   expect(allowed(j.changes, context("pull_request", true), {})).toBe(false);
   expect(allowed(j.changes, context("push"), {})).toBe(true);
-  const check = step(j.changes, "Product checks");
-  expect(check.uses).toBe("./.github/actions/product-checks");
+  const check = j["product-checks"];
+  expect(check.uses).toBe("./.github/workflows/product-checks.yml");
   expect(check.with.source_sha).toContain("github.event.pull_request.head.sha");
-  expect(check.env.GH_TOKEN).toBe("");
+  expect(check.needs).toBeUndefined();
   expect(allowed(check, context("pull_request"), {})).toBe(true);
+  expect(allowed(check, context("pull_request", true), {})).toBe(false);
   expect(
     allowed(check, context("pull_request", false, "example/fork"), {}),
   ).toBe(false);
-  expect(j.web.needs).toEqual(["changes"]);
+  expect(j.web.needs).toEqual(["changes", "product-checks"]);
+  expect(step(j.web, "Check source formatting").run).toBe("bun fmt --check");
+  expect(step(j.web, "Check").if).toContain("github.repository !=");
+  expect(step(j.web, "Generate checked release inputs").run).toBe(
+    "bun run generate",
+  );
+  expect(step(j.web, "Fingerprint")).toBeUndefined();
+  expect(allowed(j.web, context("push"), needs("success", "failure"))).toBe(
+    false,
+  );
   expect(hasRootCheck(j.web)).toBe(true);
   expect(
     allowed(j.web, context("pull_request", true), needs("skipped", "skipped")),
@@ -260,12 +270,12 @@ test("selector outputs and executable source select PR work and conservative mai
 
 test("generated reset retains root check and removes product-only gate", () => {
   const generated = structuredClone(pipeline);
-  const begin = reset.indexOf("if (\n  !pipeline.jobs.changes?.steps?");
+  const begin = reset.indexOf('if (\n  !pipeline.jobs["product-checks"]');
   const end = reset.indexOf("if (eas.submit?.production)", begin);
   expect(begin).toBeGreaterThan(-1);
   expect(end).toBeGreaterThan(begin);
   new Function("pipeline", reset.slice(begin, end))(generated);
-  expect(step(generated.jobs.changes, "Product checks")).toBeUndefined();
+  expect(generated.jobs["product-checks"]).toBeUndefined();
   expect(generated.jobs.web.needs).toBe("changes");
   expect(hasRootCheck(generated.jobs.web)).toBe(true);
   expect(
@@ -287,16 +297,23 @@ test("generated reset retains root check and removes product-only gate", () => {
 });
 
 test("product and recovery gates remain independent of root and native release jobs", () => {
-  expect(hasRootCheck({ steps: action.runs.steps })).toBe(false);
+  expect(step({ steps: action.runs.steps }, "Check source").if).toBe(
+    "inputs.lane == 'source'",
+  );
   const commands = action.runs.steps.map((x: any) => x.run || "").join("\n");
   expect(commands).toContain(
     "bun run --cwd packages/create-disposabl-app build",
   );
-  expect(commands).toContain("bun run test:unit");
+  expect(commands).toContain("bun run test:unit --parallel=4 --bail=1");
   expect(commands).toContain("bun test *.test.ts");
   expect(commands).toContain("product-browser-check.py");
   expect(product.jobs.check.env.GH_TOKEN).toBe("");
   const reusable = step(product.jobs.check, "Product checks");
+  expect(reusable.with.lane).toBe("${{ matrix.lane }}");
+  expect(product.jobs.check.strategy.matrix.lane).toContain(
+    '["source","unit","browser","web-minimal","web-android","mobile-minimal","all-platforms"]',
+  );
+  expect(commands).toContain('verify:starter "$STARTER_PROFILE"');
   expect(reusable.uses).toBe("./.github/actions/product-checks");
   expect(reusable.with.source_sha).toBe("${{ inputs.source_sha }}");
   expect(reusable.with.cli_recovery_version).toBe(
@@ -346,7 +363,31 @@ test("product and recovery gates remain independent of root and native release j
   expect(allowed(generatorCheckout, cli, {})).toBe(false);
   const submit = pipeline.jobs["android-submit"];
   expect(submit.needs).toBe("android");
-  const androidNeeds = { android: { result: "success" } };
+  expect(pipeline.jobs.android.if).toBe(
+    "needs.changes.outputs.android == 'true'",
+  );
+  expect(pipeline.jobs.android.outputs.release).toContain(
+    "steps.artifacts.outcome",
+  );
+  expect(
+    step(pipeline.jobs.android, "Prepare Android disk space").if,
+  ).toContain("steps.fingerprint.outputs.build == 'true'");
+  expect(step(pipeline.jobs.android, "Java")).toBeDefined();
+  expect(step(pipeline.jobs.android, "Update").if).toContain(
+    "steps.fingerprint.outputs.build == 'false'",
+  );
+  expect(
+    allowed(
+      submit,
+      { ...context("push"), vars: { ANDROID_PLAY_SUBMIT: "true" } },
+      {
+        android: { result: "success", outputs: { built: "false" } },
+      },
+    ),
+  ).toBe(false);
+  const androidNeeds = {
+    android: { result: "success", outputs: { built: "true" } },
+  };
   expect(
     allowed(
       submit,
@@ -372,7 +413,7 @@ test("product and recovery gates remain independent of root and native release j
     allowed(
       submit,
       { ...context("push"), vars: { ANDROID_PLAY_SUBMIT: "true" } },
-      { android: { result: "failure" } },
+      { android: { result: "failure", outputs: { built: "false" } } },
     ),
   ).toBe(false);
   const reporter = pipeline.jobs["android-failure"];
@@ -391,7 +432,7 @@ test("meaningful workflow mutations are rejected", () => {
   expect(() => assertGraph(missing)).toThrow();
   const noCheck = structuredClone(pipeline);
   noCheck.jobs.web.steps = noCheck.jobs.web.steps.filter(
-    (x: any) => x.run !== "bun run check",
+    (x: any) => x.run !== "bun run check:ci",
   );
   expect(() => assertGraph(noCheck)).toThrow();
   const fork = structuredClone(pipeline);

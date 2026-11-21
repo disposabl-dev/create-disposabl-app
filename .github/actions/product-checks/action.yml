@@ -5,6 +5,9 @@ inputs:
   source_sha:
     required: true
     description: Requested source
+  lane:
+    required: true
+    description: Source validation, unit tests, isolated browser, or a starter profile
   cli_recovery_version:
     required: false
     description: CLI recovery version
@@ -45,6 +48,7 @@ runs:
       run: bash .github/scripts/product-check-source.sh
       shell: bash
     - name: Check browser isolation harness
+      if: inputs.lane == 'browser'
       run: python3 .github/scripts/product-browser-check-test.py
       shell: bash
     - uses: actions/setup-node@v6
@@ -53,18 +57,29 @@ runs:
         package-manager-cache: false
     - uses: oven-sh/setup-bun@v2
       with:
-        bun-version: 1.4.4
+        bun-version: 1.4.5
+    - name: Check source formatting
+      if: inputs.lane == 'source'
+      run: bun fmt --check
+      shell: bash
     - name: Verify CI graph
-      if: inputs.cli_recovery_version == '' && inputs.recovery_version == ''
+      if: inputs.lane == 'unit' && inputs.cli_recovery_version == '' && inputs.recovery_version == ''
       run: bun test ./.github/scripts/ci-graph.test.ts
       shell: bash
     - uses: actions/cache@v4
       with:
         path: "~/.bun/install/cache"
         key:
-          bun-${{ runner.os }}-${{ runner.arch }}-1.4.4-${{ hashFiles('bun.lock')
+          bun-${{ runner.os }}-${{ runner.arch }}-1.4.5-${{ hashFiles('bun.lock')
           }}
-        restore-keys: bun-${{ runner.os }}-${{ runner.arch }}-1.4.4-
+        restore-keys: bun-${{ runner.os }}-${{ runner.arch }}-1.4.5-
+    - name: Restore source task cache
+      if: inputs.lane == 'source'
+      uses: actions/cache@v4
+      with:
+        path: .turbo/cache
+        key: turbo-v1-${{ runner.os }}-${{ runner.arch }}-1.4.5-${{ hashFiles('bun.lock') }}-${{ steps.source.outputs.sha }}
+        restore-keys: turbo-v1-${{ runner.os }}-${{ runner.arch }}-1.4.5-${{ hashFiles('bun.lock') }}-
     - name: Install frozen dependencies
       run: bun install --frozen-lockfile
       shell: bash
@@ -73,10 +88,16 @@ runs:
         EXPECTED_SOURCE: "${{ steps.source.outputs.sha }}"
       run: test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE"
       shell: bash
+    - name: Check source
+      if: inputs.lane == 'source'
+      run: bun run check:ci
+      shell: bash
     - name: Build current generator template
+      if: inputs.lane != 'browser' && inputs.lane != 'source'
       run: bun run --cwd packages/create-disposabl-app build
       shell: bash
     - name: Run standard unit suite
+      if: inputs.lane == 'unit'
       working-directory: packages/tests
       env:
         CLI_RECOVERY: "${{ inputs.cli_recovery_version }}"
@@ -86,22 +107,46 @@ runs:
           # Historical tags predate the shared test:unit script.
           bun test *.test.ts
         else
-          bun run test:unit
+          bun run test:unit --parallel=4 --bail=1
         fi
       shell: bash
+    - name: Verify fresh generated project
+      if: inputs.lane != 'unit' && inputs.lane != 'browser' && inputs.lane != 'source'
+      shell: bash
+      env:
+        STARTER_PROFILE: ${{ inputs.lane }}
+      run: bun run --cwd packages/create-disposabl-app verify:starter "$STARTER_PROFILE"
+    - name: Restore browser test dependencies
+      if: inputs.lane == 'browser'
+      uses: actions/cache@v4
+      with:
+        path: |
+          ${{ runner.temp }}/product-convex/backend.zip
+          ${{ runner.temp }}/product-browser-cache
+        key: product-browser-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock', '.github/actions/product-checks/action.yml') }}
     - name: Prepare isolated browser test dependencies
+      if: inputs.lane == 'browser'
       shell: bash
       env:
         PLAYWRIGHT_BROWSERS_PATH: "${{ runner.temp }}/product-browser-cache"
       run: |
         set -euo pipefail
         mkdir -p "$RUNNER_TEMP/product-convex"
-        curl --fail --location --retry 3 --output "$RUNNER_TEMP/product-convex/backend.zip" https://github.com/convex/convex-backend/releases/download/precompiled-2026-10-22-1447815/convex-local-backend-x86_64-unknown-linux-gnu.zip
-        echo '7be627d8a8c9175b66a55cf6c4ab63c5f6bde1c412f59fbbe93f64a24a11bd13  '"$RUNNER_TEMP/product-convex/backend.zip" | sha256sum --check --status
+        archive="$RUNNER_TEMP/product-convex/backend.zip"
+        verify() { echo "7be627d8a8c9175b66a55cf6c4ab63c5f6bde1c412f59fbbe93f64a24a11bd13  $archive" | sha256sum --check --status; }
+        if [[ ! -s "$archive" ]] || ! verify; then
+          curl --fail --location --retry 2 --connect-timeout 10 --max-time 60 --output "$RUNNER_TEMP/product-convex/backend.zip" https://github.com/convex/convex-backend/releases/download/precompiled-2026-10-22-1447815/convex-local-backend-x86_64-unknown-linux-gnu.zip
+        fi
+        verify
         unzip -q "$RUNNER_TEMP/product-convex/backend.zip" -d "$RUNNER_TEMP/product-convex"
         chmod +x "$RUNNER_TEMP/product-convex/convex-local-backend"
-        bun run --cwd packages/tests setup:browser
+        bun x --no-install e2e-web install chromium
+        browser=$(find "$PLAYWRIGHT_BROWSERS_PATH" -type f -name chrome-headless-shell -print -quit)
+        if [[ ! -x "$browser" ]] || ! ldd "$browser" > "$RUNNER_TEMP/chromium-libraries" || grep -q 'not found' "$RUNNER_TEMP/chromium-libraries"; then
+          bun run --cwd packages/tests setup:browser
+        fi
     - name: Run isolated product web and backend E2E
+      if: inputs.lane == 'browser'
       shell: bash
       env:
         PLAYWRIGHT_BROWSERS_PATH: "${{ runner.temp }}/product-browser-cache"

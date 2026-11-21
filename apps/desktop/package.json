@@ -27,7 +27,7 @@
     "lint": "oxlint && oxfmt --check",
     "lint:fix": "oxlint --fix && oxfmt --write",
     "format": "oxfmt --write",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "bun check",
     "preview": "bun build-ci.mjs"
   },
   "dependencies": {

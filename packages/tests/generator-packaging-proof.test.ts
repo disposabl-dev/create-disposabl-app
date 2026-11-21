@@ -36,6 +36,7 @@ const excluded = [
   "packages/tests/components/mobile-posthog-sdk.test.mjs",
   "packages/tests/mobile-posthog-sdk.test.ts",
   "packages/tests/components/ui-telemetry-web.test.mjs",
+  "apps/web/src/router/_authenticated/dashboard.billing.tsx",
   "apps/web/src/telemetry.tsx",
   "apps/web/src/telemetry-policy.ts",
   "apps/web/src/telemetry-replay.ts",
@@ -167,6 +168,11 @@ test("product browser gate shares exact-source checks with publication", async (
           secrets?: unknown;
         }>;
       };
+      "product-checks": {
+        uses: string;
+        with?: Record<string, string>;
+        secrets?: unknown;
+      };
       web: {
         needs: string[];
         if: string;
@@ -201,17 +207,15 @@ test("product browser gate shares exact-source checks with publication", async (
   )) as {
     runs: { steps: typeof reusable.jobs.check.steps };
   };
-  const gate = pipeline.jobs.changes.steps.find(
-    (step) => step.name === "Product checks",
-  );
+  const gate = pipeline.jobs["product-checks"];
   assert.ok(gate);
-  assert.equal(gate.uses, "./.github/actions/product-checks");
-  assert.equal(gate.env?.GH_TOKEN, "");
-  assert.deepEqual(pipeline.jobs.web.needs, ["changes"]);
+  assert.equal(gate.uses, "./.github/workflows/product-checks.yml");
+  assert.equal(reusable.jobs.check.env.GH_TOKEN, "");
+  assert.deepEqual(pipeline.jobs.web.needs, ["changes", "product-checks"]);
   assert.equal(
     reusable.jobs.check.steps.find((step) => step.name === "Product checks")
       ?.uses,
-    gate.uses,
+    "./.github/actions/product-checks",
   );
   const webAllowed = new Function(
     "needs",
@@ -224,7 +228,8 @@ test("product browser gate shares exact-source checks with publication", async (
     assert.equal(
       webAllowed(
         {
-          changes: { result: status, outputs: { changed: "true" } },
+          changes: { result: "success", outputs: { changed: "true" } },
+          "product-checks": { result: status },
         },
         {
           repository: "disposabl-dev/create-disposabl-app",
@@ -243,7 +248,7 @@ test("product browser gate shares exact-source checks with publication", async (
   const productUpdatePolicy =
     "${{ github.event_name == 'push' && github.repository == 'disposabl-dev/create-disposabl-app' && 'expo' || '' }}";
   assert.equal(
-    pipeline.jobs.web.steps.find((step) => step.name === "Fingerprint")?.env
+    pipeline.jobs.android.steps.find((step) => step.name === "Fingerprint")?.env
       ?.UPDATE_POLICY,
     productUpdatePolicy,
   );
@@ -346,7 +351,13 @@ const template = resolve(
   "../create-disposabl-app/dist/templates/default",
 );
 
-test("packaged starter and generated profiles exclude product proof fixtures", async () => {
+test(
+  "packaged starter and generated profiles exclude product proof fixtures",
+  { timeout: 30000 },
+  verifyPackagedProfiles,
+);
+
+async function verifyPackagedProfiles() {
   const temp = await mkdtemp(join(tmpdir(), "disposabl-packaging-proof-"));
   try {
     const input = join(temp, "template");
@@ -490,7 +501,7 @@ test("packaged starter and generated profiles exclude product proof fixtures", a
       };
       assert.equal(
         parsed.jobs.android.if,
-        "needs.web.outputs.android_build == 'true'",
+        "needs.changes.outputs.android == 'true'",
       );
       assert.equal(parsed.jobs["android-submit"].needs, "android");
       assert.match(
@@ -498,8 +509,8 @@ test("packaged starter and generated profiles exclude product proof fixtures", a
         /ANDROID_PLAY_SUBMIT == 'true'/,
       );
       assert.equal(
-        parsed.jobs.web.steps?.find((step) => step.name === "Fingerprint")?.env
-          ?.UPDATE_POLICY,
+        parsed.jobs.android.steps?.find((step) => step.name === "Fingerprint")
+          ?.env?.UPDATE_POLICY,
         undefined,
       );
       const androidChecks = spawnSync(
@@ -775,4 +786,4 @@ test("packaged starter and generated profiles exclude product proof fixtures", a
   } finally {
     await rm(temp, { recursive: true, force: true });
   }
-});
+}

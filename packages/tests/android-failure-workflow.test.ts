@@ -38,7 +38,7 @@ test("Android uses its selected runner while allowing native build and cache fin
 
 test("product and generated apps share one artifact build and gate submission", () => {
   const job = workflow.jobs.android;
-  assert.equal(job.if, "needs.web.outputs.android_build == 'true'");
+  assert.equal(job.if, "needs.changes.outputs.android == 'true'");
   assert.equal(workflow.jobs["android-play"], undefined);
   assert.equal(
     job.steps.filter((step: { run?: string }) =>
@@ -50,17 +50,17 @@ test("product and generated apps share one artifact build and gate submission", 
   assert.equal(submit.needs, "android");
   assert.equal(
     submit.if,
-    "github.event_name == 'push' && vars.ANDROID_PLAY_SUBMIT == 'true' && needs.android.result == 'success'",
+    "github.event_name == 'push' && vars.ANDROID_PLAY_SUBMIT == 'true' && needs.android.outputs.built == 'true' && needs.android.result == 'success'",
   );
   assert.ok(
     submit.steps.some(
       (step: { uses?: string }) => step.uses === "actions/download-artifact@v4",
     ),
   );
-  const fingerprint = workflow.jobs.web.steps.find(
+  const fingerprint = job.steps.find(
     (step: { name?: string }) => step.name === "Fingerprint",
   );
-  assert.equal(fingerprint.if, "needs.changes.outputs.android == 'true'");
+  assert.equal(fingerprint.id, "fingerprint");
 });
 
 test("Android failure reporting handles failed and cancelled builds independently", () => {

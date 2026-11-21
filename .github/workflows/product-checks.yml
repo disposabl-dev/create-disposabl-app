@@ -18,7 +18,11 @@ permissions:
   contents: read
 jobs:
   check:
-    name: Product unit and browser tests
+    name: Product / ${{ matrix.lane }}
+    strategy:
+      fail-fast: true
+      matrix:
+        lane: ${{ fromJSON((inputs.cli_recovery_version != '' || inputs.recovery_version != '') && '["unit","browser"]' || '["source","unit","browser","web-minimal","web-android","mobile-minimal","all-platforms"]') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     outputs:
@@ -40,5 +44,6 @@ jobs:
         uses: ./.github/actions/product-checks
         with:
           source_sha: ${{ inputs.source_sha }}
+          lane: ${{ matrix.lane }}
           cli_recovery_version: ${{ inputs.cli_recovery_version }}
           recovery_version: ${{ inputs.recovery_version }}
