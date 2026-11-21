@@ -1,76 +1,44 @@
-name: Benchmark iOS artifact smoke
+name: First current generated iOS launch
 on:
   push:
-    branches: [benchmark/ios-artifact-smoke-*]
-  workflow_dispatch:
+    branches: [benchmark/ios-artifact-smoke-latest-20261121]
 permissions:
   actions: read
   contents: read
 jobs:
   smoke:
-    name: Smoke ${{ matrix.label }}
     runs-on: macos-26
-    timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - label: product
-            run: "44899216086"
-            sha: cd5ddf7e3a70743b5e12c652b7667d04e3fe067b
-            test_sha: 4af6724ad8b797dcd4d6ee43d97820d950f72072
-            job: "136832362469"
-            name: ios-simulator
-          - label: generated
-            run: "44900751287"
-            sha: ff387a33827f9b19dd4fa241f6085296c8b94b2b
-            job: "136836017366"
-            name: first-ios-1
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
-      - name: Verify origin and locate artifact
+      - name: Verify first generated build provenance
         id: origin
         env:
           GH_TOKEN: ${{ github.token }}
-          RUN: ${{ matrix.run }}
-          EXPECTED_SHA: ${{ matrix.sha }}
-          JOB: ${{ matrix.job }}
-          ARTIFACT: ${{ matrix.name }}
+          RUN: "44909246374"
+          EXPECTED_SHA: fdfcacb916e1c914462f894313ad4f6d45e800c7
+          JOB: "136861433310"
+          ARTIFACT: first-ios-1
         run: bash .github/scripts/ios-artifact-origin.sh
-      - name: Check out the product test suite with the updated Guides assertion
-        if: matrix.label == 'product' && steps.origin.outputs.ready == 'true'
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ matrix.test_sha }}
-          path: product
-          persist-credentials: false
-      - uses: actions/setup-node@v6
-        if: matrix.label == 'product' && steps.origin.outputs.ready == 'true'
-        with:
-          node-version: 24
-          package-manager-cache: false
-      - uses: oven-sh/setup-bun@v2
-        if: matrix.label == 'product' && steps.origin.outputs.ready == 'true'
-        with:
-          bun-version: 1.4.5
-      - name: Install product test dependencies
-        if: matrix.label == 'product' && steps.origin.outputs.ready == 'true'
-        working-directory: product
-        run: bun install --frozen-lockfile --filter @disposabl/tests
-      - name: Download and smoke simulator app
-        if: steps.origin.outputs.ready == 'true'
+      - name: Install and inspect the first generated app
         env:
           GH_TOKEN: ${{ github.token }}
           ARTIFACT_ID: ${{ steps.origin.outputs.id }}
           ARTIFACT_DIGEST: ${{ steps.origin.outputs.digest }}
-          PRODUCT_SOURCE: ${{ matrix.test_sha || '' }}
-        run: bash .github/scripts/ios-artifact-smoke.sh
-      - uses: actions/upload-artifact@v4
-        if: always() && steps.origin.outputs.ready == 'true'
+        run: |
+          test -n "$ARTIFACT_ID"
+          bash .github/scripts/ios-artifact-smoke.sh
+          swiftc -O .github/scripts/ios-repack-ocr.swift -o "$RUNNER_TEMP/starter-ocr"
+          "$RUNNER_TEMP/starter-ocr" "$RUNNER_TEMP/ios-smoke-evidence/screen.png" > "$RUNNER_TEMP/ios-smoke-evidence/screen-text.txt"
+          grep -F 'Your app starts here.' "$RUNNER_TEMP/ios-smoke-evidence/screen-text.txt"
+          grep -Fx Android "$RUNNER_TEMP/ios-smoke-evidence/screen-text.txt"
+          grep -Fx iOS "$RUNNER_TEMP/ios-smoke-evidence/screen-text.txt"
+      - uses: actions/upload-artifact@v7
+        if: always()
         with:
-          name: ios-smoke-${{ matrix.label }}-${{ github.run_attempt }}
+          name: ios-generated-launch-${{ github.run_attempt }}
           path: ${{ runner.temp }}/ios-smoke-evidence/
           if-no-files-found: warn
-          retention-days: 3
+          retention-days: 1
