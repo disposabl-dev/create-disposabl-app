@@ -1,0 +1,85 @@
+name: Artifact layout compatibility fixture
+on:
+  workflow_dispatch:
+    inputs:
+      count:
+        description: Number of release artifacts
+        required: true
+        type: choice
+        options: [one, many]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  upload:
+    runs-on: ubuntu-24.04
+    steps:
+      - run: |
+          mkdir -p /tmp/android /tmp/linux
+          printf 'android stub\n' > /tmp/android/android.apk
+          printf 'linux stub\n' > /tmp/linux/linux.deb
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-android
+          path: /tmp/android/*
+      - uses: actions/upload-artifact@v4
+        if: inputs.count == 'many'
+        with:
+          name: release-linux
+          path: /tmp/linux/*
+  layout:
+    needs: upload
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        version: [v4, v8, corrected]
+    steps:
+      - uses: actions/checkout@v6
+      - name: Select release artifact destination
+        id: release-artifacts
+        if: matrix.version == 'corrected'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          names=$(gh api --paginate "repos/$GH_REPO/actions/runs/$GITHUB_RUN_ID/artifacts?per_page=100" \
+            --jq '.artifacts[] | select(.expired == false) | .name | select(test("^release-(android|linux|windows|macos)$"))' | LC_ALL=C sort -u)
+          [[ -n "$names" ]] || { echo '::error::No release artifacts were uploaded.'; exit 1; }
+          # Download v8 extracts a single match directly to the destination.
+          path=artifacts
+          if [[ "$names" != *$'\n'* ]]; then path="artifacts/$names"; fi
+          printf 'path=%s\nnames=%s\n' "$path" "${names//$'\n'/ }" >> "$GITHUB_OUTPUT"
+      - uses: actions/download-artifact@v8
+        if: matrix.version == 'corrected'
+        with:
+          pattern: release-{android,linux,windows,macos}
+          path: ${{ steps.release-artifacts.outputs.path }}
+      - uses: actions/download-artifact@v8
+        if: matrix.version == 'v8'
+        with:
+          pattern: release-*
+          path: artifacts
+      - uses: actions/download-artifact@v4
+        if: matrix.version == 'v4'
+        with:
+          pattern: release-*
+          path: artifacts
+      - name: Verify actual publisher directory inputs
+        env:
+          COUNT: ${{ inputs.count }}
+          VERSION: ${{ matrix.version }}
+          EXPECTED_RELEASE_ARTIFACTS: ${{ steps.release-artifacts.outputs.names }}
+        run: |
+          expected=1
+          if [[ "$COUNT" == many ]]; then expected=2; fi
+          if [[ "$COUNT" == one && "$VERSION" == v8 ]]; then expected=0; fi
+          if [[ "$VERSION" == corrected ]]; then
+            read -r -a names <<< "$EXPECTED_RELEASE_ARTIFACTS"
+            for name in "${names[@]}"; do
+              directory="artifacts/$name"
+              [[ -d "$directory" && -n "$(find "$directory" -maxdepth 1 -type f -size +0c -print -quit)" ]] ||
+                { echo "::error::Missing staged release artifact $name."; exit 1; }
+            done
+          fi
+          EXPECTED_PUBLISHED="$expected" bash .github/fixtures/artifact-layout/verify.sh
