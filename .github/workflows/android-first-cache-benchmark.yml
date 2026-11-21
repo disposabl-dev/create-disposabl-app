@@ -142,8 +142,8 @@ jobs:
           (cd android && bash ../../../.github/scripts/android-runner.sh build :app:assembleRelease --profile)
           apk=android/app/build/outputs/apk/release/app-release.apk
           unzip -tq "$apk"
-          jq '{androidArchitectures}' ../../disposabl.json > "$RUNNER_TEMP/abi.json"
-          node ../../.github/scripts/verify-android-abis.mjs "$apk" "$RUNNER_TEMP/abi.json"
+          manifest=$(jq -c '{androidArchitectures}' ../../disposabl.json)
+          node ../../.github/scripts/verify-android-abis.mjs "$apk" "$manifest"
           signer=$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -1)
           "$signer" verify --print-certs "$apk"
           shasum -a 256 "$apk"
