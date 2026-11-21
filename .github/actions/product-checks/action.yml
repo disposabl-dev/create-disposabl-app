@@ -12,6 +12,10 @@ inputs:
     required: false
     description: Isolated browser shard. Empty runs the full browser suite.
     default: ""
+  browser_arm:
+    description: Benchmark browser server
+    default: vite
+    required: false
   cli_recovery_version:
     required: false
     description: CLI recovery version
@@ -166,6 +170,7 @@ runs:
       env:
         PLAYWRIGHT_BROWSERS_PATH: "${{ runner.temp }}/product-browser-cache"
         PRODUCT_BROWSER_SHARD: "${{ inputs.browser_shard }}"
+        PRODUCT_BROWSER_ARM: "${{ inputs.browser_arm }}"
       run: |
         set -euo pipefail
         # Create only a private network namespace; drop root before the test.
@@ -178,8 +183,8 @@ runs:
           fi
           exec runuser -u "$1" -- env -i HOME="$2" PATH="$3" \
             CONVEX_LOCAL_BINARY="$4" PLAYWRIGHT_BROWSERS_PATH="$5" \
-            PYTHONDONTWRITEBYTECODE=1 PRODUCT_BROWSER_REQUIRE_ISOLATION=1 PRODUCT_BROWSER_FROZEN_INSTALL=1 PRODUCT_BROWSER_SHARD="$7" python3 "$6"
-        ' _ "$(id -un)" "$HOME" "$PATH" "$RUNNER_TEMP/product-convex/convex-local-backend" "$PLAYWRIGHT_BROWSERS_PATH" "$GITHUB_WORKSPACE/.github/scripts/product-browser-check.py" "$PRODUCT_BROWSER_SHARD"
+            PYTHONDONTWRITEBYTECODE=1 PRODUCT_BROWSER_REQUIRE_ISOLATION=1 PRODUCT_BROWSER_FROZEN_INSTALL=1 PRODUCT_BROWSER_SHARD="$7" PRODUCT_BROWSER_ARM="$8" python3 "$6"
+        ' _ "$(id -un)" "$HOME" "$PATH" "$RUNNER_TEMP/product-convex/convex-local-backend" "$PLAYWRIGHT_BROWSERS_PATH" "$GITHUB_WORKSPACE/.github/scripts/product-browser-check.py" "$PRODUCT_BROWSER_SHARD" "$PRODUCT_BROWSER_ARM"
     - name: Save browser test dependencies
       if: inputs.lane == 'browser' && (inputs.browser_shard == '' || inputs.browser_shard == '1/4') && steps.browser-cache.outputs.cache-hit != 'true'
       uses: actions/cache/save@v6

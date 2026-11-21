@@ -5,6 +5,7 @@ Requires an already verified local backend binary and cached browser. This runne
 never downloads a binary or configures a cloud deployment. Retained evidence is
 private; apply an OS network sandbox externally if outbound denial is required.
 """
+import hashlib
 import importlib.util
 import errno
 import json
@@ -145,6 +146,9 @@ def listeners(port):
 def main():
     if len(sys.argv) != 1:
         raise RuntimeError('No arguments accepted; supply CONVEX_LOCAL_BINARY and PLAYWRIGHT_BROWSERS_PATH')
+    arm = os.environ.get('PRODUCT_BROWSER_ARM', 'vite')
+    if arm not in ('vite', 'static'):
+        raise RuntimeError('Invalid benchmark arm')
     shard = os.environ.get('PRODUCT_BROWSER_SHARD', '')
     if shard and not re.fullmatch(r'[1-4]/4', shard):
         raise RuntimeError('Invalid product browser shard')
@@ -263,10 +267,55 @@ def main():
             raise RuntimeError('Unexpected backend environment')
         print('Owned listeners verified; backend telemetry disabled, Boat blank, other provider values absent', flush=True)
         command([cli, 'dev', '--once', '--typecheck', 'disable', '--codegen', 'disable'], cwd=backend, environment=admin, log='sync.log')
+        if arm == 'static':
+            origins = {'VITE_CONVEX_URL': 'http://127.0.0.1:3520', 'VITE_CONVEX_SITE_URL': 'http://127.0.0.1:3521'}
+            started = time.monotonic()
+            command(['bun', 'x', '--no-install', 'turbo', 'run', 'build', '--filter=@disposabl/web'],
+                    cwd=source, environment=env | origins, log='web-build.log')
+            print(f'BENCHMARK arm=static phase=build seconds={time.monotonic() - started:.3f}', flush=True)
+            dist = source / 'apps/web/dist/client'
+            files = sorted(path for path in dist.rglob('*') if path.is_file())
+            if len(files) <= 100 or not (dist / 'index.html').is_file():
+                raise RuntimeError('Incomplete Web build')
+            started = time.monotonic()
+            output = command(['bun', '--bun', 'x', '--no-install', 'static-hosting', 'upload', '--dev', '--no-spa',
+                              '--dist', str(dist), '--concurrency', '12'], cwd=backend, environment=admin, log='upload.log')
+            if f'[{len(files)}/{len(files)}]' not in output or 'Publishing deployment' not in output:
+                raise RuntimeError('Missing full upload and atomic publish markers')
+            print(f'BENCHMARK arm=static phase=upload seconds={time.monotonic() - started:.3f} files={len(files)}', flush=True)
+            from concurrent.futures import ThreadPoolExecutor
+            from urllib.parse import quote
+            def verify(path):
+                route = quote(path.relative_to(dist).as_posix())
+                with urllib.request.urlopen(f'http://127.0.0.1:3521/{route}', timeout=15) as response:
+                    if response.status != 200 or response.read() != path.read_bytes():
+                        raise RuntimeError('Uploaded bytes differ')
+            with ThreadPoolExecutor(max_workers=6) as pool:
+                list(pool.map(verify, files))
+            print(f'BENCHMARK arm=static byte_verified={len(files)}', flush=True)
+            testenv['E2E_WEB_URL'] = 'http://127.0.0.1:3521'
         platforms = json.loads((source / 'disposabl.json').read_text()).get('platforms', [])
         targets = 'web,backend,api' if 'api' in platforms else 'web,backend'
         options = ['--shard', shard] if shard else []
-        command(['bun', 'run', 'e2e', 'run', '--target', targets, '--retries', '0', '--no-cache', *options], cwd=source, environment=testenv, log='e2e.log')
+        started = time.monotonic()
+        try:
+            command(['bun', 'run', 'e2e', 'run', '--target', targets, '--retries', '0', '--no-cache', *options], cwd=source, environment=testenv, log='e2e.log')
+        finally:
+            print(f'BENCHMARK arm={arm} phase=e2e seconds={time.monotonic() - started:.3f}', flush=True)
+            report = source / 'packages/tests/.e2e/report.json'
+            if report.is_file():
+                results = json.loads(report.read_text())['run']['results']
+                for result in results:
+                    # Identity hashes avoid publishing arbitrary report payloads. Include target and repeat
+                    # because one test declaration can execute on multiple platforms.
+                    identity = json.dumps([result['testId'], result['targetId'], result['repeat']], separators=(',', ':'))
+                    digest = hashlib.sha256(identity.encode()).hexdigest()
+                    status = result['status']
+                    if status not in ('passed', 'failed', 'skipped') or type(result['selected']) is not bool:
+                        raise RuntimeError('Unexpected case result')
+                    print(f'CASE sha256={digest} selected={str(result["selected"]).lower()} status={status}', flush=True)
+            else:
+                print('BENCHMARK case_report=missing', flush=True)
         print(f'Product {targets} E2E passed', flush=True)
     if any(listeners(port) for port in PORTS):
         raise RuntimeError('Listener still present after backend teardown')
