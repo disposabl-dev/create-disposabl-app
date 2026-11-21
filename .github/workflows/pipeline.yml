@@ -446,6 +446,7 @@ jobs:
       EXPO_OWNER: *expo_owner
       EXPO_SLUG: *expo_slug
       EXPO_NO_DOTENV: "1"
+      PR_NUMBER: ${{ github.event.number }}
     steps:
       - *checkout
       - *node
@@ -469,7 +470,33 @@ jobs:
             id=$({ printf '%s\n' "$version" "$GITHUB_WORKSPACE" "$RUNNER_TEMP"; xcrun --sdk iphonesimulator --show-sdk-build-version; } | shasum -a 256 | cut -d' ' -f1)
             printf 'cas_key=%s\n' "$id" >> "$GITHUB_OUTPUT"
           fi
+      - name: Compute exact simulator cache identity
+        id: simulator-identity
+        continue-on-error: true
+        timeout-minutes: 3
+        env:
+          NATIVE_INPUT_HASH: ${{ hashFiles('bun.lock', 'apps/mobile/app.*', 'apps/mobile/package.json', 'apps/mobile/plugins/**', 'patches/**', '.github/scripts/apple.sh') }}
+        working-directory: apps/mobile
+        run: |
+          echo "NATIVE_INPUT_HASH=$NATIVE_INPUT_HASH" >> "$GITHUB_ENV"
+          bash "$GITHUB_WORKSPACE/.github/scripts/ios-preview-repack.sh" identity
+      - name: Restore exact same-PR native simulator cache
+        id: simulator-native-cache
+        if: steps.simulator-identity.outputs.key != ''
+        continue-on-error: true
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}/ios-preview-native-cache
+          key: ${{ steps.simulator-identity.outputs.key }}
+      - name: Try same-PR simulator repack
+        id: simulator-repack
+        if: steps.simulator-native-cache.outputs.cache-hit == 'true'
+        continue-on-error: true
+        timeout-minutes: 6
+        working-directory: apps/mobile
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/ios-preview-repack.sh" repack
       - name: Restore CocoaPods downloads and specifications
+        if: steps.simulator-repack.outputs.reused != 'true'
         uses: actions/cache@v6
         with:
           path: |
@@ -477,14 +504,14 @@ jobs:
             ~/.cocoapods/repos/trunk
           key: cocoapods-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}
       - name: Restore Xcode compilation cache
-        if: steps.xcode.outputs.cas_key != ''
+        if: steps.simulator-repack.outputs.reused != 'true' && steps.xcode.outputs.cas_key != ''
         uses: actions/cache@v6
         with:
           path: ${{ runner.temp }}/ios-cas
           key: ios-simulator-cas-v1-${{ runner.arch }}-${{ steps.xcode.outputs.cas_key }}-${{ hashFiles('bun.lock', 'apps/mobile/app.*', 'apps/mobile/package.json', 'apps/mobile/plugins/**', 'patches/**') }}
       - name: Enable simulator compiler cache
         id: simulator-cache
-        if: steps.xcode.outputs.cas_key == ''
+        if: steps.simulator-repack.outputs.reused != 'true' && steps.xcode.outputs.cas_key == ''
         timeout-minutes: 2
         continue-on-error: true
         run: bash .github/scripts/apple.sh prepare-cache
@@ -496,6 +523,7 @@ jobs:
           key: ios-simulator-ccache-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}-${{ env.SOURCE }}
           restore-keys: ios-simulator-ccache-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}-
       - name: Build simulator archive
+        if: steps.simulator-repack.outputs.reused != 'true'
         env:
           XCODE_COMPILATION_CACHE_DIR: ${{ steps.xcode.outputs.cas_key != '' && format('{0}/ios-cas', runner.temp) || '' }}
           CCACHE_DIR: ${{ runner.temp }}/ios-ccache
@@ -503,7 +531,24 @@ jobs:
           CCACHE_COMPILERCHECK: content
           CCACHE_MAXSIZE: 512M
         working-directory: apps/mobile
-        run: bash "$GITHUB_WORKSPACE/.github/scripts/apple.sh" simulator
+        run: |
+          bash "$GITHUB_WORKSPACE/.github/scripts/apple.sh" simulator
+      - name: Record simulator archive provenance
+        id: simulator-provenance
+        if: steps.simulator-repack.outputs.reused != 'true' && steps.simulator-identity.outputs.key != ''
+        continue-on-error: true
+        timeout-minutes: 3
+        working-directory: apps/mobile
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/ios-preview-repack.sh" manifest
+      - name: Verify current simulator preview source
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/ios-preview-repack.sh" source
+      - name: Save exact same-PR native simulator cache
+        if: steps.simulator-identity.outputs.key != '' && steps.simulator-provenance.outcome == 'success' && steps.simulator-native-cache.outputs.cache-hit != 'true'
+        continue-on-error: true
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ runner.temp }}/ios-preview-native-cache
+          key: ${{ steps.simulator-identity.outputs.key }}
       - uses: actions/upload-artifact@v7
         with:
           name: ios-simulator
