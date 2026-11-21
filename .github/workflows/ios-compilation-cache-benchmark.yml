@@ -7,12 +7,8 @@ permissions:
 jobs:
   simulator:
     if: github.repository == 'disposabl-dev/create-disposabl-app'
-    name: ${{ matrix.runner }}
-    strategy:
-      fail-fast: false
-      matrix:
-        runner: [macos-26, blacksmith-6vcpu-macos-26]
-    runs-on: ${{ matrix.runner }}
+    name: iOS simulator on GitHub
+    runs-on: macos-26
     timeout-minutes: 45
     env:
       EXPO_NO_DOTENV: "1"
@@ -47,7 +43,7 @@ jobs:
           path: |
             ${{ runner.temp }}/ios-cas
             ~/Library/Caches/CocoaPods
-          key: benchmark-ios-cas-v1-${{ matrix.runner }}-${{ runner.arch }}-${{ steps.toolchain.outputs.id }}-${{ hashFiles('bun.lock') }}
+          key: benchmark-ios-cas-v1-${{ runner.arch }}-${{ steps.toolchain.outputs.id }}-${{ hashFiles('bun.lock') }}
       - run: bun install --frozen-lockfile --filter @disposabl/mobile
       - name: Compile and verify app with Xcode compilation caching
         working-directory: apps/mobile
