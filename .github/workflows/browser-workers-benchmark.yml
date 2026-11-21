@@ -9,18 +9,15 @@ permissions:
 jobs:
   compare:
     if: github.repository == 'disposabl-dev/create-disposabl-app'
-    name: ${{ matrix.workers }} workers / ${{ matrix.runner }}
+    name: Browser / ${{ matrix.shard }}
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - { workers: 1, runner: ubuntu-24.04 }
-          - { workers: 4, runner: ubuntu-24.04 }
-          - { workers: 4, runner: blacksmith-4vcpu-ubuntu-2404 }
-    runs-on: ${{ matrix.runner }}
+        shard: [full, 1/2, 2/2]
+    runs-on: ubuntu-24.04
     timeout-minutes: 8
     env:
-      PRODUCT_BROWSER_WORKERS: ${{ matrix.workers }}
+      PRODUCT_BROWSER_SHARD: ${{ matrix.shard }}
       GH_TOKEN: ""
       PYTHONDONTWRITEBYTECODE: 1
       DO_NOT_TRACK: 1
@@ -36,3 +33,19 @@ jobs:
         with:
           source_sha: ${{ github.sha }}
           lane: browser
+  isolation:
+    if: github.repository == 'disposabl-dev/create-disposabl-app'
+    name: Blacksmith network isolation
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 2
+    steps:
+      - name: Check namespace and loopback
+        run: |
+          sudo unshare --net --fork /bin/bash -euxc '
+            ip link set lo up
+            links=$(ip -o link show | cut -d: -f2)
+            printf "Namespace interface names: %s\n" "$links"
+            test "$(ip -o link show | wc -l)" -eq 1
+            ip -o link show | grep -Eq "^[0-9]+: lo:"
+            runuser -u "$1" -- id -u
+          ' _ "$(id -un)"

@@ -159,5 +159,5 @@ runs:
           ip -o link show | grep -Eq "^[0-9]+: lo:"
           exec runuser -u "$1" -- env -i HOME="$2" PATH="$3" \
             CONVEX_LOCAL_BINARY="$4" PLAYWRIGHT_BROWSERS_PATH="$5" \
-            PYTHONDONTWRITEBYTECODE=1 PRODUCT_BROWSER_REQUIRE_ISOLATION=1 PRODUCT_BROWSER_FROZEN_INSTALL=1 PRODUCT_BROWSER_WORKERS="$7" python3 "$6"
-        ' _ "$(id -un)" "$HOME" "$PATH" "$RUNNER_TEMP/product-convex/convex-local-backend" "$PLAYWRIGHT_BROWSERS_PATH" "$GITHUB_WORKSPACE/.github/scripts/product-browser-check.py" "$PRODUCT_BROWSER_WORKERS"
+            PYTHONDONTWRITEBYTECODE=1 PRODUCT_BROWSER_REQUIRE_ISOLATION=1 PRODUCT_BROWSER_FROZEN_INSTALL=1 PRODUCT_BROWSER_SHARD="$7" python3 "$6"
+        ' _ "$(id -un)" "$HOME" "$PATH" "$RUNNER_TEMP/product-convex/convex-local-backend" "$PLAYWRIGHT_BROWSERS_PATH" "$GITHUB_WORKSPACE/.github/scripts/product-browser-check.py" "$PRODUCT_BROWSER_SHARD"

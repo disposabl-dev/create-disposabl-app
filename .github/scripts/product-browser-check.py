@@ -262,7 +262,17 @@ def main():
         command([cli, 'dev', '--once', '--typecheck', 'disable', '--codegen', 'disable'], cwd=backend, environment=admin, log='sync.log')
         platforms = json.loads((source / 'disposabl.json').read_text()).get('platforms', [])
         targets = 'web,backend,api' if 'api' in platforms else 'web,backend'
-        command(['bun', 'run', 'e2e', 'run', '--target', targets, '--retries', '0', '--no-cache', '--workers', os.environ['PRODUCT_BROWSER_WORKERS']], cwd=source, environment=testenv, log='e2e.log')
+        shard = os.environ['PRODUCT_BROWSER_SHARD']
+        options = [] if shard == 'full' else ['--shard', shard]
+        started = time.monotonic()
+        command(['bun', 'run', 'e2e', 'run', '--target', targets, '--retries', '0', '--no-cache', '--workers', '1', *options], cwd=source, environment=testenv, log='e2e.log')
+        print(f'TesterArmy {shard} elapsed: {time.monotonic() - started:.2f}s', flush=True)
+        report = json.loads((source / 'packages/tests/.e2e/report.json').read_text())
+        for result in report['run']['results']:
+            if result['selected']:
+                identifier, status = result['id'], result['status']
+                if re.fullmatch(r'[a-f0-9]{64}', identifier) and status in ('passed', 'skipped'):
+                    print(f'Test status {identifier} {status}', flush=True)
         print(f'Product {targets} E2E passed', flush=True)
     if any(listeners(port) for port in PORTS):
         raise RuntimeError('Listener still present after backend teardown')
