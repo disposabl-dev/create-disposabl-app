@@ -1,0 +1,53 @@
+name: Full product Bun test shard benchmark
+on:
+  push:
+    branches: [benchmark/ci-product-unit-shards-20261121]
+permissions:
+  contents: read
+jobs:
+  test:
+    name: Full product unit / ${{ matrix.label }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { label: full, shard: "" }
+          - { label: left, shard: "1/2" }
+          - { label: right, shard: "2/2" }
+    env:
+      CI: "1"
+      GH_TOKEN: ""
+      E2E_TELEMETRY_DISABLED: "1"
+      DO_NOT_TRACK: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+      TEST_SHARD: ${{ matrix.shard }}
+    steps:
+      - uses: actions/checkout@v6
+        with: { ref: "${{ github.sha }}", persist-credentials: false }
+      - uses: actions/setup-node@v6
+        with: { node-version: "24", package-manager-cache: false }
+      - uses: oven-sh/setup-bun@v2
+        with: { bun-version: "1.4.5" }
+      - run: bun install --frozen-lockfile
+      - run: bun run --cwd packages/create-disposabl-app build
+      - name: Run the same product unit files with native Bun sharding
+        working-directory: packages/tests
+        run: |
+          results="$RUNNER_TEMP/unit-proof"
+          mkdir "$results"
+          printf '{}\n' > "$results/timings.json"
+          shard=()
+          if [[ -n "$TEST_SHARD" ]]; then shard+=("--shard=$TEST_SHARD"); fi
+          /usr/bin/time -p bun test --parallel=4 --bail=1 --reporter=junit \
+            --reporter-outfile="$results/junit.xml" \
+            --timings="$results/timings.json" --update-timings "${shard[@]}" *.test.ts
+          test -s "$results/junit.xml"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: product-unit-${{ matrix.label }}
+          path: ${{ runner.temp }}/unit-proof/
+          retention-days: 1
+          if-no-files-found: error
