@@ -110,6 +110,10 @@ Set `features` to include `faster-ci` in `disposabl.json` to use Blacksmith runn
 
 Faster CI selects an eight-vCPU Linux runner for universal Android builds and a two-vCPU runner for web and other Linux jobs. Android retains all four architectures and its 20-minute job limit. Blacksmith usage is billed through your existing account; runner capacity alone does not guarantee a build completes within the limit.
 
+Disposabl publishes the management API's CLI and TypeScript SDK from
+[Exact's client publishing workflow](https://github.com/disposabl-dev/disposabl-exact/blob/main/.github/workflows/disposabl-clients.yml).
+Generated apps can publish their own packages from their app repository.
+
 ## Generator release checks
 
 Before publishing the generator, `bun run --cwd packages/create-disposabl-app build && bun run --cwd packages/create-disposabl-app verify:starter` creates fresh projects for four configurations: website only, website with Android, mobile without authentication, and all platforms. Each follows the CLI's formatting and installation steps, then runs the first CI frozen install, `bun run check`, its retained unit tests, and web and selected CLI/SDK builds. Pass `web-minimal`, `web-android`, `mobile-minimal`, or `all-platforms` after `verify:starter` to check one selection. These checks use no provider credentials and do not provision or deploy resources. Native builds and installed-app behavior still need the platform checks below.

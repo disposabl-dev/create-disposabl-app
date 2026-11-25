@@ -47,8 +47,8 @@ node --input-type=module -e '
     .map(platform => ({platform, runner: runners[platform]}));
   console.log(`desktop=${JSON.stringify(desktop)}`);
   const packages = (production ? ["cli", "sdk"] : []).filter(name => {
-    // This repository publishes its platform CLI before the generator in publish.yml.
-    if (name === "cli" && process.env.GH_REPO === "disposabl-dev/create-disposabl-app") return false;
+    // Exact publishes the management API packages. Generated apps publish their own clients.
+    if (process.env.GH_REPO === "disposabl-dev/create-disposabl-app") return false;
     return existsSync(`packages/${name}/package.json`)
       && enabled.includes(name === "sdk" ? "typescript-sdk" : name)
       && paths.some(p => shared(p) || p.startsWith(`packages/${name}/`) || /^(packages\/backend\/|packages\/disposabl-kit\/)/.test(p));
