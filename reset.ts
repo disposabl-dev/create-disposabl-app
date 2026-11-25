@@ -525,6 +525,7 @@ for (const path of [
   "packages/sdk/src/generated",
   "packages/create-disposabl-app",
   ".github/workflows/publish.yml",
+  "apps/web/src/router/_authenticated/dashboard.billing.tsx",
   "apps/web/src/router/_authenticated/dashboard.connections.tsx",
   "apps/web/src/router/mobile-login.tsx",
   "apps/mobile/src/app/(authenticated)/apps",
