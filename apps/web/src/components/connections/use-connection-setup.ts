@@ -44,7 +44,6 @@ export function useConnectionSetup() {
   const [installations, setInstallations] = useState<Installation[]>([]);
   const [proof, setProof] = useState<string>();
   const [installNeeded, setInstallNeeded] = useState(false);
-  const [githubPending, setGithubPending] = useState(false);
   const [mobile, setMobile] = useState(false);
   const consumed = useRef(false);
   const fail = (cause: unknown) =>
@@ -69,7 +68,6 @@ export function useConnectionSetup() {
     setInitialized(true);
     const queryProvider = url.searchParams.get("provider");
     const pending = sessionStorage.getItem(pendingKey);
-    setGithubPending(pending === "github");
     const provider = isProvider(queryProvider)
       ? queryProvider
       : isProvider(pending)
@@ -166,7 +164,6 @@ export function useConnectionSetup() {
             proof: result.proof,
             installationId: installation.installationId,
           });
-          setGithubPending(false);
         } else {
           setInstallations(result.installations);
           setProof(result.proof);
@@ -248,7 +245,6 @@ export function useConnectionSetup() {
       sessionStorage.removeItem(selectionKey);
       setInstallations([]);
       setProof(undefined);
-      setGithubPending(false);
     });
   }
   return {
@@ -261,7 +257,6 @@ export function useConnectionSetup() {
     installations,
     chooseAccount,
     installNeeded,
-    githubPending,
     mobile,
     analyticsRequired,
     paymentsRequired,

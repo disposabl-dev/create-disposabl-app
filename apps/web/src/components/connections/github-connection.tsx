@@ -15,7 +15,6 @@ export function GithubConnection({ setup }: { setup: Setup }) {
     installations,
     chooseAccount,
     installNeeded,
-    githubPending,
   } = setup;
   const connected = status?.github;
   const available = status?.available.github;
@@ -71,15 +70,13 @@ export function GithubConnection({ setup }: { setup: Setup }) {
           >
             Connect GitHub
           </Button>
-          {(githubPending || installNeeded) && (
-            <Button
-              variant="outline"
-              disabled={busy || !available}
-              onClick={() => connect("github", false)}
-            >
-              Finish connecting
-            </Button>
-          )}
+          <Button
+            variant="outline"
+            disabled={busy || !available}
+            onClick={() => connect("github", false)}
+          >
+            Already installed? Finish connecting
+          </Button>
           {installNeeded && (
             <p role="status" className="text-sm text-muted-foreground">
               Install Disposabl with the requested permissions, then finish

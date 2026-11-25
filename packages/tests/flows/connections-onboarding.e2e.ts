@@ -78,6 +78,11 @@ test(
     await expect(
       screen.getByRole("button", "Connect GitHub", { exact: true }),
     ).toBeVisible();
+    await expect(
+      screen.getByRole("button", "Already installed? Finish connecting", {
+        exact: true,
+      }),
+    ).toBeVisible();
     expect(
       await browser.evaluate(() =>
         [...document.querySelectorAll("main h2")].map((e) => e.textContent),
