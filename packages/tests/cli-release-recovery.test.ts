@@ -44,36 +44,21 @@ const readWorkflow = (name: string) =>
 const workflow = readWorkflow("publish");
 const productChecks = readWorkflow("product-checks");
 const productAction = readWorkflow("../actions/product-checks/action");
-const allSteps = workflow.jobs.publish.steps;
-const boundary = allSteps.findIndex(
-  (s: { id?: string }) => s.id === "generator-checkout",
-);
-const phaseSteps = (job: string) =>
-  job === "cli" ? allSteps.slice(0, boundary) : allSteps.slice(boundary);
-const steps = phaseSteps("cli");
-const step = (name: string, job = "cli") =>
-  (job === "product" ? productAction.runs.steps : phaseSteps(job)).find(
+const steps = workflow.jobs.publish.steps;
+const step = (name: string, job = "publish") =>
+  (job === "product" ? productAction.runs.steps : steps).find(
     (s: { name?: string }) => s.name === name,
   ).run as string;
 
-test("verification budget leaves time for release work", () => {
-  const cli = step("Verify published CLI release and tag");
-  const generator = step(
-    "Verify published generator release and tag",
-    "publish",
-  );
-  const budgets = [cli, generator].map((source) => {
-    const match = source.match(/deadline=\$\(\(SECONDS \+ (\d+)\)\)/);
-    expect(match).not.toBeNull();
-    const seconds = Number(match![1]);
-    expect(source).toContain('--max-time "$remaining"');
-    expect(source).toContain("while (( SECONDS < deadline ))");
-    return seconds;
-  });
-  expect(budgets).toEqual([1200, 1200]);
+test("verification budget leaves time for generator release work", () => {
+  const source = step("Verify published generator release and tag");
+  const match = source.match(/deadline=\$\(\(SECONDS \+ (\d+)\)\)/);
+  expect(match).not.toBeNull();
+  expect(source).toContain('--max-time "$remaining"');
+  expect(source).toContain("while (( SECONDS < deadline ))");
+  expect(Number(match![1])).toBe(1200);
   expect(
-    workflow.jobs.publish["timeout-minutes"] * 60 -
-      budgets.reduce((a, b) => a + b, 0),
+    workflow.jobs.publish["timeout-minutes"] * 60 - 1200,
   ).toBeGreaterThanOrEqual(1200);
 });
 
@@ -93,7 +78,6 @@ test("conflicting recovery inputs run validation and fail visibly", () => {
 
 function fixture() {
   const dir = temporaryDirectory("cli-release-test-");
-  symlinkSync(dir, join(dir, "cli-source"));
   symlinkSync(dir, join(dir, "generator-source"));
   const bin = join(dir, "bin");
   mkdirSync(bin);
@@ -211,7 +195,7 @@ function fixture() {
   const run = (
     name: string,
     env: Record<string, string | undefined> = {},
-    job = "cli",
+    job = "publish",
   ) => {
     const head = git("rev-parse", "HEAD").toString().trim();
     const result = spawnSync("bash", ["-c", step(name, job)], {
@@ -265,15 +249,13 @@ test("shared checks use the resolved SHA and block every failed or skipped gate"
   expect(productChecks.jobs.check.outputs.source_sha).toBe(
     "${{ steps.checks.outputs.source_sha }}",
   );
-  for (const job of ["cli", "publish"]) {
-    const verification = phaseSteps(job).find(
-      (candidate: { name?: string }) =>
-        candidate.name === "Verify workflow source",
-    );
-    expect(verification.env.RESOLVED_SHA).toBe(
-      "${{ needs.checks.outputs.source_sha }}",
-    );
-  }
+  const verification = steps.find(
+    (candidate: { name?: string }) =>
+      candidate.name === "Verify workflow source",
+  );
+  expect(verification.env.RESOLVED_SHA).toBe(
+    "${{ needs.checks.outputs.source_sha }}",
+  );
   expect(workflow.jobs.checks.permissions).toEqual({ contents: "read" });
   expect(workflow.jobs.checks.secrets).toBeUndefined();
   const github = {
@@ -288,27 +270,10 @@ test("shared checks use the resolved SHA and block every failed or skipped gate"
       () => true,
       () => cancelled,
     );
-  const enabled = (phase: string, inputs: unknown) =>
-    new Function("inputs", `return ${phaseSteps(phase)[0].if}`)(inputs);
-  const normal = { recovery_version: "", cli_recovery_version: "" };
-  const generator = { recovery_version: "1.1.0", cli_recovery_version: "" };
-  const cliRecovery = { recovery_version: "", cli_recovery_version: "1.1.0" };
   expect(check("success")).toBe(true);
   for (const result of ["failure", "cancelled", "skipped"])
     expect(check(result)).toBe(false);
   expect(check("success", true)).toBe(false);
-  expect([enabled("cli", normal), enabled("publish", normal)]).toEqual([
-    true,
-    true,
-  ]);
-  expect([
-    enabled("cli", cliRecovery),
-    enabled("publish", cliRecovery),
-  ]).toEqual([true, false]);
-  expect([enabled("cli", generator), enabled("publish", generator)]).toEqual([
-    false,
-    true,
-  ]);
 });
 
 test("release source resolves current push and fenced recovery tags", () => {
@@ -332,9 +297,6 @@ test("release source resolves current push and fenced recovery tags", () => {
     expect(
       f.run("Resolve and verify source", input, "product").status,
     ).not.toBe(0);
-  expect(
-    f.run("Verify CLI recovery tag", { RESOLVED_SHA: "0".repeat(40) }).status,
-  ).not.toBe(0);
   expect(
     f.run("Verify recovery tag", { RESOLVED_SHA: "0".repeat(40) }, "publish")
       .status,
@@ -374,12 +336,6 @@ test("recovery checks the actual historical tag commit and rejects detached or c
     }).status,
   ).toBe(0);
   expect(
-    f.run("Verify CLI recovery tag", { VERSION: "1.0.0", RESOLVED_SHA: old })
-      .status,
-  ).toBe(0);
-  expect(f.git("rev-parse", "HEAD").toString().trim()).toBe(old);
-  f.git("checkout", "--detach", head);
-  expect(
     f.run(
       "Verify recovery tag",
       { VERSION: "1.0.0", RESOLVED_SHA: old },
@@ -389,11 +345,6 @@ test("recovery checks the actual historical tag commit and rejects detached or c
   expect(f.git("rev-parse", "HEAD").toString().trim()).toBe(old);
   f.git("checkout", "--detach", head);
   f.git("tag", "-f", "v1.0.0", head);
-  f.git("tag", "-f", "@disposabl/cli@1.0.0", head);
-  expect(
-    f.run("Verify CLI recovery tag", { VERSION: "1.0.0", RESOLVED_SHA: old })
-      .status,
-  ).not.toBe(0);
   expect(
     f.run(
       "Verify recovery tag",
@@ -422,69 +373,6 @@ test("recovery checks the actual historical tag commit and rejects detached or c
     ).status,
   ).not.toBe(0);
 });
-
-test("missing newer tagged CLI blocks generator with exact recovery instruction", () => {
-  const f = fixture();
-  f.git("tag", "@disposabl/cli@1.1.0");
-  const r = f.run("Verify CLI release and tag");
-  expect(r.status).not.toBe(0);
-  expect(r.stdout).toContain("cli_recovery_version=1.1.0");
-});
-
-test("post-publish verification retries only propagation and transient network errors", () => {
-  for (const mode of ["delayed", "network"]) {
-    const f = fixture();
-    f.git("tag", "@disposabl/cli@1.1.0");
-    writeFileSync(join(f.dir, "published"), "publish\n");
-    const result = f.run("Verify published CLI release and tag", {
-      VERIFY_MODE: mode,
-    });
-    expect(result.status).toBe(0);
-    expect(result.stdout).toContain(
-      mode === "network" ? "exact curl exit 7" : "exact HTTP 404",
-    );
-    expect(readFileSync(join(f.dir, "verify-attempt"), "utf8").trim()).toBe(
-      "2",
-    );
-    expect(readFileSync(join(f.dir, "verify-sleeps"), "utf8")).toBe("sleep\n");
-    expect(readFileSync(join(f.dir, "published"), "utf8")).toBe("publish\n");
-  }
-});
-
-test(
-  "post-publish verification fails boundedly on 404 and immediately on contradictions or auth",
-  { timeout: 30000 },
-  () => {
-    for (const [mode, attempts, sleeps] of [
-      ["persistent", "60", 60],
-      ["contradictory", "1", 0],
-      ["malformed", "1", 0],
-      ["integrity", "1", 0],
-      ["auth", "1", 0],
-    ] as const) {
-      const f = fixture();
-      f.git("tag", "@disposabl/cli@1.1.0");
-      writeFileSync(join(f.dir, "published"), "publish\n");
-      const result = f.run("Verify published CLI release and tag", {
-        VERIFY_MODE: mode,
-      });
-      expect(result.status).not.toBe(0);
-      expect(result.stdout + result.stderr).not.toContain(
-        "private-marker-not-json",
-      );
-      expect(readFileSync(join(f.dir, "verify-attempt"), "utf8").trim()).toBe(
-        attempts,
-      );
-      const sleepFile = join(f.dir, "verify-sleeps");
-      expect(
-        existsSync(sleepFile)
-          ? readFileSync(sleepFile, "utf8").trim().split("\n").length
-          : 0,
-      ).toBe(sleeps);
-      expect(readFileSync(join(f.dir, "published"), "utf8")).toBe("publish\n");
-    }
-  },
-);
 
 test(
   "generator post-publish verification fails closed and never republishes",
@@ -524,94 +412,22 @@ test(
 );
 
 test(
-  "both verifiers observe delayed availability without publishing again",
-  { timeout: 30000 },
-  () => {
-    for (const [job, stepName, tag, packageName] of [
-      [
-        "cli",
-        "Verify published CLI release and tag",
-        "@disposabl/cli@",
-        "@disposabl/cli",
-      ],
-      [
-        "publish",
-        "Verify published generator release and tag",
-        "v",
-        "create-disposabl-app",
-      ],
-    ] as const) {
-      const f = fixture();
-      if (job === "publish") f.git("tag", `${tag}1.0.0`);
-      f.git("tag", `${tag}1.1.0`);
-      writeFileSync(join(f.dir, "published"), "publish\n");
-      const result = f.run(
-        stepName,
-        { VERIFY_MODE: "late", PACKAGE_NAME: packageName },
-        job,
-      );
-      expect(result.status).toBe(0);
-      expect(readFileSync(join(f.dir, "verify-attempt"), "utf8").trim()).toBe(
-        "27",
-      );
-      expect(
-        readFileSync(join(f.dir, "verify-sleeps"), "utf8").trim().split("\n")
-          .length,
-      ).toBe(26);
-      expect(result.stdout).toContain("attempt 1: exact HTTP 404");
-      expect(result.stdout).toContain("attempt 1: latest HTTP 200");
-      expect(result.stdout).toContain("latest version 1.0.0; expected 1.1.0");
-      expect(result.stdout).toContain("attempt 27: exact HTTP 200");
-      expect(readFileSync(join(f.dir, "published"), "utf8")).toBe("publish\n");
-    }
-  },
-);
-
-test("recovery publishes only a 404 and safely replays a matching version", () => {
-  const f = fixture();
-  f.git("tag", "@disposabl/cli@1.1.0");
-  expect(f.run("Verify CLI recovery tag").status).toBe(0);
-  expect(f.run("Recover tagged CLI release").status).toBe(0);
-  expect(readFileSync(join(f.dir, "published"), "utf8")).toBe("publish\n");
-  const replay = f.run("Recover tagged CLI release", {
-    STATUS: "200",
-    LATEST: "1.1.0",
-  });
-  expect(replay.status).toBe(0);
-  expect(replay.stdout).toContain("already exists");
-  expect(readFileSync(join(f.dir, "published"), "utf8")).toBe("publish\n");
-  expect(
-    f.run("Recover tagged CLI release", {
-      STATUS: "200",
-      INTEGRITY: "sha512-wrong",
-    }).status,
-  ).not.toBe(0);
-});
-
-test(
-  "historical recovery checks packed metadata before either package publishes",
+  "generator recovery checks packed metadata before publication",
   { timeout: 30000 },
   () => {
     for (const [job, recovery, packageName] of [
-      ["cli", "Recover tagged CLI release", "@disposabl/cli"],
       ["publish", "Recover tagged release", "create-disposabl-app"],
     ]) {
       const f = fixture();
-      const order = phaseSteps(job).map((s: { name?: string }) => s.name);
+      const order = steps.map((s: { name?: string }) => s.name);
       expect(order.indexOf("Preserve recovery metadata guard")).toBeLessThan(
-        order.indexOf(
-          job === "cli" ? "Verify CLI recovery tag" : "Verify recovery tag",
-        ),
+        order.indexOf("Verify recovery tag"),
       );
-      f.git("tag", job === "cli" ? "@disposabl/cli@1.1.0" : "v1.1.0", "HEAD~1");
+      f.git("tag", "v1.1.0", "HEAD~1");
       const resolved = f.git("rev-parse", "HEAD~1").toString().trim();
       expect(f.run("Preserve recovery metadata guard", {}, job).status).toBe(0);
       expect(
-        f.run(
-          job === "cli" ? "Verify CLI recovery tag" : "Verify recovery tag",
-          { RESOLVED_SHA: resolved },
-          job,
-        ).status,
+        f.run("Verify recovery tag", { RESOLVED_SHA: resolved }, job).status,
       ).toBe(0);
       expect(
         existsSync(
@@ -691,73 +507,6 @@ test("metadata guard runs through symlinks and redacts malformed JSON", () => {
     expect(result.stderr).toContain(diagnostic);
     expect(result.stdout + result.stderr).not.toContain("synthetic-secret");
   }
-});
-
-test("rejects wrong, non-ancestor, and older recovery tags", () => {
-  const f = fixture();
-  f.git("tag", "@disposabl/cli@1.1.0");
-  expect(
-    f.run("Verify CLI recovery tag", { VERSION: "2.0.0" }).status,
-  ).not.toBe(0);
-  expect(
-    f.run("Verify CLI recovery tag", { VERSION: "1.0.0" }).status,
-  ).not.toBe(0);
-  f.git("checkout", "-qb", "other");
-  f.git(
-    "-c",
-    "user.name=test",
-    "-c",
-    "user.email=test@example.test",
-    "commit",
-    "--allow-empty",
-    "-qm",
-    "other",
-  );
-  f.git("tag", "@disposabl/cli@2.0.0");
-  f.git("checkout", "-q", "-");
-  expect(
-    f.run("Verify CLI recovery tag", { VERSION: "2.0.0" }).status,
-  ).not.toBe(0);
-});
-
-test("network, registry, and dist-tag failures do not publish", () => {
-  const f = fixture();
-  f.git("tag", "@disposabl/cli@1.1.0");
-  for (const env of [
-    { NPM_FAIL: "1" },
-    { CURL_FAIL: "1" },
-    { STATUS: "401" },
-    { STATUS: "500" },
-    { LATEST: "2.0.0" },
-  ]) {
-    expect(f.run("Recover tagged CLI release", env).status).not.toBe(0);
-  }
-  expect(
-    f.run("Verify CLI release and tag", {
-      STATUS: "200",
-      REGISTRY_VERSION: "1.1.0",
-    }).status,
-  ).not.toBe(0);
-  expect(workflow.jobs.publish.needs).toEqual(["checks"]);
-  expect(phaseSteps("publish")[0].if).toContain(
-    "inputs.cli_recovery_version == ''",
-  );
-  expect(phaseSteps("cli")[0].if).toContain("inputs.recovery_version == ''");
-  expect(
-    steps.filter(
-      (s: { name?: string }) => s.name === "Verify CLI release and tag",
-    ),
-  ).toHaveLength(1);
-  expect(
-    steps.filter(
-      (s: { name?: string }) =>
-        s.name === "Verify published CLI release and tag",
-    ),
-  ).toHaveLength(1);
-  expect(workflow.env.DISPOSABL_CLI_TELEMETRY_REQUIRED).toBe("1");
-  expect(workflow.env.DISPOSABL_CLI_POSTHOG_PROJECT_TOKEN).toContain(
-    "vars.DISPOSABL_CLI_POSTHOG_PROJECT_TOKEN",
-  );
 });
 
 test(

@@ -204,13 +204,20 @@ test("selector outputs and executable source select PR work and conservative mai
   );
   writeFileSync(
     join(dir, "disposabl.json"),
-    JSON.stringify({ platforms: ["web", "android", "ios"], features: [] }),
+    JSON.stringify({
+      platforms: ["web", "android", "ios", "api", "cli", "typescript-sdk"],
+      features: [],
+    }),
   );
+  for (const name of ["cli", "sdk"]) {
+    mkdirSync(join(dir, "packages", name), { recursive: true });
+    writeFileSync(join(dir, "packages", name, "package.json"), "{}");
+  }
   try {
     const script = join(dir, "platforms.sh"),
       out = join(dir, "out");
     writeFileSync(script, source(".github/scripts/platforms.sh"));
-    const run = (pr: string, event: string) => {
+    const run = (pr: string, event: string, repository = "fixture/app") => {
       writeFileSync(out, "");
       execFileSync("bash", [script], {
         cwd: dir,
@@ -218,7 +225,7 @@ test("selector outputs and executable source select PR work and conservative mai
           ...process.env,
           PATH: `${dir}/bin:${process.env.PATH}`,
           PR: pr,
-          GH_REPO: "fixture/app",
+          GH_REPO: repository,
           RUNNER_TEMP: dir,
           GITHUB_OUTPUT: out,
           EXPO_CONNECTED: "true",
@@ -253,6 +260,12 @@ test("selector outputs and executable source select PR work and conservative mai
       "true",
     ]);
     expect(JSON.parse(main.desktop)).toEqual([]);
+    expect(JSON.parse(main.packages)).toEqual(["cli", "sdk"]);
+    expect(
+      JSON.parse(
+        run("", "push", "disposabl-dev/create-disposabl-app").packages,
+      ),
+    ).toEqual([]);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -268,10 +281,6 @@ test("generated reset retains root check and removes product-only gate", () => {
   expect(step(generated.jobs.changes, "Product checks")).toBeUndefined();
   expect(generated.jobs.web.needs).toBe("changes");
   expect(hasRootCheck(generated.jobs.web)).toBe(true);
-  expect(
-    (reset.match(/packages\/tests\/publisher-colocation\.test\.ts/g) ?? [])
-      .length,
-  ).toBe(2);
   expect(
     allowed(generated.jobs.web, context("push"), needs("success", "skipped")),
   ).toBe(true);
@@ -332,18 +341,13 @@ test("product and recovery gates remain independent of root and native release j
   ).toBe(false);
   expect(allowed(publish.jobs.publish, cfg, n, true)).toBe(false);
   const releaseSteps = publish.jobs.publish.steps;
-  const cliCheckout = releaseSteps.find((s: any) => s.id === "cli-checkout");
-  const generatorCheckout = releaseSteps.find(
-    (s: any) => s.id === "generator-checkout",
+  expect(releaseSteps.some((s: any) => s.id === "cli-checkout")).toBe(false);
+  expect(
+    publish.on.workflow_dispatch.inputs.cli_recovery_version,
+  ).toBeUndefined();
+  expect(releaseSteps.some((s: any) => s.id === "generator-checkout")).toBe(
+    true,
   );
-  expect(allowed(cliCheckout, cfg, {})).toBe(false);
-  expect(allowed(generatorCheckout, cfg, {})).toBe(true);
-  const cli = {
-    ...cfg,
-    inputs: { recovery_version: "", cli_recovery_version: "1.0.0" },
-  };
-  expect(allowed(cliCheckout, cli, {})).toBe(true);
-  expect(allowed(generatorCheckout, cli, {})).toBe(false);
   const submit = pipeline.jobs["android-submit"];
   expect(submit.needs).toBe("android");
   const androidNeeds = { android: { result: "success" } };
