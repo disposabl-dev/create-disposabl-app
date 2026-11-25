@@ -102,13 +102,13 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         if: inputs.recovery_version == ''
         with:
-          bun-version: "1.4.4"
-      - uses: actions/cache@v4
+          bun-version: "1.4.5"
+      - uses: actions/cache@v6
         if: inputs.recovery_version == ''
         with:
           path: ${{ runner.temp }}/bun-cli-cache
-          key: bun-cli-${{ runner.os }}-${{ runner.arch }}-1.4.4-${{ hashFiles('cli-source/bun.lock') }}
-          restore-keys: bun-cli-${{ runner.os }}-${{ runner.arch }}-1.4.4-
+          key: bun-cli-${{ runner.os }}-${{ runner.arch }}-1.4.5-${{ hashFiles('cli-source/bun.lock') }}
+          restore-keys: bun-cli-${{ runner.os }}-${{ runner.arch }}-1.4.5-
       - run: bun install --frozen-lockfile --cache-dir "$RUNNER_TEMP/bun-cli-cache"
         if: inputs.recovery_version == ''
         working-directory: cli-source
@@ -290,13 +290,13 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         if: inputs.cli_recovery_version == ''
         with:
-          bun-version: "1.4.4"
-      - uses: actions/cache@v4
+          bun-version: "1.4.5"
+      - uses: actions/cache@v6
         if: inputs.cli_recovery_version == ''
         with:
           path: ${{ runner.temp }}/bun-generator-cache
-          key: bun-generator-${{ runner.os }}-${{ runner.arch }}-1.4.4-${{ hashFiles('generator-source/bun.lock') }}
-          restore-keys: bun-generator-${{ runner.os }}-${{ runner.arch }}-1.4.4-
+          key: bun-generator-${{ runner.os }}-${{ runner.arch }}-1.4.5-${{ hashFiles('generator-source/bun.lock') }}
+          restore-keys: bun-generator-${{ runner.os }}-${{ runner.arch }}-1.4.5-
       - run: bun install --frozen-lockfile --cache-dir "$RUNNER_TEMP/bun-generator-cache"
         working-directory: generator-source/packages/create-disposabl-app
         if: inputs.cli_recovery_version == ''
@@ -314,10 +314,6 @@ jobs:
       - run: bun run typecheck
         if: inputs.cli_recovery_version == '' && (inputs.recovery_version != '')
         working-directory: generator-source/packages/cli
-      - name: Verify fresh generated projects
-        working-directory: generator-source/packages/create-disposabl-app
-        if: inputs.cli_recovery_version == '' && (inputs.recovery_version == '')
-        run: bun run build && bun run verify:starter
       # semantic-release sets the package version, builds, tags this commit, and publishes.
       # Recovery after a publish failure: check npm and GitHub for the tagged version first.
       # A tagged version is skipped on rerun; restore missing artifacts from that exact commit/version.

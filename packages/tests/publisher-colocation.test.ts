@@ -169,8 +169,8 @@ test("fresh checkouts, source guards and frozen installs stay separate", () => {
         ),
     );
   }
-  const cliCache = cli.find((s) => s.uses === "actions/cache@v4");
-  const generatorCache = generator.find((s) => s.uses === "actions/cache@v4");
+  const cliCache = cli.find((s) => s.uses === "actions/cache@v6");
+  const generatorCache = generator.find((s) => s.uses === "actions/cache@v6");
   assert.equal(cliCache.with.path, "${{ runner.temp }}/bun-cli-cache");
   assert.equal(
     generatorCache.with.path,

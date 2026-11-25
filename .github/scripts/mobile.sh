@@ -40,9 +40,8 @@ manifest() {
     {signing: $signing, signingId: $signingId, channel: ($channel | required("channel")), projectId: (.extra.eas.projectId | required("projectId")), applicationId: (.android.package | required("applicationId")), runtimeVersion: ($runtime | required("runtimeVersion") | if test("^[a-f0-9]{40,64}$") then . else error("Invalid runtimeVersion") end), androidArchitectures: (.extra.disposablAndroidArchitectures | if type == "array" and length > 0 then . else error("Missing Android architectures") end)}
   '
 }
-case "${1:?operation required}" in
-  expo-env)
-if [[ -z "$EXPO_PROJECT_ID" ]]; then
+configure_expo_project() {
+  [[ -z "${EXPO_PROJECT_ID:-}" ]] || return 0
   # Initialize with static config; app.config.js reads the resulting environment.
   mkdir -p "$RUNNER_TEMP/expo-project"
   jq --slurpfile app ../../disposabl.json --arg owner "${EXPO_OWNER:-}" '
@@ -61,7 +60,14 @@ if [[ -z "$EXPO_PROJECT_ID" ]]; then
   EXPO_SLUG=$(jq -er .slug "$RUNNER_TEMP/expo-project.json")
   export EXPO_PROJECT_ID EXPO_OWNER EXPO_SLUG
   printf 'EXPO_PROJECT_ID=%s\nEXPO_OWNER=%s\nEXPO_SLUG=%s\n' "$EXPO_PROJECT_ID" "$EXPO_OWNER" "$EXPO_SLUG" >> "$GITHUB_ENV"
-fi
+}
+case "${1:?operation required}" in
+  expo-project)
+    configure_expo_project
+    printf 'project_id=%s\nowner=%s\nslug=%s\n' "$EXPO_PROJECT_ID" "${EXPO_OWNER:-}" "${EXPO_SLUG:-}" >> "$GITHUB_OUTPUT"
+    ;;
+  expo-env)
+configure_expo_project
 jq --arg channel "$CHANNEL" '.build["ios-" + env.EAS_ENVIRONMENT].channel = $channel' eas.json > "$RUNNER_TEMP/eas.json"
 mv "$RUNNER_TEMP/eas.json" eas.json
 bun x "$EAS_CLI" env:pull --environment "$EAS_ENVIRONMENT" --path "$RUNNER_TEMP/expo.env" --non-interactive
@@ -78,7 +84,7 @@ bun -e '
       if (![process.env[backend[1]], expected].includes(value)) throw new Error(`EAS overrides the deployed backend: ${key}`);
       continue;
     }
-    if (/^(GITHUB_|RUNNER_|GH_|DISPOSABL_|ANDROID_|UPDATE_POLICY$|PUBLIC_SITE_URL$|BUN_|CI$|NODE_OPTIONS$|PATH$|HOME$|SOURCE(_PATH)?$|CHANNEL$|PLATFORM$|RELEASE_PREFIX$|MACOS_|EAS_(ENVIRONMENT|CLI)$|EXPO_(TOKEN|PROJECT_ID|OWNER|SLUG|NO_DOTENV)$)/.test(key)) throw new Error(`Reserved EAS variable: ${key}`);
+    if (/^(GITHUB_|RUNNER_|GH_|DISPOSABL_|ANDROID_|UPDATE_POLICY$|PUBLIC_SITE_URL$|BUN_|CI$|NODE_OPTIONS$|PATH$|HOME$|SOURCE(_PATH)?$|CHANNEL$|PLATFORM$|RELEASE_PREFIX$|MACOS_|EAS_(ENVIRONMENT|CLI)$|EXPO_METRO_CACHE_|EXPO_(TOKEN|PROJECT_ID|OWNER|SLUG|NO_DOTENV)$)/.test(key)) throw new Error(`Reserved EAS variable: ${key}`);
     if (key === "EXPO_PUBLIC_DISPOSABL_ANALYTICS_ENABLED") continue;
     effectiveEnv[key] = value;
     const delimiter = crypto.randomUUID();
@@ -91,13 +97,24 @@ bun -e '
 '
     ;;
   expo-channel)
+created=false
 for ((offset=0; ; offset+=25)); do
   bun x "$EAS_CLI" channel:list --json --limit 25 --offset "$offset" > "$RUNNER_TEMP/channels.json"
   if jq -e --arg channel "$CHANNEL" 'any(.currentPage[]; .name == $channel)' "$RUNNER_TEMP/channels.json" > /dev/null; then
     jq -e --arg channel "$CHANNEL" '.currentPage[] | select(.name == $channel) | (.isPaused == false) and (.updateBranches | length == 1) and (.updateBranches[0].name == $channel) and ((.branchMapping | fromjson).data == [{branchId: .updateBranches[0].id, branchMappingLogic: "true"}])' "$RUNNER_TEMP/channels.json" > /dev/null || { echo 'Preview channel must point only to its same-named branch'; exit 1; }
     break
   fi
-  if [[ $(jq '.currentPage | length' "$RUNNER_TEMP/channels.json") -lt 25 ]]; then bun x "$EAS_CLI" channel:create "$CHANNEL" --non-interactive; break; fi
+  if [[ $(jq '.currentPage | length' "$RUNNER_TEMP/channels.json") -lt 25 ]]; then
+    if [[ "$created" == true ]]; then
+      echo "Expo channel $CHANNEL was not found after creation." >&2
+      exit 1
+    fi
+    # Android and iOS may race to create the same channel. Read it back in
+    # either case and apply the same channel/branch validation before publishing.
+    bun x "$EAS_CLI" channel:create "$CHANNEL" --non-interactive || true
+    created=true
+    offset=-25
+  fi
 done
     ;;
   expo-fingerprint)
@@ -151,9 +168,15 @@ artifact=android.apk
 binary=android/app/build/outputs/apk/release/app-release.apk
 fingerprint=assets/fingerprint
 
-(cd android && bash ../../../.github/scripts/android-runner.sh build)
+tasks=(:app:assembleRelease)
+if [[ "$CHANNEL" != production ]]; then
+  # Preview APKs keep release JS, signing and ABIs without store shrinking.
+  tasks+=(-Pandroid.enableMinifyInReleaseBuilds=false -Pandroid.enableShrinkResourcesInReleaseBuilds=false)
+elif [[ "$ANDROID_SIGNING_MODE" == release ]]; then
+  tasks+=(:app:bundleRelease)
+fi
+(cd android && bash ../../../.github/scripts/android-runner.sh build "${tasks[@]}")
 if [[ "$CHANNEL" == production && "$ANDROID_SIGNING_MODE" == release ]]; then
-  (cd android && ./gradlew :app:bundleRelease --no-daemon --build-cache)
   test -s android/app/build/outputs/bundle/release/app-release.aab
   mkdir -p ../../dist/release
   cp android/app/build/outputs/bundle/release/app-release.aab ../../dist/release/android.aab

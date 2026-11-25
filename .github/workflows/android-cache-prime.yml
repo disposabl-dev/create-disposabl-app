@@ -19,6 +19,8 @@ jobs:
       DISPOSABL_MOBILE_CHANNEL: production
       EXPO_PROJECT_ID: 00000000-0000-4000-8000-000000000001
       CCACHE_COMPILERCHECK: content
+      CCACHE_BASEDIR: ${{ github.workspace }}
+      CCACHE_MAXSIZE: 512M
       CMAKE_C_COMPILER_LAUNCHER: ccache
       CMAKE_CXX_COMPILER_LAUNCHER: ccache
     steps:
@@ -30,11 +32,15 @@ jobs:
       - uses: actions/setup-node@v6
         with: { node-version: "24", package-manager-cache: false }
       - uses: oven-sh/setup-bun@v2
-        with: { bun-version: "1.4.4" }
+        with: { bun-version: "1.4.5" }
       - run: bun install --frozen-lockfile --filter @disposabl/mobile
       - uses: actions/setup-java@v5
         with: { distribution: temurin, java-version: "17" }
+      - name: Prepare the installed Android SDK
+        id: installed-sdk
+        run: bash .github/scripts/android-runner.sh sdk
       - uses: android-actions/setup-android@v3
+        if: steps.installed-sdk.outputs.ready != 'true'
         with: { packages: platform-tools }
       - uses: gradle/actions/setup-gradle@v4
         with: { cache-read-only: false }
@@ -44,10 +50,10 @@ jobs:
           sudo apt-get install -y ccache
       - name: Restore compiler cache
         id: cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: ${{ runner.temp }}/ccache
-          key: android-ccache-v1-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+          key: android-ccache-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock', 'apps/mobile/app.json', 'apps/mobile/scripts/**') }}-${{ github.sha }}
       - name: Prebuild Android
         if: steps.cache.outputs.cache-hit != 'true'
         working-directory: apps/mobile
@@ -58,7 +64,7 @@ jobs:
         run: bash ../../../.github/scripts/android-runner.sh prime
       - name: Save compiler cache
         if: steps.cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: ${{ runner.temp }}/ccache
-          key: android-ccache-v1-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+          key: android-ccache-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock', 'apps/mobile/app.json', 'apps/mobile/scripts/**') }}-${{ github.sha }}

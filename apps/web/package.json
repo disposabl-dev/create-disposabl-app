@@ -6,9 +6,9 @@
   "scripts": {
     "dev": "vite dev --port 3000 --open",
     "build": "vite build",
-    "lint": "eslint",
+    "lint": "node ../../.github/scripts/bun-lint.mjs web",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
-    "typecheck": "tsr generate && tsc --noEmit",
+    "typecheck": "tsr generate && bun check",
     "generate:routes": "tsr generate"
   },
   "dependencies": {

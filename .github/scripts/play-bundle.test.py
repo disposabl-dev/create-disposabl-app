@@ -25,7 +25,7 @@ print('source succession PASS')
 workflow=(root/'.github/workflows/pipeline.yml').read_text()
 assert not (root/'.github/workflows/play-bundle.yml').exists()
 assert '  android-play:\n' not in workflow and 'DISPOSABL_ANDROID_PLAY_ENABLED' not in workflow
-assert "if: needs.web.outputs.android_build == 'true'" in workflow
+assert "needs.changes.outputs.android == 'true'" in workflow
 assert "UPDATE_POLICY: ${{ github.event_name == 'push' && github.repository == 'disposabl-dev/create-disposabl-app' && 'expo' || '' }}" in workflow
 build=workflow.split('  android:',1)[1].split('  android-submit:',1)[0]
 job=workflow.split('  android-submit:',1)[1].split('  android-failure:',1)[0]
@@ -33,7 +33,7 @@ assert build.count('android-build') == 1 and "vars.ANDROID_PLAY_SUBMIT == 'true'
 assert 'verify-submission-source' in job and 'com.yastai.disposabl' in job
 assert 'SHA1: 9E:8B:A8:A6:CC:91:07:8A:46:4F:BE:F2:52:86:0B:C8:FE:FB:18:B2' in job
 assert 'android-signatures.mjs dist/release/android.aab 92ad2c5b65aad964b622a4b4fede94b40a31dcae0eb537b9201ea464689a9fb9' in job
-assert '- *artifacts' in build and job.index('download-artifact') < job.index('Verify product Play identity') < job.index('Submit Android bundle')
+assert 'name: Upload release artifacts' in build and job.index('download-artifact') < job.index('Verify product Play identity') < job.index('Submit Android bundle')
 version_step=workflow.split('      - name: Allocate product Android version',1)[1].split('      - name: Expo',1)[0]
 allocation=textwrap.dedent(version_step.split('        run: |\n',1)[1]).replace('echo "DISPOSABL_ANDROID_VERSION_CODE=$version" >> "$GITHUB_ENV"', 'export DISPOSABL_ANDROID_VERSION_CODE=$version').replace('echo "version=$version" >> "$GITHUB_OUTPUT"', '')
 for number,attempt,expected in [('1','1',1101),('1','2',1102),('2','1',1201),('20999989','99',2099999999),('20999990','1',None),('1','100',None)]:

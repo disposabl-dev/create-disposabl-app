@@ -4,9 +4,9 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "lint": "eslint",
+    "lint": "node ../../.github/scripts/bun-lint.mjs kit",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "bun check"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",

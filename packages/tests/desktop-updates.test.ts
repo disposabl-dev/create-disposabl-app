@@ -105,10 +105,8 @@ test("stages isolated Squirrel feeds and refuses ad-hoc macOS feeds", async () =
       join(root, "apps/desktop/stage-update.mjs"),
     );
     await writeFile(join(root, "dist/release/app-1.0.2-full.nupkg"), "package");
-    await writeFile(
-      join(root, "dist/release/RELEASES"),
-      `${"a".repeat(40)} app-1.0.2-full.nupkg 7\n`,
-    );
+    const releases = `${"a".repeat(40)} app-1.0.2-full.nupkg 7\r\n`;
+    await writeFile(join(root, "dist/release/RELEASES"), `\uFEFF${releases}`);
     const env = {
       ...process.env,
       DISPOSABL_DESKTOP_UPDATE_URL: "https://example.com/app",
@@ -122,6 +120,13 @@ test("stages isolated Squirrel feeds and refuses ad-hoc macOS feeds", async () =
         stdio: "pipe",
       });
     assert.equal(run({}).status, 0);
+    assert.equal(
+      await readFile(
+        join(root, "dist/update/preview/win32/x64/RELEASES"),
+        "utf8",
+      ),
+      releases,
+    );
     assert.equal(
       await readFile(
         join(root, "dist/update/preview/win32/x64/app-1.0.2-full.nupkg"),

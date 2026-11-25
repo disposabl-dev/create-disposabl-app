@@ -7,8 +7,8 @@
     "generate:watch": "bun generate.ts --watch",
     "dev": "convex dev --run billing:setup",
     "logs": "convex logs",
-    "typecheck": "tsc -p convex",
-    "lint": "eslint . --report-unused-disable-directives --max-warnings 0",
+    "typecheck": "bun check -p convex",
+    "lint": "node ../../.github/scripts/bun-lint.mjs backend",
     "format": "prettier --write 'convex/**/*.ts'"
   },
   "dependencies": {

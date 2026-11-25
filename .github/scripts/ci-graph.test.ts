@@ -35,27 +35,33 @@ const keys = [
   "changed",
   "android",
   "ios",
+  "expo_connected",
+  "expo_setup",
   "desktop",
   "packages",
 ];
 const step = (job: any, name: string) =>
   job.steps.find((item: any) => item.name === name);
 const hasRootCheck = (job: any) =>
-  job.steps.some((item: any) => item.run === "bun run check");
+  step(job, "Check")?.run ===
+  "bun run generate\nbun run --parallel check:source test:ci\n";
 
 test("deployment exports public client origins for subsequent Expo steps", () => {
-  const command = step(pipeline.jobs.web, "Deploy").run.match(
-    /--cmd '([^']*)'/,
-  )[1];
+  expect(step(pipeline.jobs.web, "Deploy").run).toBe(
+    "bash .github/scripts/web.sh deploy",
+  );
+  const deploy = source(".github/scripts/web.sh");
+  const command = deploy.match(/--cmd '([^']*)'/)![1];
   for (const appId of [undefined, "fixture-app"]) {
     const dir = mkdtempSync(join(tmpdir(), "deployment-origins-"));
     try {
       for (const path of ["bin", "packages/backend", ".github/scripts"])
         mkdirSync(join(dir, path), { recursive: true });
       writeFileSync(join(dir, "disposabl.json"), JSON.stringify({ appId }));
+      writeFileSync(join(dir, ".github/scripts/web.sh"), deploy);
       writeFileSync(
         join(dir, "bin/bun"),
-        '#!/usr/bin/env bash\nif [[ "$1" == run ]]; then printf "%s\\n%s\\n" "$VITE_CONVEX_URL" "$VITE_CONVEX_SITE_URL" > "$BUILD_VARS"; fi\n',
+        '#!/usr/bin/env bash\nif [[ "$5" == build ]]; then printf "%s\\n%s\\n" "$VITE_CONVEX_URL" "$VITE_CONVEX_SITE_URL" > "$BUILD_VARS"; fi\n',
         { mode: 0o755 },
       );
       writeFileSync(
@@ -72,10 +78,11 @@ test("deployment exports public client origins for subsequent Expo steps", () =>
           CONVEX_URL: "https://fixture.convex.cloud",
           CONVEX_SITE_URL: "https://fixture.convex.site",
           PUBLIC_SITE_URL: "",
+          GITHUB_WORKSPACE: dir,
           GITHUB_ENV: envFile,
           GITHUB_OUTPUT: output,
           BUILD_VARS: join(dir, "build-vars"),
-          AUTH_TARGET: "--prod",
+          CHANNEL: "production",
         },
       });
       const expectedSite = appId
@@ -113,8 +120,8 @@ function allowed(job: any, context: any, needs: any, cancelled = false) {
   )
     return false;
   const js = expression.replace(
-    /needs\.product-checks/g,
-    'needs["product-checks"]',
+    /needs\.(product-checks|expo-project)/g,
+    'needs["$1"]',
   );
   return !!new Function(
     "github",
@@ -170,15 +177,31 @@ function assertGraph(p: any) {
   expect(allowed(j.changes, context("pull_request"), {})).toBe(true);
   expect(allowed(j.changes, context("pull_request", true), {})).toBe(false);
   expect(allowed(j.changes, context("push"), {})).toBe(true);
-  const check = step(j.changes, "Product checks");
-  expect(check.uses).toBe("./.github/actions/product-checks");
+  const check = j["product-checks"];
+  expect(check.uses).toBe("./.github/workflows/product-checks.yml");
   expect(check.with.source_sha).toContain("github.event.pull_request.head.sha");
-  expect(check.env.GH_TOKEN).toBe("");
+  expect(check.needs).toBeUndefined();
   expect(allowed(check, context("pull_request"), {})).toBe(true);
+  expect(allowed(check, context("pull_request", true), {})).toBe(false);
   expect(
     allowed(check, context("pull_request", false, "example/fork"), {}),
   ).toBe(false);
-  expect(j.web.needs).toEqual(["changes"]);
+  expect(j.web.needs).toEqual(["changes", "product-checks"]);
+  expect(step(j.web, "Check source formatting").run).toBe("bun fmt --check");
+  expect(step(j.web, "Check").if).toContain("github.repository !=");
+  expect(step(j.web, "Generate checked release inputs").run).toBe(
+    "bun run generate",
+  );
+  expect(step(j.web, "Fingerprint")).toBeUndefined();
+  expect(step(j.web, "Check product release guards")).toBeUndefined();
+  expect(
+    step({ steps: action.runs.steps }, "Check product release guards").if,
+  ).toBe(
+    "inputs.lane == 'unit' && inputs.cli_recovery_version == '' && inputs.recovery_version == ''",
+  );
+  expect(allowed(j.web, context("push"), needs("success", "failure"))).toBe(
+    false,
+  );
   expect(hasRootCheck(j.web)).toBe(true);
   expect(
     allowed(j.web, context("pull_request", true), needs("skipped", "skipped")),
@@ -222,6 +245,7 @@ test("selector outputs and executable source select PR work and conservative mai
           RUNNER_TEMP: dir,
           GITHUB_OUTPUT: out,
           EXPO_CONNECTED: "true",
+          EXPO_PROJECT_CONFIGURED: pr ? "true" : "false",
           IOS_BUILDS_ENABLED: "true",
           RELEASE_PREFIX: "app",
           CHANNEL: "preview",
@@ -247,6 +271,8 @@ test("selector outputs and executable source select PR work and conservative mai
       expect(main[key]).toBeDefined();
     }
     expect([pr.android, pr.ios, pr.changed]).toEqual(["true", "true", "true"]);
+    expect([pr.expo_connected, main.expo_connected]).toEqual(["true", "true"]);
+    expect([pr.expo_setup, main.expo_setup]).toEqual(["false", "true"]);
     expect([main.android, main.ios, main.changed]).toEqual([
       "true",
       "true",
@@ -258,14 +284,196 @@ test("selector outputs and executable source select PR work and conservative mai
   }
 });
 
+test("mobile updates preserve cached transforms without changing the release inputs", () => {
+  const jobs = ["android", "ios-preview-update", "ios-production"].map(
+    (name) => pipeline.jobs[name],
+  );
+  const android = jobs[0];
+  expect(step(android, "Restore Expo transform cache").with.key).toContain(
+    "'native' || 'ota'",
+  );
+  for (const job of jobs) {
+    const restore = step(job, "Restore Expo transform cache");
+    expect(restore.uses).toBe("actions/cache@v6");
+    expect(restore.with.path).toBe("${{ runner.temp }}/expo-metro-restore");
+    expect(restore.with.key).toContain("hashFiles('bun.lock'");
+    expect(
+      job.steps.findIndex((item: any) => item.id === "ota"),
+    ).toBeGreaterThan(job.steps.indexOf(restore));
+  }
+  const dir = mkdtempSync(join(tmpdir(), "ci-expo-metro-"));
+  try {
+    const envFile = join(dir, "environment");
+    const prepare = step(android, "Set Expo transform cache paths");
+    const stage = step(android, "Save current Expo transforms on a cache miss");
+    const restored = join(dir, "expo-metro-restore");
+    const output = join(dir, "expo-metro-output");
+    const env = {
+      ...process.env,
+      RUNNER_TEMP: dir,
+      GITHUB_ENV: envFile,
+      EXPO_METRO_CACHE_RESTORE_DIR: restored,
+      EXPO_METRO_CACHE_OUTPUT_DIR: output,
+    };
+    execFileSync("bash", ["-e", "-c", prepare.run], { env });
+    expect(readFileSync(envFile, "utf8")).toBe(
+      `EXPO_METRO_CACHE_RESTORE_DIR=${restored}\nEXPO_METRO_CACHE_OUTPUT_DIR=${output}\n`,
+    );
+    writeFileSync(join(output, "transform"), "fresh");
+    expect(stage.if).toContain("steps.ota.outcome == 'success'");
+    expect(stage.if).toContain("cache-hit != 'true'");
+    execFileSync("bash", ["-e", "-c", stage.run], { env });
+    expect(readFileSync(join(restored, "transform"), "utf8")).toBe("fresh");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("release artifacts stage in platform directories for single and multiple downloads", () => {
+  const publisher = pipeline.jobs.publish;
+  const select = step(publisher, "Select release artifact destination");
+  const download = publisher.steps.find(
+    (item: any) => item.uses === "actions/download-artifact@v8",
+  );
+  expect(download.with.pattern).toBe("release-{android,linux,windows,macos}");
+  expect(download.with.path).toBe(
+    "${{ steps.release-artifacts.outputs.path }}",
+  );
+  const dir = mkdtempSync(join(tmpdir(), "release-artifact-layout-"));
+  try {
+    mkdirSync(join(dir, "bin"));
+    writeFileSync(
+      join(dir, "bin/gh"),
+      '#!/bin/bash\njq -r "$5" "$ARTIFACT_LIST"\n',
+      {
+        mode: 0o755,
+      },
+    );
+    const output = join(dir, "output");
+    const listing = join(dir, "listing.json");
+    const env = {
+      ...process.env,
+      PATH: `${join(dir, "bin")}:${process.env.PATH}`,
+      GITHUB_OUTPUT: output,
+      ARTIFACT_LIST: listing,
+    };
+    const run = (names: string[]) => {
+      writeFileSync(
+        listing,
+        JSON.stringify({
+          artifacts: [
+            ...names.map((name) => ({ name, expired: false })),
+            { name: "release-macos", expired: true },
+            { name: "ios-simulator", expired: false },
+          ],
+        }),
+      );
+      writeFileSync(output, "");
+      execFileSync("bash", ["-e", "-o", "pipefail", "-c", select.run], { env });
+      return readFileSync(output, "utf8");
+    };
+    expect(run(["release-android", "release-android"])).toBe(
+      "path=artifacts/release-android\nnames=release-android\n",
+    );
+    expect(run(["release-windows", "release-linux"])).toBe(
+      "path=artifacts\nnames=release-linux release-windows\n",
+    );
+    expect(() => run([])).toThrow();
+
+    const publish = step(publisher, "Publish verified build artifacts");
+    const publishEnv = {
+      ...env,
+      EXPECTED_RELEASE_ARTIFACTS: "release-android",
+    };
+    mkdirSync(join(dir, "artifacts"));
+    writeFileSync(join(dir, "artifacts/android.json"), "{}");
+    const runPublisher = () =>
+      execFileSync("bash", ["-e", "-c", publish.run], {
+        cwd: dir,
+        env: publishEnv,
+      });
+    expect(runPublisher).toThrow();
+    mkdirSync(join(dir, "artifacts/release-android"));
+    writeFileSync(join(dir, "artifacts/release-android/android.json"), "{}");
+    mkdirSync(join(dir, ".github/scripts"), { recursive: true });
+    writeFileSync(
+      join(dir, ".github/scripts/release.sh"),
+      'printf "%s" "$1"\n',
+    );
+    expect(runPublisher().toString()).toBe("release-publish");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("enabled mobile jobs share first Expo setup and iOS reports both preview results", () => {
+  const simulator = pipeline.jobs["ios-preview"];
+  const update = pipeline.jobs["ios-preview-update"];
+  const project = pipeline.jobs["expo-project"];
+  const report = pipeline.jobs["ios-preview-report"];
+  expect(project.needs).toEqual(["changes", "web"]);
+  expect(simulator.needs).toEqual(["changes", "web", "expo-project"]);
+  expect(update.needs).toEqual(simulator.needs);
+  expect(update.env).toEqual(simulator.env);
+  expect(report.needs).toContain("ios-preview");
+  expect(report.needs).toContain("ios-preview-update");
+  const needs = {
+    changes: {
+      result: "success",
+      outputs: { expo_connected: "true", expo_setup: "false" },
+    },
+    web: { result: "success", outputs: { ios: "true" } },
+    "expo-project": { result: "skipped" },
+  };
+  expect(allowed(project, context("pull_request"), needs)).toBe(false);
+  expect(allowed(update, context("pull_request"), needs)).toBe(true);
+  expect(allowed(update, context("push"), needs)).toBe(false);
+  needs.changes.outputs.expo_setup = "true";
+  expect(allowed(project, context("pull_request"), needs)).toBe(true);
+  needs["expo-project"].result = "failure";
+  expect(allowed(update, context("pull_request"), needs)).toBe(false);
+  expect(allowed(simulator, context("pull_request"), needs)).toBe(false);
+  needs["expo-project"].result = "success";
+  expect(allowed(update, context("pull_request"), needs)).toBe(true);
+  expect(allowed(simulator, context("pull_request"), needs)).toBe(true);
+  const dir = mkdtempSync(join(tmpdir(), "ci-ios-report-"));
+  try {
+    writeFileSync(join(dir, "node"), '#!/bin/sh\nprintf "%s\\n" "$4"', {
+      mode: 0o755,
+    });
+    const command = step(report, "Report combined iOS preview result").run;
+    for (const [archive, ota, expo, expected] of [
+      ["success", "success", "true", "ready"],
+      ["success", "failure", "true", "failed"],
+      ["failure", "success", "true", "failed"],
+      ["success", "skipped", "false", "ready"],
+    ]) {
+      expect(
+        execFileSync("bash", ["-c", command], {
+          env: {
+            ...process.env,
+            PATH: `${dir}:${process.env.PATH}`,
+            ARCHIVE: archive,
+            UPDATE: ota,
+            EXPO_CONNECTED: expo,
+          },
+          encoding: "utf8",
+        }).trim(),
+      ).toBe(expected);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("generated reset retains root check and removes product-only gate", () => {
   const generated = structuredClone(pipeline);
-  const begin = reset.indexOf("if (\n  !pipeline.jobs.changes?.steps?");
+  const begin = reset.indexOf('if (\n  !pipeline.jobs["product-checks"]');
   const end = reset.indexOf("if (eas.submit?.production)", begin);
   expect(begin).toBeGreaterThan(-1);
   expect(end).toBeGreaterThan(begin);
   new Function("pipeline", reset.slice(begin, end))(generated);
-  expect(step(generated.jobs.changes, "Product checks")).toBeUndefined();
+  expect(generated.jobs["product-checks"]).toBeUndefined();
   expect(generated.jobs.web.needs).toBe("changes");
   expect(hasRootCheck(generated.jobs.web)).toBe(true);
   expect(
@@ -287,16 +495,42 @@ test("generated reset retains root check and removes product-only gate", () => {
 });
 
 test("product and recovery gates remain independent of root and native release jobs", () => {
-  expect(hasRootCheck({ steps: action.runs.steps })).toBe(false);
+  expect(step({ steps: action.runs.steps }, "Check source").if).toBe(
+    "inputs.lane == 'source'",
+  );
   const commands = action.runs.steps.map((x: any) => x.run || "").join("\n");
   expect(commands).toContain(
     "bun run --cwd packages/create-disposabl-app build",
   );
-  expect(commands).toContain("bun run test:unit");
+  expect(commands).toContain("bun run test:unit --parallel=4 --bail=1");
   expect(commands).toContain("bun test *.test.ts");
   expect(commands).toContain("product-browser-check.py");
   expect(product.jobs.check.env.GH_TOKEN).toBe("");
   const reusable = step(product.jobs.check, "Product checks");
+  expect(reusable.with.lane).toBe("${{ matrix.lane }}");
+  expect(reusable.with.browser_shard).toBe("${{ matrix.shard || '' }}");
+  const [recovery, regular] = product.jobs.check.strategy.matrix.include
+    .match(/\[[^\]]+\]/g)
+    .map((value: string) => JSON.parse(value));
+  expect(recovery).toEqual([{ lane: "unit" }, { lane: "browser" }]);
+  expect(regular.map((job: { lane: string }) => job.lane)).toEqual([
+    "source",
+    "unit",
+    "browser",
+    "browser",
+    "browser",
+    "browser",
+    "web-minimal",
+    "web-android",
+    "mobile-minimal",
+    "all-platforms",
+  ]);
+  expect(
+    regular
+      .filter((job: { lane: string }) => job.lane === "browser")
+      .map((job: { shard: string }) => job.shard),
+  ).toEqual(["1/4", "2/4", "3/4", "4/4"]);
+  expect(commands).toContain('verify:starter "$STARTER_PROFILE"');
   expect(reusable.uses).toBe("./.github/actions/product-checks");
   expect(reusable.with.source_sha).toBe("${{ inputs.source_sha }}");
   expect(reusable.with.cli_recovery_version).toBe(
@@ -311,9 +545,16 @@ test("product and recovery gates remain independent of root and native release j
   );
   expect(JSON.stringify(action)).not.toContain("secrets.");
   expect(
-    action.runs.steps.find((s: any) => s.uses === "actions/checkout@v6").with
-      .ref,
+    product.jobs.check.steps.find((s: any) => s.uses === "actions/checkout@v6")
+      .with.ref,
   ).toBe("${{ inputs.source_sha }}");
+  expect(
+    product.jobs.check.steps.find((s: any) => s.uses === "actions/checkout@v6")
+      .with["fetch-depth"],
+  ).toContain("inputs.recovery_version != ''");
+  expect(
+    action.runs.steps.filter((s: any) => s.uses === "actions/checkout@v6"),
+  ).toHaveLength(0);
   expect(publish.jobs.checks.uses).toBe(
     "./.github/workflows/product-checks.yml",
   );
@@ -346,7 +587,31 @@ test("product and recovery gates remain independent of root and native release j
   expect(allowed(generatorCheckout, cli, {})).toBe(false);
   const submit = pipeline.jobs["android-submit"];
   expect(submit.needs).toBe("android");
-  const androidNeeds = { android: { result: "success" } };
+  expect(pipeline.jobs.android.if).toContain(
+    "needs.changes.outputs.android == 'true'",
+  );
+  expect(pipeline.jobs.android.outputs.release).toContain(
+    "steps.artifacts.outcome",
+  );
+  expect(
+    step(pipeline.jobs.android, "Prepare Android disk space").if,
+  ).toContain("steps.fingerprint.outputs.build == 'true'");
+  expect(step(pipeline.jobs.android, "Java")).toBeDefined();
+  expect(step(pipeline.jobs.android, "Update").if).toContain(
+    "steps.fingerprint.outputs.build == 'false'",
+  );
+  expect(
+    allowed(
+      submit,
+      { ...context("push"), vars: { ANDROID_PLAY_SUBMIT: "true" } },
+      {
+        android: { result: "success", outputs: { built: "false" } },
+      },
+    ),
+  ).toBe(false);
+  const androidNeeds = {
+    android: { result: "success", outputs: { built: "true" } },
+  };
   expect(
     allowed(
       submit,
@@ -372,7 +637,7 @@ test("product and recovery gates remain independent of root and native release j
     allowed(
       submit,
       { ...context("push"), vars: { ANDROID_PLAY_SUBMIT: "true" } },
-      { android: { result: "failure" } },
+      { android: { result: "failure", outputs: { built: "false" } } },
     ),
   ).toBe(false);
   const reporter = pipeline.jobs["android-failure"];
@@ -380,9 +645,14 @@ test("product and recovery gates remain independent of root and native release j
     expect(allowed(reporter, context("push"), { android: { result } })).toBe(
       true,
     );
-  expect(
-    allowed(reporter, context("push"), { android: { result: "success" } }),
-  ).toBe(false);
+  const reportNeeds = {
+    android: { result: "skipped" },
+    changes: { outputs: { android: "true" } },
+    "expo-project": { result: "failure" },
+  };
+  expect(allowed(reporter, context("push"), reportNeeds)).toBe(true);
+  reportNeeds["expo-project"].result = "skipped";
+  expect(allowed(reporter, context("push"), reportNeeds)).toBe(false);
 });
 
 test("meaningful workflow mutations are rejected", () => {
@@ -391,7 +661,7 @@ test("meaningful workflow mutations are rejected", () => {
   expect(() => assertGraph(missing)).toThrow();
   const noCheck = structuredClone(pipeline);
   noCheck.jobs.web.steps = noCheck.jobs.web.steps.filter(
-    (x: any) => x.run !== "bun run check",
+    (x: any) => x.name !== "Check",
   );
   expect(() => assertGraph(noCheck)).toThrow();
   const fork = structuredClone(pipeline);

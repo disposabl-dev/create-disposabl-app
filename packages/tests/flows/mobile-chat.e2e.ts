@@ -189,7 +189,12 @@ test(
       const claims = new Set<string>();
       try {
         for (const id of [activeId, failedId]) {
-          await call("agent/state:claim", { id, token }, { admin: true });
+          const claimed = await call(
+            "agent/state:claim",
+            { id, token, activationProtocol: 1 },
+            { admin: true },
+          );
+          expect(claimed?.lease?.token).toBe(token);
           claims.add(id);
           await call(
             "agent/state:append",

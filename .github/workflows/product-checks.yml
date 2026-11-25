@@ -18,7 +18,17 @@ permissions:
   contents: read
 jobs:
   check:
-    name: Product unit and browser tests
+    name: Product / ${{ matrix.lane }}${{ matrix.shard && format(' {0}', matrix.shard) || '' }}
+    strategy:
+      fail-fast: true
+      matrix:
+        include: >-
+          ${{ fromJSON((inputs.cli_recovery_version != '' || inputs.recovery_version != '')
+          && '[{"lane":"unit"},{"lane":"browser"}]'
+          || '[{"lane":"source"},{"lane":"unit"},
+          {"lane":"browser","shard":"1/4"},{"lane":"browser","shard":"2/4"},
+          {"lane":"browser","shard":"3/4"},{"lane":"browser","shard":"4/4"},
+          {"lane":"web-minimal"},{"lane":"web-android"},{"lane":"mobile-minimal"},{"lane":"all-platforms"}]') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     outputs:
@@ -33,12 +43,21 @@ jobs:
       EXPO_PUBLIC_DISPOSABL_ANALYTICS_ENABLED: "false"
       VITE_DISPOSABL_ANALYTICS_ENABLED: "false"
     steps:
+      - name: Validate immutable source
+        env:
+          EXPECTED_SOURCE: ${{ inputs.source_sha }}
+        run: '[[ "$EXPECTED_SOURCE" =~ ^[0-9a-f]{40}$ ]]'
       - uses: actions/checkout@v6
-        with: { ref: "${{ inputs.source_sha }}", persist-credentials: false }
+        with:
+          ref: ${{ inputs.source_sha }}
+          fetch-depth: ${{ (inputs.cli_recovery_version != '' || inputs.recovery_version != '') && '0' || '1' }}
+          persist-credentials: false
       - name: Product checks
         id: checks
         uses: ./.github/actions/product-checks
         with:
           source_sha: ${{ inputs.source_sha }}
+          lane: ${{ matrix.lane }}
+          browser_shard: ${{ matrix.shard || '' }}
           cli_recovery_version: ${{ inputs.cli_recovery_version }}
           recovery_version: ${{ inputs.recovery_version }}
